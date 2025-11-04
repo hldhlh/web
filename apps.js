@@ -8,6 +8,7 @@ export async function getAppDirectories() {
         {id:'test',name:'测试',path:'test/index.html'},
         {id:'wordcanvas',name:'灵感词云',path:'wordcanvas/index.html'},
         {id:'cloud',name:'云盘',path:'cloud/index.html'},
+        {id:'cloud',name:'吃什么',path:'eatwhat/index.html'},
         {id:'log',name:'日志',path:'log/index.html'}
     ];
 }
