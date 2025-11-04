@@ -1,0 +1,1158 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>每周膳食计划</title>
+    <style>
+      :root {
+        --bg: #fff;
+        --fg: #000;
+        --muted: #777;
+        --line: #222;
+        --soft: #eee;
+        --accent: #000;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        padding: 0px 16px 16px 16px; /* 顶部额外 4px 内边距 */
+        background: var(--bg);
+        color: var(--fg);
+        font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Noto Sans CJK SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: var(--bg);
+        border-bottom: 1px solid var(--line);
+      }
+      .title {
+        font-weight: 700;
+        letter-spacing: 0.5px;
+      }
+      .subtitle { display: none; }
+      .controls {
+        display: flex;
+        align-items: flex-start; /* 顶部对齐，基于按钮上边缘 */
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 4px;  /* 与下边距相同 */
+        margin-bottom: 4px; /* 原 8px 的一半 */
+      }
+      label.inline {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid var(--line);
+        padding: 6px 10px;
+      }
+      /* 顶部控件尺寸统一与对齐 */
+      .controls button,
+      .controls label.inline { height: 32px; }
+      /* 简化人数控件：仅保留外层边框，去除内部边框与背景 */
+      .controls label.inline input[type="number"] {
+        width: 72px;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        height: 100%;
+        line-height: 1;
+        color: inherit;
+      }
+      input[type="number"], select, button {
+        background: var(--bg);
+        color: var(--fg);
+        border: 1px solid var(--line);
+        padding: 6px 8px;
+        outline: none;
+        appearance: none;
+      }
+      button {
+        cursor: pointer;
+        transition: all .15s ease;
+      }
+      button:hover {
+        background: var(--fg);
+        color: var(--bg);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 110px repeat(7, minmax(130px, 1fr));
+        border: 1px solid var(--line);
+        border-bottom: 0;
+      }
+      .cell {
+        border-bottom: 1px solid var(--line);
+        border-right: 1px solid var(--line);
+        padding: 8px;
+        min-height: 64px;
+      }
+      .cell:last-child { border-right: 0; }
+      .head { background: var(--soft); font-weight: 600; }
+      .row-label { font-weight: 600; background: var(--soft); }
+      .cell .slot {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .cell .slot .grow { flex: 1; }
+      .hint { color: var(--muted); font-size: 12px; }
+      .panel {
+        margin-top: 14px;
+        display: grid;
+        grid-template-columns: 1.2fr 1fr;
+        gap: 14px;
+      }
+      .card {
+        border: 1px solid var(--line);
+        padding: 12px;
+      }
+      .card h3 {
+        margin: 0 0 8px;
+        font-size: 16px;
+      }
+      .list { margin: 0; padding-left: 18px; }
+      .stat {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 6px 10px;
+        align-items: baseline;
+      }
+      .muted { color: var(--muted); }
+      .kvs { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; }
+      .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+      /* 美化：统计面板的下拉与按钮统一尺寸 */
+      .toolbar select,
+      .toolbar button { height: 32px; padding: 6px 12px; vertical-align: top; }
+      .toolbar select { min-width: 88px; }
+      .divider { height: 1px; background: var(--line); margin: 10px 0; }
+
+      /* Modal */
+      .modal-backdrop {
+        position: fixed; inset: 0; background: rgba(0,0,0,.6);
+        display: none; align-items: center; justify-content: center;
+        padding: 16px;
+      }
+      .modal {
+        background: var(--bg);
+        color: var(--fg);
+        max-width: 820px; width: 100%;
+        border: 1px solid var(--line);
+        padding: 14px;
+      }
+      .modal h2 { margin: 0 0 8px; font-size: 18px; }
+      .modal .close {
+        float: right;
+      }
+      .pill { border: 1px solid var(--line); padding: 2px 6px; font-size: 12px; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .mini { padding: 2px 6px; font-size: 12px; }
+      .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+      .chip { border: 1px solid var(--line); padding: 2px 6px; display: inline-flex; align-items: center; gap: 6px; }
+      .chip .label { cursor: pointer; }
+      .chip .rm { visibility: hidden; }
+      .chip:hover .rm, .chip:focus-within .rm { visibility: visible; }
+      .actions { display: flex; gap: 8px; margin-top: 6px; height: 28px; align-items: center; opacity: 0; pointer-events: none; }
+      .cell:hover .actions, .cell:focus-within .actions { opacity: 1; pointer-events: auto; }
+
+      /* Print */
+      @media print {
+        .controls, .toolbar, .hint, .modal-backdrop { display: none !important; }
+        body { padding: 0; }
+        .panel { grid-template-columns: 1fr 1fr; gap: 8px; }
+        button { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <div class="title" id="appTitle">每周膳食计划</div>
+        <div class="subtitle">黑白简约 · 选择菜品 → 查看做法/配方 → 统计原材料与营养</div>
+      </div>
+      <div class="controls">
+        <a href="manage.html"><button type="button">管理菜谱</button></a>
+        <label class="inline">人数
+          <input type="number" id="people" min="1" step="1" value="2" style="width: 72px" />
+        </label>
+        <button id="clearAll">清空本周</button>
+        <button id="print">打印/导出</button>
+      </div>
+    </header>
+
+    <section id="planner" class="grid" aria-label="每周计划表">
+      <!-- Grid will be injected by JS -->
+    </section>
+
+    <section class="panel">
+      <div class="card">
+        <div class="toolbar" style="justify-content: space-between; align-items: center;">
+          <div>
+            <h3 style="display:inline-block;margin-right:8px;">原材料统计</h3>
+            <span class="muted">按天或整周聚合</span>
+          </div>
+          <div>
+            <select id="scopeSelect">
+              <option value="week">整周</option>
+              <option value="1">周一</option>
+              <option value="2">周二</option>
+              <option value="3">周三</option>
+              <option value="4">周四</option>
+              <option value="5">周五</option>
+              <option value="6">周六</option>
+              <option value="7">周日</option>
+            </select>
+            <button id="copyList">复制清单</button>
+          </div>
+        </div>
+        <div id="ingredientsList"></div>
+      </div>
+      <div class="card">
+        <h3>营养估算</h3>
+        <div class="kvs" id="nutritionSummary"></div>
+        <div class="divider"></div>
+        <div class="kvs" id="healthSummary"></div>
+        <div class="hint">说明：营养值为估算，每份按 1 人食用。人数越多会按比例放大。仅供参考。</div>
+      </div>
+    </section>
+
+    <!-- 菜谱详情弹窗 -->
+    <div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true">
+      <div class="modal">
+        <button class="close" id="modalClose">关闭</button>
+        <h2 id="modalTitle">菜名</h2>
+        <div class="muted" id="modalMeta"></div>
+        <div class="divider"></div>
+        <h3 style="margin-top:0">配料（按当前人数）</h3>
+        <ul class="list" id="modalIngredients"></ul>
+        <div class="divider"></div>
+        <h3>做法</h3>
+        <ol class="list" id="modalSteps"></ol>
+        <div class="divider"></div>
+        <h3>营养（每人）</h3>
+        <div class="kvs" id="modalNutrition"></div>
+      </div>
+    </div>
+
+    <script>
+      // 数据 —— 简洁黑白，内置若干常见菜品（每份=1人）
+      const MEALS = [
+        { key: 'morning', label: '上午' },
+        { key: 'noon', label: '中午' },
+        { key: 'afternoon', label: '下午' },
+      ];
+      const DAYS = [ '周一','周二','周三','周四','周五','周六','周日' ];
+      // 标准人参考摄入（每日）
+      const RDI = { kcal: 2000, protein: 60, fat: 70, carbs: 300, fiber: 25, sodium_mg: 2000 };
+
+      // 菜谱库：每道菜的 ingredients 数量均为“每人”的量，nutrition 为“每人”估算
+      // 单位按常用中文单位，不做跨单位换算（同名+同单位可聚合）
+      const DEFAULT_RECIPES = {
+        // 上午
+        '皮蛋瘦肉粥': {
+          meal: 'morning',
+          ingredients: [
+            { name: '大米', amount: 60, unit: 'g' },
+            { name: '猪里脊', amount: 50, unit: 'g' },
+            { name: '皮蛋', amount: 0.5, unit: '个' },
+            { name: '姜', amount: 2, unit: '片' },
+            { name: '香葱', amount: 1, unit: '根' },
+            { name: '盐', amount: 2, unit: 'g' },
+          ],
+          steps: [
+            '大米洗净浸泡30分钟；猪里脊切末，皮蛋切丁。',
+            '锅中加足水，下米大火煮开后转小火。',
+            '粥浓稠时下瘦肉与皮蛋，搅匀再煮5-8分钟。',
+            '加盐调味，撒葱花出锅。',
+          ],
+          nutrition: { kcal: 280, protein: 14, fat: 5, carbs: 44, fiber: 1.5, sodium_mg: 900 },
+        },
+        '燕麦牛奶': {
+          meal: 'morning',
+          ingredients: [
+            { name: '燕麦片', amount: 50, unit: 'g' },
+            { name: '牛奶', amount: 250, unit: 'ml' },
+            { name: '蜂蜜', amount: 10, unit: 'g' },
+          ],
+          steps: [
+            '牛奶小火加热，加入燕麦片搅动3-5分钟。',
+            '关火后拌入蜂蜜即可。',
+          ],
+          nutrition: { kcal: 350, protein: 17, fat: 9, carbs: 50, fiber: 5, sodium_mg: 120 },
+        },
+        '鸡蛋玉米三明治': {
+          meal: 'morning',
+          ingredients: [
+            { name: '吐司', amount: 2, unit: '片' },
+            { name: '鸡蛋', amount: 1, unit: '个' },
+            { name: '玉米粒', amount: 30, unit: 'g' },
+            { name: '沙拉酱', amount: 10, unit: 'g' },
+          ],
+          steps: [
+            '鸡蛋煮熟切碎，拌玉米粒与少量沙拉酱。',
+            '夹入吐司中压实，斜切即可。',
+          ],
+          nutrition: { kcal: 320, protein: 14, fat: 10, carbs: 40, fiber: 3.5, sodium_mg: 420 },
+        },
+
+        // 中午
+        '番茄炒蛋': {
+          meal: 'noon',
+          ingredients: [
+            { name: '鸡蛋', amount: 2, unit: '个' },
+            { name: '番茄', amount: 200, unit: 'g' },
+            { name: '食用油', amount: 10, unit: 'ml' },
+            { name: '盐', amount: 2, unit: 'g' },
+            { name: '糖', amount: 2, unit: 'g' },
+          ],
+          steps: [
+            '鸡蛋打散滑炒盛出；番茄切块。',
+            '少油炒至番茄出汁，回锅鸡蛋，加盐糖翻匀。',
+          ],
+          nutrition: { kcal: 380, protein: 20, fat: 22, carbs: 20, fiber: 3, sodium_mg: 650 },
+        },
+        '青椒肉丝': {
+          meal: 'noon',
+          ingredients: [
+            { name: '猪里脊', amount: 120, unit: 'g' },
+            { name: '青椒', amount: 150, unit: 'g' },
+            { name: '食用油', amount: 10, unit: 'ml' },
+            { name: '生抽', amount: 8, unit: 'ml' },
+            { name: '盐', amount: 2, unit: 'g' },
+            { name: '玉米淀粉', amount: 5, unit: 'g' },
+            { name: '蒜', amount: 2, unit: '瓣' },
+          ],
+          steps: [
+            '肉丝加少许盐、生抽、淀粉抓匀腌10分钟。',
+            '热锅滑油，下肉丝翻炒变色，加入青椒与蒜，调味出锅。',
+          ],
+          nutrition: { kcal: 360, protein: 28, fat: 20, carbs: 12, fiber: 3.5, sodium_mg: 900 },
+        },
+        '宫保鸡丁': {
+          meal: 'noon',
+          ingredients: [
+            { name: '鸡胸肉', amount: 150, unit: 'g' },
+            { name: '花生米', amount: 30, unit: 'g' },
+            { name: '黄瓜', amount: 80, unit: 'g' },
+            { name: '胡萝卜', amount: 80, unit: 'g' },
+            { name: '干辣椒', amount: 5, unit: 'g' },
+            { name: '食用油', amount: 12, unit: 'ml' },
+            { name: '生抽', amount: 10, unit: 'ml' },
+            { name: '米醋', amount: 8, unit: 'ml' },
+            { name: '糖', amount: 8, unit: 'g' },
+            { name: '料酒', amount: 8, unit: 'ml' },
+            { name: '盐', amount: 2, unit: 'g' },
+            { name: '姜蒜', amount: 10, unit: 'g' },
+          ],
+          steps: [
+            '鸡胸切丁腌制；花生小火炒香。',
+            '爆香干辣椒与姜蒜，下鸡丁翻炒，入黄瓜胡萝卜。',
+            '调入生抽、醋、糖、料酒收汁，最后放花生拌匀。',
+          ],
+          nutrition: { kcal: 520, protein: 40, fat: 26, carbs: 25, fiber: 4, sodium_mg: 1100 },
+        },
+        '红烧茄子': {
+          meal: 'noon',
+          ingredients: [
+            { name: '茄子', amount: 300, unit: 'g' },
+            { name: '食用油', amount: 20, unit: 'ml' },
+            { name: '生抽', amount: 10, unit: 'ml' },
+            { name: '蒜', amount: 10, unit: 'g' },
+            { name: '糖', amount: 5, unit: 'g' },
+            { name: '盐', amount: 2, unit: 'g' },
+          ],
+          steps: [
+            '茄子切条入油煎软。',
+            '加蒜末爆香，入生抽糖盐与少量清水，收汁。',
+          ],
+          nutrition: { kcal: 360, protein: 5, fat: 25, carbs: 30, fiber: 6, sodium_mg: 800 },
+        },
+
+        // 下午 / 晚上
+        '清蒸鲈鱼': {
+          meal: 'afternoon',
+          ingredients: [
+            { name: '鲈鱼', amount: 300, unit: 'g' },
+            { name: '姜', amount: 10, unit: 'g' },
+            { name: '香葱', amount: 10, unit: 'g' },
+            { name: '蒸鱼豉油', amount: 10, unit: 'ml' },
+            { name: '食用油', amount: 10, unit: 'ml' },
+          ],
+          steps: [
+            '鲈鱼去腥处理，腹内放姜丝与葱段。',
+            '大火蒸8-10分钟，倒掉蒸汁，淋豉油与热油，撒葱丝。',
+          ],
+          nutrition: { kcal: 350, protein: 45, fat: 15, carbs: 0, fiber: 0, sodium_mg: 900 },
+        },
+        '西兰花炒虾仁': {
+          meal: 'afternoon',
+          ingredients: [
+            { name: '西兰花', amount: 250, unit: 'g' },
+            { name: '虾仁', amount: 150, unit: 'g' },
+            { name: '蒜', amount: 10, unit: 'g' },
+            { name: '食用油', amount: 10, unit: 'ml' },
+            { name: '盐', amount: 2, unit: 'g' },
+          ],
+          steps: [
+            '西兰花焯水过凉；虾仁去腥。',
+            '蒜末爆香，下虾仁变色后入西兰花，快速翻炒加盐出锅。',
+          ],
+          nutrition: { kcal: 280, protein: 32, fat: 10, carbs: 8, fiber: 4.5, sodium_mg: 700 },
+        },
+        '土豆炖牛肉': {
+          meal: 'afternoon',
+          ingredients: [
+            { name: '牛腩', amount: 180, unit: 'g' },
+            { name: '土豆', amount: 300, unit: 'g' },
+            { name: '胡萝卜', amount: 120, unit: 'g' },
+            { name: '洋葱', amount: 80, unit: 'g' },
+            { name: '番茄酱', amount: 20, unit: 'g' },
+            { name: '生抽', amount: 10, unit: 'ml' },
+            { name: '食用油', amount: 10, unit: 'ml' },
+            { name: '盐', amount: 3, unit: 'g' },
+          ],
+          steps: [
+            '牛腩焯水后与洋葱、番茄酱翻炒；加入清水小火炖40-60分钟。',
+            '下土豆胡萝卜继续炖至软烂，加生抽与盐调味收汁。',
+          ],
+          nutrition: { kcal: 550, protein: 35, fat: 20, carbs: 50, fiber: 6, sodium_mg: 1000 },
+        },
+        '素炒时蔬': {
+          meal: 'afternoon',
+          ingredients: [
+            { name: '上海青', amount: 300, unit: 'g' },
+            { name: '香菇', amount: 100, unit: 'g' },
+            { name: '胡萝卜', amount: 80, unit: 'g' },
+            { name: '蒜', amount: 2, unit: '瓣' },
+            { name: '食用油', amount: 10, unit: 'ml' },
+            { name: '盐', amount: 2, unit: 'g' },
+          ],
+          steps: [
+            '热油爆香蒜末，下香菇与胡萝卜翻炒，再入青菜断生，加盐出锅。',
+          ],
+          nutrition: { kcal: 200, protein: 6, fat: 10, carbs: 20, fiber: 6, sodium_mg: 600 },
+        },
+
+        // 可选主食
+        '米饭（单人份）': {
+          meal: 'noon',
+          also: ['afternoon'],
+          ingredients: [
+            { name: '大米', amount: 80, unit: 'g' },
+            { name: '清水', amount: 100, unit: 'ml' },
+          ],
+          steps: [
+            '淘米后加水，电饭煲煮熟焖10分钟。'
+          ],
+          nutrition: { kcal: 290, protein: 5, fat: 1, carbs: 64, fiber: 1, sodium_mg: 2 },
+        },
+        '杂粮饭（单人份）': {
+          meal: 'afternoon',
+          also: ['noon'],
+          ingredients: [
+            { name: '糙米', amount: 50, unit: 'g' },
+            { name: '燕麦米', amount: 30, unit: 'g' },
+            { name: '清水', amount: 120, unit: 'ml' },
+          ],
+          steps: [
+            '粗粮淘洗后浸泡30分钟，加水煮/蒸至熟。'
+          ],
+          nutrition: { kcal: 280, protein: 7, fat: 3, carbs: 56, fiber: 3.5, sodium_mg: 3 },
+        },
+      };
+
+      // 自定义菜谱覆盖（与 manage.html 共用一个数据源）
+      const RECIPE_STORAGE_KEY = 'meal-planner.recipes.v1';
+      function loadCustomRecipes() {
+        try {
+          const raw = localStorage.getItem(RECIPE_STORAGE_KEY);
+          if (!raw) return null;
+          const obj = JSON.parse(raw);
+          return obj && typeof obj === 'object' ? obj : null;
+        } catch { return null; }
+      }
+      let RECIPES = loadCustomRecipes() || DEFAULT_RECIPES;
+
+      // 状态与存储
+      const storageKey = 'meal-planner.v3';
+      const defaultPlan = () => ({
+        people: 2,
+        picks: { // day:1..7 -> mealKey -> recipeName or ''
+          1: { morning: '燕麦牛奶', noon: ['番茄炒蛋'], afternoon: ['清蒸鲈鱼'] },
+          2: { morning: '皮蛋瘦肉粥', noon: ['青椒肉丝'], afternoon: ['西兰花炒虾仁'] },
+          3: { morning: '鸡蛋玉米三明治', noon: ['宫保鸡丁'], afternoon: ['土豆炖牛肉'] },
+          4: { morning: '', noon: ['红烧茄子'], afternoon: ['杂粮饭（单人份）'] },
+          5: { morning: '燕麦牛奶', noon: ['米饭（单人份）'], afternoon: ['西兰花炒虾仁'] },
+          6: { morning: '皮蛋瘦肉粥', noon: [], afternoon: ['素炒时蔬'] },
+          7: { morning: '', noon: [], afternoon: [] },
+        }
+      });
+      let state = loadState();
+      function loadState() {
+        try {
+          // 兼容旧版本 v1
+          const savedV3 = JSON.parse(localStorage.getItem(storageKey));
+          if (savedV3 && savedV3.picks && savedV3.people) return normalizeState(savedV3);
+          const savedV2 = JSON.parse(localStorage.getItem('meal-planner.v2'));
+          if (savedV2 && savedV2.picks && savedV2.people) return normalizeState(savedV2);
+          const savedV1 = JSON.parse(localStorage.getItem('meal-planner.v1'));
+          const base = savedV1 && savedV1.picks && savedV1.people ? savedV1 : defaultPlan();
+          return normalizeState(base);
+        } catch {
+          return defaultPlan();
+        }
+      }
+      function saveState() {
+        localStorage.setItem(storageKey, JSON.stringify(state));
+      }
+      function isMultiMeal(key){ return true; }
+      function ensureArray(v){ return Array.isArray(v) ? v.slice() : (v ? [v] : []); }
+      function normalizeState(s) {
+        const out = { people: s.people || 2, picks: {} };
+        for (let d=1; d<=7; d++) {
+          const day = s.picks?.[d] || {};
+          out.picks[d] = {
+            morning: ensureArray(day.morning),
+            noon: ensureArray(day.noon),
+            afternoon: ensureArray(day.afternoon),
+          };
+        }
+        return out;
+      }
+
+      // UI 构建
+      function buildGrid() {
+        const root = document.getElementById('planner');
+        root.innerHTML = '';
+
+        // Header row
+        const headerRow = document.createDocumentFragment();
+        // corner
+        headerRow.appendChild(cell('head', '用餐/日期'));
+        for (let d = 0; d < 7; d++) headerRow.appendChild(cell('head', DAYS[d], { dayHeader: d+1 }));
+        root.appendChild(row(headerRow));
+
+        // Meal rows
+        for (const meal of MEALS) {
+          const frag = document.createDocumentFragment();
+          frag.appendChild(cell('row-label', meal.label));
+          for (let day = 1; day <= 7; day++) {
+            const c = document.createElement('div');
+            c.className = 'cell';
+            const slot = document.createElement('div');
+            slot.className = 'slot';
+
+            if (!isMultiMeal(meal.key)) {
+              // 单菜（上午）
+              const sel = document.createElement('select');
+              sel.className = 'grow recipe-select';
+              sel.dataset.day = String(day);
+              sel.dataset.meal = meal.key;
+              createOptions(sel, meal.key);
+              sel.value = state.picks[day][meal.key] || '';
+              sel.addEventListener('change', (e) => {
+                const d = Number(e.target.dataset.day);
+                const m = e.target.dataset.meal;
+                state.picks[d][m] = e.target.value;
+                saveState();
+                refreshStats();
+              });
+              const viewBtn = document.createElement('button');
+              viewBtn.textContent = '详情';
+              viewBtn.addEventListener('click', () => { const val = sel.value; if (val) openModal(val); });
+              const clr = document.createElement('button');
+              clr.textContent = '清空';
+              clr.addEventListener('click', () => {
+                sel.value = '';
+                const d = Number(sel.dataset.day);
+                const m = sel.dataset.meal;
+                state.picks[d][m] = '';
+                saveState();
+                refreshStats();
+              });
+              slot.appendChild(sel);
+              slot.appendChild(viewBtn);
+              slot.appendChild(clr);
+              c.appendChild(slot);
+            } else {
+              // 多菜（中午/下午）
+              const sel = document.createElement('select');
+              sel.className = 'grow recipe-select';
+              sel.dataset.day = String(day);
+              sel.dataset.meal = meal.key;
+              createOptions(sel, meal.key);
+              const addBtn = document.createElement('button');
+              addBtn.textContent = '添加';
+              addBtn.addEventListener('click', () => {
+                const val = sel.value;
+                if (!val) return;
+                const d = Number(sel.dataset.day);
+                const m = sel.dataset.meal;
+                const arr = ensureArray(state.picks[d][m]);
+                if (!arr.includes(val)) arr.push(val);
+                state.picks[d][m] = arr;
+                saveState();
+                renderMultiList(listDiv, d, m);
+                slot.style.display = 'none';
+                updateUI();
+                refreshStats();
+              });
+              const closeBtn = document.createElement('button');
+              closeBtn.textContent = '取消';
+              closeBtn.addEventListener('click', () => {
+                slot.style.display = 'none';
+              });
+              slot.appendChild(sel);
+              slot.appendChild(addBtn);
+              slot.appendChild(closeBtn);
+              c.appendChild(slot);
+              // 默认隐藏选择区，按需展开
+              slot.style.display = 'none';
+
+              const listDiv = document.createElement('div');
+              listDiv.className = 'chips';
+              c.appendChild(listDiv);
+              renderMultiList(listDiv, day, meal.key);
+
+              // 动作区：共用生成函数，按需显示
+              let updateUI = () => {};
+              { const { update } = createActions(c, day, meal.key, listDiv, slot); updateUI = update; }
+              updateUI();
+            }
+            frag.appendChild(c);
+          }
+          root.appendChild(row(frag));
+        }
+      }
+      function createOptions(selectEl, mealKey) {
+        selectEl.innerHTML = '';
+        selectEl.appendChild(new Option('— 选择菜品 —', ''));
+        for (const [name, rec] of Object.entries(RECIPES)) {
+          if (rec.meal === mealKey || (rec.also && rec.also.includes(mealKey))) {
+            selectEl.appendChild(new Option(name, name));
+          }
+        }
+      }
+
+      // 统一生成每个单元格的 actions（添加/清空），以减少重复代码
+      function createActions(cell, day, mealKey, listDiv, adderSlot) {
+        const actions = document.createElement('div');
+        actions.className = 'actions';
+        const addToggle = document.createElement('button'); addToggle.className = 'mini'; addToggle.textContent = '添加';
+        const clearBtn = document.createElement('button'); clearBtn.className = 'mini'; clearBtn.textContent = '清空';
+        const statsBtn = document.createElement('button'); statsBtn.className = 'mini'; statsBtn.textContent = '统计';
+        actions.appendChild(addToggle); actions.appendChild(clearBtn); actions.appendChild(statsBtn);
+        cell.appendChild(actions);
+
+        const update = () => {
+          const arr = ensureArray(state.picks[day][mealKey]);
+          cell.classList.toggle('empty', arr.length === 0);
+          // 若无数据，清空按钮可隐藏；如需始终显示可去掉下一行
+          clearBtn.style.display = arr.length ? 'inline-flex' : 'none';
+        };
+
+        addToggle.addEventListener('click', () => {
+          if (!adderSlot) return;
+          adderSlot.style.display = (adderSlot.style.display === 'none') ? 'flex' : 'none';
+        });
+        clearBtn.addEventListener('click', () => {
+          state.picks[day][mealKey] = [];
+          saveState();
+          renderMultiList(listDiv, day, mealKey);
+          update();
+          refreshStats();
+        });
+        statsBtn.addEventListener('click', () => {
+          showStatsForCell(day, mealKey);
+          const panel = document.getElementById('ingredientsList');
+          if (panel && panel.scrollIntoView) {
+            try { panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch {}
+          }
+        });
+
+        return { actions, update };
+      }
+
+      function renderMultiList(container, day, mealKey) {
+        const arr = ensureArray(state.picks[day][mealKey]);
+        const cell = container.closest('.cell');
+        const clearBtn = cell ? cell.querySelector('.actions .mini:nth-child(2)') : null;
+        container.innerHTML = '';
+        if (!arr.length) {
+          const hint = document.createElement('div');
+          hint.className = 'hint';
+          hint.textContent = '未选择菜品';
+          container.appendChild(hint);
+          if (cell) cell.classList.add('empty');
+          if (clearBtn) clearBtn.style.display = 'none';
+          return;
+        }
+        if (cell) cell.classList.remove('empty');
+        if (clearBtn) clearBtn.style.display = 'inline-flex';
+        for (const name of arr) {
+          const chip = document.createElement('div');
+          chip.className = 'chip';
+          const t = document.createElement('span'); t.className = 'label'; t.textContent = name; chip.appendChild(t);
+          t.addEventListener('click', () => openModal(name));
+          const rm = document.createElement('button'); rm.className = 'mini rm'; rm.textContent = '×'; rm.title = '移除';
+          rm.addEventListener('click', () => {
+            const list = ensureArray(state.picks[day][mealKey]).filter(x => x !== name);
+            state.picks[day][mealKey] = list;
+            saveState();
+            renderMultiList(container, day, mealKey);
+            refreshStats();
+          });
+          chip.appendChild(rm);
+          container.appendChild(chip);
+        }
+      }
+
+      function row(childrenFrag) {
+        const r = document.createElement('div');
+        r.style.display = 'contents';
+        r.appendChild(childrenFrag);
+        return r;
+      }
+      function cell(cls, text, data = {}) {
+        const c = document.createElement('div');
+        c.className = 'cell ' + cls;
+        c.textContent = text;
+        if (data.dayHeader) {
+          c.style.cursor = 'pointer';
+          c.title = '点击查看当天统计';
+          c.addEventListener('click', () => {
+            document.getElementById('scopeSelect').value = String(data.dayHeader);
+            refreshStats();
+          });
+        }
+        return c;
+      }
+      // 聚合逻辑
+      function scaleIngredients(ingredients, people) {
+        return ingredients.map(i => ({...i, amount: i.amount * people }));
+      }
+      // 单位归一化：合并可换算单位（kg->g, L->ml, 斤->g）
+      function normalizeUnit(item){
+        const u = (item.unit||'').trim();
+        let unit = u, amount = Number(item.amount)||0;
+        if (u === 'kg') { unit = 'g'; amount = amount * 1000; }
+        else if (u === '斤') { unit = 'g'; amount = amount * 500; }
+        else if (u === 'L' || u === 'l') { unit = 'ml'; amount = amount * 1000; }
+        return { name: item.name, unit, amount };
+      }
+      // 更智能的聚合：同名食材按“单位桶”求和，并在渲染时合并为一行
+      function aggregateSmart(list) {
+        const byName = new Map();
+        for (const raw of list) {
+          const it = normalizeUnit(raw);
+          if (!it.name) continue;
+          const unitMap = byName.get(it.name) || new Map();
+          unitMap.set(it.unit, (unitMap.get(it.unit)||0) + (Number(it.amount)||0));
+          byName.set(it.name, unitMap);
+        }
+        const out = [];
+        for (const [name, unitMap] of byName.entries()) {
+          const units = Array.from(unitMap.entries()).map(([unit, amount]) => ({ unit, amount }));
+          // 单位内部不改变，仅在显示时做 kg/L 的美化
+          out.push({ name, units });
+        }
+        return out.sort((a,b)=>a.name.localeCompare(b.name,'zh-CN'));
+      }
+      function getSelectedRecipesForDay(day) {
+        const picks = state.picks[day];
+        const out = [];
+        for (const m of MEALS) {
+          const arr = ensureArray(picks[m.key]);
+          for (const name of arr) if (name && RECIPES[name]) out.push({ name, def: RECIPES[name] });
+        }
+        return out;
+      }
+
+      // 仅获取某个单元格（某天某时段）的菜品
+      function getSelectedRecipesForCell(day, mealKey) {
+        const arr = ensureArray(state.picks[day]?.[mealKey]);
+        return arr.filter(Boolean).filter(name => !!RECIPES[name]).map(name => ({ name, def: RECIPES[name] }));
+      }
+      function collectIngredientsForDay(day) {
+        const recs = getSelectedRecipesForDay(day);
+        const people = Number(state.people) || 1;
+        const all = [];
+        for (const r of recs) all.push(...scaleIngredients(r.def.ingredients, people));
+        return aggregateSmart(all);
+      }
+      function collectIngredientsForCell(day, mealKey) {
+        const recs = getSelectedRecipesForCell(day, mealKey);
+        const people = Number(state.people) || 1;
+        const all = [];
+        for (const r of recs) all.push(...scaleIngredients(r.def.ingredients, people));
+        return aggregateSmart(all);
+      }
+      function collectIngredientsForWeek() {
+        const people = Number(state.people) || 1;
+        const all = [];
+        for (let d=1; d<=7; d++) {
+          const recs = getSelectedRecipesForDay(d);
+          for (const r of recs) all.push(...scaleIngredients(r.def.ingredients, people));
+        }
+        return aggregateSmart(all);
+      }
+
+      function sumNutrition(nuts) {
+        return nuts.reduce((acc, n) => ({
+          kcal: acc.kcal + (n.kcal||0),
+          protein: acc.protein + (n.protein||0),
+          fat: acc.fat + (n.fat||0),
+          carbs: acc.carbs + (n.carbs||0),
+          fiber: acc.fiber + (n.fiber||0),
+          sodium_mg: acc.sodium_mg + (n.sodium_mg||0),
+        }), { kcal:0, protein:0, fat:0, carbs:0, fiber:0, sodium_mg:0 });
+      }
+      function collectNutrition(scope) {
+        const people = Number(state.people) || 1;
+        const perPersonList = [];
+        const pushRecs = (day) => {
+          const recs = getSelectedRecipesForDay(day);
+          for (const r of recs) perPersonList.push(r.def.nutrition);
+        };
+        if (scope === 'week') {
+          for (let d=1; d<=7; d++) pushRecs(d);
+        } else {
+          pushRecs(Number(scope));
+        }
+        const perPerson = sumNutrition(perPersonList);
+        const total = { ...perPerson };
+        // 总量按人数放大
+        for (const k of Object.keys(total)) total[k] = (total[k]||0) * people;
+        return { perPerson, total };
+      }
+
+      // 渲染统计
+      function fmtAmount(amount, unit) {
+        const n = Number(amount);
+        if (unit === 'g' && n >= 1000) return (n/1000).toFixed(1).replace(/\.0$/, '') + ' kg';
+        if (unit === 'ml' && n >= 1000) return (n/1000).toFixed(1).replace(/\.0$/, '') + ' L';
+        // integers where sensible
+        const str = (Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, ''));
+        return str + ' ' + unit;
+      }
+
+      function renderIngredients(scope) {
+        const list = scope === 'week' ? collectIngredientsForWeek() : collectIngredientsForDay(Number(scope));
+        const wrap = document.getElementById('ingredientsList');
+        if (!list.length) {
+          wrap.innerHTML = '<div class="muted">暂无数据。请先在表格中选择菜品。</div>';
+          return;
+        }
+        const ul = document.createElement('ul');
+        ul.className = 'list';
+        for (const row of list) {
+          const li = document.createElement('li');
+          const units = row.units.map(u => fmtAmount(u.amount, u.unit)).join(' + ');
+          li.textContent = `${row.name} · ${units}`;
+          ul.appendChild(li);
+        }
+        wrap.innerHTML = '';
+        wrap.appendChild(ul);
+      }
+      function renderNutrition(scope) {
+        const people = Number(state.people) || 1;
+        const { perPerson, total } = collectNutrition(scope);
+        const el = document.getElementById('nutritionSummary');
+        const fmt = (n, unit='') => (Math.round(n*10)/10).toString().replace(/\.0$/, '') + (unit ? ' ' + unit : '');
+        el.innerHTML = '';
+        const add = (k, v) => {
+          const a = document.createElement('div'); a.textContent = k; el.appendChild(a);
+          const b = document.createElement('div'); b.textContent = v; el.appendChild(b);
+        };
+        add('每人·能量', fmt(perPerson.kcal, 'kcal'));
+        add('每人·蛋白质', fmt(perPerson.protein, 'g'));
+        add('每人·脂肪', fmt(perPerson.fat, 'g'));
+        add('每人·碳水', fmt(perPerson.carbs, 'g'));
+        add('每人·膳食纤维', fmt(perPerson.fiber, 'g'));
+        add('每人·钠', fmt(perPerson.sodium_mg, 'mg'));
+        // 基于标准人建议值的评估（每人）
+        const pct = (val, base) => base ? Math.round((val/base)*100) : 0;
+        const verdict = (p, key) => {
+          if (key === 'sodium_mg') return p <= 100 ? '良好' : (p <= 120 ? '稍高' : '偏高');
+          if (p < 80) return '偏低';
+          if (p > 120) return '偏高';
+          return '良好';
+        };
+        const closeness = (p, key) => {
+          if (key === 'sodium_mg') return p <= 100 ? 1 : Math.max(0, 1 - (p - 100)/100);
+          return Math.max(0, 1 - Math.abs(p - 100)/100);
+        };
+        const pcts = {
+          kcal: pct(perPerson.kcal, RDI.kcal),
+          protein: pct(perPerson.protein, RDI.protein),
+          fat: pct(perPerson.fat, RDI.fat),
+          carbs: pct(perPerson.carbs, RDI.carbs),
+          fiber: pct(perPerson.fiber, RDI.fiber),
+          sodium_mg: pct(perPerson.sodium_mg, RDI.sodium_mg),
+        };
+        const score = Math.round(100 * (
+          (closeness(pcts.kcal, 'kcal') +
+           closeness(pcts.protein, 'protein') +
+           closeness(pcts.fat, 'fat') +
+           closeness(pcts.carbs, 'carbs') +
+           closeness(pcts.fiber, 'fiber') +
+           closeness(pcts.sodium_mg, 'sodium_mg')) / 6
+        ));
+        el.appendChild(document.createElement('div')); el.appendChild(document.createElement('div'));
+        add('健康值（每人）', `${score}/100`);
+        add('达标·能量', `${pcts.kcal}%（${verdict(pcts.kcal, 'kcal')}）`);
+        add('达标·蛋白质', `${pcts.protein}%（${verdict(pcts.protein, 'protein')}）`);
+        add('达标·脂肪', `${pcts.fat}%（${verdict(pcts.fat, 'fat')}）`);
+        add('达标·碳水', `${pcts.carbs}%（${verdict(pcts.carbs, 'carbs')}）`);
+        add('达标·膳食纤维', `${pcts.fiber}%（${verdict(pcts.fiber, 'fiber')}）`);
+        add('达标·钠', `${pcts.sodium_mg}%（${verdict(pcts.sodium_mg, 'sodium_mg')}）`);
+        el.appendChild(document.createElement('div'));
+        el.appendChild(document.createElement('div'));
+        add(`总量（${people}人）·能量`, fmt(total.kcal, 'kcal'));
+        add(`总量（${people}人）·蛋白质`, fmt(total.protein, 'g'));
+        add(`总量（${people}人）·脂肪`, fmt(total.fat, 'g'));
+        add(`总量（${people}人）·碳水`, fmt(total.carbs, 'g'));
+        add(`总量（${people}人）·膳食纤维`, fmt(total.fiber, 'g'));
+        add(`总量（${people}人）·钠`, fmt(total.sodium_mg, 'mg'));
+      }
+
+      function refreshStats() {
+        const scope = document.getElementById('scopeSelect').value;
+        renderIngredients(scope);
+        renderNutrition(scope);
+        const ns = document.getElementById('nutritionSummary');
+        const hint = ns && ns.parentElement ? ns.parentElement.querySelector('.hint') : null;
+        if (hint) hint.textContent = '健康值预测根据当前数据';
+        moveHealthBelowDivider();
+        updateTitle();
+      }
+
+      // 将“健康值预测/达标率”移动到分割线下方
+      function moveHealthBelowDivider() {
+        const el = document.getElementById('nutritionSummary');
+        const healthEl = document.getElementById('healthSummary');
+        if (!el || !healthEl) return;
+        healthEl.innerHTML = '';
+        const cells = Array.from(el.children);
+        for (let i = 0; i < cells.length; i += 2) {
+          const a = cells[i]; const b = cells[i+1];
+          if (!a) break;
+          const text = (a.textContent || '').trim();
+          if (/健康|达标/.test(text)) {
+            if (a.parentElement) healthEl.appendChild(a);
+            if (b && b.parentElement) healthEl.appendChild(b);
+          }
+        }
+      }
+      // 仅渲染当前单元格（某天某时段）的统计
+      function showStatsForCell(day, mealKey) {
+        // 原材料
+        const list = collectIngredientsForCell(day, mealKey);
+        const wrap = document.getElementById('ingredientsList');
+        if (wrap) {
+          if (!list.length) {
+            wrap.innerHTML = '<div class="muted">该格未选择菜品。</div>';
+          } else {
+            const ul = document.createElement('ul'); ul.className = 'list';
+            for (const row of list) {
+              const li = document.createElement('li');
+              const units = row.units.map(u => fmtAmount(u.amount, u.unit)).join(' + ');
+              li.textContent = `${row.name} · ${units}`;
+              ul.appendChild(li);
+            }
+            wrap.innerHTML = ''; wrap.appendChild(ul);
+          }
+        }
+
+        // 营养（复用与 renderNutrition 相同的输出结构）
+        const people = Number(state.people) || 1;
+        const recs = getSelectedRecipesForCell(day, mealKey);
+        const perPerson = sumNutrition(recs.map(r => r.def.nutrition));
+        const total = { ...perPerson };
+        for (const k of Object.keys(total)) total[k] = (total[k]||0) * people;
+
+        const el = document.getElementById('nutritionSummary');
+        if (el) {
+          const fmt = (n, unit='') => (Math.round(n*10)/10).toString().replace(/\.0$/, '') + (unit ? ' ' + unit : '');
+          el.innerHTML = '';
+          const add = (k, v) => { const a = document.createElement('div'); a.textContent = k; el.appendChild(a); const b = document.createElement('div'); b.textContent = v; el.appendChild(b); };
+          add('每人·能量', fmt(perPerson.kcal, 'kcal'));
+          add('每人·蛋白质', fmt(perPerson.protein, 'g'));
+          add('每人·脂肪', fmt(perPerson.fat, 'g'));
+          add('每人·碳水', fmt(perPerson.carbs, 'g'));
+          add('每人·膳食纤维', fmt(perPerson.fiber, 'g'));
+          add('每人·钠', fmt(perPerson.sodium_mg, 'mg'));
+
+          // 健康值与达标率
+          const pct = (val, base) => base ? Math.round((val/base)*100) : 0;
+          const verdict = (p, key) => {
+            if (key === 'sodium_mg') return p <= 100 ? '良好' : (p <= 120 ? '稍高' : '偏高');
+            if (p < 80) return '偏低';
+            if (p > 120) return '偏高';
+            return '良好';
+          };
+          const closeness = (p, key) => {
+            if (key === 'sodium_mg') return p <= 100 ? 1 : Math.max(0, 1 - (p - 100)/100);
+            return Math.max(0, 1 - Math.abs(p - 100)/100);
+          };
+          const pcts = {
+            kcal: pct(perPerson.kcal, RDI.kcal),
+            protein: pct(perPerson.protein, RDI.protein),
+            fat: pct(perPerson.fat, RDI.fat),
+            carbs: pct(perPerson.carbs, RDI.carbs),
+            fiber: pct(perPerson.fiber, RDI.fiber),
+            sodium_mg: pct(perPerson.sodium_mg, RDI.sodium_mg),
+          };
+          const score = Math.round(100 * (
+            (closeness(pcts.kcal, 'kcal') +
+             closeness(pcts.protein, 'protein') +
+             closeness(pcts.fat, 'fat') +
+             closeness(pcts.carbs, 'carbs') +
+             closeness(pcts.fiber, 'fiber') +
+             closeness(pcts.sodium_mg, 'sodium_mg')) / 6
+          ));
+          el.appendChild(document.createElement('div')); el.appendChild(document.createElement('div'));
+          add('健康值（每人）', `${score}/100`);
+          add('达标·能量', `${pcts.kcal}%（${verdict(pcts.kcal, 'kcal')}）`);
+          add('达标·蛋白质', `${pcts.protein}%（${verdict(pcts.protein, 'protein')}）`);
+          add('达标·脂肪', `${pcts.fat}%（${verdict(pcts.fat, 'fat')}）`);
+          add('达标·碳水', `${pcts.carbs}%（${verdict(pcts.carbs, 'carbs')}）`);
+          add('达标·膳食纤维', `${pcts.fiber}%（${verdict(pcts.fiber, 'fiber')}）`);
+          add('达标·钠', `${pcts.sodium_mg}%（${verdict(pcts.sodium_mg, 'sodium_mg')}）`);
+          el.appendChild(document.createElement('div')); el.appendChild(document.createElement('div'));
+          add(`总量（${people}人）·能量`, fmt(total.kcal, 'kcal'));
+          add(`总量（${people}人）·蛋白质`, fmt(total.protein, 'g'));
+          add(`总量（${people}人）·脂肪`, fmt(total.fat, 'g'));
+          add(`总量（${people}人）·碳水`, fmt(total.carbs, 'g'));
+          add(`总量（${people}人）·膳食纤维`, fmt(total.fiber, 'g'));
+          add(`总量（${people}人）·钠`, fmt(total.sodium_mg, 'mg'));
+        }
+
+        // 说明与位置
+        const ns = document.getElementById('nutritionSummary');
+        const hint = ns && ns.parentElement ? ns.parentElement.querySelector('.hint') : null;
+        if (hint) hint.textContent = '健康值预测根据当前数据';
+        moveHealthBelowDivider();
+      }
+
+      // 动态标题
+      function scopeLabel(scope) {
+        const val = scope ?? document.getElementById('scopeSelect')?.value ?? 'week';
+        return val === 'week' ? '整周' : DAYS[(Number(val) || 1) - 1] || '整周';
+      }
+      function updateTitle() {
+        const el = document.getElementById('appTitle');
+        if (!el) return;
+        const people = Number(state.people) || 1;
+        const sc = document.getElementById('scopeSelect')?.value || 'week';
+        el.textContent = `每周膳食计划 · ${scopeLabel(sc)} · ${people}人`;
+      }
+      // 菜谱弹窗
+      function openModal(recipeName) {
+        const rec = RECIPES[recipeName];
+        if (!rec) return;
+        const people = Number(state.people) || 1;
+        document.getElementById('modalTitle').textContent = recipeName;
+        const _meals = [rec.meal, ...((rec.also)||[])].filter(Boolean);
+        const _uniqMeals = Array.from(new Set(_meals));
+        document.getElementById('modalMeta').innerHTML = _uniqMeals.map(m => `<span class="pill">${labelOfMeal(m)}</span>`).join(' ');
+
+        const ing = scaleIngredients(rec.ingredients, people);
+        const ul = document.getElementById('modalIngredients');
+        ul.innerHTML = '';
+        for (const i of ing) {
+          const li = document.createElement('li');
+          li.textContent = `${i.name} · ${fmtAmount(i.amount, i.unit)}`;
+          ul.appendChild(li);
+        }
+        const steps = document.getElementById('modalSteps');
+        steps.innerHTML = '';
+        for (const s of rec.steps) {
+          const li = document.createElement('li'); li.textContent = s; steps.appendChild(li);
+        }
+        const nuts = document.getElementById('modalNutrition');
+        nuts.innerHTML = '';
+        const add = (k, v) => { const a = document.createElement('div'); a.textContent = k; nuts.appendChild(a); const b = document.createElement('div'); b.textContent = v; nuts.appendChild(b); };
+        const fmt = (n, unit='') => (Math.round(n*10)/10).toString().replace(/\.0$/, '') + (unit ? ' ' + unit : '');
+        add('能量', fmt(rec.nutrition.kcal, 'kcal'));
+        add('蛋白质', fmt(rec.nutrition.protein, 'g'));
+        add('脂肪', fmt(rec.nutrition.fat, 'g'));
+        add('碳水', fmt(rec.nutrition.carbs, 'g'));
+        add('膳食纤维', fmt(rec.nutrition.fiber, 'g'));
+        add('钠', fmt(rec.nutrition.sodium_mg, 'mg'));
+
+        document.getElementById('modalBackdrop').style.display = 'flex';
+      }
+      function closeModal() {
+        document.getElementById('modalBackdrop').style.display = 'none';
+      }
+      function labelOfMeal(key) {
+        return MEALS.find(m => m.key === key)?.label || key;
+      }
+
+      // 复制清单
+      function copyIngredients(scope) {
+        const people = Number(state.people) || 1;
+        const list = scope === 'week' ? collectIngredientsForWeek() : collectIngredientsForDay(Number(scope));
+        const lines = [ `购物清单（${scope==='week'?'整周':DAYS[Number(scope)-1]}，${people}人）` ];
+        for (const row of list) {
+          const units = row.units.map(u => fmtAmount(u.amount, u.unit)).join(' + ');
+          lines.push(`- ${row.name}：${units}`);
+        }
+        const txt = lines.join('\n');
+        navigator.clipboard?.writeText(txt).then(() => {
+          alert('已复制到剪贴板');
+        }).catch(() => {
+          // 回退
+          const ta = document.createElement('textarea');
+          ta.value = txt; document.body.appendChild(ta); ta.select();
+          document.execCommand('copy'); document.body.removeChild(ta);
+          alert('已复制到剪贴板');
+        });
+      }
+
+      // 事件绑定
+      function bindEvents() {
+        const people = document.getElementById('people');
+        people.value = state.people;
+        people.addEventListener('change', () => {
+          const n = Math.max(1, Math.round(Number(people.value)||1));
+          state.people = n; people.value = String(n);
+          saveState();
+          refreshStats();
+        });
+
+        document.getElementById('scopeSelect').addEventListener('change', refreshStats);
+        document.getElementById('copyList').addEventListener('click', () => copyIngredients(document.getElementById('scopeSelect').value));
+        document.getElementById('print').addEventListener('click', () => window.print());
+        document.getElementById('clearAll').addEventListener('click', () => {
+          if (!confirm('确定清空本周所有选择？')) return;
+          for (let d=1; d<=7; d++) for (const m of MEALS) state.picks[d][m.key] = [];
+          saveState();
+          buildGrid();
+          refreshStats();
+        });
+
+        // modal
+        document.getElementById('modalClose').addEventListener('click', closeModal);
+        document.getElementById('modalBackdrop').addEventListener('click', (e) => {
+          if (e.target.id === 'modalBackdrop') closeModal();
+        });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+      }
+
+      // 初始化
+      buildGrid();
+      bindEvents();
+      refreshStats();
+    </script>
+  </body>
+  </html>

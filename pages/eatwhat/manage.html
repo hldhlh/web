@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>菜谱管理</title>
+    <style>
+      :root {
+        --bg: #fff; --fg: #000; --line: #222; --muted: #777; --soft: #eee;
+      }
+      *{box-sizing:border-box}
+      body{margin:0;padding:12px 16px;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Microsoft YaHei",sans-serif}
+      header{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:12px;position:sticky;top:0;background:var(--bg);z-index:10}
+      h1{font-size:18px;margin:0}
+      .toolbar{display:flex;gap:8px;flex-wrap:wrap}
+      button,select,input,textarea{border:1px solid var(--line);background:var(--bg);color:var(--fg);padding:6px 8px}
+      button{cursor:pointer}
+      button:hover{background:var(--fg);color:var(--bg)}
+      .layout{display:grid;grid-template-columns: 1fr 2fr;gap:14px}
+      .card{border:1px solid var(--line);padding:12px}
+      .list{margin:0;padding:0;list-style:none}
+      .list li{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--soft);padding:6px 4px}
+      .muted{color:var(--muted)}
+      .row{display:grid;grid-template-columns: 120px 1fr;gap:10px;align-items:center;margin:6px 0}
+      .k3{display:grid;grid-template-columns: 1fr 1fr 1fr;gap:8px}
+      /* 让配料行垂直堆叠 */
+      #ingWrap{grid-template-columns: 1fr}
+      .inline{display:inline-flex;gap:8px;align-items:center}
+      .chips{display:flex;gap:6px;flex-wrap:wrap}
+      .chip{border:1px solid var(--line);padding:2px 6px}
+      textarea{min-height:120px;resize:vertical}
+      .danger{border-color:#900;color:#900}
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>菜谱管理</h1>
+      <div class="toolbar">
+        <a href="index.html"><button type="button">返回计划页</button></a>
+        <button id="btnNew">新建</button>
+        <button id="btnSave">保存</button>
+        <button id="btnDelete" class="danger">删除</button>
+        <button id="btnExport">导出JSON</button>
+        <button id="btnImport">导入JSON</button>
+        <button id="btnReset">恢复内置</button>
+      </div>
+    </header>
+
+    <section class="layout">
+      <div class="card">
+        <div class="row">
+          <input id="search" placeholder="搜索菜名…" />
+        </div>
+        <ul id="recipeList" class="list"></ul>
+        <div class="muted" id="emptyListHint" style="display:none">暂无自定义菜谱。可新建，或导入JSON。点击“恢复内置”回到默认菜谱。</div>
+      </div>
+      <div class="card">
+        <div class="row"><label>菜名</label><input id="name" placeholder="例如：番茄炒蛋" /></div>
+        <div class="row"><label>用餐</label>
+          <span class="inline">
+            <select id="meal">
+              <option value="morning">上午</option>
+              <option value="noon">中午</option>
+              <option value="afternoon">下午</option>
+            </select>
+            <span class="muted">也可用于：</span>
+            <label class="inline"><input type="checkbox" id="alsoNoon" />中午</label>
+            <label class="inline"><input type="checkbox" id="alsoAfternoon" />下午</label>
+          </span>
+        </div>
+        <div class="row"><label>配料</label>
+          <div>
+            <div class="k3" id="ingWrap"></div>
+            <div class="inline" style="margin-top:6px"><button id="addIng">添加配料</button><span class="muted">格式：名称 / 数量 / 单位</span></div>
+          </div>
+        </div>
+        <div class="row"><label>做法</label><textarea id="steps" placeholder="每行一步"></textarea></div>
+        <div class="row"><label>营养（每人）</label>
+          <div class="k3">
+            <input id="kcal" type="number" step="1" placeholder="kcal" />
+            <input id="protein" type="number" step="0.1" placeholder="蛋白质 g" />
+            <input id="fat" type="number" step="0.1" placeholder="脂肪 g" />
+            <input id="carbs" type="number" step="0.1" placeholder="碳水 g" />
+            <input id="fiber" type="number" step="0.1" placeholder="膳食纤维 g" />
+            <input id="sodium" type="number" step="1" placeholder="钠 mg" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <script>
+      const STORAGE_KEY = 'meal-planner.recipes.v1';
+
+      function loadRecipes() {
+        try { const raw = localStorage.getItem(STORAGE_KEY); if (!raw) return {}; const obj = JSON.parse(raw); return (obj && typeof obj==='object')? obj : {}; } catch { return {}; }
+      }
+      function saveRecipes(obj) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+      }
+      function clearCustom() {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+
+      let recipes = loadRecipes();
+      let currentKey = '';
+
+      const $ = sel => document.querySelector(sel);
+      const $$ = sel => Array.from(document.querySelectorAll(sel));
+
+      function renderList() {
+        const list = $('#recipeList');
+        const q = ($('#search').value||'').trim();
+        const keys = Object.keys(recipes).sort((a,b)=>a.localeCompare(b,'zh-CN'))
+          .filter(k => !q || k.includes(q));
+        list.innerHTML = '';
+        if (!keys.length) { $('#emptyListHint').style.display = 'block'; return; }
+        $('#emptyListHint').style.display = 'none';
+        for (const k of keys) {
+          const li = document.createElement('li');
+          const left = document.createElement('div'); left.textContent = k;
+          const right = document.createElement('div');
+          right.className='muted';
+          const r = recipes[k] || {};
+          const meals = [r.meal, ...((r.also)||[])].filter(Boolean);
+          const uniq = Array.from(new Set(meals));
+          right.textContent = uniq.length ? uniq.map(mealLabel).join(' / ') : '';
+          li.appendChild(left); li.appendChild(right);
+          li.addEventListener('click', () => loadForm(k));
+          list.appendChild(li);
+        }
+      }
+
+      function mealLabel(m){ return m==='morning'?'上午':(m==='noon'?'中午':(m==='afternoon'?'下午':m)); }
+
+      function clearForm() {
+        currentKey = '';
+        $('#name').value = '';
+        $('#meal').value = 'morning';
+        $('#alsoNoon').checked = false; $('#alsoAfternoon').checked = false;
+        $('#ingWrap').innerHTML = '';
+        $('#steps').value = '';
+        $('#kcal').value = ''; $('#protein').value=''; $('#fat').value=''; $('#carbs').value=''; $('#fiber').value=''; $('#sodium').value='';
+      }
+
+      function addIngRow(data){
+        const wrap = document.createElement('div');
+        wrap.className = 'inline';
+        const n = document.createElement('input'); n.placeholder='名称'; n.value = data?.name||'';
+        const a = document.createElement('input'); a.type='number'; a.step='0.1'; a.placeholder='数量'; a.style.width='120px'; a.value = data?.amount??'';
+        const u = document.createElement('input'); u.placeholder='单位'; u.style.width='100px'; u.value = data?.unit||'';
+        const rm = document.createElement('button'); rm.type='button'; rm.textContent='移除'; rm.addEventListener('click',()=>wrap.remove());
+        wrap.appendChild(n); wrap.appendChild(a); wrap.appendChild(u); wrap.appendChild(rm);
+        $('#ingWrap').appendChild(wrap);
+      }
+
+      function loadForm(key){
+        const r = recipes[key]; if (!r) return;
+        currentKey = key;
+        $('#name').value = key;
+        $('#meal').value = r.meal||'morning';
+        $('#alsoNoon').checked = !!(r.also||[]).includes('noon');
+        $('#alsoAfternoon').checked = !!(r.also||[]).includes('afternoon');
+        $('#ingWrap').innerHTML=''; (r.ingredients||[]).forEach(addIngRow);
+        $('#steps').value = (r.steps||[]).join('\n');
+        const n = r.nutrition||{}; $('#kcal').value=n.kcal||''; $('#protein').value=n.protein||''; $('#fat').value=n.fat||''; $('#carbs').value=n.carbs||''; $('#fiber').value=n.fiber||''; $('#sodium').value=n.sodium_mg||'';
+      }
+
+      function readForm(){
+        const name = ($('#name').value||'').trim();
+        if (!name) { alert('请填写菜名'); return null; }
+        const meal = $('#meal').value;
+        const also = []; if ($('#alsoNoon').checked) also.push('noon'); if ($('#alsoAfternoon').checked) also.push('afternoon');
+        const ingredients = $$('#ingWrap .inline').map(row => {
+          const [n,a,u] = row.querySelectorAll('input');
+          const amount = parseFloat(a.value);
+          return { name: (n.value||'').trim(), amount: isNaN(amount)?0:amount, unit: (u.value||'').trim() };
+        }).filter(x=>x.name && x.unit);
+        const steps = ($('#steps').value||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+        const nutrition = {
+          kcal: +($('#kcal').value||0), protein: +($('#protein').value||0), fat: +($('#fat').value||0), carbs: +($('#carbs').value||0), fiber: +($('#fiber').value||0), sodium_mg: +($('#sodium').value||0)
+        };
+        return { key: name, def: { meal, ...(also.length?{also}:{}), ingredients, steps, nutrition } };
+      }
+
+      // actions
+      $('#btnNew').addEventListener('click', clearForm);
+      $('#addIng').addEventListener('click', ()=>addIngRow());
+      $('#search').addEventListener('input', renderList);
+
+      $('#btnSave').addEventListener('click', ()=>{
+        const data = readForm(); if (!data) return;
+        const oldKey = currentKey && currentKey!==data.key ? currentKey : null;
+        if (oldKey && recipes[data.key]) {
+          if (!confirm('将覆盖已存在的同名菜谱，确定继续？')) return;
+        }
+        if (oldKey && oldKey!==data.key) delete recipes[oldKey];
+        recipes[data.key] = data.def;
+        saveRecipes(recipes);
+        currentKey = data.key;
+        renderList();
+        alert('已保存');
+      });
+
+      $('#btnDelete').addEventListener('click', ()=>{
+        if (!currentKey) { alert('未选择菜谱'); return; }
+        if (!confirm('确定删除该菜谱？')) return;
+        delete recipes[currentKey];
+        saveRecipes(recipes);
+        clearForm(); renderList();
+      });
+
+      $('#btnExport').addEventListener('click', ()=>{
+        const txt = JSON.stringify(recipes, null, 2);
+        (navigator.clipboard? navigator.clipboard.writeText(txt) : Promise.reject()).then(()=>{
+          alert('已复制JSON到剪贴板');
+        }).catch(()=>{
+          const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); alert('已复制JSON到剪贴板');
+        });
+      });
+
+      $('#btnImport').addEventListener('click', ()=>{
+        const txt = prompt('粘贴菜谱JSON：');
+        if (!txt) return;
+        try {
+          const obj = JSON.parse(txt);
+          if (!obj || typeof obj!=='object') throw new Error('格式不正确');
+          recipes = obj; saveRecipes(recipes); clearForm(); renderList(); alert('导入成功');
+        } catch (e) { alert('导入失败：'+ e.message); }
+      });
+
+      $('#btnReset').addEventListener('click', ()=>{
+        if (!confirm('这将移除自定义菜谱，恢复到内置。继续？')) return;
+        clearCustom(); recipes = {}; clearForm(); renderList(); alert('已恢复。返回计划页后将使用内置菜谱。');
+      });
+
+      // init
+      renderList();
+      if (!Object.keys(recipes).length) $('#emptyListHint').style.display='block';
+    </script>
+  </body>
+  </html>
