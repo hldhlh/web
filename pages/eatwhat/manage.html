@@ -59,13 +59,13 @@
         <div class="row"><label>用餐</label>
           <span class="inline">
             <select id="meal">
-              <option value="morning">上午</option>
-              <option value="noon">中午</option>
-              <option value="afternoon">下午</option>
+              <option value="morning">早餐</option>
+              <option value="noon">午餐</option>
+              <option value="afternoon">晚餐</option>
             </select>
             <span class="muted">也可用于：</span>
-            <label class="inline"><input type="checkbox" id="alsoNoon" />中午</label>
-            <label class="inline"><input type="checkbox" id="alsoAfternoon" />下午</label>
+            <label class="inline"><input type="checkbox" id="alsoNoon" />午餐</label>
+            <label class="inline"><input type="checkbox" id="alsoAfternoon" />晚餐</label>
           </span>
         </div>
         <div class="row"><label>配料</label>
@@ -130,7 +130,7 @@
         }
       }
 
-      function mealLabel(m){ return m==='morning'?'上午':(m==='noon'?'中午':(m==='afternoon'?'下午':m)); }
+      function mealLabel(m){ return m==='morning'?'早餐':(m==='noon'?'午餐':(m==='afternoon'?'晚餐':m)); }
 
       function clearForm() {
         currentKey = '';

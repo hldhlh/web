@@ -132,6 +132,10 @@
       /* 美化：统计面板的下拉与按钮统一尺寸 */
       .toolbar select,
       .toolbar button { height: 32px; padding: 6px 12px; vertical-align: top; }
+      /* 工具条内部的控件之间留出横向间距 */
+      .toolbar button + button,
+      .toolbar select + button,
+      .toolbar button + select { margin-left: 8px; }
       .toolbar select { min-width: 88px; }
       .divider { height: 1px; background: var(--line); margin: 10px 0; }
 
@@ -152,6 +156,16 @@
       .modal .close {
         float: right;
       }
+      /* 让打印/关闭按钮尺寸一致并对齐，打印按钮在关闭按钮左侧 */
+      .modal .close,
+      .modal .print {
+        height: 28px;
+        padding: 2px 8px;
+        line-height: 1.2;
+        float: right;
+      }
+      /* 打印在左、关闭在右；使用 print 的右外边距控制两者间距 */
+      .modal .print { margin-right: 12px; }
       .pill { border: 1px solid var(--line); padding: 2px 6px; font-size: 12px; }
       .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
       .mini { padding: 2px 6px; font-size: 12px; }
@@ -165,10 +179,27 @@
 
       /* Print */
       @media print {
+        @page { size: A4 landscape; margin: 10mm; }
+        html, body { height: auto; }
+        body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-size: 12pt; line-height: 1.6; }
+        /* hide interactive UI */
         .controls, .toolbar, .hint, .modal-backdrop { display: none !important; }
-        body { padding: 0; }
-        .panel { grid-template-columns: 1fr 1fr; gap: 8px; }
         button { display: none; }
+        /* header tidy */
+        header { position: static; border-bottom: 0; margin-bottom: 8mm; }
+        .title { font-size: 18pt; }
+        /* grid uses page width */
+        .grid { grid-template-columns: 80px repeat(7, 1fr); border-width: 1px; border-right: 1px solid #000; }
+        .cell { padding: 6px; min-height: 40px; }
+        /* ensure rightmost column prints its border */
+        .grid .cell:nth-child(8n) { border-right: 1px solid #000 !important; }
+        .grid .cell:last-child { border-right: 1px solid #000 !important; }
+        .head, .row-label { background: #fff; }
+        /* two columns area */
+        .panel { grid-template-columns: 1fr 1fr; gap: 8mm; }
+        .card { page-break-inside: avoid; }
+        /* lists more compact */
+        .list { margin: 0; padding-left: 18px; list-style-position: inside; }
       }
     </style>
   </head>
@@ -539,11 +570,14 @@
         headerRow.appendChild(cell('head', '用餐/日期'));
         for (let d = 0; d < 7; d++) headerRow.appendChild(cell('head', DAYS[d], { dayHeader: d+1 }));
         root.appendChild(row(headerRow));
+        // 修正左上角表头文字
+        const corner = root.querySelector('.cell.head');
+        if (corner) corner.textContent = '用餐/日期';
 
         // Meal rows
         for (const meal of MEALS) {
           const frag = document.createDocumentFragment();
-          frag.appendChild(cell('row-label', meal.label));
+          frag.appendChild(cell('row-label', labelOfMeal(meal.key)));
           for (let day = 1; day <= 7; day++) {
             const c = document.createElement('div');
             c.className = 'cell';
@@ -1095,7 +1129,92 @@
         document.getElementById('modalBackdrop').style.display = 'none';
       }
       function labelOfMeal(key) {
-        return MEALS.find(m => m.key === key)?.label || key;
+        // 强制将早/中/晚三餐显示为固定文字
+        const mealMap = { morning: '早餐', noon: '午餐', afternoon: '晚餐' };
+        return mealMap[key] || (MEALS.find(m => m.key === key)?.label) || key;
+      }
+
+      // 打印当前弹窗为 80mm 宽度
+      function printModal80mm() {
+        const modal = document.querySelector('.modal');
+        if (!modal) return;
+        const clone = modal.cloneNode(true);
+        // 移除按钮，避免打印按钮/关闭按钮出现在票据里
+        clone.querySelectorAll('button').forEach(function(b){ b.remove(); });
+
+        const w = window.open('', '_blank');
+        if (!w) return;
+        var rawTitle = document.getElementById('modalTitle') ? document.getElementById('modalTitle').textContent : '打印';
+        var safeTitle = String(rawTitle || '打印').replace(/</g,'&lt;');
+        var doc = w.document;
+        try { doc.title = safeTitle; } catch (e) {}
+        // 清空并注入样式
+        if (doc.head) { while (doc.head.firstChild) doc.head.removeChild(doc.head.firstChild); } else { doc.head = doc.createElement('head'); }
+        if (doc.body) { while (doc.body.firstChild) doc.body.removeChild(doc.body.firstChild); } else { doc.body = doc.createElement('body'); }
+
+        var style = doc.createElement('style');
+        style.type = 'text/css';
+        style.appendChild(doc.createTextNode(
+          '@page { size: 80mm auto; margin: 0; }' +
+          'html, body { width: 80mm; height: auto; margin: 0; padding: 0; }' +
+          "body { margin: 0; padding: 0.8mm 1.2mm; font: 16px/1.7 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Microsoft YaHei', sans-serif; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }" +
+          'ul, ol { margin: 0; padding-left: 3mm; list-style-position: inside; }' +
+          '.kvs { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; align-items: baseline; }' +
+          'h2 { margin: 0 0 6px; font-size: 20px; }' +
+          'h3 { margin: 6px 0 4px; font-size: 17px; }' +
+          '.divider { height: 1px; background: #000; margin: 6px 0; }' +
+          '.muted { color: #555; }'
+        ));
+        doc.head.appendChild(style);
+
+        var body = doc.body;
+        Array.prototype.slice.call(clone.childNodes).forEach(function(node){ body.appendChild(doc.importNode(node, true)); });
+
+        w.focus();
+        w.print();
+        w.close();
+      }
+
+      // 打印原料清单（80mm，随内容长度）
+      function printIngredients80mm(scope) {
+        const people = Number(state.people) || 1;
+        const list = scope === 'week' ? collectIngredientsForWeek() : collectIngredientsForDay(Number(scope));
+        const w = window.open('', '_blank');
+        if (!w) return;
+        const title = `原料清单 - ${scopeLabel(scope)}（${people}人）`;
+        var doc = w.document;
+        try { doc.title = title; } catch (e) {}
+        if (doc.head) { while (doc.head.firstChild) doc.head.removeChild(doc.head.firstChild); } else { doc.head = doc.createElement('head'); }
+        if (doc.body) { while (doc.body.firstChild) doc.body.removeChild(doc.body.firstChild); } else { doc.body = doc.createElement('body'); }
+        var style = doc.createElement('style');
+        style.type = 'text/css';
+        style.appendChild(doc.createTextNode(
+          '@page { size: 80mm auto; margin: 0; }' +
+          'html, body { width: 80mm; height: auto; margin: 0; padding: 0; }' +
+          "body { margin: 0; padding: 0.8mm 1.2mm; font: 16px/1.7 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Microsoft YaHei', sans-serif; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }" +
+          'ul { margin: 0; padding-left: 3mm; list-style-position: inside; }' +
+          'h2 { margin: 0 0 6px; font-size: 20px; }' +
+          '.divider { height: 1px; background: #000; margin: 6px 0; }'
+        ));
+        doc.head.appendChild(style);
+        var body = doc.body;
+        var h2 = doc.createElement('h2'); h2.textContent = title; body.appendChild(h2);
+        var divider = doc.createElement('div'); divider.className = 'divider'; body.appendChild(divider);
+        if (!list.length) {
+          var p = doc.createElement('div'); p.textContent = '暂无数据'; body.appendChild(p);
+        } else {
+          var ul = doc.createElement('ul');
+          for (const row of list) {
+            const li = doc.createElement('li');
+            const units = row.units.map(u => fmtAmount(u.amount, u.unit)).join(' + ');
+            li.textContent = row.name + ' · ' + units;
+            ul.appendChild(li);
+          }
+          body.appendChild(ul);
+        }
+        w.focus();
+        w.print();
+        w.close();
       }
 
       // 复制清单
@@ -1132,6 +1251,17 @@
 
         document.getElementById('scopeSelect').addEventListener('change', refreshStats);
         document.getElementById('copyList').addEventListener('click', () => copyIngredients(document.getElementById('scopeSelect').value));
+        // 在“复制清单”右侧插入“打印清单”按钮
+        (function(){
+          const copyBtn = document.getElementById('copyList');
+          if (copyBtn && !document.getElementById('printList')) {
+            const printBtn2 = document.createElement('button');
+            printBtn2.id = 'printList';
+            printBtn2.textContent = '打印';
+            copyBtn.parentNode.insertBefore(printBtn2, copyBtn.nextSibling);
+            printBtn2.addEventListener('click', () => printIngredients80mm(document.getElementById('scopeSelect').value));
+          }
+        })();
         document.getElementById('print').addEventListener('click', () => window.print());
         document.getElementById('clearAll').addEventListener('click', () => {
           if (!confirm('确定清空本周所有选择？')) return;
@@ -1143,6 +1273,18 @@
 
         // modal
         document.getElementById('modalClose').addEventListener('click', closeModal);
+        // 在关闭按钮旁动态插入打印按钮（80mm），并放在“关闭”的左侧
+        const closeBtn = document.getElementById('modalClose');
+        if (closeBtn && !document.getElementById('modalPrint')) {
+          const printBtn = document.createElement('button');
+          printBtn.id = 'modalPrint';
+          printBtn.className = 'print mini';
+          printBtn.textContent = '打印';
+          // float:right 时，源顺序靠后的元素会出现在更靠左的位置，
+          // 因此把“打印”插入到“关闭”的后面，实现打印在左、关闭在右。
+          closeBtn.parentNode.insertBefore(printBtn, closeBtn.nextSibling);
+          printBtn.addEventListener('click', printModal80mm);
+        }
         document.getElementById('modalBackdrop').addEventListener('click', (e) => {
           if (e.target.id === 'modalBackdrop') closeModal();
         });
@@ -1156,3 +1298,4 @@
     </script>
   </body>
   </html>
+
