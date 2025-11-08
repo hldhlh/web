@@ -139,7 +139,7 @@
       .toolbar select { min-width: 88px; }
       .divider { height: 1px; background: var(--line); margin: 10px 0; }
 
-      /* Modal */
+      /* 弹窗区域 */
       .modal-backdrop {
         position: fixed; inset: 0; background: rgba(0,0,0,.6);
         display: none; align-items: center; justify-content: center;
@@ -176,29 +176,36 @@
       .chip:hover .rm, .chip:focus-within .rm { visibility: visible; }
       .actions { display: flex; gap: 8px; margin-top: 6px; height: 28px; align-items: center; opacity: 0; pointer-events: none; }
       .cell:hover .actions, .cell:focus-within .actions { opacity: 1; pointer-events: auto; }
+      .settings-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+      .settings-row { display: flex; align-items: center; gap: 12px; }
+      .settings-row label { min-width: 96px; font-weight: 600; }
+      .settings-row input,
+      .settings-row select { flex: 1; }
+      .settings-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+      .settings-hint { font-size: 12px; color: var(--muted); margin-top: -6px; }
 
-      /* Print */
+      /* 打印样式 */
       @media print {
         @page { size: A4 landscape; margin: 10mm; }
         html, body { height: auto; }
         body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-size: 12pt; line-height: 1.6; }
-        /* hide interactive UI */
+        /* 隐藏交互控件 */
         .controls, .toolbar, .hint, .modal-backdrop { display: none !important; }
         button { display: none; }
-        /* header tidy */
+        /* 清理页眉布局 */
         header { position: static; border-bottom: 0; margin-bottom: 8mm; }
         .title { font-size: 18pt; }
-        /* grid uses page width */
+        /* 让网格铺满页面宽度 */
         .grid { grid-template-columns: 80px repeat(7, 1fr); border-width: 1px; border-right: 1px solid #000; }
         .cell { padding: 6px; min-height: 40px; }
-        /* ensure rightmost column prints its border */
+        /* 确保最右侧列打印时保留边框 */
         .grid .cell:nth-child(8n) { border-right: 1px solid #000 !important; }
         .grid .cell:last-child { border-right: 1px solid #000 !important; }
         .head, .row-label { background: #fff; }
-        /* two columns area */
+        /* 底部双列区域 */
         .panel { grid-template-columns: 1fr 1fr; gap: 8mm; }
         .card { page-break-inside: avoid; }
-        /* lists more compact */
+        /* 列表更紧凑 */
         .list { margin: 0; padding-left: 18px; list-style-position: inside; }
       }
     </style>
@@ -215,12 +222,13 @@
           <input type="number" id="people" min="1" step="1" value="2" style="width: 72px" />
         </label>
         <button id="clearAll">清空本周</button>
+        <button id="printSettingsBtn" type="button">打印设置</button>
         <button id="print">打印/导出</button>
       </div>
     </header>
 
     <section id="planner" class="grid" aria-label="每周计划表">
-      <!-- Grid will be injected by JS -->
+      <!-- 网格由 JS 注入 -->
     </section>
 
     <section class="panel">
@@ -272,6 +280,57 @@
         <div class="kvs" id="modalNutrition"></div>
       </div>
     </div>
+    <!-- 打印设置弹窗 -->
+    <div class="modal-backdrop" id="settingsBackdrop" role="dialog" aria-modal="true">
+      <div class="modal">
+        <button class="close" id="settingsClose">关闭</button>
+        <h2>打印设置</h2>
+        <div class="divider"></div>
+        <div class="settings-grid" id="printSettingsForm">
+          <div class="settings-row">
+            <label for="paperSize">纸张类型</label>
+            <select id="paperSize">
+              <option value="A4">A4</option>
+              <option value="A5">A5</option>
+              <option value="receipt">票据（80mm）</option>
+              <option value="custom">自定义尺寸</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <label for="paperOrientation">方向</label>
+            <select id="paperOrientation">
+              <option value="portrait">竖向</option>
+              <option value="landscape">横向</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <label for="customWidth">自定义宽度 (mm)</label>
+            <input type="number" id="customWidth" min="40" max="320" step="1" />
+          </div>
+          <div class="settings-row">
+            <label for="customHeight">打印长度 (mm)</label>
+            <input type="number" id="customHeight" min="0" max="2000" step="10" />
+          </div>
+          <div class="settings-row">
+            <label for="printMargin">上下左右边距 (mm)</label>
+            <input type="number" id="printMargin" min="0" max="30" step="1" />
+          </div>
+          <div class="settings-row">
+            <label for="printFontSize">打印字体 (pt)</label>
+            <input type="number" id="printFontSize" min="8" max="20" step="1" />
+          </div>
+          <div class="settings-row">
+            <label for="printRowHeight">单元格高度 (px)</label>
+            <input type="number" id="printRowHeight" min="20" max="120" step="2" />
+          </div>
+          <div class="settings-hint">提示：票据模式下宽度固定 80mm，长度 0 表示按内容自动增长。</div>
+        </div>
+        <div class="settings-actions">
+          <button id="settingsCancel" type="button">取消</button>
+          <button id="savePrintSettings" type="button">保存</button>
+        </div>
+      </div>
+    </div>
 
     <script>
       // 数据 —— 简洁黑白，内置若干常见菜品（每份=1人）
@@ -283,6 +342,18 @@
       const DAYS = [ '周一','周二','周三','周四','周五','周六','周日' ];
       // 标准人参考摄入（每日）
       const RDI = { kcal: 2000, protein: 60, fat: 70, carbs: 300, fiber: 25, sodium_mg: 2000 };
+      const PRINT_SETTINGS_KEY = 'meal-planner.print-settings.v1';
+      const DEFAULT_PRINT_SETTINGS = {
+        paper: 'A4',
+        orientation: 'landscape',
+        customWidth: 80,
+        customHeight: 0,
+        margin: 10,
+        fontSize: 12,
+        rowHeight: 40,
+      };
+      const PRINT_FONT_STACK = "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Microsoft YaHei', sans-serif";
+      let printSettings = loadPrintSettings();
 
       // 菜谱库：每道菜的 ingredients 数量均为“每人”的量，nutrition 为“每人”估算
       // 单位按常用中文单位，不做跨单位换算（同名+同单位可聚合）
@@ -516,7 +587,7 @@
       const storageKey = 'meal-planner.v3';
       const defaultPlan = () => ({
         people: 2,
-        picks: { // day:1..7 -> mealKey -> recipeName or ''
+        picks: { // day:1..7 -> mealKey -> 菜名或 ''
           1: { morning: '燕麦牛奶', noon: ['番茄炒蛋'], afternoon: ['清蒸鲈鱼'] },
           2: { morning: '皮蛋瘦肉粥', noon: ['青椒肉丝'], afternoon: ['西兰花炒虾仁'] },
           3: { morning: '鸡蛋玉米三明治', noon: ['宫保鸡丁'], afternoon: ['土豆炖牛肉'] },
@@ -558,15 +629,151 @@
         }
         return out;
       }
+      function loadPrintSettings() {
+        try {
+          const raw = localStorage.getItem(PRINT_SETTINGS_KEY);
+          if (!raw) return { ...DEFAULT_PRINT_SETTINGS };
+          const parsed = JSON.parse(raw);
+          return { ...DEFAULT_PRINT_SETTINGS, ...(parsed && typeof parsed === 'object' ? parsed : {}) };
+        } catch {
+          return { ...DEFAULT_PRINT_SETTINGS };
+        }
+      }
+      function savePrintSettings() {
+        localStorage.setItem(PRINT_SETTINGS_KEY, JSON.stringify(printSettings));
+      }
+      function numericSetting(value, fallback) {
+        const num = Number(value);
+        return Number.isFinite(num) ? num : fallback;
+      }
+      function pageSizeForPrint() {
+        const paper = printSettings.paper || DEFAULT_PRINT_SETTINGS.paper;
+        const orientation = printSettings.orientation || DEFAULT_PRINT_SETTINGS.orientation;
+        const width = Math.max(40, Number(printSettings.customWidth) || DEFAULT_PRINT_SETTINGS.customWidth);
+        const height = Math.max(0, Number(printSettings.customHeight) || 0);
+        if (paper === 'A4' || paper === 'A5') return `${paper} ${orientation}`;
+        if (paper === 'receipt') return height > 0 ? `${width}mm ${height}mm` : `${width}mm auto`;
+        return height > 0 ? `${width}mm ${height}mm` : `${width}mm auto`;
+      }
+      function getPopupDimensions() {
+        const paper = printSettings.paper || DEFAULT_PRINT_SETTINGS.paper;
+        if (paper === 'receipt' || paper === 'custom') {
+          const width = Math.max(40, numericSetting(printSettings.customWidth, DEFAULT_PRINT_SETTINGS.customWidth));
+          const heightRaw = Math.max(0, numericSetting(printSettings.customHeight, DEFAULT_PRINT_SETTINGS.customHeight));
+          return { width, height: heightRaw };
+        }
+        return { width: null, height: 0 };
+      }
+      function applyPrintSettings() {
+        let styleEl = document.getElementById('printSettingsStyle');
+        if (!styleEl) {
+          styleEl = document.createElement('style');
+          styleEl.id = 'printSettingsStyle';
+          document.head.appendChild(styleEl);
+        }
+        const margin = Math.max(0, numericSetting(printSettings.margin, DEFAULT_PRINT_SETTINGS.margin));
+        const fontSize = Math.max(8, numericSetting(printSettings.fontSize, DEFAULT_PRINT_SETTINGS.fontSize));
+        const rowHeight = Math.max(20, numericSetting(printSettings.rowHeight, DEFAULT_PRINT_SETTINGS.rowHeight));
+        styleEl.textContent = `
+@media print {
+  @page { size: ${pageSizeForPrint()}; margin: ${margin}mm; }
+  body { font-size: ${fontSize}pt !important; }
+  .grid .cell { min-height: ${rowHeight}px !important; }
+}
+`;
+      }
+      function buildPopupPrintCss(extraRules = '', { bodyPadding = '0.8mm 1.2mm', lineHeight = 1.7 } = {}) {
+        const margin = Math.max(0, numericSetting(printSettings.margin, DEFAULT_PRINT_SETTINGS.margin));
+        const fontSize = Math.max(8, numericSetting(printSettings.fontSize, DEFAULT_PRINT_SETTINGS.fontSize));
+        const { width, height } = getPopupDimensions();
+        const widthRule = width ? `width: ${width}mm;` : '';
+        const heightRule = height > 0 ? `min-height: ${height}mm; height: auto;` : 'height: auto;';
+        return `
+@page { size: ${pageSizeForPrint()}; margin: ${margin}mm; }
+html, body { margin: 0; padding: 0; ${widthRule} ${heightRule} }
+body { margin: 0; padding: ${bodyPadding}; font-size: ${fontSize}pt; line-height: ${lineHeight}; font-family: ${PRINT_FONT_STACK}; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+${extraRules}
+`;
+      }
+      function fillPrintSettingsForm() {
+        const paperEl = document.getElementById('paperSize');
+        const orientEl = document.getElementById('paperOrientation');
+        const widthEl = document.getElementById('customWidth');
+        const heightEl = document.getElementById('customHeight');
+        const marginEl = document.getElementById('printMargin');
+        const fontEl = document.getElementById('printFontSize');
+        const rowEl = document.getElementById('printRowHeight');
+        if (!paperEl) return;
+        paperEl.value = printSettings.paper;
+        orientEl.value = printSettings.orientation;
+        const widthVal = Number(printSettings.customWidth);
+        widthEl.value = Number.isFinite(widthVal) ? Math.round(widthVal) : DEFAULT_PRINT_SETTINGS.customWidth;
+        const heightVal = Number(printSettings.customHeight);
+        heightEl.value = Number.isFinite(heightVal) ? Math.round(heightVal) : DEFAULT_PRINT_SETTINGS.customHeight;
+        const marginVal = Number(printSettings.margin);
+        marginEl.value = Number.isFinite(marginVal) ? marginVal : DEFAULT_PRINT_SETTINGS.margin;
+        const fontVal = Number(printSettings.fontSize);
+        fontEl.value = Number.isFinite(fontVal) ? fontVal : DEFAULT_PRINT_SETTINGS.fontSize;
+        const rowVal = Number(printSettings.rowHeight);
+        rowEl.value = Number.isFinite(rowVal) ? rowVal : DEFAULT_PRINT_SETTINGS.rowHeight;
+        refreshSettingsFormState();
+      }
+      function refreshSettingsFormState() {
+        const paper = document.getElementById('paperSize').value;
+        const orientEl = document.getElementById('paperOrientation');
+        const widthEl = document.getElementById('customWidth');
+        const heightEl = document.getElementById('customHeight');
+        const isStandard = paper === 'A4' || paper === 'A5';
+        orientEl.disabled = !isStandard;
+        widthEl.disabled = paper !== 'custom';
+        heightEl.disabled = !(paper === 'custom' || paper === 'receipt');
+        if (paper === 'receipt') widthEl.value = 80;
+      }
+      function readPrintSettingsForm() {
+        const paper = document.getElementById('paperSize').value;
+        const orientation = document.getElementById('paperOrientation').value;
+        const widthEl = document.getElementById('customWidth');
+        const heightEl = document.getElementById('customHeight');
+        const marginEl = document.getElementById('printMargin');
+        const fontEl = document.getElementById('printFontSize');
+        const rowEl = document.getElementById('printRowHeight');
+        const clamp = (val, min, max, fallback) => {
+          const num = Number(val);
+          if (isNaN(num)) return fallback;
+          return Math.min(max, Math.max(min, num));
+        };
+        const next = { ...printSettings, paper, orientation };
+        const previousWidth = Number.isFinite(Number(printSettings.customWidth)) ? Number(printSettings.customWidth) : DEFAULT_PRINT_SETTINGS.customWidth;
+        if (paper === 'receipt') {
+          next.customWidth = 80;
+        } else if (widthEl.disabled) {
+          next.customWidth = previousWidth;
+        } else {
+          next.customWidth = clamp(widthEl.value, 40, 320, previousWidth);
+        }
+        const heightFallback = Number.isFinite(Number(printSettings.customHeight)) ? Number(printSettings.customHeight) : DEFAULT_PRINT_SETTINGS.customHeight;
+        if (paper === 'custom' || paper === 'receipt') {
+          next.customHeight = clamp(heightEl.value, 0, 2000, heightFallback);
+        }
+        next.margin = clamp(marginEl.value, 0, 30, DEFAULT_PRINT_SETTINGS.margin);
+        next.fontSize = clamp(fontEl.value, 8, 20, DEFAULT_PRINT_SETTINGS.fontSize);
+        next.rowHeight = clamp(rowEl.value, 20, 120, DEFAULT_PRINT_SETTINGS.rowHeight);
+        return next;
+      }
+      function togglePrintSettingsModal(show) {
+        const wrap = document.getElementById('settingsBackdrop');
+        if (!wrap) return;
+        wrap.style.display = show ? 'flex' : 'none';
+      }
 
       // UI 构建
       function buildGrid() {
         const root = document.getElementById('planner');
         root.innerHTML = '';
 
-        // Header row
+        // 表头行
         const headerRow = document.createDocumentFragment();
-        // corner
+        // 左上角单元格
         headerRow.appendChild(cell('head', '用餐/日期'));
         for (let d = 0; d < 7; d++) headerRow.appendChild(cell('head', DAYS[d], { dayHeader: d+1 }));
         root.appendChild(row(headerRow));
@@ -574,7 +781,7 @@
         const corner = root.querySelector('.cell.head');
         if (corner) corner.textContent = '用餐/日期';
 
-        // Meal rows
+        // 用餐行
         for (const meal of MEALS) {
           const frag = document.createDocumentFragment();
           frag.appendChild(cell('row-label', labelOfMeal(meal.key)));
@@ -873,7 +1080,7 @@
         const n = Number(amount);
         if (unit === 'g' && n >= 1000) return (n/1000).toFixed(1).replace(/\.0$/, '') + ' kg';
         if (unit === 'ml' && n >= 1000) return (n/1000).toFixed(1).replace(/\.0$/, '') + ' L';
-        // integers where sensible
+        // 能取整时优先输出整数
         const str = (Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, ''));
         return str + ' ' + unit;
       }
@@ -1136,7 +1343,7 @@
 
       // 打印当前弹窗为 80mm 宽度
       function printModal80mm() {
-        const modal = document.querySelector('.modal');
+        const modal = document.querySelector('#modalBackdrop .modal');
         if (!modal) return;
         const clone = modal.cloneNode(true);
         // 移除按钮，避免打印按钮/关闭按钮出现在票据里
@@ -1154,17 +1361,15 @@
 
         var style = doc.createElement('style');
         style.type = 'text/css';
-        style.appendChild(doc.createTextNode(
-          '@page { size: 80mm auto; margin: 0; }' +
-          'html, body { width: 80mm; height: auto; margin: 0; padding: 0; }' +
-          "body { margin: 0; padding: 0.8mm 1.2mm; font: 16px/1.7 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Microsoft YaHei', sans-serif; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }" +
-          'ul, ol { margin: 0; padding-left: 3mm; list-style-position: inside; }' +
-          '.kvs { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; align-items: baseline; }' +
-          'h2 { margin: 0 0 6px; font-size: 20px; }' +
-          'h3 { margin: 6px 0 4px; font-size: 17px; }' +
-          '.divider { height: 1px; background: #000; margin: 6px 0; }' +
+        const modalExtraCss = [
+          'ul, ol { margin: 0; padding-left: 3mm; list-style-position: inside; }',
+          '.kvs { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; align-items: baseline; }',
+          'h2 { margin: 0 0 6px; font-size: 20px; }',
+          'h3 { margin: 6px 0 4px; font-size: 17px; }',
+          '.divider { height: 1px; background: #000; margin: 6px 0; }',
           '.muted { color: #555; }'
-        ));
+        ].join('\n');
+        style.appendChild(doc.createTextNode(buildPopupPrintCss(modalExtraCss)));
         doc.head.appendChild(style);
 
         var body = doc.body;
@@ -1188,14 +1393,12 @@
         if (doc.body) { while (doc.body.firstChild) doc.body.removeChild(doc.body.firstChild); } else { doc.body = doc.createElement('body'); }
         var style = doc.createElement('style');
         style.type = 'text/css';
-        style.appendChild(doc.createTextNode(
-          '@page { size: 80mm auto; margin: 0; }' +
-          'html, body { width: 80mm; height: auto; margin: 0; padding: 0; }' +
-          "body { margin: 0; padding: 0.8mm 1.2mm; font: 16px/1.7 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Microsoft YaHei', sans-serif; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }" +
-          'ul { margin: 0; padding-left: 3mm; list-style-position: inside; }' +
-          'h2 { margin: 0 0 6px; font-size: 20px; }' +
+        const listExtraCss = [
+          'ul { margin: 0; padding-left: 3mm; list-style-position: inside; }',
+          'h2 { margin: 0 0 6px; font-size: 20px; }',
           '.divider { height: 1px; background: #000; margin: 6px 0; }'
-        ));
+        ].join('\n');
+        style.appendChild(doc.createTextNode(buildPopupPrintCss(listExtraCss)));
         doc.head.appendChild(style);
         var body = doc.body;
         var h2 = doc.createElement('h2'); h2.textContent = title; body.appendChild(h2);
@@ -1251,6 +1454,22 @@
 
         document.getElementById('scopeSelect').addEventListener('change', refreshStats);
         document.getElementById('copyList').addEventListener('click', () => copyIngredients(document.getElementById('scopeSelect').value));
+        document.getElementById('printSettingsBtn').addEventListener('click', () => {
+          fillPrintSettingsForm();
+          togglePrintSettingsModal(true);
+        });
+        document.getElementById('settingsClose').addEventListener('click', () => togglePrintSettingsModal(false));
+        document.getElementById('settingsCancel').addEventListener('click', () => togglePrintSettingsModal(false));
+        document.getElementById('settingsBackdrop').addEventListener('click', (e) => {
+          if (e.target.id === 'settingsBackdrop') togglePrintSettingsModal(false);
+        });
+        document.getElementById('paperSize').addEventListener('change', refreshSettingsFormState);
+        document.getElementById('savePrintSettings').addEventListener('click', () => {
+          printSettings = readPrintSettingsForm();
+          savePrintSettings();
+          applyPrintSettings();
+          togglePrintSettingsModal(false);
+        });
         // 在“复制清单”右侧插入“打印清单”按钮
         (function(){
           const copyBtn = document.getElementById('copyList');
@@ -1271,7 +1490,7 @@
           refreshStats();
         });
 
-        // modal
+        // 弹窗事件
         document.getElementById('modalClose').addEventListener('click', closeModal);
         // 在关闭按钮旁动态插入打印按钮（80mm），并放在“关闭”的左侧
         const closeBtn = document.getElementById('modalClose');
@@ -1288,10 +1507,16 @@
         document.getElementById('modalBackdrop').addEventListener('click', (e) => {
           if (e.target.id === 'modalBackdrop') closeModal();
         });
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            closeModal();
+            togglePrintSettingsModal(false);
+          }
+        });
       }
 
       // 初始化
+      applyPrintSettings();
       buildGrid();
       bindEvents();
       refreshStats();

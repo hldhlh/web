@@ -182,7 +182,7 @@
         return { key: name, def: { meal, ...(also.length?{also}:{}), ingredients, steps, nutrition } };
       }
 
-      // actions
+      // 操作绑定
       $('#btnNew').addEventListener('click', clearForm);
       $('#addIng').addEventListener('click', ()=>addIngRow());
       $('#search').addEventListener('input', renderList);
@@ -233,7 +233,7 @@
         clearCustom(); recipes = {}; clearForm(); renderList(); alert('已恢复。返回计划页后将使用内置菜谱。');
       });
 
-      // init
+      // 初始化
       renderList();
       if (!Object.keys(recipes).length) $('#emptyListHint').style.display='block';
     </script>
