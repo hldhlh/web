@@ -159,9 +159,14 @@
       /* 让打印/关闭按钮尺寸一致并对齐，打印按钮在关闭按钮左侧 */
       .modal .close,
       .modal .print {
+        min-width: 56px;
         height: 28px;
-        padding: 2px 8px;
-        line-height: 1.2;
+        padding: 0 10px;
+        line-height: 28px;
+        text-align: center;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         float: right;
       }
       /* 打印在左、关闭在右；使用 print 的右外边距控制两者间距 */
@@ -183,6 +188,15 @@
       .settings-row select { flex: 1; }
       .settings-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
       .settings-hint { font-size: 12px; color: var(--muted); margin-top: -6px; }
+      .settings-row--checkbox { align-items: flex-start; }
+      .settings-checkboxes { display: flex; flex-wrap: wrap; gap: 6px 16px; flex: 1; }
+      .settings-checkboxes label {
+        min-width: auto;
+        font-weight: 400;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
 
       /* 打印样式 */
       @media print {
@@ -227,12 +241,12 @@
       </div>
     </header>
 
-    <section id="planner" class="grid" aria-label="每周计划表">
+    <section id="planner" class="grid" aria-label="每周计划表" data-print-section="planner">
       <!-- 网格由 JS 注入 -->
     </section>
 
     <section class="panel">
-      <div class="card">
+      <div class="card" data-print-section="ingredients">
         <div class="toolbar" style="justify-content: space-between; align-items: center;">
           <div>
             <h3 style="display:inline-block;margin-right:8px;">原材料统计</h3>
@@ -254,7 +268,7 @@
         </div>
         <div id="ingredientsList"></div>
       </div>
-      <div class="card">
+      <div class="card" data-print-section="nutrition">
         <h3>营养估算</h3>
         <div class="kvs" id="nutritionSummary"></div>
         <div class="divider"></div>
@@ -275,9 +289,11 @@
         <div class="divider"></div>
         <h3>做法</h3>
         <ol class="list" id="modalSteps"></ol>
-        <div class="divider"></div>
-        <h3>营养（每人）</h3>
-        <div class="kvs" id="modalNutrition"></div>
+        <div class="divider" data-print-section="modal-nutrition-divider"></div>
+        <div data-print-section="modal-nutrition">
+          <h3>营养（每人）</h3>
+          <div class="kvs" id="modalNutrition"></div>
+        </div>
       </div>
     </div>
     <!-- 打印设置弹窗 -->
@@ -323,6 +339,22 @@
             <label for="printRowHeight">单元格高度 (px)</label>
             <input type="number" id="printRowHeight" min="20" max="120" step="2" />
           </div>
+          <div class="settings-row settings-row--checkbox">
+            <label>打印内容</label>
+            <div class="settings-checkboxes">
+              <label><input type="checkbox" id="sectionPlanner" checked />周计划表</label>
+              <label><input type="checkbox" id="sectionIngredients" checked />原材料统计</label>
+              <label><input type="checkbox" id="sectionNutrition" checked />营养估算</label>
+            </div>
+          </div>
+          <div class="settings-row settings-row--checkbox">
+            <label>打印按钮</label>
+            <div class="settings-checkboxes">
+              <label><input type="checkbox" id="featureMainPrint" checked />顶部打印</label>
+              <label><input type="checkbox" id="featureModalPrint" checked />菜谱弹窗</label>
+              <label><input type="checkbox" id="featureIngredientsPrint" checked />原料清单</label>
+            </div>
+          </div>
           <div class="settings-hint">提示：票据模式下宽度固定 80mm，长度 0 表示按内容自动增长。</div>
         </div>
         <div class="settings-actions">
@@ -343,6 +375,26 @@
       // 标准人参考摄入（每日）
       const RDI = { kcal: 2000, protein: 60, fat: 70, carbs: 300, fiber: 25, sodium_mg: 2000 };
       const PRINT_SETTINGS_KEY = 'meal-planner.print-settings.v1';
+      const DEFAULT_PRINT_SECTIONS = {
+        planner: true,
+        ingredients: true,
+        nutrition: true,
+      };
+      const DEFAULT_PRINT_FEATURES = {
+        main: true,
+        modal: true,
+        ingredients: true,
+      };
+      const SECTION_CHECKBOXES = [
+        { key: 'planner', id: 'sectionPlanner' },
+        { key: 'ingredients', id: 'sectionIngredients' },
+        { key: 'nutrition', id: 'sectionNutrition' },
+      ];
+      const FEATURE_CHECKBOXES = [
+        { key: 'main', id: 'featureMainPrint' },
+        { key: 'modal', id: 'featureModalPrint' },
+        { key: 'ingredients', id: 'featureIngredientsPrint' },
+      ];
       const DEFAULT_PRINT_SETTINGS = {
         paper: 'A4',
         orientation: 'landscape',
@@ -351,6 +403,8 @@
         margin: 10,
         fontSize: 12,
         rowHeight: 40,
+        sections: { ...DEFAULT_PRINT_SECTIONS },
+        features: { ...DEFAULT_PRINT_FEATURES },
       };
       const PRINT_FONT_STACK = "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Microsoft YaHei', sans-serif";
       let printSettings = loadPrintSettings();
@@ -630,13 +684,23 @@
         return out;
       }
       function loadPrintSettings() {
+        const fallback = () => ({
+          ...DEFAULT_PRINT_SETTINGS,
+          sections: { ...DEFAULT_PRINT_SECTIONS },
+          features: { ...DEFAULT_PRINT_FEATURES },
+        });
         try {
           const raw = localStorage.getItem(PRINT_SETTINGS_KEY);
-          if (!raw) return { ...DEFAULT_PRINT_SETTINGS };
-          const parsed = JSON.parse(raw);
-          return { ...DEFAULT_PRINT_SETTINGS, ...(parsed && typeof parsed === 'object' ? parsed : {}) };
+          if (!raw) return fallback();
+          const parsed = JSON.parse(raw) || {};
+          const sections = { ...DEFAULT_PRINT_SECTIONS, ...(parsed.sections || {}) };
+          const features = { ...DEFAULT_PRINT_FEATURES, ...(parsed.features || {}) };
+          const rest = { ...parsed };
+          delete rest.sections;
+          delete rest.features;
+          return { ...DEFAULT_PRINT_SETTINGS, ...rest, sections, features };
         } catch {
-          return { ...DEFAULT_PRINT_SETTINGS };
+          return fallback();
         }
       }
       function savePrintSettings() {
@@ -645,6 +709,14 @@
       function numericSetting(value, fallback) {
         const num = Number(value);
         return Number.isFinite(num) ? num : fallback;
+      }
+      function getPrintSections(settings = printSettings) {
+        const sections = settings?.sections;
+        return { ...DEFAULT_PRINT_SECTIONS, ...(sections && typeof sections === 'object' ? sections : {}) };
+      }
+      function getPrintFeatures(settings = printSettings) {
+        const features = settings?.features;
+        return { ...DEFAULT_PRINT_FEATURES, ...(features && typeof features === 'object' ? features : {}) };
       }
       function pageSizeForPrint() {
         const paper = printSettings.paper || DEFAULT_PRINT_SETTINGS.paper;
@@ -674,13 +746,49 @@
         const margin = Math.max(0, numericSetting(printSettings.margin, DEFAULT_PRINT_SETTINGS.margin));
         const fontSize = Math.max(8, numericSetting(printSettings.fontSize, DEFAULT_PRINT_SETTINGS.fontSize));
         const rowHeight = Math.max(20, numericSetting(printSettings.rowHeight, DEFAULT_PRINT_SETTINGS.rowHeight));
+        const sections = getPrintSections();
+        const sectionRules = [];
+        if (!sections.planner) sectionRules.push('#planner { display: none !important; }');
+        if (!sections.ingredients) sectionRules.push('[data-print-section="ingredients"] { display: none !important; }');
+        if (!sections.nutrition) sectionRules.push('[data-print-section="nutrition"] { display: none !important; }');
         styleEl.textContent = `
 @media print {
   @page { size: ${pageSizeForPrint()}; margin: ${margin}mm; }
   body { font-size: ${fontSize}pt !important; }
   .grid .cell { min-height: ${rowHeight}px !important; }
+  ${sectionRules.join('\n  ')}
 }
 `;
+        applyPrintVisibility();
+      }
+      function applyPrintVisibility() {
+        const sections = getPrintSections();
+        const features = getPrintFeatures();
+        const plannerAllowed = !!sections.planner && !!features.main;
+        const modalAllowed = !!sections.planner && !!features.modal;
+        const ingredientsAllowed = !!sections.ingredients && !!features.ingredients;
+        const printBtn = document.getElementById('print');
+        if (printBtn) {
+          printBtn.disabled = !plannerAllowed;
+          printBtn.title = plannerAllowed ? '' : '打印设置中已禁用顶部打印或周计划内容';
+        }
+        const modalPrintBtn = document.getElementById('modalPrint');
+        if (modalPrintBtn) {
+          modalPrintBtn.style.display = modalAllowed ? 'inline-flex' : 'none';
+          modalPrintBtn.style.visibility = modalAllowed ? 'visible' : 'hidden';
+          modalPrintBtn.style.pointerEvents = modalAllowed ? 'auto' : 'none';
+          if (!modalAllowed) modalPrintBtn.setAttribute('aria-hidden', 'true');
+          else modalPrintBtn.removeAttribute('aria-hidden');
+        }
+        const printListBtn = document.getElementById('printList');
+        if (printListBtn) {
+          printListBtn.style.display = ingredientsAllowed ? 'inline-flex' : 'none';
+          if (!ingredientsAllowed) printListBtn.setAttribute('aria-hidden', 'true');
+          else printListBtn.removeAttribute('aria-hidden');
+        }
+        document.querySelectorAll('[data-print-section="modal-nutrition"], [data-print-section="modal-nutrition-divider"]').forEach(el => {
+          el.style.display = sections.nutrition ? '' : 'none';
+        });
       }
       function buildPopupPrintCss(extraRules = '', { bodyPadding = '0.8mm 1.2mm', lineHeight = 1.7 } = {}) {
         const margin = Math.max(0, numericSetting(printSettings.margin, DEFAULT_PRINT_SETTINGS.margin));
@@ -688,11 +796,17 @@
         const { width, height } = getPopupDimensions();
         const widthRule = width ? `width: ${width}mm;` : '';
         const heightRule = height > 0 ? `min-height: ${height}mm; height: auto;` : 'height: auto;';
+        const sections = getPrintSections();
+        const conditionalRules = [];
+        if (!sections.nutrition) {
+          conditionalRules.push('[data-print-section="modal-nutrition"], [data-print-section="modal-nutrition-divider"] { display: none !important; }');
+        }
         return `
 @page { size: ${pageSizeForPrint()}; margin: ${margin}mm; }
 html, body { margin: 0; padding: 0; ${widthRule} ${heightRule} }
 body { margin: 0; padding: ${bodyPadding}; font-size: ${fontSize}pt; line-height: ${lineHeight}; font-family: ${PRINT_FONT_STACK}; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 ${extraRules}
+${conditionalRules.join('\n')}
 `;
       }
       function fillPrintSettingsForm() {
@@ -716,6 +830,16 @@ ${extraRules}
         fontEl.value = Number.isFinite(fontVal) ? fontVal : DEFAULT_PRINT_SETTINGS.fontSize;
         const rowVal = Number(printSettings.rowHeight);
         rowEl.value = Number.isFinite(rowVal) ? rowVal : DEFAULT_PRINT_SETTINGS.rowHeight;
+        const sections = getPrintSections();
+        SECTION_CHECKBOXES.forEach(({ key, id }) => {
+          const el = document.getElementById(id);
+          if (el) el.checked = !!sections[key];
+        });
+        const features = getPrintFeatures();
+        FEATURE_CHECKBOXES.forEach(({ key, id }) => {
+          const el = document.getElementById(id);
+          if (el) el.checked = !!features[key];
+        });
         refreshSettingsFormState();
       }
       function refreshSettingsFormState() {
@@ -758,6 +882,18 @@ ${extraRules}
         next.margin = clamp(marginEl.value, 0, 30, DEFAULT_PRINT_SETTINGS.margin);
         next.fontSize = clamp(fontEl.value, 8, 20, DEFAULT_PRINT_SETTINGS.fontSize);
         next.rowHeight = clamp(rowEl.value, 20, 120, DEFAULT_PRINT_SETTINGS.rowHeight);
+        const sections = getPrintSections(next);
+        SECTION_CHECKBOXES.forEach(({ key, id }) => {
+          const el = document.getElementById(id);
+          if (el) sections[key] = el.checked;
+        });
+        next.sections = sections;
+        const features = getPrintFeatures(next);
+        FEATURE_CHECKBOXES.forEach(({ key, id }) => {
+          const el = document.getElementById(id);
+          if (el) features[key] = el.checked;
+        });
+        next.features = features;
         return next;
       }
       function togglePrintSettingsModal(show) {
@@ -1343,6 +1479,16 @@ ${extraRules}
 
       // 打印当前弹窗为 80mm 宽度
       function printModal80mm() {
+        const sections = getPrintSections();
+        const features = getPrintFeatures();
+        if (!features.modal) {
+          alert('打印设置中已禁用“菜谱弹窗”打印，请先启用。');
+          return;
+        }
+        if (!sections.planner) {
+          alert('打印设置中已关闭“周计划表”内容打印，请先启用后再打印菜谱。');
+          return;
+        }
         const modal = document.querySelector('#modalBackdrop .modal');
         if (!modal) return;
         const clone = modal.cloneNode(true);
@@ -1382,6 +1528,16 @@ ${extraRules}
 
       // 打印原料清单（80mm，随内容长度）
       function printIngredients80mm(scope) {
+        const sections = getPrintSections();
+        const features = getPrintFeatures();
+        if (!features.ingredients) {
+          alert('打印设置中已禁用“原料清单”打印，请先启用。');
+          return;
+        }
+        if (!sections.ingredients) {
+          alert('打印设置中已关闭“原材料统计”打印内容，请先启用。');
+          return;
+        }
         const people = Number(state.people) || 1;
         const list = scope === 'week' ? collectIngredientsForWeek() : collectIngredientsForDay(Number(scope));
         const w = window.open('', '_blank');
@@ -1481,7 +1637,19 @@ ${extraRules}
             printBtn2.addEventListener('click', () => printIngredients80mm(document.getElementById('scopeSelect').value));
           }
         })();
-        document.getElementById('print').addEventListener('click', () => window.print());
+        document.getElementById('print').addEventListener('click', () => {
+          const sections = getPrintSections();
+          const features = getPrintFeatures();
+          if (!features.main) {
+            alert('打印设置中已禁用顶部打印按钮，请先启用。');
+            return;
+          }
+          if (!sections.planner) {
+            alert('已关闭“周计划表”打印，请先在打印设置中启用内容。');
+            return;
+          }
+          window.print();
+        });
         document.getElementById('clearAll').addEventListener('click', () => {
           if (!confirm('确定清空本周所有选择？')) return;
           for (let d=1; d<=7; d++) for (const m of MEALS) state.picks[d][m.key] = [];
@@ -1513,6 +1681,7 @@ ${extraRules}
             togglePrintSettingsModal(false);
           }
         });
+        applyPrintVisibility();
       }
 
       // 初始化
