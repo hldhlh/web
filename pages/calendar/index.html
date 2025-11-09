@@ -1,239 +1,94 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>日历</title>
-    <style>
-        :root {
-            --app-color: #ff9500;
-            --app-color-light: rgba(255, 149, 0, 0.1);
-            --text-color: #1d1d1f;
-            --secondary-text: #86868b;
-            --border-color: rgba(0, 0, 0, 0.1);
-        }
-        
-        body {
-            font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            color: var(--text-color);
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            -webkit-font-smoothing: antialiased;
-        }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>物语日历 · Minimal</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script defer src="script.js"></script>
+  </head>
+  <body>
+    <div class="bg"></div>
+    <div class="page-wrap">
+    <main class="info-card timeline-shell" id="timeline" aria-label="时间线">
+      <div class="info-top tl-head">
+        <div class="info-label">时间线</div>
+      </div>
+      <ul class="tl-list" id="tlList" aria-label="时间线"></ul>
+    </main>
 
-        .app-container {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            width: 100%;
-        }
-
-        .app-header {
-            background-color: var(--app-color);
-            color: white;
-            padding: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .app-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin: 0;
-        }
-
-        .app-content {
-            flex: 1;
-            padding: 20px;
-            overflow-y: auto;
-        }
-
-        .back-button {
-            background: none;
-            border: none;
-            color: white;
-            font-size: 1.2rem;
-            cursor: pointer;
-            margin-right: 10px;
-            display: flex;
-            align-items: center;
-        }
-        
-        .calendar-grid {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 5px;
-            margin-top: 20px;
-        }
-        
-        .calendar-header {
-            text-align: center;
-            font-weight: bold;
-            padding: 10px 0;
-            background-color: #f8f9fa;
-        }
-        
-        .calendar-day {
-            padding: 10px;
-            text-align: center;
-            border: 1px solid #eee;
-            border-radius: 5px;
-            height: 60px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            position: relative;
-        }
-        
-        .calendar-day.today {
-            background-color: var(--app-color-light);
-            font-weight: bold;
-            color: var(--app-color);
-        }
-        
-        .calendar-day.has-event::after {
-            content: '';
-            position: absolute;
-            bottom: 5px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background-color: var(--app-color);
-        }
-        
-        .event-list {
-            margin-top: 30px;
-        }
-        
-        .event-item {
-            border-left: 3px solid var(--app-color);
-            padding: 10px 15px;
-            margin-bottom: 10px;
-            background-color: #f8f9fa;
-            border-radius: 4px;
-        }
-            /* 原生工具类与组件样式 */
-        .d-flex{display:flex}
-        .align-items-center{align-items:center}
-        .justify-content-between{justify-content:space-between}
-        .text-white{color:#fff}
-        .text-muted{color:var(--secondary-text)}
-        .fw-bold{font-weight:700}
-        .fw-semibold{font-weight:600}
-        .mb-1{margin-bottom:.25rem}
-        .mb-2{margin-bottom:.5rem}
-        .mb-3{margin-bottom:1rem}
-        .mb-4{margin-bottom:1.5rem}
-        .mt-3{margin-top:1rem}
-        .mt-4{margin-top:1.5rem}
-        .me-1{margin-right:.25rem}
-        .me-2{margin-right:.5rem}
-        .fs-4{font-size:1.25rem}
-        .fs-5{font-size:1.1rem}
-        .btn{border:0;background:transparent;color:inherit;cursor:pointer;padding:6px 10px;border-radius:6px}
-        .btn:hover{background:rgba(0,0,0,.06)}
-        .btn-outline-secondary{border:1px solid var(--border-color);background:#fff}
-        .btn-sm{padding:4px 8px;border-radius:6px}
-        .input-group{display:flex;align-items:center;border:1px solid var(--border-color);border-radius:8px;overflow:hidden}
-        .input-group-text{padding:8px 10px;background:#f6f6f6;border-right:1px solid var(--border-color);display:flex;align-items:center}
-        .form-control{flex:1;border:0;outline:none;padding:10px 12px;font:inherit;background:#fff}
-        .list-group{display:flex;flex-direction:column;gap:6px}
-        .list-group-item{padding:10px 12px;border:1px solid var(--border-color);border-radius:10px;background:#fff}
-        .list-group-item-action{transition:background .15s ease}
-        .list-group-item-action:hover{background:var(--app-color-light)}
-        .alert{padding:10px 12px;border-radius:8px}
-        .alert-info{background:#e9f5ff;color:#084d7a}
-        .icon{width:20px;height:20px;display:inline-block;vertical-align:middle}</style>
-</head>
-<body>
-    <div class="app-container">
-        <div class="app-header">
-            <div class="d-flex align-items-center">
-                <button class="back-button" onclick="window.location.href='../../index.html'">
-                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/><line x1="20" y1="12" x2="9" y2="12"/></svg>
-                </button>
-                <h1 class="app-title">鏃ュ巻</h1>
-            </div>
-            <div>
-                <button class="btn text-white"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
-            </div>
+    <main class="calendar-shell" aria-label="物语日历">
+      <header class="cal-header">
+        <div class="left">
+          <button class="icon-btn" id="prevBtn" aria-label="上个月" title="上个月">⟨</button>
+          <button class="icon-btn" id="nextBtn" aria-label="下个月" title="下个月">⟩</button>
         </div>
-        
-        <div class="app-content">
-            <div class="d-flex justify-content-between align-items-center">
-                <h2 class="fs-4">2025骞?鏈?/h2>
-                <div>
-                    <button class="btn btn-sm btn-outline-secondary me-1"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
-                    <button class="btn btn-sm btn-outline-secondary"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
-                </div>
-            </div>
-            
-            <div class="calendar-grid">
-                <div class="calendar-header">鏃?/div>
-                <div class="calendar-header">涓€</div>
-                <div class="calendar-header">浜?/div>
-                <div class="calendar-header">涓?/div>
-                <div class="calendar-header">鍥?/div>
-                <div class="calendar-header">浜?/div>
-                <div class="calendar-header">鍏?/div>
-                
-                <div class="calendar-day text-muted">30</div>
-                <div class="calendar-day text-muted">31</div>
-                <div class="calendar-day">1</div>
-                <div class="calendar-day">2</div>
-                <div class="calendar-day">3</div>
-                <div class="calendar-day">4</div>
-                <div class="calendar-day">5</div>
-                
-                <div class="calendar-day">6</div>
-                <div class="calendar-day">7</div>
-                <div class="calendar-day">8</div>
-                <div class="calendar-day">9</div>
-                <div class="calendar-day">10</div>
-                <div class="calendar-day">11</div>
-                <div class="calendar-day">12</div>
-                
-                <div class="calendar-day">13</div>
-                <div class="calendar-day">14</div>
-                <div class="calendar-day has-event">15</div>
-                <div class="calendar-day">16</div>
-                <div class="calendar-day">17</div>
-                <div class="calendar-day">18</div>
-                <div class="calendar-day">19</div>
-                
-                <div class="calendar-day">20</div>
-                <div class="calendar-day">21</div>
-                <div class="calendar-day">22</div>
-                <div class="calendar-day">23</div>
-                <div class="calendar-day">24</div>
-                <div class="calendar-day">25</div>
-                <div class="calendar-day">26</div>
-                
-                <div class="calendar-day">27</div>
-                <div class="calendar-day">28</div>
-                <div class="calendar-day today">29</div>
-                <div class="calendar-day has-event">30</div>
-                <div class="calendar-day text-muted">1</div>
-                <div class="calendar-day text-muted">2</div>
-                <div class="calendar-day text-muted">3</div>
-            </div>
-            
-            <div class="event-list">
-                <h3 class="fs-5 mb-3">浠婃棩鏃ョ▼</h3>
-                <div class="event-item">
-                    <div class="fw-semibold">鍥㈤槦浼氳</div>
-                    <div class="text-muted">14:00 - 15:30</div>
-                </div>
-                <div class="event-item">
-                    <div class="fw-semibold">椤圭洰鎴鏃ユ湡</div>
-                    <div class="text-muted">17:00</div>
-                </div>
-            </div>
+        <h1 class="title">
+          <span id="yearLabel">2025</span>
+          <span class="dot">·</span>
+          <span id="monthLabel">11月</span>
+        </h1>
+        <div class="right">
+          <button class="pill-btn" id="todayBtn" aria-label="回到今天">今天</button>
+          <button class="icon-btn" id="themeToggle" aria-label="主题切换" title="主题切换">🌓</button>
         </div>
+      </header>
+
+      <div class="cal-content">
+        <section class="cal-grid" aria-label="日期网格">
+          <div class="weekday" aria-hidden="true">一</div>
+          <div class="weekday" aria-hidden="true">二</div>
+          <div class="weekday" aria-hidden="true">三</div>
+          <div class="weekday" aria-hidden="true">四</div>
+          <div class="weekday" aria-hidden="true">五</div>
+          <div class="weekday weekend" aria-hidden="true">六</div>
+          <div class="weekday weekend" aria-hidden="true">日</div>
+
+          <!-- days will be injected here by JS -->
+          <div id="days" class="days" role="grid" aria-live="polite"></div>
+        </section>
+      </div>
+
+      <!--
+      <aside class="info-card floating" id="todoCard" aria-live="polite">
+        <div class="info-top">
+          <div id="todoTitle" class="info-label" aria-hidden="true">日期</div>
+          <div class="info-row">
+            <div id="todoDate" class="info-main">——</div>
+            <span id="todoStatus" class="badge">暂无代办</span>
+          </div>
+        </div>
+
+        <div class="todo-input">
+          <input id="todoInput" type="text" placeholder="新增代办" aria-label="新增代办事项" />
+          <button class="icon-btn" id="todoAdd" title="添加">+</button>
+        </div>
+
+        <ul class="todo-list" id="todoList" aria-label="代办事项列表"></ul>
+
+      </aside>
+      -->
+
+      
+    </main>
+
+    <main class="info-card todo-shell" id="todoCard" aria-live="polite" aria-label="日期代办">
+      <div class="info-top">
+        <div id="todoTitle" class="info-label" aria-hidden="true">日期</div>
+        <div class="info-row">
+          <div id="todoDate" class="info-main">——</div>
+          <span id="todoStatus" class="badge">暂无代办</span>
+        </div>
+      </div>
+
+      <div class="todo-input">
+        <input id="todoInput" type="text" placeholder="新增代办" aria-label="新增代办事项" />
+        <button class="icon-btn" id="todoAdd" title="添加">+</button>
+      </div>
+
+      <ul class="todo-list" id="todoList" aria-label="代办事项列表"></ul>
+
+    </main>
     </div>
-</body>
-</html> 
+  </body>
+  </html>
