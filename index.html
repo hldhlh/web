@@ -21,6 +21,7 @@
     .container { height:100vh; display:flex; flex-direction:column; overflow-y:auto; -webkit-overflow-scrolling:touch; }
     .status-bar { padding:.5rem 1rem; display:flex; justify-content:flex-end; align-items:center; }
     .app-icons-wrapper { flex:1; padding:1rem; display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); grid-auto-rows:minmax(90px,auto); gap:1.5rem; width:100%; max-width:1200px; margin:0 auto; align-content:start; }
+    .app-icon-wrapper { content-visibility:auto; contain-intrinsic-size: 120px 110px; }
     .app-icon { text-decoration:none; display:flex; flex-direction:column; align-items:center; }
     .app-icon-image { width:64px; height:64px; border-radius:16px; margin-bottom:.3rem; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,.08); }
     .app-icon:hover .app-icon-image { transform:translateY(-3px) scale(1.03); box-shadow:0 4px 10px rgba(0,0,0,.1); }
@@ -34,6 +35,9 @@
     [data-theme=dark] .theme-toggle .sun-icon { opacity:0; transform:translateY(-20px); }
     [data-theme=dark] .theme-toggle .moon-icon { opacity:1; transform:translateY(0); }
     @media (max-width:768px){ .app-icons-wrapper{ grid-template-columns:repeat(4,1fr); gap:1rem; padding:.8rem; } .app-icon-image{ width:55px; height:55px; } }
+    @media (prefers-reduced-motion: reduce){
+      .app-icon-image, .theme-toggle { transition:none }
+    }
   </style>
 </head>
 <body>
@@ -70,15 +74,33 @@
 
     const appColors = { mail:'#FF453A', contacts:'#FF9F0A', photos:'#30D158', calendar:'#FFD60A', todo:'#5E5CE6', cloud:'#0A84FF', default:'#FFFFFF' };
 
+    // 简单的会话级图标缓存，避免重复网络请求
+    const ICON_CACHE_KEY = 'app_icon_cache_v1';
+    const iconCache = (() => {
+      let store; try { store = JSON.parse(sessionStorage.getItem(ICON_CACHE_KEY) || '{}') } catch { store = {} }
+      return {
+        get:(k)=>store[k],
+        set:(k,v)=>{ store[k]=v; try{ sessionStorage.setItem(ICON_CACHE_KEY, JSON.stringify(store)) }catch{} }
+      }
+    })();
+
     const getDirFromPath = (p) => { if(!p) return ''; const i=p.indexOf('/'); return i===-1?p:p.slice(0,i); };
     const resolveIcon = async (dir) => {
+      if (iconCache.get(dir)) return iconCache.get(dir);
       const candidates = [`./pages/${dir}/icon.svg`,`./pages/${dir}/icon`];
       for(const url of candidates){
-        try{ const res = await fetch(url); if(!res.ok) continue; const ct=(res.headers.get('content-type')||'').toLowerCase();
-          if(ct.includes('image/svg')) return { type:'svg', content: await res.text() };
-          return { type:'img', url };
+        try{
+          const res = await fetch(url, { cache: 'force-cache' });
+          if(!res.ok) continue;
+          const ct=(res.headers.get('content-type')||'').toLowerCase();
+          const value = ct.includes('image/svg')
+            ? { type:'svg', content: await res.text() }
+            : { type:'img', url };
+          iconCache.set(dir, value);
+          return value;
         }catch(e){}
       }
+      iconCache.set(dir, null);
       return null;
     };
 
@@ -86,20 +108,35 @@
       const container = document.getElementById('app-container');
       try{
         const apps = await getAppDirectories();
+        // 预解析目录并消除重复
+        const dirs = Array.from(new Set(apps.map(a=>getDirFromPath(a.path))));
+        // 并发限制，避免首屏阻塞
+        const limit = Math.min(4, Math.max(2, (navigator.hardwareConcurrency||4)>>1));
+        let idx = 0; const iconMap = new Map();
+        async function worker(){
+          while(idx < dirs.length){
+            const i = idx++; const d = dirs[i];
+            iconMap.set(d, await resolveIcon(d));
+          }
+        }
+        await Promise.all(Array.from({length:limit}, worker));
+
+        const frag = document.createDocumentFragment();
         for(const app of apps){
           const dir = getDirFromPath(app.path);
-          const icon = await resolveIcon(dir);
+          const icon = iconMap.get(dir) ?? null;
           const el = document.createElement('a');
           el.href = `./pages/${app.path}`; el.className='app-icon';
           if(icon){
-            const inner = icon.type==='svg' ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center">${icon.content}</div>` : `<img src="${icon.url}" alt="${app.name}" style="width:100%;height:100%;object-fit:contain;display:block">`;
+            const inner = icon.type==='svg' ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center">${icon.content}</div>` : `<img src="${icon.url}" alt="${app.name}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:contain;display:block">`;
             el.innerHTML = `<div class="app-icon-wrapper"><div class="app-icon-image">${inner}</div><div class="app-name">${app.name}</div></div>`;
           }else{
             const bg = appColors[dir] || appColors.default; const tc = bg==='#FFFFFF' ? '#000' : '#FFF';
             el.innerHTML = `<div class="app-icon-wrapper"><div class="app-icon-image" style="background-color:${bg}"><div style="width:60%;height:60%;display:flex;align-items:center;justify-content:center;color:${tc};font-weight:bold;font-size:18px">${app.name.charAt(0)}</div></div><div class="app-name">${app.name}</div></div>`;
           }
-          container.appendChild(el);
+          frag.appendChild(el);
         }
+        container.appendChild(frag);
       }catch(e){ container.innerHTML = '<p>加载应用失败，请稍后重试</p>'; }
     }
 
