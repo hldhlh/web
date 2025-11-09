@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-labelledby="title desc">
+  <title>Rice Bowl Icon</title>
+  <desc>Blue bowl with rice and a pair of chopsticks</desc>
+  <defs>
+    <style>
+      :root {
+        --bowl:#0B7CFF;
+        --rim:#2FA1FF;
+        --base:#004CE5;
+        --rice:#CBEFFD;
+        --grain:#FFFFFF;
+        --stickA:#FFC24D;
+        --stickB:#FF9E2C;
+      }
+    </style>
+
+    <!-- 夹住“米粒”的上缘，让米粒不要溢出碗口 -->
+    <clipPath id="riceClip">
+      <!-- 以碗口为界，略带弧度的上边界 -->
+      <path d="M16 60 H112 V20 H16 Z" />
+    </clipPath>
+  </defs>
+
+  <!-- 筷子（在最上层更像插入米饭里） -->
+  <g transform="translate(0,0)">
+    <rect x="88" y="14" width="8" height="44" rx="3" fill="var(--stickA)" transform="rotate(25 92 36)"/>
+    <rect x="96" y="8"  width="8" height="48" rx="3" fill="var(--stickB)" transform="rotate(25 100 32)"/>
+  </g>
+
+  <!-- 米饭（云朵形组合） -->
+  <g clip-path="url(#riceClip)">
+    <g fill="var(--rice)">
+      <circle cx="44" cy="52" r="18"/>
+      <circle cx="58" cy="48" r="20"/>
+      <circle cx="74" cy="50" r="18"/>
+      <circle cx="90" cy="55" r="15"/>
+      <circle cx="30" cy="57" r="14"/>
+    </g>
+    <!-- 米粒点缀 -->
+    <g fill="var(--grain)" opacity="0.95">
+      <circle cx="48" cy="50" r="2.6"/>
+      <circle cx="56" cy="56" r="2.6"/>
+      <circle cx="66" cy="50" r="2.6"/>
+      <circle cx="74" cy="57" r="2.6"/>
+      <circle cx="84" cy="53" r="2.6"/>
+      <circle cx="36" cy="57" r="2.6"/>
+      <circle cx="60" cy="44" r="2.6"/>
+    </g>
+  </g>
+
+  <!-- 碗口 -->
+  <rect x="12" y="56" width="104" height="16" rx="8" fill="var(--rim)"/>
+
+  <!-- 碗身 -->
+  <path d="M16 64 H112
+           Q96 118 64 118
+           Q32 118 16 64 Z" fill="var(--bowl)"/>
+
+  <!-- 碗底座 -->
+  <rect x="54" y="118" width="20" height="8" rx="3" fill="var(--base)"/>
+</svg>

@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="styles.css">
     <!-- CDN加载优化脚本 -->
     <script>
-        // CDN配置 - 多源备选，确保全球可访问
         const CDN_CONFIG = {
             supabase: [
                 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
@@ -18,232 +17,95 @@
             ]
         };
 
-        // CDN加载器
         class CDNLoader {
-            constructor() {
-                this.loadedScripts = new Set();
-                this.loadedStyles = new Set();
-                this.timeout = 8000; // 8秒超时
-            }
-
-            // 检测资源类型
-            getResourceType(url) {
-                return 'js';
-            }
-
-            // 检测地理位置优化CDN顺序
-            async optimizeCDNOrder(urls) {
-                const optimized = [...urls];
-                
-                try {
-                    // 简单的地理检测 - 基于时区
-                    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                    
-                    if (timezone.includes('Asia') || timezone.includes('Shanghai') || timezone.includes('Hong_Kong')) {
-                        // 亚洲地区优先使用更快的CDN
-                        optimized.sort((a, b) => {
-                            if (a.includes('fastly')) return -1;
-                            if (b.includes('fastly')) return 1;
-                            return 0;
-                        });
-                    } else if (timezone.includes('Europe')) {
-                        // 欧洲地区优化
-                        optimized.sort((a, b) => {
-                            if (a.includes('cdnjs') || a.includes('jsdelivr')) return -1;
-                            if (b.includes('cdnjs') || b.includes('jsdelivr')) return 1;
-                            return 0;
-                        });
-                    }
-                } catch (error) {
-                    console.log('地理位置检测失败，使用默认顺序');
-                }
-                
-                return optimized;
-            }
-
-            // 加载单个资源
-            loadResource(url, type) {
+            constructor() { this.timeout = 8000; }
+            loadScript(url) {
                 return new Promise((resolve, reject) => {
-                    let element;
-                    
-                    if (type === 'css') {
-                        element = document.createElement('link');
-                        element.rel = 'stylesheet';
-                        element.href = url;
-                    } else {
-                        element = document.createElement('script');
-                        element.src = url;
-                    }
-
-                    // 设置超时
-                    const timeoutId = setTimeout(() => {
-                        element.remove();
-                        reject(new Error(`加载超时: ${url}`));
-                    }, this.timeout);
-
-                    element.onload = () => {
-                        clearTimeout(timeoutId);
-                        console.log(`✅ CDN加载成功: ${url}`);
-                        resolve(url);
-                    };
-
-                    element.onerror = () => {
-                        clearTimeout(timeoutId);
-                        element.remove();
-                        reject(new Error(`加载失败: ${url}`));
-                    };
-
-                    document.head.appendChild(element);
+                    const s = document.createElement('script');
+                    s.src = url;
+                    const t = setTimeout(() => { s.remove(); reject(new Error(`加载超时: ${url}`)); }, this.timeout);
+                    s.onload = () => { clearTimeout(t); resolve(url); };
+                    s.onerror = () => { clearTimeout(t); s.remove(); reject(new Error(`加载失败: ${url}`)); };
+                    document.head.appendChild(s);
                 });
             }
-
-            // 尝试加载多个CDN源直到成功
             async loadWithFallback(name, urls) {
-                const type = this.getResourceType(urls[0]);
-                const optimizedUrls = await this.optimizeCDNOrder(urls);
-                
-                console.log(`🚀 开始加载 ${name}，尝试顺序:`, optimizedUrls);
-
-                for (let i = 0; i < optimizedUrls.length; i++) {
-                    const url = optimizedUrls[i];
+                console.log(`🚀 开始加载 ${name}，尝试顺序`, urls);
+                for (let i = 0; i < urls.length; i++) {
                     try {
-                        await this.loadResource(url, type);
-                        
-                        // 特殊处理：验证Supabase是否真正可用
-                        if (name === 'supabase') {
-                            await this.waitForSupabase();
-                        }
-                        
-                        console.log(`✅ ${name} 加载成功: ${url}`);
-                        return url;
-                    } catch (error) {
-                        console.warn(`❌ ${name} CDN失败 (${i + 1}/${optimizedUrls.length}): ${error.message}`);
-                        
-                        if (i === optimizedUrls.length - 1) {
-                            throw new Error(`所有 ${name} CDN源均不可用`);
-                        }
-                        
-                        // 短暂延迟后尝试下一个CDN
-                        await new Promise(resolve => setTimeout(resolve, 500));
+                        const u = urls[i];
+                        await this.loadScript(u);
+                        if (name === 'supabase') await this.waitForSupabase();
+                        console.log(`✅ ${name} 加载成功: ${u}`);
+                        return u;
+                    } catch (e) {
+                        console.warn(`${name} CDN失败 (${i+1}/${urls.length}):`, e.message);
+                        if (i === urls.length - 1) throw new Error(`所有 ${name} CDN 源均不可用`);
+                        await new Promise(r => setTimeout(r, 500));
                     }
                 }
             }
-
-            // 等待Supabase加载完成
             waitForSupabase() {
                 return new Promise((resolve, reject) => {
-                    let attempts = 0;
-                    const maxAttempts = 50;
-                    
-                    const checkSupabase = () => {
-                        attempts++;
-                        
-                        if (window.supabase && typeof window.supabase.createClient === 'function') {
-                            resolve();
-                        } else if (attempts >= maxAttempts) {
-                            reject(new Error('Supabase验证超时'));
-                        } else {
-                            setTimeout(checkSupabase, 100);
-                        }
+                    let n = 0; const max = 50;
+                    const check = () => {
+                        n++;
+                        if (window.supabase && typeof window.supabase.createClient === 'function') return resolve();
+                        if (n >= max) return reject(new Error('Supabase 验证超时'));
+                        setTimeout(check, 100);
                     };
-                    
-                    checkSupabase();
+                    check();
                 });
             }
-
-            // 显示加载状态
             showLoadingStatus(message, type = 'info') {
-                const existingStatus = document.querySelector('.status-indicator');
-                if (existingStatus) {
-                    existingStatus.remove();
-                }
-
-                const status = document.createElement('div');
-                status.className = `status-indicator ${type}`;
-                status.textContent = message;
-                document.body.appendChild(status);
-
-                setTimeout(() => {
-                    if (status && status.parentNode) {
-                        status.remove();
-                    }
-                }, type === 'error' ? 8000 : 3000);
+                const ex = document.querySelector('.status-indicator');
+                if (ex) ex.remove();
+                const el = document.createElement('div');
+                el.className = `status-indicator ${type}`;
+                el.textContent = message;
+                document.body.appendChild(el);
+                setTimeout(() => { if (el && el.parentNode) el.remove(); }, type === 'error' ? 8000 : 3000);
             }
         }
-
-        // 初始化CDN加载器
         const cdnLoader = new CDNLoader();
-
-        // 页面加载完成后开始加载CDN
         document.addEventListener('DOMContentLoaded', async () => {
             try {
                 cdnLoader.showLoadingStatus('正在加载数据库连接...', 'info');
-                
-                // 只加载Supabase CDN
                 const supabaseUrl = await cdnLoader.loadWithFallback('supabase', CDN_CONFIG.supabase);
-
                 cdnLoader.showLoadingStatus('CDN加载完成', 'success');
-                console.log('🎉 Supabase CDN加载完成:', supabaseUrl);
-                
-                // 触发自定义事件，通知主应用CDN已准备就绪
-                window.dispatchEvent(new CustomEvent('cdnReady', {
-                    detail: { supabase: supabaseUrl }
-                }));
-                
+                console.log('🎉 Supabase CDN加载完成', supabaseUrl);
+                window.dispatchEvent(new CustomEvent('cdnReady', { detail: { supabase: supabaseUrl } }));
             } catch (error) {
                 console.error('❌ CDN加载失败:', error);
                 cdnLoader.showLoadingStatus('CDN加载失败，部分功能可能不可用', 'error');
-                
-                // 即使CDN失败也要初始化基本功能
-                window.dispatchEvent(new CustomEvent('cdnError', {
-                    detail: { error: error.message }
-                }));
+                window.dispatchEvent(new CustomEvent('cdnError', { detail: { error: error.message } }));
             }
         });
     </script>
-
 </head>
 <body>
     <div class="container">
         <h1 class="page-title">日志</h1>
-
         <form id="logForm" class="form-container">
-            <textarea id="logContent" name="content" rows="3"
-                      class="form-textarea"
-                      placeholder="记录..." required></textarea>
+            <textarea id="logContent" name="content" rows="3" class="form-textarea" placeholder="随手记录点什么..." required></textarea>
             <div class="form-actions">
-                <button type="button" id="cancelBtn" class="btn btn-cancel hidden">
-                    取消
-                </button>
-                <button type="submit" id="submitBtn" class="btn btn-primary">
-                    保存
-                </button>
+                <button type="button" id="cancelBtn" class="btn btn-cancel hidden">取消</button>
+                <button type="submit" id="submitBtn" class="btn btn-primary">保存</button>
             </div>
         </form>
-
-        <div id="timeline" class="timeline-container">
-            <!-- 日志条目 -->
-        </div>
-
-        <div id="emptyState" class="empty-state hidden">
-            暂无日志
-        </div>
+        <div id="timeline" class="timeline-container"><!-- 日志条目 --></div>
+        <div id="emptyState" class="empty-state hidden">暂无日志</div>
     </div>
-
     <div id="deleteModal" class="modal hidden">
         <div class="modal-content">
             <p class="modal-text">确定删除？</p>
             <div class="modal-actions">
-                <button id="cancelDelete" class="btn btn-cancel">
-                    取消
-                </button>
-                <button id="confirmDelete" class="btn btn-danger">
-                    删除
-                </button>
+                <button id="cancelDelete" class="btn btn-cancel">取消</button>
+                <button id="confirmDelete" class="btn btn-danger">删除</button>
             </div>
         </div>
     </div>
-
     <script src="script.js"></script>
 </body>
 </html>
+

@@ -1,495 +1,109 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>应用导航页</title>
-	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-	<style>
-		* {
-			margin: 0;
-			padding: 0;
-			box-sizing: border-box;
-		}
-
-		:root {
-			--app-primary-color: #0a84ff;
-			--app-primary-light: rgba(10, 132, 255, .1);
-			--app-background: #f5f5f5;
-			--app-surface: #fff;
-			--text-primary: #1d1d1f;
-			--text-secondary: #86868b;
-			--border-color: rgba(0, 0, 0, .1);
-		}
-
-		[data-theme=dark] {
-			--app-primary-color: #0a84ff;
-			--app-primary-light: rgba(10, 132, 255, .2);
-			--app-background: #1c1c1e;
-			--app-surface: #2c2c2e;
-			--text-primary: #fff;
-			--text-secondary: #ebebf0;
-			--border-color: rgba(255, 255, 255, .1);
-		}
-
-		body {
-			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-			background-color: var(--app-background);
-			color: var(--text-primary);
-			height: 100vh;
-			overflow: hidden;
-			-webkit-font-smoothing: antialiased;
-		}
-
-		/* 滚动条样式 */
-		::-webkit-scrollbar {
-			width: 6px;
-			height: 6px;
-		}
-
-		::-webkit-scrollbar-track {
-			background: transparent;
-		}
-
-		::-webkit-scrollbar-thumb {
-			background-color: rgba(0, 0, 0, 0.15);
-			border-radius: 4px;
-			border: 2px solid transparent;
-		}
-
-		::-webkit-scrollbar-thumb:hover {
-			background-color: rgba(0, 0, 0, 0.3);
-		}
-
-		.container {
-			width: 100%;
-			max-width: 100%;
-			margin: 0 auto;
-			height: 100vh;
-			display: flex;
-			flex-direction: column;
-			position: relative;
-			overflow-y: auto;
-			scrollbar-width: thin;
-			scrollbar-color: transparent transparent;
-			-webkit-overflow-scrolling: touch;
-			scroll-behavior: smooth;
-		}
-
-		/* 桌面端滚动条交互 */
-		@media (hover:hover) and (pointer:fine) {
-			.container::-webkit-scrollbar-thumb {
-				background-color: transparent;
-				transition: background-color 0.3s ease;
-			}
-			
-			.container.is-scrolling::-webkit-scrollbar-thumb {
-				background-color: rgba(0, 0, 0, 0.15);
-			}
-			
-			.container {
-				transition: scrollbar-color 0.3s ease;
-			}
-			
-			.container.is-scrolling {
-				scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
-			}
-		}
-
-		/* 移动端滚动条 - 完全隐藏 */
-		@media (hover:none) or (pointer:coarse) {
-			.container::-webkit-scrollbar {
-				width: 0;
-				height: 0;
-			}
-			
-			.container {
-				-ms-overflow-style: none;  /* IE and Edge */
-				scrollbar-width: none;     /* Firefox */
-			}
-		}
-
-		.status-bar {
-			padding: .5rem 1rem;
-			display: flex;
-			justify-content: flex-end;
-			align-items: center;
-		}
-
-		.app-icons-wrapper {
-			flex: 1;
-			padding: 1rem;
-			display: grid;
-			grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-			grid-auto-rows: minmax(90px, auto);
-			gap: 1.5rem;
-			width: 100%;
-			max-width: 1200px;
-			justify-content: center;
-			align-content: start;
-			margin: 0 auto;
-		}
-
-		.app-icon {
-			text-decoration: none;
-			width: 100%;
-			display: flex;
-			flex-direction: column;
-			align-items: center;
-			justify-content: flex-start;
-			margin: 0 auto;
-		}
-
-		.app-icon-image {
-			width: 64px;
-			height: 64px;
-			border-radius: 16px;
-			margin-bottom: .3rem;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			overflow: hidden;
-			box-shadow: 0 2px 6px rgba(0, 0, 0, .08);
-			position: relative;
-			background-color: #fff;
-			transition: transform .15s cubic-bezier(.34, 1.56, .64, 1), box-shadow .15s cubic-bezier(.34, 1.56, .64, 1);
-			will-change: transform, box-shadow;
-		}
-
-		.app-icon:hover .app-icon-image {
-			transform: translateY(-3px) scale(1.03);
-			box-shadow: 0 4px 10px rgba(0, 0, 0, .1);
-		}
-
-		.app-icon-image svg {
-			width: 100%;
-			height: 100%;
-			display: block;
-		}
-
-		.app-name {
-			font-size: .85rem;
-			color: var(--text-primary);
-			text-align: center;
-			max-width: 80px;
-			overflow: hidden;
-			text-overflow: ellipsis;
-			white-space: nowrap;
-			transition: color .15s ease;
-		}
-
-		.app-icon:hover .app-name {
-			color: var(--app-primary-color);
-		}
-
-		.theme-toggle {
-			background: var(--app-surface);
-			border: none;
-			cursor: pointer;
-			width: 36px;
-			height: 36px;
-			border-radius: 50%;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-			transition: all 0.3s ease;
-			overflow: hidden;
-			position: relative;
-		}
-
-		.theme-toggle:hover {
-			transform: translateY(-2px);
-			box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-		}
-
-		.theme-toggle svg {
-			width: 20px;
-			height: 20px;
-			transition: transform 0.5s ease;
-		}
-
-		.theme-toggle .sun-icon,
-		.theme-toggle .moon-icon {
-			position: absolute;
-			fill: var(--text-primary);
-		}
-
-		.theme-toggle .sun-icon {
-			opacity: 1;
-			transform: translateY(0);
-			transition: opacity 0.3s ease, transform 0.5s ease;
-			stroke: var(--text-primary);
-			stroke-width: 1.5;
-			stroke-linecap: round;
-			fill: none;
-		}
-
-		.theme-toggle .moon-icon {
-			opacity: 0;
-			transform: translateY(20px);
-			transition: opacity 0.3s ease, transform 0.5s ease;
-			fill: var(--text-primary);
-		}
-
-		[data-theme=dark] .theme-toggle .sun-icon {
-			opacity: 0;
-			transform: translateY(-20px);
-		}
-
-		[data-theme=dark] .theme-toggle .moon-icon {
-			opacity: 1;
-			transform: translateY(0);
-		}
-
-		@media (max-width:768px) {
-			.app-icons-wrapper {
-				grid-template-columns: repeat(4, 1fr);
-				padding: .8rem;
-				gap: 1rem;
-			}
-			.app-icon-image {
-				width: 55px;
-				height: 55px;
-			}
-		}
-	</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>应用导航</title>
+  <!-- 使用原生 CSS/JS/HTML，不依赖 Bootstrap -->
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    :root {
+      --app-primary-color:#0a84ff; --app-primary-light:rgba(10,132,255,.1);
+      --app-background:#f5f5f5; --app-surface:#fff;
+      --text-primary:#1d1d1f; --text-secondary:#86868b; --border-color:rgba(0,0,0,.1);
+    }
+    [data-theme=dark] {
+      --app-primary-color:#0a84ff; --app-primary-light:rgba(10,132,255,.2);
+      --app-background:#1c1c1e; --app-surface:#2c2c2e;
+      --text-primary:#fff; --text-secondary:#ebebf0; --border-color:rgba(255,255,255,.1);
+    }
+    body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--app-background); color:var(--text-primary); height:100vh; overflow:hidden; -webkit-font-smoothing:antialiased; }
+    .container { height:100vh; display:flex; flex-direction:column; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+    .status-bar { padding:.5rem 1rem; display:flex; justify-content:flex-end; align-items:center; }
+    .app-icons-wrapper { flex:1; padding:1rem; display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); grid-auto-rows:minmax(90px,auto); gap:1.5rem; width:100%; max-width:1200px; margin:0 auto; align-content:start; }
+    .app-icon { text-decoration:none; display:flex; flex-direction:column; align-items:center; }
+    .app-icon-image { width:64px; height:64px; border-radius:16px; margin-bottom:.3rem; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,.08); }
+    .app-icon:hover .app-icon-image { transform:translateY(-3px) scale(1.03); box-shadow:0 4px 10px rgba(0,0,0,.1); }
+    .app-icon-image svg { width:100%; height:100%; display:block; }
+    .app-name { font-size:.85rem; color:var(--text-primary); text-align:center; max-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .app-icon:hover .app-name { color:var(--app-primary-color); }
+    .theme-toggle { background:var(--app-surface); border:none; cursor:pointer; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,.12); position:relative; }
+    .theme-toggle .sun-icon,.theme-toggle .moon-icon { position:absolute; fill:var(--text-primary); }
+    .theme-toggle .sun-icon { opacity:1; stroke:var(--text-primary); stroke-width:1.5; stroke-linecap:round; fill:none; }
+    .theme-toggle .moon-icon { opacity:0; }
+    [data-theme=dark] .theme-toggle .sun-icon { opacity:0; transform:translateY(-20px); }
+    [data-theme=dark] .theme-toggle .moon-icon { opacity:1; transform:translateY(0); }
+    @media (max-width:768px){ .app-icons-wrapper{ grid-template-columns:repeat(4,1fr); gap:1rem; padding:.8rem; } .app-icon-image{ width:55px; height:55px; } }
+  </style>
 </head>
 <body>
-	<div class="container">
-		<div class="status-bar">
-			<button id="theme-toggle" class="theme-toggle" title="切换主题">
-				<svg class="sun-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-					<circle cx="12" cy="12" r="4.5" />
-					<line x1="12" y1="2" x2="12" y2="4" />
-					<line x1="12" y1="20" x2="12" y2="22" />
-					<line x1="4" y1="12" x2="2" y2="12" />
-					<line x1="22" y1="12" x2="20" y2="12" />
-					<line x1="6.34" y1="6.34" x2="4.93" y2="4.93" />
-					<line x1="19.07" y1="19.07" x2="17.66" y2="17.66" />
-					<line x1="6.34" y1="17.66" x2="4.93" y2="19.07" />
-					<line x1="19.07" y1="4.93" x2="17.66" y2="6.34" />
-				</svg>
-				<svg class="moon-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-					<path d="M21.5 14.0784C20.3003 14.7189 18.9341 15.0821 17.4849 15.0821C12.9237 15.0821 9.22612 11.3845 9.22612 6.82334C9.22612 5.37545 9.59114 4.0109 10.2322 2.8125C6.36838 3.92340 3.5 7.45216 3.5 11.636C3.5 16.7325 7.63757 20.87 12.734 20.87C16.9262 20.87 20.4603 18.0075 21.5 14.0784Z" />
-				</svg>
-			</button>
-		</div>
-		<div class="app-icons-wrapper" id="app-container"></div>
-	</div>
-	<script type="module">
-		import { getAppDirectories } from './apps.js';
+  <div class="container">
+    <div class="status-bar">
+      <button id="theme-toggle" class="theme-toggle" title="切换主题">
+        <svg class="sun-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="4.5" />
+          <line x1="12" y1="2" x2="12" y2="4" />
+          <line x1="12" y1="20" x2="12" y2="22" />
+          <line x1="4" y1="12" x2="2" y2="12" />
+          <line x1="22" y1="12" x2="20" y2="12" />
+          <line x1="6.34" y1="6.34" x2="4.93" y2="4.93" />
+          <line x1="19.07" y1="19.07" x2="17.66" y2="17.66" />
+          <line x1="6.34" y1="17.66" x2="4.93" y2="19.07" />
+          <line x1="19.07" y1="4.93" x2="17.66" y2="6.34" />
+        </svg>
+        <svg class="moon-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M21.5 14.0784C20.3003 14.7189 18.9341 15.0821 17.4849 15.0821C12.9237 15.0821 9.22612 11.3845 9.22612 6.82334C9.22612 5.37545 9.59114 4.0109 10.2322 2.8125C6.36838 3.9234 3.5 7.45216 3.5 11.636C3.5 16.7325 7.63757 20.87 12.734 20.87C16.9262 20.87 20.4603 18.0075 21.5 14.0784Z" />
+        </svg>
+      </button>
+    </div>
+    <div class="app-icons-wrapper" id="app-container"></div>
+  </div>
+  <script type="module">
+    import { getAppDirectories } from './apps.js';
 
-		// 主题管理对象
-		const Theme = {
-			getTheme() {
-				return localStorage.getItem('app-theme') || 'light';
-			},
-			setTheme(theme) {
-				localStorage.setItem('app-theme', theme);
-				document.body.setAttribute('data-theme', theme);
-			},
-			toggleTheme() {
-				const newTheme = this.getTheme() === 'light' ? 'dark' : 'light';
-				this.setTheme(newTheme);
-				return newTheme;
-			},
-			initialize() {
-				this.setTheme(this.getTheme());
-			}
-		};
+    const Theme = {
+      getTheme(){ return localStorage.getItem('app-theme') || 'light' },
+      setTheme(t){ localStorage.setItem('app-theme', t); document.body.setAttribute('data-theme', t) },
+      toggle(){ const t=this.getTheme()==='light'?'dark':'light'; this.setTheme(t); return t },
+      init(){ this.setTheme(this.getTheme()) }
+    };
 
-		// 滚动增强功能
-		function setupScrollEnhancement() {
-			// 获取主容器
-			const container = document.querySelector('.container');
-			if (!container) return;
-			
-			// 检测是否为移动设备
-			const isMobileDevice = window.matchMedia('(hover: none), (pointer: coarse)').matches;
-			
-			// 桌面端滚动条自动隐藏
-			if (!isMobileDevice) {
-				let scrollTimer;
-				container.addEventListener('scroll', function() {
-					// 显示滚动条
-					this.classList.add('is-scrolling');
-					
-					// 清除之前的定时器
-					clearTimeout(scrollTimer);
-					
-					// 设置新的定时器，滚动停止后隐藏滚动条
-					scrollTimer = setTimeout(() => {
-						this.classList.remove('is-scrolling');
-					}, 1000); // 滚动停止1秒后隐藏滚动条
-				});
-				
-				// 初始加载时触发一次滚动事件，显示滚动条
-				if (container.scrollHeight > container.clientHeight) {
-					container.classList.add('is-scrolling');
-					clearTimeout(scrollTimer);
-					scrollTimer = setTimeout(() => {
-						container.classList.remove('is-scrolling');
-					}, 2000); // 初始显示2秒后隐藏
-				}
-			}
-			
-			if (isMobileDevice) {
-				// 创建滚动指示器元素
-				const scrollIndicator = document.createElement('div');
-				scrollIndicator.style.cssText = `
-					position: fixed;
-					right: 2px;
-					width: 4px;
-					border-radius: 2px;
-					background-color: rgba(0, 0, 0, 0.2);
-					opacity: 0;
-					transition: opacity 0.3s ease;
-					pointer-events: none;
-					z-index: 1000;
-				`;
-				document.body.appendChild(scrollIndicator);
-				
-				// 添加滚动事件处理
-				let scrollTimer;
-				container.addEventListener('scroll', function() {
-					// 计算滚动位置和指示器高度
-					const scrollTop = container.scrollTop;
-					const scrollHeight = container.scrollHeight;
-					const clientHeight = container.clientHeight;
-					
-					// 计算滚动百分比
-					const scrollPercent = scrollTop / (scrollHeight - clientHeight);
-					
-					// 设置指示器高度和位置
-					const indicatorHeight = Math.max(30, clientHeight * (clientHeight / scrollHeight));
-					const indicatorTop = scrollTop + (clientHeight - indicatorHeight) * scrollPercent;
-					
-					// 根据当前主题设置颜色
-					const isDark = document.body.getAttribute('data-theme') === 'dark';
-					scrollIndicator.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)';
-					
-					scrollIndicator.style.height = `${indicatorHeight}px`;
-					scrollIndicator.style.top = `${indicatorTop}px`;
-					scrollIndicator.style.opacity = '1';
-					
-					// 清除之前的定时器
-					clearTimeout(scrollTimer);
-					
-					// 设置新的定时器，滚动停止后隐藏指示器
-					scrollTimer = setTimeout(() => {
-						scrollIndicator.style.opacity = '0';
-					}, 1000); // 滚动停止1秒后隐藏指示器
-				});
-				
-				// 监听主题变化
-				const themeToggle = document.getElementById('theme-toggle');
-				if (themeToggle) {
-					themeToggle.addEventListener('click', () => {
-						// 主题切换后更新滚动指示器颜色
-						setTimeout(() => {
-							const isDark = document.body.getAttribute('data-theme') === 'dark';
-							scrollIndicator.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)';
-						}, 0);
-					});
-				}
-			}
-		}
+    const appColors = { mail:'#FF453A', contacts:'#FF9F0A', photos:'#30D158', calendar:'#FFD60A', todo:'#5E5CE6', cloud:'#0A84FF', default:'#FFFFFF' };
 
-		// 应用颜色映射
-		const appColors = {
-			mail: '#FF453A',
-			contacts: '#FF9F0A',
-			photos: '#30D158',
-			calendar: '#FFD60A',
-			todo: '#5E5CE6',
-			cloud: '#0A84FF',
-			default: '#FFFFFF'
-		};
+    const getDirFromPath = (p) => { if(!p) return ''; const i=p.indexOf('/'); return i===-1?p:p.slice(0,i); };
+    const resolveIcon = async (dir) => {
+      const candidates = [`./pages/${dir}/icon.svg`,`./pages/${dir}/icon`];
+      for(const url of candidates){
+        try{ const res = await fetch(url); if(!res.ok) continue; const ct=(res.headers.get('content-type')||'').toLowerCase();
+          if(ct.includes('image/svg')) return { type:'svg', content: await res.text() };
+          return { type:'img', url };
+        }catch(e){}
+      }
+      return null;
+    };
 
-		// 加载应用列表
-		async function loadApps() {
-			const container = document.getElementById('app-container');
-			try {
-				const apps = await getAppDirectories();
-				
-				// 加载 SVG 图标函数
-				const loadSvgIcon = async (appId) => {
-					try {
-						const response = await fetch(`./pages/${appId}/icon.svg`);
-						if (response.ok)
-							return await response.text();
-						throw new Error(`无法加载图标:${response.status}`);
-					} catch (error) {
-						return null;
-					}
-				};
+    async function loadApps(){
+      const container = document.getElementById('app-container');
+      try{
+        const apps = await getAppDirectories();
+        for(const app of apps){
+          const dir = getDirFromPath(app.path);
+          const icon = await resolveIcon(dir);
+          const el = document.createElement('a');
+          el.href = `./pages/${app.path}`; el.className='app-icon';
+          if(icon){
+            const inner = icon.type==='svg' ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center">${icon.content}</div>` : `<img src="${icon.url}" alt="${app.name}" style="width:100%;height:100%;object-fit:contain;display:block">`;
+            el.innerHTML = `<div class="app-icon-wrapper"><div class="app-icon-image">${inner}</div><div class="app-name">${app.name}</div></div>`;
+          }else{
+            const bg = appColors[dir] || appColors.default; const tc = bg==='#FFFFFF' ? '#000' : '#FFF';
+            el.innerHTML = `<div class="app-icon-wrapper"><div class="app-icon-image" style="background-color:${bg}"><div style="width:60%;height:60%;display:flex;align-items:center;justify-content:center;color:${tc};font-weight:bold;font-size:18px">${app.name.charAt(0)}</div></div><div class="app-name">${app.name}</div></div>`;
+          }
+          container.appendChild(el);
+        }
+      }catch(e){ container.innerHTML = '<p>加载应用失败，请稍后重试</p>'; }
+    }
 
-				// 为每个应用创建图标
-				for (const app of apps) {
-					let iconContent = await loadSvgIcon(app.id);
-					const element = document.createElement('a');
-					element.href = `./pages/${app.path}`;
-					element.className = 'app-icon';
-
-					if (iconContent) {
-						// 使用 SVG 图标
-						element.innerHTML = `
-							<div class="app-icon-wrapper">
-								<div class="app-icon-image">
-									<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center">
-										${iconContent}
-									</div>
-								</div>
-								<div class="app-name">${app.name}</div>
-							</div>
-						`;
-					} else {
-						// 使用颜色背景和首字母作为备用
-						const bgColor = appColors[app.id] || appColors.default;
-						const textColor = bgColor === '#FFFFFF' ? '#000000' : '#FFFFFF';
-						element.innerHTML = `
-							<div class="app-icon-wrapper">
-								<div class="app-icon-image" style="background-color:${bgColor}">
-									<div style="width:60%; height:60%; display:flex; align-items:center; justify-content:center; color:${textColor}; font-weight:bold; font-size:18px">
-										${app.name.charAt(0)}
-									</div>
-								</div>
-								<div class="app-name">${app.name}</div>
-							</div>
-						`;
-					}
-					container.appendChild(element);
-				}
-			} catch (error) {
-				container.innerHTML = '<p>加载应用失败，请稍后重试。</p>';
-			}
-		}
-
-		// 页面加载完成后初始化
-		document.addEventListener('DOMContentLoaded', () => {
-			// 初始化主题
-			Theme.initialize();
-			
-			// 初始化滚动增强功能
-			setupScrollEnhancement();
-			
-			// 加载应用列表
-			loadApps();
-			
-			// 绑定主题切换事件
-			document.getElementById('theme-toggle').addEventListener('click', () => Theme.toggleTheme());
-			
-			// 处理浏览器前进后退事件
-			(() => {
-				const currentUrl = window.location.href;
-				window.history.replaceState({ page: 'home' }, '', currentUrl);
-				window.history.pushState({ page: 'home' }, '', currentUrl);
-				window.addEventListener('popstate', () => {
-					window.history.pushState({ page: 'home' }, '', currentUrl);
-				});
-			})();
-		});
-	</script>
+    document.addEventListener('DOMContentLoaded', ()=>{ Theme.init(); loadApps(); document.getElementById('theme-toggle').addEventListener('click', ()=>Theme.toggle()); });
+  </script>
 </body>
 </html>

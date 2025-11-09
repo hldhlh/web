@@ -1,14 +1,14 @@
 export async function getAppDirectories() {
-    return [
-        {id:'mail',name:'邮件',path:'mail/index.html'},
-        {id:'contacts',name:'联系人',path:'contacts/index.html'},
-        {id:'photos',name:'照片',path:'photos/index.html'},
-        {id:'calendar',name:'日历',path:'calendar/index.html'},
-        {id:'todo',name:'待办事项',path:'todo/index.html'},
-        {id:'test',name:'测试',path:'test/index.html'},
-        {id:'wordcanvas',name:'灵感词云',path:'wordcanvas/index.html'},
-        {id:'cloud',name:'云盘',path:'cloud/index.html'},
-        {id:'cloud',name:'吃什么',path:'eatwhat/index.html'},
-        {id:'log',name:'日志',path:'log/index.html'}
-    ];
+  return [
+    { name: "\u90AE\u4EF6",     path: "mail/index.html" },
+    { name: "\u8054\u7CFB\u4EBA",   path: "contacts/index.html" },
+    { name: "\u7167\u7247",     path: "photos/index.html" },
+    { name: "\u65E5\u5386",     path: "calendar/index.html" },
+    { name: "\u5F85\u529E\u4E8B\u9879", path: "todo/index.html" },
+    { name: "\u6D4B\u8BD5",     path: "test/index.html" },
+    { name: "\u7075\u611F\u8BCD\u4E91", path: "wordcanvas/index.html" },
+    { name: "\u4E91\u76D8",     path: "cloud/index.html" },
+    { name: "\u5403\u4EC0\u4E48",   path: "eatwhat/index.html" },
+    { name: "\u65E5\u5FD7",     path: "log/index.html" }
+  ];
 }

@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>日历</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
         :root {
             --app-color: #ff9500;
@@ -118,39 +116,70 @@
             background-color: #f8f9fa;
             border-radius: 4px;
         }
-    </style>
+            /* 原生工具类与组件样式 */
+        .d-flex{display:flex}
+        .align-items-center{align-items:center}
+        .justify-content-between{justify-content:space-between}
+        .text-white{color:#fff}
+        .text-muted{color:var(--secondary-text)}
+        .fw-bold{font-weight:700}
+        .fw-semibold{font-weight:600}
+        .mb-1{margin-bottom:.25rem}
+        .mb-2{margin-bottom:.5rem}
+        .mb-3{margin-bottom:1rem}
+        .mb-4{margin-bottom:1.5rem}
+        .mt-3{margin-top:1rem}
+        .mt-4{margin-top:1.5rem}
+        .me-1{margin-right:.25rem}
+        .me-2{margin-right:.5rem}
+        .fs-4{font-size:1.25rem}
+        .fs-5{font-size:1.1rem}
+        .btn{border:0;background:transparent;color:inherit;cursor:pointer;padding:6px 10px;border-radius:6px}
+        .btn:hover{background:rgba(0,0,0,.06)}
+        .btn-outline-secondary{border:1px solid var(--border-color);background:#fff}
+        .btn-sm{padding:4px 8px;border-radius:6px}
+        .input-group{display:flex;align-items:center;border:1px solid var(--border-color);border-radius:8px;overflow:hidden}
+        .input-group-text{padding:8px 10px;background:#f6f6f6;border-right:1px solid var(--border-color);display:flex;align-items:center}
+        .form-control{flex:1;border:0;outline:none;padding:10px 12px;font:inherit;background:#fff}
+        .list-group{display:flex;flex-direction:column;gap:6px}
+        .list-group-item{padding:10px 12px;border:1px solid var(--border-color);border-radius:10px;background:#fff}
+        .list-group-item-action{transition:background .15s ease}
+        .list-group-item-action:hover{background:var(--app-color-light)}
+        .alert{padding:10px 12px;border-radius:8px}
+        .alert-info{background:#e9f5ff;color:#084d7a}
+        .icon{width:20px;height:20px;display:inline-block;vertical-align:middle}</style>
 </head>
 <body>
     <div class="app-container">
         <div class="app-header">
             <div class="d-flex align-items-center">
                 <button class="back-button" onclick="window.location.href='../../index.html'">
-                    <i class="bi bi-arrow-left"></i>
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/><line x1="20" y1="12" x2="9" y2="12"/></svg>
                 </button>
-                <h1 class="app-title">日历</h1>
+                <h1 class="app-title">鏃ュ巻</h1>
             </div>
             <div>
-                <button class="btn text-white"><i class="bi bi-plus-lg"></i></button>
+                <button class="btn text-white"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
             </div>
         </div>
         
         <div class="app-content">
             <div class="d-flex justify-content-between align-items-center">
-                <h2 class="fs-4">2025年4月</h2>
+                <h2 class="fs-4">2025骞?鏈?/h2>
                 <div>
-                    <button class="btn btn-sm btn-outline-secondary me-1"><i class="bi bi-chevron-left"></i></button>
-                    <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-chevron-right"></i></button>
+                    <button class="btn btn-sm btn-outline-secondary me-1"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+                    <button class="btn btn-sm btn-outline-secondary"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
                 </div>
             </div>
             
             <div class="calendar-grid">
-                <div class="calendar-header">日</div>
-                <div class="calendar-header">一</div>
-                <div class="calendar-header">二</div>
-                <div class="calendar-header">三</div>
-                <div class="calendar-header">四</div>
-                <div class="calendar-header">五</div>
-                <div class="calendar-header">六</div>
+                <div class="calendar-header">鏃?/div>
+                <div class="calendar-header">涓€</div>
+                <div class="calendar-header">浜?/div>
+                <div class="calendar-header">涓?/div>
+                <div class="calendar-header">鍥?/div>
+                <div class="calendar-header">浜?/div>
+                <div class="calendar-header">鍏?/div>
                 
                 <div class="calendar-day text-muted">30</div>
                 <div class="calendar-day text-muted">31</div>
@@ -194,13 +223,13 @@
             </div>
             
             <div class="event-list">
-                <h3 class="fs-5 mb-3">今日日程</h3>
+                <h3 class="fs-5 mb-3">浠婃棩鏃ョ▼</h3>
                 <div class="event-item">
-                    <div class="fw-semibold">团队会议</div>
+                    <div class="fw-semibold">鍥㈤槦浼氳</div>
                     <div class="text-muted">14:00 - 15:30</div>
                 </div>
                 <div class="event-item">
-                    <div class="fw-semibold">项目截止日期</div>
+                    <div class="fw-semibold">椤圭洰鎴鏃ユ湡</div>
                     <div class="text-muted">17:00</div>
                 </div>
             </div>

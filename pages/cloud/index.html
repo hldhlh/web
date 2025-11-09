@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+锘?!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>云存储</title>
+    <title>浜戝瓨鍌?/title>
     <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -12,8 +12,8 @@
     <div class="container">
         <header>
             <div class="logo">
-                <img src="icon.svg" alt="云存储图标">
-                <h1>云存储</h1>
+                <img src="icon.svg" alt="浜戝瓨鍌ㄥ浘鏍?>
+                <h1>浜戝瓨鍌?/h1>
             </div>
         </header>
 
@@ -26,7 +26,7 @@
                             <polyline points="17 8 12 3 7 8"></polyline>
                             <line x1="12" y1="3" x2="12" y2="15"></line>
                         </svg>
-                        上传文件
+                        娑撳﹣绱堕弬鍥︽
                     </label>
                     <input type="file" id="file-upload" multiple hidden>
                 </div>
@@ -35,7 +35,7 @@
                         <div class="progress-bar">
                             <div class="progress" id="storage-progress"></div>
                         </div>
-                        <div class="storage-text">已使用 <span id="used-storage">0</span> / <span id="total-storage">5GB</span></div>
+                        <div class="storage-text">瀹歌弓濞囬悽?<span id="used-storage">0</span> / <span id="total-storage">5GB</span></div>
                     </div>
                 </div>
                 <div class="category-list">
@@ -45,7 +45,7 @@
                             <path d="M3 6l9 4 9-4"></path>
                             <path d="M12 10v10"></path>
                         </svg>
-                        全部文件
+                        閸忋劑鍎撮弬鍥︽
                     </div>
                     <div class="category" data-category="images">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -53,7 +53,7 @@
                             <circle cx="8.5" cy="8.5" r="1.5"></circle>
                             <polyline points="21 15 16 10 5 21"></polyline>
                         </svg>
-                        图片
+                        閸ュ墽澧?
                     </div>
                     <div class="category" data-category="documents">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -63,21 +63,21 @@
                             <line x1="16" y1="17" x2="8" y2="17"></line>
                             <polyline points="10 9 9 9 8 9"></polyline>
                         </svg>
-                        文档
+                        閺傚洦銆?
                     </div>
                     <div class="category" data-category="others">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline>
                             <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>
                         </svg>
-                        其他
+                        閸忔湹绮?
                     </div>
                 </div>
             </div>
 
             <div class="content">
                 <div class="search-bar">
-                    <input type="text" id="search-input" placeholder="搜索文件...">
+                    <input type="text" id="search-input" placeholder="閹兼粎鍌ㄩ弬鍥︽...">
                     <button id="search-btn">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="11" cy="11" r="8"></circle>
@@ -109,10 +109,10 @@
 
                 <div id="drop-area" class="drop-area">
                     <div class="file-list" id="file-list">
-                        <!-- 文件将通过 JavaScript 动态加载 -->
+                        <!-- 閺傚洣娆㈢亸鍡涒偓姘崇箖 JavaScript 閸斻劍鈧礁濮炴潪?-->
                         <div class="loading-indicator">
                             <div class="spinner"></div>
-                            <span>正在加载文件...</span>
+                            <span>濮濓絽婀崝鐘烘祰閺傚洣娆?..</span>
                         </div>
                     </div>
                     
@@ -123,7 +123,7 @@
                                 <polyline points="17 8 12 3 7 8"></polyline>
                                 <line x1="12" y1="3" x2="12" y2="15"></line>
                             </svg>
-                            <h3>拖放文件至此处上传</h3>
+                            <h3>閹锋牗鏂侀弬鍥︽閼疯櫕顒濇径鍕瑐娴?/h3>
                         </div>
                     </div>
                 </div>
@@ -132,22 +132,22 @@
 
         <div id="upload-progress-container" class="hidden">
             <div class="upload-progress-header">
-                <span>上传进度</span>
-                <button id="close-progress">×</button>
+                <span>娑撳﹣绱舵潻娑樺</span>
+                <button id="close-progress">鑴?/button>
             </div>
             <div id="upload-progress-items">
-                <!-- 上传进度条将在此动态显示 -->
+                <!-- 娑撳﹣绱舵潻娑樺閺夆€崇殺閸︺劍顒濋崝銊︹偓浣规▔缁€?-->
             </div>
         </div>
 
         <div id="modal" class="modal">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2 id="modal-title">文件操作</h2>
+                    <h2 id="modal-title">閺傚洣娆㈤幙宥勭稊</h2>
                     <span class="close-modal">&times;</span>
                 </div>
                 <div class="modal-body" id="modal-body">
-                    <!-- 模态框内容将动态生成 -->
+                    <!-- 濡剝鈧焦顢嬮崘鍛啇鐏忓棗濮╅幀浣烘晸閹?-->
                 </div>
             </div>
         </div>
@@ -160,3 +160,4 @@
     <script src="script.js"></script>
 </body>
 </html> 
+

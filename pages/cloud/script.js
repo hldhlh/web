@@ -1,4 +1,4 @@
-const SUPABASE_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
+﻿const SUPABASE_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NDA0MzMyNywiZXhwIjoyMDU5NjE5MzI3fQ.03Je2x-ixNl0SUzjSHmGy_fmybYbkxyg6prdv7TumI8';
 const BUCKET_NAME = 'cloud-storage';
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -29,50 +29,50 @@ const imageCache = {
                 this.storage = parsedCache;
             }
         } catch (error) {
-            console.warn('初始化图片缓存失败:', error);
+            console.warn('鍒濆鍖栧浘鐗囩紦瀛樺け璐?', error);
             this.storage = {};
         }
     },
     async getImageUrl(fileName) {
         try {
-            // 检查内存缓存
+            // 妫€鏌ュ唴瀛樼紦瀛?
             const cachedItem = this.storage[fileName];
             if (cachedItem && cachedItem.expires > Date.now()) {
-                // 如果缓存的是公共 URL，直接返回
-                if (!cachedItem.url.includes('/sign/')) { // 简单判断是否为签名 URL
+                // 濡傛灉缂撳瓨鐨勬槸鍏叡 URL锛岀洿鎺ヨ繑鍥?
+                if (!cachedItem.url.includes('/sign/')) { // 绠€鍗曞垽鏂槸鍚︿负绛惧悕 URL
                     return cachedItem.url;
                 }
-                // 如果缓存的是签名 URL，则忽略缓存，继续往下获取新的 URL
+                // 濡傛灉缂撳瓨鐨勬槸绛惧悕 URL锛屽垯蹇界暐缂撳瓨锛岀户缁線涓嬭幏鍙栨柊鐨?URL
             }
 
-            // 缓存无效或为签名 URL，尝试获取新的签名 URL
+            // 缂撳瓨鏃犳晥鎴栦负绛惧悕 URL锛屽皾璇曡幏鍙栨柊鐨勭鍚?URL
             try {
                 const { data, error } = await supabase.storage
                     .from(BUCKET_NAME)
-                    .createSignedUrl(fileName, 5 * 60); // 缩短有效期至5分钟，减少过期风险
+                    .createSignedUrl(fileName, 5 * 60); // 缂╃煭鏈夋晥鏈熻嚦5鍒嗛挓锛屽噺灏戣繃鏈熼闄?
 
                 if (!error && data.signedUrl) {
-                    // 获取成功，更新缓存（但下次仍会重新获取新的签名URL）
+                    // 鑾峰彇鎴愬姛锛屾洿鏂扮紦瀛橈紙浣嗕笅娆′粛浼氶噸鏂拌幏鍙栨柊鐨勭鍚峌RL锛?
                     this.storage[fileName] = {
                         url: data.signedUrl,
-                        expires: Date.now() + this.cacheLifetime // 仍然使用长缓存时间标记，但逻辑上会忽略
+                        expires: Date.now() + this.cacheLifetime // 浠嶇劧浣跨敤闀跨紦瀛樻椂闂存爣璁帮紝浣嗛€昏緫涓婁細蹇界暐
                     };
                     this.saveToLocalStorage();
                     return data.signedUrl;
                 }
-                // 如果获取签名 URL 出错，继续尝试公共 URL
-                if(error) console.warn(`获取签名URL失败 (${fileName}):`, error.message);
+                // 濡傛灉鑾峰彇绛惧悕 URL 鍑洪敊锛岀户缁皾璇曞叕鍏?URL
+                if(error) console.warn(`鑾峰彇绛惧悕URL澶辫触 (${fileName}):`, error.message);
 
             } catch (signError) {
-                 console.warn(`获取签名URL异常 (${fileName}):`, signError);
+                 console.warn(`鑾峰彇绛惧悕URL寮傚父 (${fileName}):`, signError);
             }
 
-            // 获取签名 URL 失败或出错，尝试使用公共 URL
+            // 鑾峰彇绛惧悕 URL 澶辫触鎴栧嚭閿欙紝灏濊瘯浣跨敤鍏叡 URL
             const publicUrl = supabase.storage
                 .from(BUCKET_NAME)
                 .getPublicUrl(fileName).data.publicUrl;
 
-            // 更新缓存为公共 URL
+            // 鏇存柊缂撳瓨涓哄叕鍏?URL
             this.storage[fileName] = {
                 url: publicUrl,
                 expires: Date.now() + this.cacheLifetime
@@ -81,15 +81,15 @@ const imageCache = {
             return publicUrl;
 
         } catch (error) {
-            console.error(`获取图片URL失败 (${fileName}):`, error);
-             // 尝试再次获取公共URL作为最终备选
-            try {q
+            console.error(`鑾峰彇鍥剧墖URL澶辫触 (${fileName}):`, error);
+             // 灏濊瘯鍐嶆鑾峰彇鍏叡URL浣滀负鏈€缁堝閫?
+            try {
                 const publicUrl = supabase.storage
                     .from(BUCKET_NAME)
                     .getPublicUrl(fileName).data.publicUrl;
                 return publicUrl;
             } catch (e) {
-                console.error(`获取公共URL也失败 (${fileName}):`, e);
+                console.error(`鑾峰彇鍏叡URL涔熷け璐?(${fileName}):`, e);
                 return null;
             }
         }
@@ -98,13 +98,13 @@ const imageCache = {
         try {
             localStorage.setItem(this.localStorageKey, JSON.stringify(this.storage));
         } catch (error) {
-            console.warn('保存缓存到localStorage失败:', error);
+            console.warn('淇濆瓨缂撳瓨鍒發ocalStorage澶辫触:', error);
             if (error instanceof DOMException && error.name === 'QuotaExceededError') {
                 this.cleanOldestHalf();
                 try {
                     localStorage.setItem(this.localStorageKey, JSON.stringify(this.storage));
                 } catch (innerError) {
-                    console.error('清理后仍无法保存缓存:', innerError);
+                    console.error('娓呯悊鍚庝粛鏃犳硶淇濆瓨缂撳瓨:', innerError);
                 }
             }
         }
@@ -205,11 +205,11 @@ async function createBucketIfNotExists() {
             await supabase.storage.createBucket(BUCKET_NAME, {
                 public: true
             });
-            console.log(`创建存储桶 ${BUCKET_NAME} 成功`);
+            console.log(`鍒涘缓瀛樺偍妗?${BUCKET_NAME} 鎴愬姛`);
         }
     } catch (error) {
-        console.error('创建存储桶失败:', error);
-        showToast('创建存储桶失败，请检查网络连接');
+        console.error('鍒涘缓瀛樺偍妗跺け璐?', error);
+        showToast('鍒涘缓瀛樺偍妗跺け璐ワ紝璇锋鏌ョ綉缁滆繛鎺?);
     }
 }
 function initDragAndDrop() {
@@ -247,16 +247,16 @@ function initDragAndDrop() {
             <div class="drop-icon">
                 <i class="fas fa-cloud-upload-alt"></i>
             </div>
-            <p>将文件拖放到此处或点击上传</p>
+            <p>灏嗘枃浠舵嫋鏀惧埌姝ゅ鎴栫偣鍑讳笂浼?/p>
             <div class="supported-formats">
-                <p>支持的格式:</p>
+                <p>鏀寔鐨勬牸寮?</p>
                 <div class="format-tags">
-                    <span class="format-tag">图片</span>
-                    <span class="format-tag">文档</span>
-                    <span class="format-tag">视频</span>
-                    <span class="format-tag">音频</span>
-                    <span class="format-tag">压缩包</span>
-                    <span class="format-tag">代码</span>
+                    <span class="format-tag">鍥剧墖</span>
+                    <span class="format-tag">鏂囨。</span>
+                    <span class="format-tag">瑙嗛</span>
+                    <span class="format-tag">闊抽</span>
+                    <span class="format-tag">鍘嬬缉鍖?/span>
+                    <span class="format-tag">浠ｇ爜</span>
                 </div>
             </div>
         `;
@@ -274,9 +274,9 @@ async function loadFiles() {
         currentFiles = data || [];
         filterFiles();
     } catch (error) {
-        console.error('加载文件失败:', error);
-        showToast('加载文件失败，请检查网络连接');
-        fileList.innerHTML = '<div class="error-message">加载文件失败，请重试</div>';
+        console.error('鍔犺浇鏂囦欢澶辫触:', error);
+        showToast('鍔犺浇鏂囦欢澶辫触锛岃妫€鏌ョ綉缁滆繛鎺?);
+        fileList.innerHTML = '<div class="error-message">鍔犺浇鏂囦欢澶辫触锛岃閲嶈瘯</div>';
     } finally {
         showLoading(false);
     }
@@ -324,7 +324,7 @@ function addFileToUploadQueue(file, fileId) {
             <div id="${fileId}" class="upload-progress" style="width: 0%;"></div>
         </div>
         <div class="upload-status">
-            <span id="${fileId}-status">准备上传...</span>
+            <span id="${fileId}-status">鍑嗗涓婁紶...</span>
             <span id="${fileId}-percent">0%</span>
         </div>
     `;
@@ -337,25 +337,25 @@ function sanitizeFileName(name) {
 async function processFileUpload(file, fileId) {
     if (file.size > MAX_FILE_SIZE) {
         document.getElementById(fileId).classList.add('error');
-        document.getElementById(`${fileId}-status`).textContent = '文件过大';
-        document.getElementById(`${fileId}-percent`).textContent = '错误';
-        showToast(`文件 ${file.name} 超过最大上传限制（100MB）`);
+        document.getElementById(`${fileId}-status`).textContent = '鏂囦欢杩囧ぇ';
+        document.getElementById(`${fileId}-percent`).textContent = '閿欒';
+        showToast(`鏂囦欢 ${file.name} 瓒呰繃鏈€澶т笂浼犻檺鍒讹紙100MB锛塦);
         return;
     }
     const fileType = getFileType(file.name).toLowerCase();
     const isAllowedType = Object.values(ALLOWED_FILE_TYPES).some(types => types.includes(fileType));
     if (!isAllowedType) {
-        showToast(`警告：文件类型 ${fileType} 可能不受支持`);
+        showToast(`璀﹀憡锛氭枃浠剁被鍨?${fileType} 鍙兘涓嶅彈鏀寔`);
     }
     const safeName = sanitizeFileName(file.name);
     const fileExists = currentFiles.some(existingFile =>
         existingFile.name.toLowerCase() === safeName.toLowerCase());
     if (fileExists) {
-        document.getElementById(`${fileId}-status`).textContent = '文件已存在';
-        document.getElementById(`${fileId}-percent`).textContent = '等待确认';
-        if (!confirm(`文件 "${file.name}" 已存在，是否覆盖？`)) {
+        document.getElementById(`${fileId}-status`).textContent = '鏂囦欢宸插瓨鍦?;
+        document.getElementById(`${fileId}-percent`).textContent = '绛夊緟纭';
+        if (!confirm(`鏂囦欢 "${file.name}" 宸插瓨鍦紝鏄惁瑕嗙洊锛焋)) {
             document.getElementById(fileId).classList.add('error');
-            document.getElementById(`${fileId}-status`).textContent = '已取消';
+            document.getElementById(`${fileId}-status`).textContent = '宸插彇娑?;
             return;
         }
     }
@@ -364,7 +364,7 @@ async function processFileUpload(file, fileId) {
         const percentEl = document.getElementById(`${fileId}-percent`);
         const statusEl = document.getElementById(`${fileId}-status`);
         if (statusEl) {
-            statusEl.textContent = '上传中...';
+            statusEl.textContent = '涓婁紶涓?..';
         }
         if (progressEl) {
             progressEl.classList.add('uploading');
@@ -419,7 +419,7 @@ async function processFileUpload(file, fileId) {
             progressEl.classList.add('complete-animation');
         }
         if (statusEl) {
-            statusEl.textContent = '上传完成';
+            statusEl.textContent = '涓婁紶瀹屾垚';
         }
         if (percentEl) {
             percentEl.textContent = '100%';
@@ -427,7 +427,7 @@ async function processFileUpload(file, fileId) {
         await loadFiles();
         await updateStorageUsage();
     } catch (error) {
-        console.error(`上传文件 ${file.name} 失败:`, error);
+        console.error(`涓婁紶鏂囦欢 ${file.name} 澶辫触:`, error);
         const progressEl = document.getElementById(fileId);
         const statusEl = document.getElementById(`${fileId}-status`);
         const percentEl = document.getElementById(`${fileId}-percent`);
@@ -437,12 +437,12 @@ async function processFileUpload(file, fileId) {
             progressEl.classList.add('error-animation');
         }
         if (statusEl) {
-            statusEl.textContent = '上传失败';
+            statusEl.textContent = '涓婁紶澶辫触';
         }
         if (percentEl) {
-            percentEl.textContent = '错误';
+            percentEl.textContent = '閿欒';
         }
-        showToast(`上传文件 ${file.name} 失败: ${error.message}`);
+        showToast(`涓婁紶鏂囦欢 ${file.name} 澶辫触: ${error.message}`);
     }
 }
 function changeView(view) {
@@ -473,10 +473,10 @@ async function downloadSelectedFile() {
         a.click();
         URL.revokeObjectURL(url);
         document.body.removeChild(a);
-        showToast('文件下载开始');
+        showToast('鏂囦欢涓嬭浇寮€濮?);
     } catch (error) {
-        console.error('下载文件失败:', error);
-        showToast('下载文件失败: ' + error.message);
+        console.error('涓嬭浇鏂囦欢澶辫触:', error);
+        showToast('涓嬭浇鏂囦欢澶辫触: ' + error.message);
     }
 }
 async function shareSelectedFile() {
@@ -485,41 +485,41 @@ async function shareSelectedFile() {
         const { data } = supabase.storage
             .from(BUCKET_NAME)
             .getPublicUrl(selectedFile.name);
-        modalTitle.textContent = '分享文件';
+        modalTitle.textContent = '鍒嗕韩鏂囦欢';
         modalBody.innerHTML = `
             <div class="form-group">
-                <label>分享链接</label>
+                <label>鍒嗕韩閾炬帴</label>
                 <div style="display: flex; margin-bottom: 10px;">
                     <input type="text" id="share-link" class="form-control" value="${data.publicUrl}" readonly>
-                    <button id="copy-link" class="btn" style="margin-left: 10px; border-radius: 4px;">复制</button>
+                    <button id="copy-link" class="btn" style="margin-left: 10px; border-radius: 4px;">澶嶅埗</button>
                 </div>
             </div>
-            <button id="close-share" class="form-btn">关闭</button>
+            <button id="close-share" class="form-btn">鍏抽棴</button>
         `;
         document.getElementById('copy-link').addEventListener('click', () => {
             const shareLink = document.getElementById('share-link');
             shareLink.select();
             document.execCommand('copy');
-            showToast('链接已复制到剪贴板');
+            showToast('閾炬帴宸插鍒跺埌鍓创鏉?);
         });
         document.getElementById('close-share').addEventListener('click', () => {
             modal.style.display = 'none';
         });
         modal.style.display = 'block';
     } catch (error) {
-        console.error('创建分享链接失败:', error);
-        showToast('创建分享链接失败: ' + error.message);
+        console.error('鍒涘缓鍒嗕韩閾炬帴澶辫触:', error);
+        showToast('鍒涘缓鍒嗕韩閾炬帴澶辫触: ' + error.message);
     }
 }
 function showRenameForm() {
     if (!selectedFile) return;
-    modalTitle.textContent = '重命名文件';
+    modalTitle.textContent = '閲嶅懡鍚嶆枃浠?;
     modalBody.innerHTML = `
         <div class="form-group">
-            <label for="new-name">新文件名</label>
+            <label for="new-name">鏂版枃浠跺悕</label>
             <input type="text" id="new-name" class="form-control" value="${selectedFile.name}">
         </div>
-        <button id="rename-submit" class="form-btn">确认</button>
+        <button id="rename-submit" class="form-btn">纭</button>
     `;
     document.getElementById('rename-submit').addEventListener('click', handleRename);
     modal.style.display = 'block';
@@ -527,7 +527,7 @@ function showRenameForm() {
 async function handleRename() {
     const newName = document.getElementById('new-name').value.trim();
     if (!newName) {
-        showToast('请输入有效的文件名');
+        showToast('璇疯緭鍏ユ湁鏁堢殑鏂囦欢鍚?);
         return;
     }
     if (newName === selectedFile.name) {
@@ -538,7 +538,7 @@ async function handleRename() {
         modalBody.innerHTML = `
             <div style="text-align: center;">
                 <div class="spinner" style="margin: 20px auto;"></div>
-                <p>正在重命名文件，请稍候...</p>
+                <p>姝ｅ湪閲嶅懡鍚嶆枃浠讹紝璇风◢鍊?..</p>
             </div>
         `;
         const { data: fileData, error: downloadError } = await supabase.storage
@@ -556,15 +556,15 @@ async function handleRename() {
             .remove([selectedFile.name]);
         if (deleteError) throw deleteError;
         modal.style.display = 'none';
-        showToast('文件重命名成功');
+        showToast('鏂囦欢閲嶅懡鍚嶆垚鍔?);
         await loadFiles();
     } catch (error) {
-        console.error('重命名文件失败:', error);
-        showToast('重命名文件失败: ' + error.message);
+        console.error('閲嶅懡鍚嶆枃浠跺け璐?', error);
+        showToast('閲嶅懡鍚嶆枃浠跺け璐? ' + error.message);
         modalBody.innerHTML = `
             <div style="text-align: center;" class="error-message">
-                <p>重命名失败: ${error.message}</p>
-                <button id="retry-rename" class="form-btn" style="margin-top: 15px;">重试</button>
+                <p>閲嶅懡鍚嶅け璐? ${error.message}</p>
+                <button id="retry-rename" class="form-btn" style="margin-top: 15px;">閲嶈瘯</button>
             </div>
         `;
         document.getElementById('retry-rename').addEventListener('click', handleRename);
@@ -572,12 +572,12 @@ async function handleRename() {
 }
 function confirmDeleteFile() {
     if (!selectedFile) return;
-    modalTitle.textContent = '删除文件';
+    modalTitle.textContent = '鍒犻櫎鏂囦欢';
     modalBody.innerHTML = `
-        <p>确定要删除文件 "${selectedFile.name}" 吗？此操作不可撤销。</p>
+        <p>纭畾瑕佸垹闄ゆ枃浠?"${selectedFile.name}" 鍚楋紵姝ゆ搷浣滀笉鍙挙閿€銆?/p>
         <div style="display: flex; justify-content: space-between; margin-top: 20px;">
-            <button id="delete-cancel" class="btn" style="background-color: var(--text-light);">取消</button>
-            <button id="delete-confirm" class="btn" style="background-color: var(--danger-color);">删除</button>
+            <button id="delete-cancel" class="btn" style="background-color: var(--text-light);">鍙栨秷</button>
+            <button id="delete-confirm" class="btn" style="background-color: var(--danger-color);">鍒犻櫎</button>
         </div>
     `;
     document.getElementById('delete-cancel').addEventListener('click', () => {
@@ -591,7 +591,7 @@ async function handleDelete() {
         modalBody.innerHTML = `
             <div style="text-align: center;">
                 <div class="spinner" style="margin: 20px auto;"></div>
-                <p>正在删除文件，请稍候...</p>
+                <p>姝ｅ湪鍒犻櫎鏂囦欢锛岃绋嶅€?..</p>
             </div>
         `;
         const { error } = await supabase.storage
@@ -599,18 +599,18 @@ async function handleDelete() {
             .remove([selectedFile.name]);
         if (error) throw error;
         modal.style.display = 'none';
-        showToast('文件删除成功');
+        showToast('鏂囦欢鍒犻櫎鎴愬姛');
         currentFiles = currentFiles.filter(file => file.name !== selectedFile.name);
         filterFiles();
         await updateStorageUsage();
     } catch (error) {
-        console.error('删除文件失败:', error);
+        console.error('鍒犻櫎鏂囦欢澶辫触:', error);
         modalBody.innerHTML = `
             <div style="text-align: center;" class="error-message">
-                <p>删除失败: ${error.message}</p>
+                <p>鍒犻櫎澶辫触: ${error.message}</p>
                 <div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">
-                    <button id="retry-delete" class="btn" style="background-color: var(--danger-color);">重试</button>
-                    <button id="cancel-delete" class="btn" style="background-color: var(--text-light);">取消</button>
+                    <button id="retry-delete" class="btn" style="background-color: var(--danger-color);">閲嶈瘯</button>
+                    <button id="cancel-delete" class="btn" style="background-color: var(--text-light);">鍙栨秷</button>
                 </div>
             </div>
         `;
@@ -618,7 +618,7 @@ async function handleDelete() {
         document.getElementById('cancel-delete').addEventListener('click', () => {
             modal.style.display = 'none';
         });
-        showToast('删除文件失败: ' + error.message);
+        showToast('鍒犻櫎鏂囦欢澶辫触: ' + error.message);
     }
 }
 function getFileType(fileName) {
@@ -651,12 +651,12 @@ function showLoading(isLoading) {
         loadingEl.style.display = isLoading ? 'flex' : 'none';
     }
     if (isLoading) {
-        fileList.innerHTML = '<div class="loading-message">正在加载文件...</div>';
+        fileList.innerHTML = '<div class="loading-message">姝ｅ湪鍔犺浇鏂囦欢...</div>';
     }
 }
 function renderFiles(files) {
     if (files.length === 0) {
-        fileList.innerHTML = '<div class="empty-message">没有找到文件</div>';
+        fileList.innerHTML = '<div class="empty-message">娌℃湁鎵惧埌鏂囦欢</div>';
         return;
     }
     fileList.className = `file-list ${currentView}-view`;
@@ -666,11 +666,11 @@ function renderFiles(files) {
         header.className = 'file-list-header';
         header.innerHTML = `
             <div></div>
-            <div>文件名</div>
-            <div>类型</div>
-            <div>大小</div>
-            <div>日期</div>
-            <div>操作</div>
+            <div>鏂囦欢鍚?/div>
+            <div>绫诲瀷</div>
+            <div>澶у皬</div>
+            <div>鏃ユ湡</div>
+            <div>鎿嶄綔</div>
         `;
         fileList.appendChild(header);
     }
@@ -710,13 +710,13 @@ function renderFiles(files) {
                 <div class="file-size">${fileSize}</div>
                 <div class="file-date">${fileDate}</div>
                 <div class="file-actions">
-                    <button class="action-btn download-btn" title="下载">
+                    <button class="action-btn download-btn" title="涓嬭浇">
                         <i class="fas fa-download"></i>
                     </button>
-                    <button class="action-btn share-btn" title="分享">
+                    <button class="action-btn share-btn" title="鍒嗕韩">
                         <i class="fas fa-share-alt"></i>
                     </button>
-                    <button class="action-btn delete-btn" title="删除">
+                    <button class="action-btn delete-btn" title="鍒犻櫎">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
@@ -753,7 +753,7 @@ function renderFiles(files) {
     });
 }
 function formatDate(date) {
-    if (!(date instanceof Date) || isNaN(date)) return '未知';
+    if (!(date instanceof Date) || isNaN(date)) return '鏈煡';
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -767,12 +767,12 @@ async function generateThumbnail(fileName, fileEl) {
         if (!iconDiv) return;
         iconDiv.innerHTML = '<div class="thumbnail-loading"><div class="spinner"></div></div>';
 
-        // 使用 imageCache.getImageUrl 直接获取 URL
+        // 浣跨敤 imageCache.getImageUrl 鐩存帴鑾峰彇 URL
         const imageUrl = await imageCache.getImageUrl(fileName);
 
         if (!imageUrl) {
-            // 如果 getImageUrl 返回 null，说明获取失败，直接显示默认图标
-            console.error(`无法获取文件URL: ${fileName}`);
+            // 濡傛灉 getImageUrl 杩斿洖 null锛岃鏄庤幏鍙栧け璐ワ紝鐩存帴鏄剧ず榛樿鍥炬爣
+            console.error(`鏃犳硶鑾峰彇鏂囦欢URL: ${fileName}`);
             iconDiv.style.backgroundImage = '';
             iconDiv.innerHTML = getFileIcon(getFileType(fileName));
             const typeTag = document.createElement('span');
@@ -796,10 +796,10 @@ async function generateThumbnail(fileName, fileEl) {
         };
 
         img.onerror = (errorEvent) => {
-            // 增强错误日志
-            console.error(`缩略图加载失败: ${fileName}`, `URL: ${imageUrl}`, errorEvent);
+            // 澧炲己閿欒鏃ュ織
+            console.error(`缂╃暐鍥惧姞杞藉け璐? ${fileName}`, `URL: ${imageUrl}`, errorEvent);
 
-            // 加载失败，显示默认图标
+            // 鍔犺浇澶辫触锛屾樉绀洪粯璁ゅ浘鏍?
             iconDiv.style.backgroundImage = '';
             iconDiv.innerHTML = getFileIcon(getFileType(fileName));
             const typeTag = document.createElement('span');
@@ -810,7 +810,7 @@ async function generateThumbnail(fileName, fileEl) {
 
         img.src = imageUrl;
     } catch (error) {
-        console.error(`生成缩略图时发生异常: ${fileName}`, error);
+        console.error(`鐢熸垚缂╃暐鍥炬椂鍙戠敓寮傚父: ${fileName}`, error);
         const iconDiv = fileEl.querySelector('.file-icon');
         if (iconDiv) {
             iconDiv.innerHTML = getFileIcon(getFileType(fileName));
@@ -883,12 +883,12 @@ async function updateStorageUsage() {
             storageProgress.className = 'progress-bar success';
         }
     } catch (error) {
-        console.error('更新存储使用情况失败:', error);
+        console.error('鏇存柊瀛樺偍浣跨敤鎯呭喌澶辫触:', error);
     }
 }
 async function previewFile(file) {
     const type = getFileType(file.name);
-    // 使用 imageCache.getImageUrl 直接获取 URL
+    // 浣跨敤 imageCache.getImageUrl 鐩存帴鑾峰彇 URL
     const url = await imageCache.getImageUrl(file.name);
     if (!url) return;
 
@@ -898,57 +898,57 @@ async function previewFile(file) {
     if (ALLOWED_FILE_TYPES.images.includes(type)) {
         previewContentHtml = `<img id="preview-media-element" src="${url}" alt="${file.name}" class="preview-media preview-image">`;
     } else if (ALLOWED_FILE_TYPES.videos.includes(type)) {
-        previewContentHtml = `<video id="preview-media-element" controls class="preview-media preview-video" src="${url}">浏览器不支持视频预览</video>`;
+        previewContentHtml = `<video id="preview-media-element" controls class="preview-media preview-video" src="${url}">娴忚鍣ㄤ笉鏀寔瑙嗛棰勮</video>`;
     } else if (ALLOWED_FILE_TYPES.audios.includes(type)) {
-        // 音频预览放在容器中间
-        previewContentHtml = `<div class="audio-container"><audio id="preview-media-element" controls class="preview-media preview-audio" src="${url}">浏览器不支持音频预览</audio></div>`;
+        // 闊抽棰勮鏀惧湪瀹瑰櫒涓棿
+        previewContentHtml = `<div class="audio-container"><audio id="preview-media-element" controls class="preview-media preview-audio" src="${url}">娴忚鍣ㄤ笉鏀寔闊抽棰勮</audio></div>`;
     } else {
         const size = formatBytes(file.metadata?.size || 0);
-        const date = file.metadata?.lastModified ? formatDate(new Date(file.metadata.lastModified)) : '未知';
-        // 优化文件信息展示
+        const date = file.metadata?.lastModified ? formatDate(new Date(file.metadata.lastModified)) : '鏈煡';
+        // 浼樺寲鏂囦欢淇℃伅灞曠ず
         previewContentHtml = `
             <div class="preview-details-minimal">
                 <div class="file-icon large ${getFileTypeClass(type)}">${getFileIcon(type)}</div>
                 <div class="details-text-minimal">
-                    <p><strong class="detail-label">类型:</strong> <span class="detail-value">${type || '未知'} 文件</span></p>
-                    <p><strong class="detail-label">大小:</strong> <span class="detail-value">${size}</span></p>
-                    <p><strong class="detail-label">修改日期:</strong> <span class="detail-value">${date}</span></p>
+                    <p><strong class="detail-label">绫诲瀷:</strong> <span class="detail-value">${type || '鏈煡'} 鏂囦欢</span></p>
+                    <p><strong class="detail-label">澶у皬:</strong> <span class="detail-value">${size}</span></p>
+                    <p><strong class="detail-label">淇敼鏃ユ湡:</strong> <span class="detail-value">${date}</span></p>
                 </div>
             </div>`;
     }
 
     modalTitle.textContent = file.name;
-    // 使用新的HTML结构和CSS类
+    // 浣跨敤鏂扮殑HTML缁撴瀯鍜孋SS绫?
     modalBody.innerHTML = `
         <div class="preview-modal-wrapper">
             <div class="preview-area ${isDirectPreview ? 'direct-preview' : 'info-preview'}" id="preview-content-container">
                 ${previewContentHtml}
             </div>
             <!-- <div class="preview-actions-bar"> -->
-                 <!-- <button id="modal-fullscreen" class="btn action-btn minimal-btn" title="全屏"><i class="fas fa-expand"></i> <span class="btn-text">全屏</span></button> -->
-                 <!-- <button id="modal-download" class="btn action-btn minimal-btn" title="下载"><i class="fas fa-download"></i> <span class="btn-text">下载</span></button> -->
-                 <!-- <button id="modal-share" class="btn action-btn minimal-btn" title="分享"><i class="fas fa-share-alt"></i> <span class="btn-text">分享</span></button> -->
-                 <!-- <button id="modal-rename" class="btn action-btn minimal-btn" title="重命名"><i class="fas fa-edit"></i> <span class="btn-text">重命名</span></button> -->
-                 <!-- <button id="modal-delete" class="btn action-btn minimal-btn danger-btn" title="删除"><i class="fas fa-trash"></i> <span class="btn-text">删除</span></button> -->
+                 <!-- <button id="modal-fullscreen" class="btn action-btn minimal-btn" title="鍏ㄥ睆"><i class="fas fa-expand"></i> <span class="btn-text">鍏ㄥ睆</span></button> -->
+                 <!-- <button id="modal-download" class="btn action-btn minimal-btn" title="涓嬭浇"><i class="fas fa-download"></i> <span class="btn-text">涓嬭浇</span></button> -->
+                 <!-- <button id="modal-share" class="btn action-btn minimal-btn" title="鍒嗕韩"><i class="fas fa-share-alt"></i> <span class="btn-text">鍒嗕韩</span></button> -->
+                 <!-- <button id="modal-rename" class="btn action-btn minimal-btn" title="閲嶅懡鍚?><i class="fas fa-edit"></i> <span class="btn-text">閲嶅懡鍚?/span></button> -->
+                 <!-- <button id="modal-delete" class="btn action-btn minimal-btn danger-btn" title="鍒犻櫎"><i class="fas fa-trash"></i> <span class="btn-text">鍒犻櫎</span></button> -->
             <!-- </div> -->
         </div>`;
 
-    // modal.style.display = 'block'; // 这行被移到 adjustModalSize 内部了
+    // modal.style.display = 'block'; // 杩欒琚Щ鍒?adjustModalSize 鍐呴儴浜?
 
-    // 确保所有事件监听器都正确绑定 (移除与 action bar 相关的)
+    // 纭繚鎵€鏈変簨浠剁洃鍚櫒閮芥纭粦瀹?(绉婚櫎涓?action bar 鐩稿叧鐨?
     // on('#modal-download','click', downloadSelectedFile);
     // on('#modal-share','click', shareSelectedFile);
     // on('#modal-rename','click', showRenameForm);
     // on('#modal-delete','click', confirmDeleteFile);
     // on('#modal-fullscreen', 'click', handleFullscreen);
 
-    // --- 新增：动态调整模态框尺寸 --- 
+    // --- 鏂板锛氬姩鎬佽皟鏁存ā鎬佹灏哄 --- 
     const previewMediaElement = document.getElementById('preview-media-element');
     const adjustModalSize = (naturalWidth, naturalHeight) => {
         if (!modalContent) return;
 
-        const maxWidth = window.innerWidth * 0.85;  // 与 CSS max-width: 85vw 对应
-        const maxHeight = window.innerHeight * 0.85; // 与 CSS max-height: 85vh 对应
+        const maxWidth = window.innerWidth * 0.85;  // 涓?CSS max-width: 85vw 瀵瑰簲
+        const maxHeight = window.innerHeight * 0.85; // 涓?CSS max-height: 85vh 瀵瑰簲
 
         const contentRatio = naturalWidth / naturalHeight;
         const containerMaxRatio = maxWidth / maxHeight;
@@ -957,33 +957,33 @@ async function previewFile(file) {
         let targetHeight = maxHeight;
 
         if (contentRatio > containerMaxRatio) {
-            // 内容比容器更宽，以宽度为基准缩放高度
+            // 鍐呭姣斿鍣ㄦ洿瀹斤紝浠ュ搴︿负鍩哄噯缂╂斁楂樺害
             targetWidth = maxWidth;
             targetHeight = maxWidth / contentRatio;
         } else {
-            // 内容比容器更高（或比例相同），以高度为基准缩放宽度
+            // 鍐呭姣斿鍣ㄦ洿楂橈紙鎴栨瘮渚嬬浉鍚岋級锛屼互楂樺害涓哄熀鍑嗙缉鏀惧搴?
             targetHeight = maxHeight;
             targetWidth = maxHeight * contentRatio;
         }
         
-        // 确保不超过最大值（理论上前面的计算已经保证，但加一层保险）
+        // 纭繚涓嶈秴杩囨渶澶у€硷紙鐞嗚涓婂墠闈㈢殑璁＄畻宸茬粡淇濊瘉锛屼絾鍔犱竴灞備繚闄╋級
         targetWidth = Math.min(targetWidth, maxWidth);
         targetHeight = Math.min(targetHeight, maxHeight);
 
-        // 应用尺寸 - 直接设置 style 会覆盖 CSS，确保 CSS 中移除固定 width/height
-        // 我们已经在 CSS 中使用 max-width/max-height 和 width/height: auto，
-        // 这里改为设置 modal-body 或 preview-area 的尺寸可能更好，
-        // 但最简单的是直接修改 modalContent 的 width/height 来强制尺寸。
+        // 搴旂敤灏哄 - 鐩存帴璁剧疆 style 浼氳鐩?CSS锛岀‘淇?CSS 涓Щ闄ゅ浐瀹?width/height
+        // 鎴戜滑宸茬粡鍦?CSS 涓娇鐢?max-width/max-height 鍜?width/height: auto锛?
+        // 杩欓噷鏀逛负璁剧疆 modal-body 鎴?preview-area 鐨勫昂瀵稿彲鑳芥洿濂斤紝
+        // 浣嗘渶绠€鍗曠殑鏄洿鎺ヤ慨鏀?modalContent 鐨?width/height 鏉ュ己鍒跺昂瀵搞€?
         modalContent.style.width = `${targetWidth}px`;
         modalContent.style.height = `${targetHeight}px`;
 
-        // 重新居中（因为尺寸变了）
-        // transform: translate(-50%, -50%) 应该能自动处理居中
+        // 閲嶆柊灞呬腑锛堝洜涓哄昂瀵稿彉浜嗭級
+        // transform: translate(-50%, -50%) 搴旇鑳借嚜鍔ㄥ鐞嗗眳涓?
         
-        // 显示模态框
+        // 鏄剧ず妯℃€佹
         modal.style.display = 'block';
 
-        // --- 新增：控制控件显隐的事件监听 --- 
+        // --- 鏂板锛氭帶鍒舵帶浠舵樉闅愮殑浜嬩欢鐩戝惉 --- 
         const modalHeader = modal.querySelector('.modal-header');
         const previewArea = modal.querySelector('.preview-area');
 
@@ -1010,43 +1010,43 @@ async function previewFile(file) {
         };
 
         if (previewArea) {
-            // 移除旧监听器 (如果存在)
+            // 绉婚櫎鏃х洃鍚櫒 (濡傛灉瀛樺湪)
             previewArea.removeEventListener('mouseenter', showControls);
             previewArea.removeEventListener('mouseleave', hideControls);
 
-            // 添加新监听器
+            // 娣诲姞鏂扮洃鍚櫒
             previewArea.addEventListener('mouseenter', showControls);
             previewArea.addEventListener('mouseleave', hideControls);
         }
-        // --- 结束：控制控件显隐的事件监听 --- 
+        // --- 缁撴潫锛氭帶鍒舵帶浠舵樉闅愮殑浜嬩欢鐩戝惉 --- 
     };
 
     if (previewMediaElement && (previewMediaElement.tagName === 'IMG' || previewMediaElement.tagName === 'VIDEO')) {
         if (previewMediaElement.tagName === 'IMG') {
             if (previewMediaElement.complete) {
-                // 图片已加载完成 (可能来自缓存)
+                // 鍥剧墖宸插姞杞藉畬鎴?(鍙兘鏉ヨ嚜缂撳瓨)
                 adjustModalSize(previewMediaElement.naturalWidth, previewMediaElement.naturalHeight);
             } else {
                 previewMediaElement.onload = () => {
                     adjustModalSize(previewMediaElement.naturalWidth, previewMediaElement.naturalHeight);
                 };
                  previewMediaElement.onerror = () => {
-                     // 加载失败，使用默认最大尺寸显示信息
-                     modalContent.style.width = ''; // 清除内联样式，恢复 CSS 控制
+                     // 鍔犺浇澶辫触锛屼娇鐢ㄩ粯璁ゆ渶澶у昂瀵告樉绀轰俊鎭?
+                     modalContent.style.width = ''; // 娓呴櫎鍐呰仈鏍峰紡锛屾仮澶?CSS 鎺у埗
                      modalContent.style.height = '';
                      modal.style.display = 'block'; 
                  }
             }
         } else if (previewMediaElement.tagName === 'VIDEO') {
             if (previewMediaElement.readyState >= 1) { // HAVE_METADATA
-                 // 视频元数据已加载
+                 // 瑙嗛鍏冩暟鎹凡鍔犺浇
                  adjustModalSize(previewMediaElement.videoWidth, previewMediaElement.videoHeight);
             } else {
                 previewMediaElement.onloadedmetadata = () => {
                      adjustModalSize(previewMediaElement.videoWidth, previewMediaElement.videoHeight);
                 };
                  previewMediaElement.onerror = () => {
-                     // 加载失败，使用默认最大尺寸显示信息
+                     // 鍔犺浇澶辫触锛屼娇鐢ㄩ粯璁ゆ渶澶у昂瀵告樉绀轰俊鎭?
                      modalContent.style.width = '';
                      modalContent.style.height = '';
                      modal.style.display = 'block'; 
@@ -1054,18 +1054,18 @@ async function previewFile(file) {
             }
         }
     } else {
-         // 非图片/视频，或元素未找到，使用默认最大尺寸
-         modalContent.style.width = ''; // 清除内联样式，恢复 CSS 控制
+         // 闈炲浘鐗?瑙嗛锛屾垨鍏冪礌鏈壘鍒帮紝浣跨敤榛樿鏈€澶у昂瀵?
+         modalContent.style.width = ''; // 娓呴櫎鍐呰仈鏍峰紡锛屾仮澶?CSS 鎺у埗
          modalContent.style.height = '';
          modal.style.display = 'block';
-         // 对于非媒体文件，可能需要一直显示控件，或者根据需要处理
-         // 暂时保持默认隐藏，如果需要修改可以取消下面的注释
+         // 瀵逛簬闈炲獟浣撴枃浠讹紝鍙兘闇€瑕佷竴鐩存樉绀烘帶浠讹紝鎴栬€呮牴鎹渶瑕佸鐞?
+         // 鏆傛椂淇濇寔榛樿闅愯棌锛屽鏋滈渶瑕佷慨鏀瑰彲浠ュ彇娑堜笅闈㈢殑娉ㄩ噴
          // const modalHeader = modal.querySelector('.modal-header');
          // const previewActionsBar = modal.querySelector('.preview-actions-bar');
-         // if(modalHeader) modalHeader.style.opacity = '1'; // 总是显示？
-         // if(previewActionsBar) previewActionsBar.style.opacity = '1'; // 总是显示？
+         // if(modalHeader) modalHeader.style.opacity = '1'; // 鎬绘槸鏄剧ず锛?
+         // if(previewActionsBar) previewActionsBar.style.opacity = '1'; // 鎬绘槸鏄剧ず锛?
     }
-    // --- 结束：动态调整模态框尺寸 --- 
+    // --- 缁撴潫锛氬姩鎬佽皟鏁存ā鎬佹灏哄 --- 
 }
 function handleFileClick(file) {
     selectedFile = file;
@@ -1092,7 +1092,7 @@ function showSimpleContextMenu(e, file) {
                 <polyline points="7 10 12 15 17 10"></polyline>
                 <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
-            下载
+            涓嬭浇
         </div>
         <div class="menu-item share-item">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1102,7 +1102,7 @@ function showSimpleContextMenu(e, file) {
                 <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
                 <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
             </svg>
-            分享链接
+            鍒嗕韩閾炬帴
         </div>
         <div class="menu-divider"></div>
         <div class="menu-item rename-item">
@@ -1110,14 +1110,14 @@ function showSimpleContextMenu(e, file) {
                 <path d="M12 20h9"></path>
                 <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
             </svg>
-            重命名
+            閲嶅懡鍚?
         </div>
         <div class="menu-item delete-item delete">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="3 6 5 6 21 6"></polyline>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
             </svg>
-            删除
+            鍒犻櫎
         </div>
     `;
     document.body.appendChild(simpleContextMenu);
@@ -1169,21 +1169,21 @@ function hideContextMenu() {
 function handleFullscreen() {
     const mediaElement = document.getElementById('preview-media-element');
     const containerElement = document.getElementById('preview-content-container');
-    const elementToFullscreen = mediaElement || containerElement; // 优先全屏媒体，否则全屏容器
+    const elementToFullscreen = mediaElement || containerElement; // 浼樺厛鍏ㄥ睆濯掍綋锛屽惁鍒欏叏灞忓鍣?
 
     if (!elementToFullscreen) return;
 
     if (document.fullscreenElement) {
-        // 如果已是全屏，则退出全屏
-        document.exitFullscreen().catch(err => console.error("退出全屏失败:", err));
+        // 濡傛灉宸叉槸鍏ㄥ睆锛屽垯閫€鍑哄叏灞?
+        document.exitFullscreen().catch(err => console.error("閫€鍑哄叏灞忓け璐?", err));
     } else {
-        // 请求全屏
+        // 璇锋眰鍏ㄥ睆
         if (elementToFullscreen.requestFullscreen) {
-            elementToFullscreen.requestFullscreen().catch(err => console.error("请求全屏失败:", err));
+            elementToFullscreen.requestFullscreen().catch(err => console.error("璇锋眰鍏ㄥ睆澶辫触:", err));
         } else if (elementToFullscreen.webkitRequestFullscreen) { /* Safari */
-            elementToFullscreen.webkitRequestFullscreen().catch(err => console.error("请求全屏失败 (webkit):", err));
+            elementToFullscreen.webkitRequestFullscreen().catch(err => console.error("璇锋眰鍏ㄥ睆澶辫触 (webkit):", err));
         } else if (elementToFullscreen.msRequestFullscreen) { /* IE11 */
-            elementToFullscreen.msRequestFullscreen().catch(err => console.error("请求全屏失败 (ms):", err));
+            elementToFullscreen.msRequestFullscreen().catch(err => console.error("璇锋眰鍏ㄥ睆澶辫触 (ms):", err));
         }
     }
 }
