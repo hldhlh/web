@@ -9,6 +9,7 @@ export async function getAppDirectories() {
     { name: "\u7075\u611F\u8BCD\u4E91", path: "wordcanvas/index.html" },
     { name: "\u4E91\u76D8",     path: "cloud/index.html" },
     { name: "\u5403\u4EC0\u4E48",   path: "eatwhat/index.html" },
+    { name: "\u5403\u4EC0\u4E48",   path: "sop/index.html" },
     { name: "\u65E5\u5FD7",     path: "log/index.html" }
   ];
 }

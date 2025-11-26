@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SOP 终端数据库</title>
+<script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.19.5/dist/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+    :root {
+        --bg: #111;
+        --border: #333;
+        --text: #eee;
+        --highlight: #4af626; /* 极客绿 */
+        --muted: #666;
+    }
+
+    body { font-family: "Courier New", Courier, monospace, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; line-height: 1.5; }
+    
+    /* 容器 */
+    .container { max-width: 600px; margin: 0 auto; }
+    
+    /* 顶部区域：搜索 + 按钮 */
+    .top-bar { position: sticky; top: 0; background: var(--bg); z-index: 10; padding-bottom: 10px; border-bottom: 2px solid var(--border); margin-bottom: 20px; display: flex; align-items: center; gap: 10px;}
+    
+    .input-group { flex: 1; }
+    input { background: transparent; border: none; color: #fff; font-size: 18px; width: 100%; outline: none; font-family: inherit; }
+    input::placeholder { color: #555; }
+
+    /* 功能按钮 */
+    .btn-icon { cursor: pointer; color: var(--muted); font-weight: bold; font-size: 20px; user-select: none; transition: color 0.2s; padding: 0 10px;}
+    .btn-icon:hover { color: var(--highlight); }
+
+    /* 添加面板 (默认隐藏) */
+    .panel { display: none; background: #1a1a1a; border: 1px dashed var(--border); padding: 15px; margin-bottom: 20px; animation: slideDown 0.2s ease-out; }
+    .panel.open { display: block; }
+    @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .form-row { margin-bottom: 12px; }
+    .form-label { font-size: 12px; color: var(--highlight); margin-bottom: 4px; display: block; }
+    .form-input { width: 100%; background: #000; border: 1px solid var(--border); color: #fff; padding: 8px; font-family: inherit; box-sizing: border-box; caret-color: var(--highlight); }
+    .form-input:focus { border-color: var(--highlight); outline: none; }
+
+    /* textarea 自适应高度 */
+    textarea.form-input {
+        min-height: 80px;
+        max-height: 400px;
+        resize: vertical;
+        overflow-y: auto;
+        line-height: 1.5;
+        scrollbar-width: thin; /* Firefox */
+        scrollbar-color: var(--highlight) var(--bg); /* Firefox: 滑块 轨道 */
+    }
+
+    /* Webkit 浏览器滚动条样式 (Chrome, Edge, Safari) */
+    textarea.form-input::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    textarea.form-input::-webkit-scrollbar-track {
+        background: var(--bg);
+        border-radius: 4px;
+    }
+
+    textarea.form-input::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 4px;
+        transition: background 0.2s;
+    }
+
+    textarea.form-input::-webkit-scrollbar-thumb:hover {
+        background: var(--highlight);
+    }
+
+    textarea.form-input::-webkit-scrollbar-thumb:active {
+        background: var(--highlight);
+    }
+    
+    .btn-save { background: var(--border); color: #fff; border: none; padding: 8px 20px; font-family: inherit; cursor: pointer; margin-top: 5px; }
+    .btn-save:hover { background: var(--highlight); color: #000; }
+
+    /* 列表项 */
+    .list-item { padding: 15px 0; border-bottom: 1px solid #222; cursor: pointer; transition: color 0.2s; }
+    .list-item:hover { color: var(--highlight); }
+    .item-header { display: flex; justify-content: space-between; align-items: baseline; }
+    .title { font-size: 16px; font-weight: bold; }
+    .tag { font-size: 12px; color: var(--muted); border: 1px solid var(--border); padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }
+    
+    /* 展开的内容 */
+    .content { display: none; margin-top: 10px; color: #bbb; font-size: 14px; padding-left: 10px; border-left: 2px solid var(--border); white-space: pre-wrap; }
+    .list-item.expanded .content { display: block; }
+    .list-item.expanded .title { color: var(--highlight); }
+
+    /* 全局滚动条样式 */
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: var(--bg);
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 5px;
+        transition: background 0.2s;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--highlight);
+    }
+
+    /* 滚动条角落（垂直和水平滚动条相交处） */
+    ::-webkit-scrollbar-corner {
+        background: var(--bg);
+    }
+
+    /* 可调整大小元素的角落 */
+    ::-webkit-resizer {
+        width: 12px;
+        height: 12px;
+        background-image:
+            linear-gradient(135deg, transparent 45%, var(--border) 45%, var(--border) 55%, transparent 55%),
+            linear-gradient(135deg, transparent 45%, var(--border) 45%, var(--border) 55%, transparent 55%);
+        background-size: 6px 6px;
+        background-position: 0 0, 3px 3px;
+        background-repeat: repeat;
+    }
+
+    /* Textarea 专用拖动手柄 */
+    textarea.form-input::-webkit-resizer {
+        width: 10px;
+        height: 10px;
+    }
+
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: var(--border) var(--bg);
+    }
+    
+    /* 编辑按钮 (仅在展开时显示) */
+    .btn-delete { float: right; font-size: 12px; color: #ff4444; margin-top: 10px; border: none; background: none; cursor: pointer; display: none; }
+    .list-item.expanded .btn-delete { display: inline-block; }
+
+</style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 顶部控制栏 -->
+    <div class="top-bar">
+        <div class="input-group">
+            <input type="text" id="search" placeholder="> 输入关键词或简拼..." autofocus>
+        </div>
+        <div class="btn-icon" onclick="togglePanel()" title="Add New Entry">[ + ]</div>
+    </div>
+
+    <!-- 新增/设置面板 -->
+    <div class="panel" id="addPanel">
+        <div style="color: #666; font-size: 12px; margin-bottom: 10px;">// 数据编辑面板：新增/修改条目</div>
+        
+        <div class="form-row">
+            <label class="form-label">> 分类 (TYPE/TAG)</label>
+            <input type="text" id="newTag" class="form-input" placeholder="例如: RECIPE, SOP, VIP">
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">> 标题 (TITLE)</label>
+            <input type="text" id="newTitle" class="form-input" placeholder="例如: 秘制干碟配方">
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">> 内容详情 (CONTENT)</label>
+            <textarea id="newContent" class="form-input" rows="4" placeholder="在此输入详细配方或流程..."></textarea>
+        </div>
+
+        <button class="btn-save" onclick="saveData()">[ 保存 ]</button>
+        <button class="btn-save" style="background:transparent; color:#666;" onclick="togglePanel()">[ 取消 ]</button>
+        <button class="btn-save" style="background:transparent; color:#444; float:right;" onclick="deleteCurrentItem()">[ 删除 ]</button>
+    </div>
+
+    <!-- 列表结果 -->
+    <div id="results"></div>
+</div>
+
+<script>
+    // ========================================
+    // 拼音工具模块 (可复用)
+    // ========================================
+    const PinyinUtil = {
+        // 检查拼音库是否可用
+        isAvailable() {
+            return typeof pinyinPro !== 'undefined';
+        },
+
+        // 生成全拼和简拼
+        generate(text) {
+            if (!text || !this.isAvailable()) {
+                return { pinyin: '', initial: '' };
+            }
+
+            // 只处理中文字符，其他字符原样保留
+            const pinyin = pinyinPro.pinyin(text, {
+                toneType: 'none',
+                type: 'array'
+            }).join('');
+
+            const initial = pinyinPro.pinyin(text, {
+                pattern: 'first',
+                toneType: 'none'
+            }).replace(/\s+/g, '');
+
+            return { pinyin, initial };
+        },
+
+        // 检查文本是否匹配搜索关键词（包含拼音匹配）
+        match(text, keyword) {
+            if (!text) return false;
+
+            const lowerText = text.toLowerCase();
+            const lowerKey = keyword.toLowerCase();
+
+            // 先检查直接匹配
+            if (lowerText.includes(lowerKey)) return true;
+
+            // 再检查拼音匹配
+            if (this.isAvailable()) {
+                const { pinyin, initial } = this.generate(text);
+                return pinyin.toLowerCase().includes(lowerKey) ||
+                       initial.toLowerCase().includes(lowerKey);
+            }
+
+            return false;
+        }
+    };
+
+    // ========================================
+    // 配置常量
+    // ========================================
+    const CONFIG = {
+        SUPABASE_URL: 'https://fmxddvjgkykuqwmasigo.supabase.co',
+        SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo',
+        TABLE_NAME: 'sop_items',
+        DEFAULT_TAG: 'MISC',
+        PASSWORD: '654321' // 前端密码（不安全，仅作基本保护）
+    };
+
+    const supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
+
+    // ========================================
+    // 全局数据变量
+    // ========================================
+    let db = [];
+    let editingId = null; // 记录正在编辑的条目ID
+
+    // ========================================
+    // 密码验证函数
+    // ========================================
+    function verifyPassword(action = '操作') {
+        const password = prompt(`请输入密码以进行${action}：`);
+        if (password === null) {
+            return false; // 用户取消
+        }
+        if (password !== CONFIG.PASSWORD) {
+            alert('密码错误！');
+            return false;
+        }
+        return true;
+    }
+
+    // DOM 元素引用（避免重复查询）
+    const DOM = {
+        input: null,
+        results: null,
+        panel: null,
+        newTag: null,
+        newTitle: null,
+        newContent: null
+    };
+
+    // 初始化 DOM 引用
+    function initDOM() {
+        DOM.input = document.getElementById('search');
+        DOM.results = document.getElementById('results');
+        DOM.panel = document.getElementById('addPanel');
+        DOM.newTag = document.getElementById('newTag');
+        DOM.newTitle = document.getElementById('newTitle');
+        DOM.newContent = document.getElementById('newContent');
+
+        // 设置 textarea 自适应高度
+        setupTextareaAutoResize();
+    }
+
+    // 设置 textarea 自适应高度
+    function setupTextareaAutoResize() {
+        const textarea = DOM.newContent;
+        const minHeight = 80; // 最小高度
+        const maxHeight = 400; // 最大高度
+
+        function autoResize() {
+            // 重置高度以获取正确的 scrollHeight
+            textarea.style.height = 'auto';
+            // 设置新高度（限制在最小和最大高度之间）
+            const newHeight = Math.max(minHeight, Math.min(textarea.scrollHeight, maxHeight));
+            textarea.style.height = newHeight + 'px';
+        }
+
+        // 监听输入事件
+        textarea.addEventListener('input', autoResize);
+
+        // 初始调整
+        autoResize();
+    }
+
+    // 初始化：从 Supabase 加载数据
+    async function initDB() {
+        try {
+            const { data, error } = await supabase
+                .from(CONFIG.TABLE_NAME)
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            db = data || [];
+            render(db);
+
+            // 设置实时订阅
+            setupRealtimeSubscription();
+        } catch (error) {
+            console.error('加载数据失败:', error);
+            alert('加载数据失败: ' + error.message);
+        }
+    }
+
+    // 设置实时订阅
+    function setupRealtimeSubscription() {
+        supabase
+            .channel(`${CONFIG.TABLE_NAME}_changes`)
+            .on('postgres_changes',
+                { event: '*', schema: 'public', table: CONFIG.TABLE_NAME },
+                (payload) => {
+                    console.log('数据变化:', payload);
+                    // 重新加载数据
+                    loadData();
+                }
+            )
+            .subscribe();
+    }
+
+    // 加载数据（不包含订阅设置）
+    async function loadData() {
+        try {
+            const { data, error } = await supabase
+                .from(CONFIG.TABLE_NAME)
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            db = data || [];
+            render(db);
+        } catch (error) {
+            console.error('加载数据失败:', error);
+        }
+    }
+
+    // 渲染函数
+    function render(list) {
+        if(list.length === 0) {
+            DOM.results.innerHTML = '<div style="color:#444; padding-top:20px;">_NO DATA FOUND</div>';
+            return;
+        }
+
+        DOM.results.innerHTML = list.map(item => `
+            <div class="list-item" onclick="toggleExpand(this)">
+                <div class="item-header">
+                    <span class="title">${item.title}</span>
+                    <span class="tag">${item.tag}</span>
+                </div>
+                <div class="content" onclick="event.stopPropagation()">${item.info}
+                    <div style="clear:both;"></div>
+                    <button class="btn-delete" onclick="editItem(${item.id})">[ 编辑 ]</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // 交互逻辑
+    function toggleExpand(element) {
+        element.classList.toggle('expanded');
+    }
+
+    function togglePanel() {
+        DOM.panel.classList.toggle('open');
+        if(DOM.panel.classList.contains('open')) {
+            DOM.newTag.focus();
+        } else {
+            // 关闭面板时清空编辑状态和表单
+            clearForm();
+        }
+    }
+
+    // 清空表单
+    function clearForm() {
+        editingId = null;
+        DOM.newTag.value = '';
+        DOM.newTitle.value = '';
+        DOM.newContent.value = '';
+        // 重置 textarea 高度
+        DOM.newContent.style.height = 'auto';
+    }
+
+    // 新增/编辑数据功能
+    async function saveData() {
+        const tag = DOM.newTag.value.trim().toUpperCase();
+        const title = DOM.newTitle.value.trim();
+        const content = DOM.newContent.value.trim();
+
+        if (!title || !content) {
+            alert("错误：标题和内容不能为空");
+            return;
+        }
+
+        // 密码验证
+        if (!verifyPassword('保存')) {
+            return;
+        }
+
+        try {
+            if (editingId) {
+                // 编辑模式：更新现有条目
+                const { error } = await supabase
+                    .from(CONFIG.TABLE_NAME)
+                    .update({
+                        tag: tag || CONFIG.DEFAULT_TAG,
+                        title: title,
+                        info: content
+                    })
+                    .eq('id', editingId);
+
+                if (error) throw error;
+                editingId = null;
+            } else {
+                // 新增模式：添加新条目
+                const { error } = await supabase
+                    .from(CONFIG.TABLE_NAME)
+                    .insert([{
+                        tag: tag || CONFIG.DEFAULT_TAG,
+                        title: title,
+                        info: content
+                    }]);
+
+                if (error) throw error;
+            }
+
+            // 重新加载数据
+            await loadData();
+
+            // 重置并关闭面板
+            clearForm();
+            togglePanel();
+
+            // 自动聚焦搜索框
+            DOM.input.value = '';
+            DOM.input.focus();
+        } catch (error) {
+            console.error('保存失败:', error);
+            alert('保存失败: ' + error.message);
+        }
+    }
+
+    // 编辑功能
+    function editItem(id) {
+        const item = db.find(i => i.id === id);
+        if (!item) return;
+
+        // 填充表单
+        DOM.newTag.value = item.tag;
+        DOM.newTitle.value = item.title;
+        DOM.newContent.value = item.info;
+
+        // 设置编辑状态
+        editingId = id;
+
+        // 打开面板
+        DOM.panel.classList.add('open');
+        DOM.newTag.focus();
+
+        // 触发 textarea 自适应高度调整
+        setTimeout(() => {
+            DOM.newContent.dispatchEvent(new Event('input'));
+        }, 0);
+    }
+
+    // 删除功能
+    async function deleteCurrentItem() {
+        if (!editingId) {
+            alert("当前没有正在编辑的条目");
+            return;
+        }
+
+        if (!confirm("确认删除此条目？")) {
+            return;
+        }
+
+        // 密码验证
+        if (!verifyPassword('删除')) {
+            return;
+        }
+
+        try {
+            const { error } = await supabase
+                .from(CONFIG.TABLE_NAME)
+                .delete()
+                .eq('id', editingId);
+
+            if (error) throw error;
+
+            // 重新加载数据
+            await loadData();
+
+            // 清空表单并关闭面板
+            clearForm();
+            togglePanel();
+
+            // 如果正在搜索，重新触发搜索
+            DOM.input.dispatchEvent(new Event('input'));
+        } catch (error) {
+            console.error('删除失败:', error);
+            alert('删除失败: ' + error.message);
+        }
+    }
+
+    // 搜索逻辑
+    function setupSearch() {
+        DOM.input.addEventListener('input', (e) => {
+            const key = e.target.value.toLowerCase();
+            const filtered = db.filter(i => {
+                // 使用 PinyinUtil 进行匹配（包含标题和内容）
+                return PinyinUtil.match(i.title, key) ||
+                       PinyinUtil.match(i.info, key);
+            });
+            render(filtered);
+        });
+    }
+
+    // 启动程序
+    function init() {
+        initDOM();
+        initDB();
+        setupSearch();
+    }
+
+    // 页面加载完成后启动
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
+</script>
+</body>
+</html>
