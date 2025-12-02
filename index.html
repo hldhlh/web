@@ -34,6 +34,10 @@
     .theme-toggle .moon-icon { opacity:0; }
     [data-theme=dark] .theme-toggle .sun-icon { opacity:0; transform:translateY(-20px); }
     [data-theme=dark] .theme-toggle .moon-icon { opacity:1; transform:translateY(0); }
+    .clear-cache-btn { background:var(--app-surface); border:none; cursor:pointer; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,.12); position:fixed; left:1rem; bottom:1rem; z-index:100; transition:transform 0.2s ease; }
+    .clear-cache-btn:hover { transform:scale(1.1); }
+    .clear-cache-btn:active { transform:scale(0.95); }
+    .clear-cache-btn svg { fill:var(--text-primary); stroke:var(--text-primary); stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
     @media (max-width:768px){ .app-icons-wrapper{ grid-template-columns:repeat(4,1fr); gap:1rem; padding:.8rem; } .app-icon-image{ width:55px; height:55px; } }
     @media (prefers-reduced-motion: reduce){
       .app-icon-image, .theme-toggle { transition:none }
@@ -62,6 +66,14 @@
     </div>
     <div class="app-icons-wrapper" id="app-container"></div>
   </div>
+
+  <!-- 清除缓存按钮 -->
+  <button id="clear-cache-btn" class="clear-cache-btn" title="清除本地缓存">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" />
+    </svg>
+  </button>
+
   <script type="module">
     import { getAppDirectories } from './apps.js';
 
@@ -140,7 +152,29 @@
       }catch(e){ container.innerHTML = '<p>加载应用失败，请稍后重试</p>'; }
     }
 
-    document.addEventListener('DOMContentLoaded', ()=>{ Theme.init(); loadApps(); document.getElementById('theme-toggle').addEventListener('click', ()=>Theme.toggle()); });
+    document.addEventListener('DOMContentLoaded', ()=>{
+      Theme.init();
+      loadApps();
+      document.getElementById('theme-toggle').addEventListener('click', ()=>Theme.toggle());
+
+      // 清除缓存按钮事件
+      document.getElementById('clear-cache-btn').addEventListener('click', ()=>{
+        if(confirm('确定要清除所有本地缓存吗？这将删除所有 localStorage 和 sessionStorage 数据。')){
+          try{
+            localStorage.clear();
+            sessionStorage.clear();
+            // 清除 Service Worker 缓存
+            if('caches' in window){
+              caches.keys().then(names=>Promise.all(names.map(n=>caches.delete(n))));
+            }
+            alert('缓存已清除！页面将刷新。');
+            location.reload();
+          }catch(e){
+            alert('清除缓存失败：' + e.message);
+          }
+        }
+      });
+    });
   </script>
 </body>
 </html>
