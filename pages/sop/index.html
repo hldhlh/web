@@ -1061,6 +1061,9 @@ function render(list) {
     DOM.results.innerHTML = list.map(item => {
         const { renderedContent, webappBlocks } = processContentWithWebapps(item.info, item.id);
 
+        // 高亮列表编号（如 1. 2. 3.）
+        const highlightedContent = renderedContent.replace(/(^|\n)(\d+)\./g, '$1<span style="color:var(--highlight);">$2.</span>');
+
         // 将webappBlocks存储到元素的dataset中，供后续使用
         const webappData = JSON.stringify(webappBlocks.map(b => ({
             id: b.id,
@@ -1075,7 +1078,7 @@ function render(list) {
                 <span class="title">${item.title}</span>
                 <span class="tag">${item.tag || 'MISC'}</span>
             </div>
-            <div class="content" onclick="event.stopPropagation()">${renderedContent}
+            <div class="content" onclick="event.stopPropagation()">${highlightedContent}
                 <button class="btn-delete" onclick="editItem(${item.id})">[ 编辑 ]</button>
             </div>
         </div>`;
