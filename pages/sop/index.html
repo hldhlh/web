@@ -309,7 +309,7 @@ textarea.form-input {
 }
 
 .webapp-container::before {
-    content: '📱 Mini App';
+    content: 'Mini App';
     position: absolute;
     top: -10px;
     left: 10px;
@@ -533,7 +533,7 @@ textarea.form-input {
         <!-- 隐藏的诱饵输入框，防止浏览器自动填充 -->
         <input type="text" style="position:absolute;top:-9999px;left:-9999px;" tabindex="-1" autocomplete="off">
         <input type="password" style="position:absolute;top:-9999px;left:-9999px;" tabindex="-1" autocomplete="new-password">
-        <input type="password" id="passwordInput" class="password-input" placeholder="输入密码以继续..." autocomplete="new-password" />
+        <input type="password" id="passwordInput" class="password-input" placeholder="输入密码以继续..." autocomplete="off" name="password-field" />
         <div class="password-error" id="passwordError">密码错误！</div>
         <div class="password-buttons">
             <button class="password-btn cancel" onclick="closePasswordDialog()">取消</button>
