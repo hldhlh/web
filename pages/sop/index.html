@@ -290,6 +290,41 @@ textarea.form-input {
     background: var(--highlight);
 }
 
+/* WEBAPP 小程序容器样式 */
+.webapp-container {
+    margin: 15px 0;
+    padding: 15px;
+    background: rgba(155, 134, 189, 0.05);
+    border: 1px dashed var(--border);
+    border-radius: 4px;
+    position: relative;
+    min-height: 40px;
+}
+
+.webapp-container.webapp-active {
+    background: rgba(155, 134, 189, 0.08);
+    border-style: solid;
+    border-color: var(--highlight);
+    box-shadow: 0 0 8px rgba(155, 134, 189, 0.2);
+}
+
+.webapp-container::before {
+    content: '📱 Mini App';
+    position: absolute;
+    top: -10px;
+    left: 10px;
+    background: var(--bg);
+    padding: 0 8px;
+    font-size: 11px;
+    color: var(--highlight);
+    letter-spacing: 0.5px;
+}
+
+/* WEBAPP 内部样式重置（可选） */
+.webapp-container * {
+    box-sizing: border-box;
+}
+
 /* 密码输入弹窗 */
 #passwordOverlay {
     position: fixed;
@@ -553,6 +588,13 @@ const CONFIG = {
 
 const supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 
+// ==================== WEBAPP 小程序配置 ====================
+const WEBAPP_PARSER = {
+    REGEX: /\[WEBAPP\]([\s\S]*?)\[\/WEBAPP\]/g,
+    UNIQUE_PREFIX: 'webapp_'
+};
+const WEBAPP_INSTANCES = new Map(); // 存储小程序实例的清理函数
+
 let db = [];
 let editingId = null;
 let passwordResolve = null;
@@ -734,7 +776,11 @@ function filterAndRender() {
     if (searchKey) {
         const filtered = db.filter(i => {
             const titleMatch = PinyinUtil.match(i.title, searchKey);
-            const infoMatch = i.info && i.info.toLowerCase().includes(searchKey);
+
+            // 移除WEBAPP块后再搜索内容
+            const contentWithoutWebapp = i.info.replace(WEBAPP_PARSER.REGEX, '');
+            const infoMatch = contentWithoutWebapp && contentWithoutWebapp.toLowerCase().includes(searchKey);
+
             return titleMatch || infoMatch;
         });
         render(filtered);
@@ -768,20 +814,286 @@ function handleRealtimeDelete(deletedItem) {
         filterAndRender();
     }
 }
+
+// ==================== WEBAPP 小程序解析和执行引擎 ====================
+
+/**
+ * 解析单个 WEBAPP 块
+ * @param {string} webappCode - WEBAPP块内的代码
+ * @param {number} itemId - 所属SOP条目的ID
+ * @param {number} blockIndex - 该条目中的第几个WEBAPP块
+ * @returns {object} 解析后的结构化对象
+ */
+function parseWebappBlock(webappCode, itemId, blockIndex) {
+    const uniqueId = `${WEBAPP_PARSER.UNIQUE_PREFIX}${itemId}_${blockIndex}`;
+
+    let html = '', css = '', js = '';
+
+    // 提取 <style> 标签
+    const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+    let styleMatch;
+    while ((styleMatch = styleRegex.exec(webappCode)) !== null) {
+        css += styleMatch[1] + '\n';
+    }
+
+    // 提取 <script> 标签
+    const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+    let scriptMatch;
+    while ((scriptMatch = scriptRegex.exec(webappCode)) !== null) {
+        js += scriptMatch[1] + '\n';
+    }
+
+    // 移除style和script后，剩余的就是HTML
+    html = webappCode
+        .replace(styleRegex, '')
+        .replace(scriptRegex, '')
+        .trim();
+
+    return {
+        id: uniqueId,
+        html: html,
+        css: css,
+        js: js,
+        itemId: itemId,
+        blockIndex: blockIndex
+    };
+}
+
+/**
+ * 处理内容字符串，解析所有WEBAPP块
+ * @param {string} content - 原始内容
+ * @param {number} itemId - SOP条目ID
+ * @returns {object} { renderedContent, webappBlocks }
+ */
+function processContentWithWebapps(content, itemId) {
+    const webappBlocks = [];
+    let blockIndex = 0;
+
+    // 替换所有WEBAPP块为占位符，并收集解析结果
+    const renderedContent = content.replace(WEBAPP_PARSER.REGEX, (match, webappCode) => {
+        const parsed = parseWebappBlock(webappCode, itemId, blockIndex);
+        webappBlocks.push(parsed);
+        blockIndex++;
+
+        // 返回占位容器
+        return `<div class="webapp-container" data-webapp-id="${parsed.id}"></div>`;
+    });
+
+    return { renderedContent, webappBlocks };
+}
+
+/**
+ * 重写HTML中的ID，避免冲突
+ * @param {string} html - 原始HTML
+ * @param {string} scopeId - 唯一的作用域ID
+ * @returns {object} { html, idMap } - 处理后的HTML和ID映射表
+ */
+function rewriteHtmlIds(html, scopeId) {
+    const idMap = {}; // 原始ID -> 新ID 的映射
+
+    const processedHtml = html.replace(/\bid\s*=\s*["']([^"']+)["']/gi, (match, originalId) => {
+        const newId = `${scopeId}_${originalId}`;
+        idMap[originalId] = newId;
+        return `id="${newId}"`;
+    });
+
+    return { html: processedHtml, idMap };
+}
+
+/**
+ * 处理CSS作用域隔离
+ * @param {string} css - 原始CSS代码
+ * @param {string} scopeId - 唯一的作用域ID
+ * @returns {string} 带作用域前缀的CSS
+ */
+function scopeCss(css, scopeId) {
+    if (!css.trim()) return '';
+
+    // 为每个选择器添加作用域前缀
+    const scopedCss = css.replace(/([^{}]+)\s*{/g, (match, selector) => {
+        // 跳过 @media, @keyframes 等规则
+        if (selector.trim().startsWith('@')) {
+            return match;
+        }
+
+        // 为每个逗号分隔的选择器添加前缀
+        const selectors = selector.split(',').map(s => {
+            s = s.trim();
+            // 特殊处理：body/html -> 直接替换为容器
+            if (s === 'body' || s === 'html') {
+                return `[data-webapp-scope="${scopeId}"]`;
+            }
+            return `[data-webapp-scope="${scopeId}"] ${s}`;
+        }).join(', ');
+
+        return `${selectors} {`;
+    });
+
+    return scopedCss;
+}
+
+/**
+ * 在隔离作用域中执行JavaScript
+ * @param {string} jsCode - JavaScript代码
+ * @param {string} scopeId - 作用域ID
+ * @param {object} idMap - ID映射表
+ * @param {HTMLElement} containerElement - 容器DOM元素
+ */
+function executeIsolatedJs(jsCode, scopeId, idMap, containerElement) {
+    if (!jsCode.trim()) return;
+
+    // 重写代码中的 getElementById 调用
+    let rewrittenJs = jsCode;
+
+    // 替换 document.getElementById('xxx') 为新ID
+    Object.keys(idMap).forEach(oldId => {
+        const regex = new RegExp(`getElementById\\s*\\(\\s*['"\`]${oldId}['"\`]\\s*\\)`, 'g');
+        rewrittenJs = rewrittenJs.replace(regex, `getElementById('${idMap[oldId]}')`);
+    });
+
+    // 创建隔离的执行环境
+    try {
+        // 使用Function构造器创建闭包，限制全局污染
+        const isolatedFunction = new Function(
+            'container',
+            'scopeId',
+            `
+            // 创建局部作用域的 $ 查询函数（可选）
+            const $ = (selector) => container.querySelector(selector);
+            const $$ = (selector) => container.querySelectorAll(selector);
+
+            // 执行用户代码
+            ${rewrittenJs}
+            `
+        );
+
+        // 异步执行，避免阻塞主渲染
+        setTimeout(() => {
+            isolatedFunction(containerElement, scopeId);
+        }, 0);
+
+    } catch (error) {
+        console.error(`[WEBAPP ${scopeId}] 执行错误:`, error);
+        containerElement.innerHTML += `<div style="color:#c47a9f;padding:10px;border:1px solid #c47a9f;margin-top:10px;">⚠ 小程序执行失败: ${error.message}</div>`;
+    }
+}
+
+/**
+ * 注册WEBAPP实例的清理函数
+ */
+function registerWebappCleanup(scopeId, cleanupFn) {
+    WEBAPP_INSTANCES.set(scopeId, { cleanup: cleanupFn });
+}
+
+/**
+ * 清理特定WEBAPP实例
+ */
+function cleanupWebapps(listItemElement) {
+    const webappBlocks = JSON.parse(listItemElement.dataset.webappBlocks || '[]');
+
+    webappBlocks.forEach(block => {
+        const instance = WEBAPP_INSTANCES.get(block.id);
+        if (instance && instance.cleanup) {
+            instance.cleanup();
+        }
+        WEBAPP_INSTANCES.delete(block.id);
+    });
+}
+
+/**
+ * 执行列表项中的所有WEBAPP
+ * @param {HTMLElement} listItemElement - list-item元素
+ */
+function executeWebapps(listItemElement) {
+    const webappBlocks = JSON.parse(listItemElement.dataset.webappBlocks || '[]');
+    if (!webappBlocks.length) return;
+
+    webappBlocks.forEach(block => {
+        const container = listItemElement.querySelector(`[data-webapp-id="${block.id}"]`);
+        if (!container) return;
+
+        // 1. 处理HTML（ID重写）
+        const { html, idMap } = rewriteHtmlIds(block.html, block.id);
+
+        // 2. 创建隔离容器
+        container.setAttribute('data-webapp-scope', block.id);
+        container.className = 'webapp-container webapp-active';
+        container.innerHTML = html;
+
+        // 3. 注入作用域CSS
+        if (block.css) {
+            const styleId = `style_${block.id}`;
+            let styleElement = document.getElementById(styleId);
+
+            if (!styleElement) {
+                styleElement = document.createElement('style');
+                styleElement.id = styleId;
+                document.head.appendChild(styleElement);
+            }
+
+            styleElement.textContent = scopeCss(block.css, block.id);
+        }
+
+        // 4. 执行隔离的JavaScript
+        executeIsolatedJs(block.js, block.id, idMap, container);
+
+        // 5. 注册清理函数
+        registerWebappCleanup(block.id, () => {
+            // 移除style标签
+            const styleElement = document.getElementById(`style_${block.id}`);
+            if (styleElement) styleElement.remove();
+
+            // 清空容器
+            container.innerHTML = '';
+            container.className = 'webapp-container';
+        });
+    });
+}
+
+// ==================== 渲染函数 ====================
 function render(list) {
-    if (!list.length) { DOM.results.innerHTML = '<div style="color:var(--muted);padding-top:20px;">暂无数据</div>'; return; }
-    DOM.results.innerHTML = list.map(item => `
-        <div class="list-item" onclick="toggleExpand(this)">
+    if (!list.length) {
+        DOM.results.innerHTML = '<div style="color:var(--muted);padding-top:20px;">暂无数据</div>';
+        return;
+    }
+
+    // 第一步：生成基础HTML结构（带WEBAPP占位符）
+    DOM.results.innerHTML = list.map(item => {
+        const { renderedContent, webappBlocks } = processContentWithWebapps(item.info, item.id);
+
+        // 将webappBlocks存储到元素的dataset中，供后续使用
+        const webappData = JSON.stringify(webappBlocks.map(b => ({
+            id: b.id,
+            html: b.html,
+            css: b.css,
+            js: b.js
+        })));
+
+        return `
+        <div class="list-item" onclick="toggleExpand(this)" data-webapp-blocks='${webappData.replace(/'/g, '&apos;')}'>
             <div class="item-header">
                 <span class="title">${item.title}</span>
                 <span class="tag">${item.tag || 'MISC'}</span>
             </div>
-            <div class="content" onclick="event.stopPropagation()">${item.info}
+            <div class="content" onclick="event.stopPropagation()">${renderedContent}
                 <button class="btn-delete" onclick="editItem(${item.id})">[ 编辑 ]</button>
             </div>
-        </div>`).join('');
+        </div>`;
+    }).join('');
 }
-function toggleExpand(el) { el.classList.toggle('expanded'); }
+
+function toggleExpand(el) {
+    const wasExpanded = el.classList.contains('expanded');
+    el.classList.toggle('expanded');
+
+    // 如果是展开操作，执行WEBAPP
+    if (!wasExpanded) {
+        executeWebapps(el);
+    } else {
+        // 收起时清理WEBAPP
+        cleanupWebapps(el);
+    }
+}
 
 // ==================== 密码弹窗控制 ====================
 function showPasswordDialog() {
