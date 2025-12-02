@@ -556,6 +556,7 @@ const supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABA
 let db = [];
 let editingId = null;
 let passwordResolve = null;
+let hasShownCacheAlert = false; // 标记是否已显示过缓存提示
 
 // ==================== 加载遮罩控制 ====================
 const loadingOverlay = document.getElementById('loadingOverlay');
@@ -620,6 +621,12 @@ async function initDB(retryCount = 0) {
         render(db);
         setupRealtimeSubscription();
         hideLoading();
+
+        // 如果之前显示过缓存提示，现在成功连接了，重置标记并提示用户
+        if (hasShownCacheAlert && retryCount > 0) {
+            hasShownCacheAlert = false;
+            console.log('✓ 网络已恢复，数据已更新');
+        }
     } catch (e) {
         console.error('数据加载失败:', e);
 
@@ -633,11 +640,19 @@ async function initDB(retryCount = 0) {
                 const hours = Math.floor(timeDiff / 1000 / 60 / 60);
                 render(db);
                 hideLoading();
-                alert(`网络连接失败，已加载缓存数据 (${hours}小时前)\n${retryCount < maxRetries ? '将在后台继续尝试连接...' : ''}`);
+
+                // 只在第一次失败时显示 alert，后续静默重试
+                if (!hasShownCacheAlert) {
+                    hasShownCacheAlert = true;
+                    alert(`网络连接失败，已加载缓存数据 (${hours}小时前)\n将在后台继续尝试连接...`);
+                } else {
+                    // 后台重试失败，只在控制台输出日志
+                    console.log(`后台重试 ${retryCount}/${maxRetries} 失败，继续使用缓存数据`);
+                }
 
                 // 后台继续重试
                 if (retryCount < maxRetries) {
-                    setTimeout(() => initDB(retryCount + 1), 3000);
+                    setTimeout(() => initDB(retryCount + 1), 5000); // 增加重试间隔到5秒
                 }
                 return;
             } catch (parseError) {
