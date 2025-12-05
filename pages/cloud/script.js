@@ -8,6 +8,7 @@ let files = [];
 let selectedFile = null; // Store currently selected file for context menu
 let currentView = 'files'; // 'files', 'shared', 'trash'
 let searchQuery = ''; // Current search query
+let currentFolderId = null; // Current folder ID (null for root)
 
 const fileIcons = {
     fig: '<svg viewBox="0 0 24 24"><path d="M5 5.5A3.5 3.5 0 0 1 8.5 2H12v7H8.5A3.5 3.5 0 0 1 5 5.5z"/><path d="M12 2h3.5a3.5 3.5 0 1 1 0 7H12V2z"/><path d="M12 12.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0z"/><path d="M5 19.5A3.5 3.5 0 0 1 8.5 16H12v3.5a3.5 3.5 0 1 1-7 0z"/><path d="M12 12.5V16h3.5a3.5 3.5 0 0 0 0-7H12z"/></svg>',
@@ -35,9 +36,11 @@ const renameAction = document.getElementById('renameAction');
 const downloadAction = document.getElementById('downloadAction');
 const deleteAction = document.getElementById('deleteAction');
 const shareAction = document.getElementById('shareAction');
+const copyLinkAction = document.getElementById('copyLinkAction');
 const restoreAction = document.getElementById('restoreAction');
 const sectionTitle = document.querySelector('.section-title');
 const searchInput = document.querySelector('.search-bar input');
+const breadcrumbNav = document.getElementById('breadcrumbNav');
 
 // View Elements
 const fileView = document.getElementById('fileView');
@@ -179,8 +182,8 @@ class TaskManager {
         el.id = `task-${task.id}`;
         
         const typeIcon = task.type === 'upload' 
-            ? '<svg viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>'
-            : '<svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>';
+            ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>'
+            : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
 
         el.innerHTML = `
             <div class="task-info-row">
@@ -195,11 +198,11 @@ class TaskManager {
                 </div>
                 <div class="task-actions">
                     <button class="task-action-btn pause-btn" title="暂停/继续">
-                        <svg viewBox="0 0 24 24" class="pause-icon" style="display:none"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
-                        <svg viewBox="0 0 24 24" class="play-icon" style="display:none"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        <svg viewBox="0 0 24 24" class="pause-icon" style="display:none" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                        <svg viewBox="0 0 24 24" class="play-icon" style="display:none" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
                     </button>
                     <button class="task-action-btn cancel-btn" title="取消">
-                        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                     </button>
                 </div>
             </div>
@@ -267,6 +270,7 @@ class TaskManager {
             speedText.textContent = task.speed;
             pauseBtn.style.display = 'flex';
             pauseIcon.style.display = 'block';
+            pauseIcon.style.display = 'block';
             playIcon.style.display = 'none';
         }
     }
@@ -303,7 +307,6 @@ async function updateStorageInfo() {
     const { data, error } = await client.rpc('get_storage_summary');
     
     if (error) {
-        // Silently fail or log, as this RPC might not exist or work for anon
         console.warn('Error fetching storage usage:', error);
         return;
     }
@@ -340,7 +343,10 @@ function setupRealtimeSubscription() {
             (payload) => {
                 console.log('Realtime update:', payload);
                 if (payload.eventType === 'INSERT') {
-                    files.unshift(payload.new);
+                    // Prevent duplicates
+                    if (!files.some(f => f.id === payload.new.id)) {
+                        files.unshift(payload.new);
+                    }
                 } else if (payload.eventType === 'DELETE') {
                     files = files.filter(f => f.id !== payload.old.id);
                 } else if (payload.eventType === 'UPDATE') {
@@ -356,20 +362,72 @@ function setupRealtimeSubscription() {
         .subscribe();
 }
 
+// Navigation Helper
+function getBreadcrumbs() {
+    if (!currentFolderId) return [{ id: null, name: '根目录' }];
+    
+    const path = [];
+    let current = files.find(f => f.id === currentFolderId);
+    
+    while (current) {
+        path.unshift({ id: current.id, name: current.name });
+        current = files.find(f => f.id === current.parent_id);
+    }
+    
+    path.unshift({ id: null, name: '根目录' });
+    return path;
+}
+
+function navigateToFolder(folderId) {
+    currentFolderId = folderId;
+    renderFiles();
+}
+
+// Move File Logic
+async function moveFile(fileId, targetFolderId) {
+    if (fileId === targetFolderId) return; // Can't move folder into itself (simple check)
+    
+    // Check for circular dependency
+    let parent = files.find(f => f.id === targetFolderId);
+    while (parent) {
+        if (parent.id === fileId) {
+            showToast('无法将文件夹移动到其子文件夹中');
+            return;
+        }
+        parent = files.find(f => f.id === parent.parent_id);
+    }
+
+    const { error } = await client
+        .from('files')
+        .update({ parent_id: targetFolderId })
+        .eq('id', fileId);
+
+    if (error) {
+        showToast('移动失败: ' + error.message);
+    } else {
+        // Optimistic update
+        const file = files.find(f => f.id === fileId);
+        if (file) file.parent_id = targetFolderId;
+        renderFiles();
+        showToast('移动成功');
+    }
+}
+
+
 // Render Files
 function renderFiles() {
     // Handle View Switching
     if (currentView === 'tasks') {
         fileView.style.display = 'none';
         taskView.style.display = 'block';
-        uploadBtn.style.display = 'none'; // Hide FAB in task view
+        uploadBtn.style.display = 'none';
         if (sectionTitle) sectionTitle.textContent = '传输列表';
         manager.updateEmptyState();
         return;
     } else {
         fileView.style.display = 'block';
         taskView.style.display = 'none';
-        uploadBtn.style.display = 'flex'; // Show FAB
+        uploadBtn.style.display = currentView === 'files' ? 'flex' : 'none';
     }
 
     let filteredFiles = [];
@@ -377,12 +435,13 @@ function renderFiles() {
 
     switch (currentView) {
         case 'files':
-            filteredFiles = files.filter(f => !f.is_deleted);
+            // Filter by parent_id
+            filteredFiles = files.filter(f => !f.is_deleted && f.parent_id === currentFolderId);
             title = '我的文件';
             break;
         case 'shared':
             filteredFiles = files.filter(f => !f.is_deleted && f.is_shared);
-            title = '已共享文件';
+            title = '我的收藏';
             break;
         case 'trash':
             filteredFiles = files.filter(f => f.is_deleted);
@@ -395,8 +454,27 @@ function renderFiles() {
     // Apply Search Filter
     if (searchQuery) {
         const query = searchQuery.toLowerCase();
-        filteredFiles = filteredFiles.filter(f => f.name.toLowerCase().includes(query));
+        filteredFiles = files.filter(f => !f.is_deleted && f.name.toLowerCase().includes(query)); // Search across all non-deleted files
         title = `搜索: "${searchQuery}"`;
+        // Hide breadcrumbs during search
+        if (breadcrumbNav) breadcrumbNav.style.display = 'none';
+    } else {
+        // Show Breadcrumbs in 'files' view
+        if (currentView === 'files' && breadcrumbNav) {
+            breadcrumbNav.style.display = 'flex';
+            const breadcrumbs = getBreadcrumbs();
+            breadcrumbNav.innerHTML = breadcrumbs.map((crumb, index) => {
+                const isLast = index === breadcrumbs.length - 1;
+                return `
+                    <div class="breadcrumb-item" onclick="navigateToFolder(${crumb.id === null ? 'null' : `'${crumb.id}'`})" style="${isLast ? 'font-weight:bold; cursor:default; color:var(--text-color); text-decoration:none;' : ''}">
+                        ${crumb.name}
+                    </div>
+                    ${!isLast ? '<div class="breadcrumb-separator">/</div>' : ''}
+                `;
+            }).join('');
+        } else if (breadcrumbNav) {
+            breadcrumbNav.style.display = 'none';
+        }
     }
 
     if (sectionTitle) sectionTitle.textContent = title;
@@ -405,7 +483,6 @@ function renderFiles() {
     filteredFiles.sort((a, b) => {
         if (a.type === 'folder' && b.type !== 'folder') return -1;
         if (a.type !== 'folder' && b.type === 'folder') return 1;
-        // If same type, keep original order (created_at desc)
         return 0; 
     });
 
@@ -429,31 +506,117 @@ function renderFiles() {
         });
         
         let displayName = file.name;
-        // Apply highlighting if searching
         if (searchQuery) {
-            // Escape special regex characters
             const escapedQuery = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const regex = new RegExp(`(${escapedQuery})`, 'gi');
             displayName = displayName.replace(regex, '<span class="search-highlight">$1</span>');
         }
 
+        let displaySize = file.size;
+        if (file.type === 'folder') {
+            displaySize = formatSize(calculateFolderSize(file.id));
+        }
+
+        const draggable = !file.is_deleted ? 'draggable="true"' : '';
+        const droppable = (file.type === 'folder' && !file.is_deleted) ? 'data-droppable="true"' : '';
+
         return `
-        <div class="file-card" data-id="${file.id}" data-url="${file.url}" data-name="${file.name}" data-shared="${file.is_shared}">
+        <div class="file-card" 
+             data-id="${file.id}" 
+             data-url="${file.url}" 
+             data-name="${file.name}" 
+             data-type="${file.type}"
+             data-shared="${file.is_shared}"
+             ${draggable}
+             ${droppable}>
             <div class="file-icon">
                 ${fileIcons[file.type] || fileIcons.default}
             </div>
             <div class="file-info">
                 <h3>${displayName}</h3>
-                <p>${file.size} • ${timeString}</p>
-                ${file.is_shared ? '<span style="font-size: 10px; background: #e0f2fe; color: #0284c7; padding: 2px 6px; border-radius: 4px;">已共享</span>' : ''}
+                <p>${displaySize} • ${timeString}</p>
+                ${file.is_shared ? '<span style="font-size: 10px; background: #fef3c7; color: #d97706; padding: 2px 6px; border-radius: 4px;">已收藏</span>' : ''}
             </div>
         </div>
     `}).join('');
+
+    // Attach Drag and Drop Events
+    const cards = fileGrid.querySelectorAll('.file-card');
+    cards.forEach(card => {
+        // Click to Select (already handled by context menu logic, but let's improve UX)
+        // Double Click to enter folder
+        if (card.dataset.type === 'folder') {
+            card.addEventListener('dblclick', () => {
+                navigateToFolder(card.dataset.id);
+            });
+        }
+
+        // Drag Events
+        if (card.getAttribute('draggable') === 'true') {
+            card.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', card.dataset.id);
+                e.dataTransfer.effectAllowed = 'move';
+                card.style.opacity = '0.5';
+            });
+
+            card.addEventListener('dragend', (e) => {
+                card.style.opacity = '1';
+            });
+        }
+
+        // Drop Events (only folders)
+        if (card.dataset.droppable === 'true') {
+            card.addEventListener('dragover', (e) => {
+                e.preventDefault(); // Allow drop
+                e.dataTransfer.dropEffect = 'move';
+                card.classList.add('drag-over');
+            });
+
+            card.addEventListener('dragleave', (e) => {
+                card.classList.remove('drag-over');
+            });
+
+            card.addEventListener('drop', (e) => {
+                e.preventDefault();
+                card.classList.remove('drag-over');
+                const fileId = e.dataTransfer.getData('text/plain');
+                if (fileId && fileId !== card.dataset.id) {
+                    moveFile(fileId, card.dataset.id);
+                }
+            });
+        }
+    });
 }
 
 // Utils
+function parseSize(sizeStr) {
+    if (!sizeStr || sizeStr === '-' || sizeStr === '0 B') return 0;
+    const parts = sizeStr.split(' ');
+    if (parts.length < 2) return 0;
+    const num = parseFloat(parts[0]);
+    const unit = parts[1];
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = sizes.indexOf(unit);
+    if (i < 0) return 0;
+    return num * Math.pow(k, i);
+}
+
+function calculateFolderSize(folderId) {
+    const children = files.filter(f => f.parent_id === folderId && !f.is_deleted);
+    let total = 0;
+    for (const child of children) {
+        if (child.type === 'folder') {
+            total += calculateFolderSize(child.id);
+        } else {
+            total += parseSize(child.size);
+        }
+    }
+    return total;
+}
+
 function formatSize(bytes) {
-    if (bytes === 0) return '0 B';
+    if (bytes === 0 || bytes === '-' || isNaN(bytes)) return bytes === '-' ? '-' : '0 B';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -472,22 +635,29 @@ function getFileType(filename) {
 }
 
 // Upload Handling
-async function handleFileUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+async function uploadFile(file) {
+    // Capture current folder ID at the START of the upload to ensure consistency
+    const targetFolderId = currentFolderId;
+    console.log('Starting upload for file:', file.name, 'to folder:', targetFolderId);
 
-    // Reset input immediately
-    const input = event.target;
-    
     // Create Task
     let lastLoaded = 0;
     let lastTime = Date.now();
     let taskId;
 
-    const fileName = `${Date.now()}_${file.name}`;
+    // Generate a URL-safe filename
+    const lastDotIndex = file.name.lastIndexOf('.');
+    let ext = 'bin'; 
+    if (lastDotIndex !== -1 && lastDotIndex < file.name.length - 1) {
+        const rawExt = file.name.substring(lastDotIndex + 1);
+        const cleanExt = rawExt.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+        if (cleanExt) ext = cleanExt;
+    }
+
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`;
     
     // Configure TUS Upload
-    const projectId = 'fmxddvjgkykuqwmasigo'; 
+    const projectId = supabaseUrl.split('//')[1].split('.')[0]; 
     const bucketName = 'cloud-files';
     
     const upload = new tus.Upload(file, {
@@ -537,8 +707,10 @@ async function handleFileUpload(event) {
                 .from(bucketName)
                 .getPublicUrl(fileName);
 
+            console.log('Upload finished, inserting into DB with parent_id:', targetFolderId);
+
             // Insert into Database
-            const { error: dbError } = await client
+            const { data: insertedData, error: dbError } = await client
                 .from('files')
                 .insert({
                     name: file.name,
@@ -546,17 +718,26 @@ async function handleFileUpload(event) {
                     size: formatSize(file.size),
                     url: publicUrl,
                     is_deleted: false,
-                    is_shared: false
-                });
+                    is_shared: false,
+                    parent_id: targetFolderId // Use captured folder ID
+                })
+                .select();
 
             if (dbError) {
                 console.error('DB Insert Error', dbError);
                 showToast('上传成功但保存记录失败');
             } else {
                 showToast('文件上传完成');
-                // If not in task view, maybe switch or just notify
-                if (currentView !== 'tasks') {
-                    // Refresh current list if needed (realtime sub handles this mostly)
+                // Manually add to list to ensure immediate update
+                if (insertedData && insertedData.length > 0) {
+                     const newFile = insertedData[0];
+                     if (!files.some(f => f.id === newFile.id)) {
+                         files.unshift(newFile);
+                         // Only render if we are still in the same view and folder
+                         // Or just render anyway, the filter will handle it
+                         renderFiles();
+                         updateStorageInfo();
+                     }
                 }
             }
         }
@@ -574,9 +755,17 @@ async function handleFileUpload(event) {
         }
     );
     
-    input.value = '';
-    
     showToast('已添加到传输列表');
+}
+
+async function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    await uploadFile(file);
+    
+    // Reset input
+    event.target.value = '';
 }
 
 // Download Handling
@@ -702,6 +891,20 @@ async function handleDownload() {
     );
 }
 
+// Copy Link Handling
+async function handleCopyLink() {
+    if (!selectedFile || !selectedFile.url) return;
+    contextMenu.style.display = 'none';
+
+    try {
+        await navigator.clipboard.writeText(selectedFile.url);
+        showToast('链接已复制到剪贴板');
+    } catch (err) {
+        console.error('Copy failed', err);
+        showToast('复制失败，请重试');
+    }
+}
+
 // Toggle Share
 async function handleShare() {
     if (!selectedFile) return;
@@ -716,7 +919,15 @@ async function handleShare() {
     if (error) {
         showToast('操作失败: ' + error.message);
     } else {
-        showToast(newStatus ? '文件已共享' : '已取消共享');
+        const file = files.find(f => f.id == selectedFile.id);
+        if (file) file.is_shared = newStatus;
+        renderFiles();
+        
+        if (newStatus) {
+            showToast('已添加到收藏');
+        } else {
+            showToast('已取消收藏');
+        }
     }
 }
 
@@ -733,6 +944,9 @@ async function handleRestore() {
     if (error) {
         showToast('恢复失败: ' + error.message);
     } else {
+        const file = files.find(f => f.id == selectedFile.id);
+        if (file) file.is_deleted = false;
+        renderFiles();
         showToast('文件已恢复');
     }
 }
@@ -754,7 +968,8 @@ async function handleNewFolder() {
             size: '-',
             url: null,
             is_deleted: false,
-            is_shared: false
+            is_shared: false,
+            parent_id: currentFolderId // Use currentFolderId
         });
 
     if (error) {
@@ -785,6 +1000,9 @@ async function handleRename() {
         showToast('重命名失败: ' + error.message);
         console.error(error);
     } else {
+        const file = files.find(f => f.id == selectedFile.id);
+        if (file) file.name = newName.trim();
+        renderFiles();
         showToast('重命名成功');
     }
 }
@@ -800,14 +1018,33 @@ async function handleDelete() {
 
         showToast('正在删除...');
         
-        // 1. Delete from Storage (Optional, getting path from URL is tricky without storing it)
-        // For simplicity, we just delete the record for now, or try to parse path
-        // Assuming filename is last part of URL path
-        try {
-            const path = selectedFile.url.split('/').pop();
-            await client.storage.from('cloud-files').remove([path]);
-        } catch (e) {
-            console.error('Storage delete error', e);
+        // Helper to recursively collect all descendant file paths
+        const collectStoragePaths = (file) => {
+            let paths = [];
+            if (file.url) {
+                try {
+                    const path = file.url.split('/').pop();
+                    if (path) paths.push(path);
+                } catch (e) {}
+            }
+            
+            // Find children
+            const children = files.filter(f => f.parent_id === file.id);
+            for (const child of children) {
+                paths = paths.concat(collectStoragePaths(child));
+            }
+            return paths;
+        };
+
+        const pathsToDelete = collectStoragePaths(selectedFile);
+        
+        if (pathsToDelete.length > 0) {
+            try {
+                // Delete in chunks if needed, but for now single call
+                await client.storage.from('cloud-files').remove(pathsToDelete);
+            } catch (e) {
+                console.error('Storage delete error', e);
+            }
         }
 
         const { error } = await client
@@ -818,11 +1055,63 @@ async function handleDelete() {
         if (error) {
             showToast('删除失败: ' + error.message);
         } else {
+            // Optimistic update logic
+            // Since we have ON DELETE CASCADE, DB will delete children.
+            // But we need to update our local 'files' array to reflect this.
+            
+            // Helper to recursively find all IDs to remove from local state
+            const collectIdsToRemove = (fileId) => {
+                let ids = [fileId];
+                const children = files.filter(f => f.parent_id === fileId);
+                for (const child of children) {
+                    ids = ids.concat(collectIdsToRemove(child.id));
+                }
+                return ids;
+            };
+
+            const idsToRemove = collectIdsToRemove(selectedFile.id);
+            files = files.filter(f => !idsToRemove.includes(f.id));
+            
+            renderFiles();
             showToast('文件已永久删除');
         }
 
     } else {
         // Soft Delete (Move to Trash)
+        // We should recursively mark children as deleted too? 
+        // Or does moving a folder to trash imply moving all contents?
+        // Usually yes. But if we restore, do we restore all?
+        // Let's implement soft delete cascading logic here for consistency
+        
+        // Actually, Windows logic: if you move folder to trash, you just move the folder.
+        // The contents are "inside" it.
+        // Since my view filters by parent_id, if the folder is in trash (is_deleted=true),
+        // we can't navigate into it (dblclick won't show it in file list).
+        // So effectively contents are hidden/trashed.
+        // However, 'trash' view shows a flat list currently?
+        // Let's check renderFiles logic for trash:
+        // filteredFiles = files.filter(f => f.is_deleted);
+        
+        // If I soft-delete ONLY the folder, its children still have is_deleted=false.
+        // But since their parent is deleted, they are effectively orphaned in the UI if navigation depends on parent.
+        // BUT, the Trash view currently shows ALL files where is_deleted=true.
+        // If I delete a folder, the children won't show up in Trash view unless I mark them is_deleted=true.
+        // BUT, if I mark them is_deleted=true, they will show up as individual items in Trash?
+        // Windows Trash shows the FOLDER. It doesn't show the children separately.
+        // My current logic:
+        // case 'trash': filteredFiles = files.filter(f => f.is_deleted);
+        
+        // If I only mark parent as deleted:
+        // 1. Parent shows in Trash.
+        // 2. Children (is_deleted=false) - where do they show?
+        //    They have parent_id = deleted_folder_id.
+        //    They won't show in root or other folders.
+        //    They won't show in Trash.
+        //    So they are hidden. This is actually correct behavior for "Folder in Trash".
+        //    When we Restore the folder, children become visible again because we can navigate into the folder.
+        
+        // So for Soft Delete, we ONLY update the target folder.
+        
         const { error } = await client
             .from('files')
             .update({ is_deleted: true })
@@ -831,6 +1120,9 @@ async function handleDelete() {
         if (error) {
             showToast('操作失败: ' + error.message);
         } else {
+            const file = files.find(f => f.id == selectedFile.id);
+            if (file) file.is_deleted = true;
+            renderFiles();
             showToast('文件已移至回收站');
         }
     }
@@ -838,6 +1130,41 @@ async function handleDelete() {
 
 // Event Listeners
 function setupEventListeners() {
+    // Drag and Drop Upload (Desktop to Browser)
+    const contentArea = document.querySelector('.content-area');
+    if (contentArea) {
+        contentArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // Check if it's a file drag from OS
+            if (e.dataTransfer.types.includes('Files')) {
+                contentArea.classList.add('drag-over-upload');
+            }
+        });
+
+        contentArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // Only remove if we are leaving the content area boundary
+            if (!contentArea.contains(e.relatedTarget)) {
+                contentArea.classList.remove('drag-over-upload');
+            }
+        });
+
+        contentArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            contentArea.classList.remove('drag-over-upload');
+            
+            const files = e.dataTransfer.files;
+            if (files && files.length > 0) {
+                Array.from(files).forEach(file => {
+                    uploadFile(file);
+                });
+            }
+        });
+    }
+
     // Mobile Menu
     menuBtn.addEventListener('click', toggleSidebar);
     overlay.addEventListener('click', toggleSidebar);
@@ -853,7 +1180,10 @@ function setupEventListeners() {
             const view = item.dataset.view;
             if (view) {
                 currentView = view;
-                renderFiles(); // This will now handle switching views
+                if (view !== 'files') {
+                    currentFolderId = null; // Reset folder nav when switching views
+                }
+                renderFiles(); 
             }
 
             if (window.innerWidth <= 768) {
@@ -861,8 +1191,6 @@ function setupEventListeners() {
             }
         });
     });
-
-    // Handle view switching explicitly in renderFiles
 
     uploadBtn.addEventListener('click', () => {
         fileInput.click();
@@ -893,7 +1221,7 @@ function setupEventListeners() {
         if (card) {
             // Clicked on a file/folder
             const id = card.dataset.id;
-            const file = files.find(f => f.id === id);
+            const file = files.find(f => f.id == id);
             
             if (file) {
                 selectedFile = file;
@@ -903,22 +1231,29 @@ function setupEventListeners() {
                 renameAction.style.display = 'flex';
                 
                 if (currentView === 'trash') {
-                    renameAction.style.display = 'none'; // Can't rename in trash
+                    renameAction.style.display = 'none'; 
                     shareAction.style.display = 'none';
+                    copyLinkAction.style.display = 'none';
                     restoreAction.style.display = 'flex';
                     deleteAction.style.display = 'flex';
                     document.getElementById('deleteText').textContent = '永久删除';
                 } else {
                     shareAction.style.display = 'flex';
+                    if (file.url) {
+                         copyLinkAction.style.display = 'flex';
+                    } else {
+                         copyLinkAction.style.display = 'none';
+                    }
+                    
                     restoreAction.style.display = 'none';
                     deleteAction.style.display = 'flex';
-                    document.getElementById('shareText').textContent = file.is_shared ? '取消共享' : '共享';
+                    document.getElementById('shareText').textContent = file.is_shared ? '取消收藏' : '收藏';
                     document.getElementById('deleteText').textContent = '删除';
                 }
 
-                // If folder, hide download/share if not supported, but for now keep simple
                 if (file.type === 'folder') {
-                    downloadAction.style.display = 'none'; // Can't download folder as zip yet
+                    downloadAction.style.display = 'none'; 
+                    copyLinkAction.style.display = 'none'; 
                 } else {
                     downloadAction.style.display = 'flex';
                 }
@@ -932,6 +1267,7 @@ function setupEventListeners() {
             renameAction.style.display = 'none';
             downloadAction.style.display = 'none';
             shareAction.style.display = 'none';
+            copyLinkAction.style.display = 'none';
             restoreAction.style.display = 'none';
             deleteAction.style.display = 'none';
         }
@@ -949,6 +1285,7 @@ function setupEventListeners() {
     renameAction.addEventListener('click', handleRename);
     downloadAction.addEventListener('click', handleDownload);
     shareAction.addEventListener('click', handleShare);
+    copyLinkAction.addEventListener('click', handleCopyLink);
     restoreAction.addEventListener('click', handleRestore);
     deleteAction.addEventListener('click', handleDelete);
 }

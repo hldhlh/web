@@ -189,10 +189,53 @@ svg {
     padding: 24px;
 }
 
-.section-title {
-    font-size: 1.1rem;
+.view-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 20px;
-    font-weight: 600;
+}
+
+.header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.breadcrumb-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    color: #666;
+    flex-wrap: wrap;
+}
+
+.breadcrumb-item {
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.breadcrumb-item:hover {
+    color: var(--accent-color);
+    text-decoration: underline;
+}
+
+.breadcrumb-separator {
+    color: #ccc;
+    font-size: 0.8rem;
+}
+
+.file-card.drag-over {
+    background-color: #e0f2fe; /* Light blue */
+    border-color: var(--accent-color);
+    transform: scale(1.02);
+}
+
+.content-area.drag-over-upload {
+    background-color: rgba(0,0,0,0.02);
+    border: 2px dashed var(--accent-color);
+    border-radius: 8px;
 }
 
 .file-grid {
