@@ -4,6 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cloud Space</title>
+    
+    <!-- DNS 预解析和预连接，加速资源加载 -->
+    <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
+    <link rel="dns-prefetch" href="//unpkg.com">
+    <link rel="dns-prefetch" href="//cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="//fastly.jsdelivr.net">
+    <link rel="dns-prefetch" href="//fmxddvjgkykuqwmasigo.supabase.co">
+    
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://fmxddvjgkykuqwmasigo.supabase.co" crossorigin>
+    
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -124,7 +135,7 @@
         <div class="context-menu-separator" style="height: 1px; background: #eee; margin: 4px 0;"></div>
         <div class="context-menu-item" id="downloadAction">
             <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            下载
+            <span id="downloadText">下载</span>
         </div>
         <div class="context-menu-item" id="shareAction">
              <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
@@ -149,10 +160,171 @@
     <!-- Hidden File Input -->
     <input type="file" id="fileInput" style="display: none">
 
-    <!-- Supabase SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- Tus Client for Resumable Uploads -->
-    <script src="https://cdn.jsdelivr.net/npm/tus-js-client@3/dist/tus.min.js"></script>
-    <script src="script.js"></script>
+    <!-- 多 CDN 回退加载器 -->
+    <script>
+        // CDN 回退配置（已验证可用的 CDN 源）
+        const CDN_CONFIG = {
+            supabase: [
+                'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js',
+                'https://fastly.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js',
+                'https://unpkg.com/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js',
+                'https://esm.sh/@supabase/supabase-js@2?bundle'
+            ],
+            tus: [
+                'https://cdn.jsdelivr.net/npm/tus-js-client@3/dist/tus.min.js',
+                'https://fastly.jsdelivr.net/npm/tus-js-client@3/dist/tus.min.js',
+                'https://unpkg.com/tus-js-client@3.1.3/dist/tus.min.js'
+            ],
+            jszip: [
+                'https://cdn.jsdelivr.net/npm/jszip@3/dist/jszip.min.js',
+                'https://fastly.jsdelivr.net/npm/jszip@3/dist/jszip.min.js',
+                'https://unpkg.com/jszip@3.10.1/dist/jszip.min.js'
+            ]
+        };
+
+        // 加载脚本的通用函数（带超时和重试）
+        function loadScript(url, timeout = 8000) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = url;
+                script.async = false;
+                
+                const timer = setTimeout(() => {
+                    script.remove();
+                    reject(new Error(`加载超时: ${url}`));
+                }, timeout);
+                
+                script.onload = () => {
+                    clearTimeout(timer);
+                    resolve(url);
+                };
+                
+                script.onerror = () => {
+                    clearTimeout(timer);
+                    script.remove();
+                    reject(new Error(`加载失败: ${url}`));
+                };
+                
+                document.head.appendChild(script);
+            });
+        }
+
+        // 智能 CDN 加载（跳过不可靠的探测，直接按优先级加载）
+        async function probeAndLoadFastest(urls, name) {
+            // 检查是否有缓存的最快 CDN
+            const cacheKey = `cdn_prefer_${name.replace(/\s/g, '_')}`;
+            const cachedCDN = sessionStorage.getItem(cacheKey);
+            
+            let orderedUrls = urls;
+            if (cachedCDN) {
+                // 把上次成功的 CDN 放到最前面
+                const cachedIndex = urls.findIndex(u => u.includes(cachedCDN));
+                if (cachedIndex > 0) {
+                    orderedUrls = [urls[cachedIndex], ...urls.filter((_, i) => i !== cachedIndex)];
+                }
+            }
+            
+            // 直接按顺序尝试加载
+            for (let i = 0; i < orderedUrls.length; i++) {
+                try {
+                    const domain = orderedUrls[i].split('/')[2];
+                    console.log(`[CDN] 加载 ${name} ← ${domain}`);
+                    await loadScript(orderedUrls[i]);
+                    console.log(`[CDN] ✓ ${name} 就绪`);
+                    
+                    // 缓存成功的 CDN 域名
+                    sessionStorage.setItem(cacheKey, domain);
+                    return true;
+                } catch (error) {
+                    if (i < orderedUrls.length - 1) {
+                        console.log(`[CDN] 切换备用源 (${i + 1}/${orderedUrls.length})`);
+                    } else {
+                        throw new Error(`所有 CDN 都无法加载 ${name}`);
+                    }
+                }
+            }
+        }
+
+        // 初始化加载
+        async function initializeApp() {
+            const loadingEl = document.getElementById('loading-overlay');
+            const statusEl = document.getElementById('loading-status');
+            
+            try {
+                // 加载 Supabase SDK
+                if (statusEl) statusEl.textContent = '正在加载核心组件...';
+                await probeAndLoadFastest(CDN_CONFIG.supabase, 'Supabase SDK');
+                
+                // 并行加载 Tus 和 JSZip
+                if (statusEl) statusEl.textContent = '正在加载功能组件...';
+                await Promise.all([
+                    probeAndLoadFastest(CDN_CONFIG.tus, 'Tus Client'),
+                    probeAndLoadFastest(CDN_CONFIG.jszip, 'JSZip')
+                ]);
+                
+                // 加载主应用脚本
+                if (statusEl) statusEl.textContent = '正在初始化...';
+                await loadScript('script.js');
+                
+                // 隐藏加载界面
+                if (loadingEl) {
+                    loadingEl.style.opacity = '0';
+                    setTimeout(() => loadingEl.remove(), 300);
+                }
+            } catch (error) {
+                console.error('[CDN] 致命错误:', error);
+                if (statusEl) {
+                    statusEl.innerHTML = `
+                        <span style="color: #ef4444;">加载失败</span><br>
+                        <small style="color: #888;">请检查网络连接后刷新页面</small><br>
+                        <button onclick="location.reload()" style="margin-top: 12px; padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer;">重新加载</button>
+                    `;
+                }
+            }
+        }
+
+        // DOM 加载完成后开始初始化
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeApp);
+        } else {
+            initializeApp();
+        }
+    </script>
+    
+    <!-- 加载中遮罩 -->
+    <div id="loading-overlay" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        transition: opacity 0.3s ease;
+    ">
+        <div style="
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        "></div>
+        <div id="loading-status" style="
+            margin-top: 20px;
+            color: #94a3b8;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+        ">正在连接服务器...</div>
+        <style>
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+        </style>
+    </div>
 </body>
 </html>

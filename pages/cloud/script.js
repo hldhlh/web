@@ -1,7 +1,92 @@
 // Supabase Configuration
 const supabaseUrl = 'https://fmxddvjgkykuqwmasigo.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
-const client = supabase.createClient(supabaseUrl, supabaseKey);
+
+// 创建 Supabase 客户端 - 优化配置
+const client = supabase.createClient(supabaseUrl, supabaseKey, {
+    db: {
+        schema: 'public'
+    },
+    global: {
+        headers: {
+            'x-client-info': 'cloud-space/1.0'
+        }
+    },
+    realtime: {
+        params: {
+            eventsPerSecond: 10
+        }
+    }
+});
+
+// 数据库缓存管理器
+const DBCache = {
+    _cache: new Map(),
+    _timestamps: new Map(),
+    TTL: 30000, // 缓存有效期 30 秒
+    
+    set(key, data) {
+        this._cache.set(key, data);
+        this._timestamps.set(key, Date.now());
+    },
+    
+    get(key) {
+        const timestamp = this._timestamps.get(key);
+        if (!timestamp || Date.now() - timestamp > this.TTL) {
+            this._cache.delete(key);
+            this._timestamps.delete(key);
+            return null;
+        }
+        return this._cache.get(key);
+    },
+    
+    invalidate(key) {
+        if (key) {
+            this._cache.delete(key);
+            this._timestamps.delete(key);
+        } else {
+            this._cache.clear();
+            this._timestamps.clear();
+        }
+    },
+    
+    // 预热缓存
+    async warmup() {
+        try {
+            const { data, error } = await client
+                .from('files')
+                .select('*')
+                .order('created_at', { ascending: false });
+            
+            if (!error && data) {
+                this.set('files_all', data);
+                return data;
+            }
+        } catch (e) {
+            // 静默处理预热失败
+        }
+        return null;
+    }
+};
+
+// 请求去重和批处理
+const RequestBatcher = {
+    _pending: new Map(),
+    
+    // 去重请求 - 相同请求只发送一次
+    async dedupe(key, requestFn) {
+        if (this._pending.has(key)) {
+            return this._pending.get(key);
+        }
+        
+        const promise = requestFn().finally(() => {
+            this._pending.delete(key);
+        });
+        
+        this._pending.set(key, promise);
+        return promise;
+    }
+};
 
 // State
 let files = [];
@@ -280,39 +365,84 @@ const manager = new TaskManager();
 
 // Initialize
 async function init() {
-    await fetchFiles();
-    await updateStorageInfo();
+    const start = performance.now();
+    
+    // 并行初始化 - 同时获取文件和存储信息
+    await Promise.all([
+        fetchFiles(),
+        updateStorageInfo()
+    ]);
+    
     setupRealtimeSubscription();
     setupEventListeners();
+    
+    console.log(`[App] 就绪 (${(performance.now() - start).toFixed(0)}ms)`);
 }
 
-// Fetch Initial Files
-async function fetchFiles() {
-    const { data, error } = await client
-        .from('files')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-    if (error) {
-        console.error('Error fetching files:', error);
-        return;
+// Fetch Initial Files - 优化版本，使用缓存
+async function fetchFiles(forceRefresh = false) {
+    // 检查缓存
+    if (!forceRefresh) {
+        const cached = DBCache.get('files_all');
+        if (cached) {
+            files = cached;
+            renderFiles();
+            return cached;
+        }
     }
+    
+    // 使用请求去重，避免重复请求
+    return RequestBatcher.dedupe('fetchFiles', async () => {
+        const { data, error } = await client
+            .from('files')
+            .select('*')
+            .order('created_at', { ascending: false });
 
-    files = data;
-    renderFiles();
+        if (error) {
+            console.error('[DB] 获取文件失败:', error.message);
+            return null;
+        }
+
+        // 更新缓存
+        DBCache.set('files_all', data);
+        
+        files = data;
+        renderFiles();
+        return data;
+    });
 }
 
 // Fetch Storage Usage
-async function updateStorageInfo() {
+async function updateStorageInfo(forceRefresh = false) {
+    // 检查缓存
+    if (!forceRefresh) {
+        const cached = DBCache.get('storage_info');
+        if (cached) {
+            renderStorageUI(cached);
+            return;
+        }
+    }
+    
     const { data, error } = await client.rpc('get_storage_summary');
     
     if (error) {
-        console.warn('Error fetching storage usage:', error);
+        // 静默处理，不影响主功能
         return;
     }
 
-    const usedBytes = data.used || 0;
-    const totalBytes = data.limit || 1073741824; // Fallback to 1GB if missing
+    const storageData = {
+        usedBytes: data.used || 0,
+        totalBytes: data.limit || 1073741824 // Fallback to 1GB if missing
+    };
+    
+    // 缓存存储信息
+    DBCache.set('storage_info', storageData);
+    
+    renderStorageUI(storageData);
+}
+
+function renderStorageUI(storageData) {
+    const { usedBytes, totalBytes } = storageData;
     const percentage = Math.min((usedBytes / totalBytes) * 100, 100);
 
     // Update UI
@@ -341,7 +471,6 @@ function setupRealtimeSubscription() {
             'postgres_changes',
             { event: '*', schema: 'public', table: 'files' },
             (payload) => {
-                console.log('Realtime update:', payload);
                 if (payload.eventType === 'INSERT') {
                     // Prevent duplicates
                     if (!files.some(f => f.id === payload.new.id)) {
@@ -355,8 +484,16 @@ function setupRealtimeSubscription() {
                         files[index] = payload.new;
                     }
                 }
+                
+                // 同步更新缓存
+                DBCache.set('files_all', files);
+                
                 renderFiles();
-                if (payload.eventType === 'INSERT') updateStorageInfo(); 
+                if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
+                    // 文件增删时强制刷新存储信息
+                    DBCache.invalidate('storage_info');
+                    updateStorageInfo(true);
+                }
             }
         )
         .subscribe();
@@ -733,10 +870,11 @@ async function uploadFile(file) {
                      const newFile = insertedData[0];
                      if (!files.some(f => f.id === newFile.id)) {
                          files.unshift(newFile);
-                         // Only render if we are still in the same view and folder
-                         // Or just render anyway, the filter will handle it
+                         // 同步更新缓存
+                         DBCache.set('files_all', files);
+                         DBCache.invalidate('storage_info');
                          renderFiles();
-                         updateStorageInfo();
+                         updateStorageInfo(true);
                      }
                 }
             }
@@ -771,13 +909,23 @@ async function handleFileUpload(event) {
 // Download Handling
 async function handleDownload() {
     if (!selectedFile) return;
-
-    showToast('已添加到传输列表');
     contextMenu.style.display = 'none';
 
-    const fileUrl = selectedFile.url;
-    const fileName = selectedFile.name;
-    const fileSizeStr = selectedFile.size; 
+    // 判断是文件还是文件夹
+    if (selectedFile.type === 'folder') {
+        await handleFolderDownload(selectedFile);
+    } else {
+        await handleFileDownload(selectedFile);
+    }
+}
+
+// 单文件下载
+async function handleFileDownload(file) {
+    showToast('已添加到传输列表');
+
+    const fileUrl = file.url;
+    const fileName = file.name;
+    const fileSizeStr = file.size; 
     
     // Start Download Task
     let taskId;
@@ -887,6 +1035,258 @@ async function handleDownload() {
                 abortController.abort();
                 downloadedChunks = []; 
             }
+        }
+    );
+}
+
+// 文件夹下载 - 优先保存到目录，不支持则回退到 ZIP
+async function handleFolderDownload(folder) {
+    // 递归获取文件夹内所有文件和子文件夹结构
+    const collectFilesInFolder = (folderId, basePath = '') => {
+        const result = { files: [], folders: [] };
+        const children = files.filter(f => f.parent_id === folderId && !f.is_deleted);
+        
+        for (const child of children) {
+            const childPath = basePath ? `${basePath}/${child.name}` : child.name;
+            
+            if (child.type === 'folder') {
+                result.folders.push(childPath);
+                const subResult = collectFilesInFolder(child.id, childPath);
+                result.files.push(...subResult.files);
+                result.folders.push(...subResult.folders);
+            } else if (child.url) {
+                result.files.push({
+                    path: childPath,
+                    url: child.url,
+                    name: child.name,
+                    size: child.size
+                });
+            }
+        }
+        return result;
+    };
+    
+    const { files: filesToDownload, folders: foldersToCreate } = collectFilesInFolder(folder.id);
+    
+    if (filesToDownload.length === 0) {
+        showToast('文件夹为空，无法下载');
+        return;
+    }
+    
+    // 检查是否支持 File System Access API
+    if ('showDirectoryPicker' in window) {
+        await handleFolderDownloadToDirectory(folder, filesToDownload, foldersToCreate);
+    } else {
+        // 不支持，回退到 ZIP 下载
+        showToast('浏览器不支持直接保存到目录，将下载为 ZIP');
+        await handleFolderDownloadAsZip(folder, filesToDownload);
+    }
+}
+
+// 直接保存到用户选择的目录
+async function handleFolderDownloadToDirectory(folder, filesToDownload, foldersToCreate) {
+    try {
+        // 让用户选择保存目录
+        showToast('请选择保存位置...');
+        const dirHandle = await window.showDirectoryPicker({
+            mode: 'readwrite',
+            startIn: 'downloads'
+        });
+        
+        // 在选择的目录中创建文件夹
+        const folderHandle = await dirHandle.getDirectoryHandle(folder.name, { create: true });
+        
+        // 创建下载任务
+        let taskId;
+        let isCancelled = false;
+        let downloadedCount = 0;
+        
+        const startDirectoryDownload = async () => {
+            try {
+                // 预先创建所有子文件夹
+                const folderHandles = new Map();
+                folderHandles.set('', folderHandle);
+                
+                for (const folderPath of foldersToCreate) {
+                    if (isCancelled) throw new Error('用户取消');
+                    
+                    const parts = folderPath.split('/');
+                    let currentHandle = folderHandle;
+                    let currentPath = '';
+                    
+                    for (const part of parts) {
+                        currentPath = currentPath ? `${currentPath}/${part}` : part;
+                        if (!folderHandles.has(currentPath)) {
+                            currentHandle = await currentHandle.getDirectoryHandle(part, { create: true });
+                            folderHandles.set(currentPath, currentHandle);
+                        } else {
+                            currentHandle = folderHandles.get(currentPath);
+                        }
+                    }
+                }
+                
+                // 下载并保存所有文件
+                for (let i = 0; i < filesToDownload.length; i++) {
+                    if (isCancelled) throw new Error('用户取消');
+                    
+                    const file = filesToDownload[i];
+                    const shortName = file.name.length > 15 ? file.name.substring(0, 15) + '...' : file.name;
+                    
+                    const percentage = ((i / filesToDownload.length) * 100).toFixed(0);
+                    manager.updateProgress(taskId, percentage, `保存: ${shortName}`);
+                    
+                    try {
+                        // 下载文件
+                        const response = await fetch(file.url);
+                        if (!response.ok) {
+                            console.warn(`跳过文件 ${file.name}: 下载失败`);
+                            continue;
+                        }
+                        
+                        const blob = await response.blob();
+                        
+                        // 获取父目录 handle
+                        const pathParts = file.path.split('/');
+                        const fileName = pathParts.pop();
+                        const parentPath = pathParts.join('/');
+                        const parentHandle = folderHandles.get(parentPath) || folderHandle;
+                        
+                        // 创建并写入文件
+                        const fileHandle = await parentHandle.getFileHandle(fileName, { create: true });
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(blob);
+                        await writable.close();
+                        
+                        downloadedCount++;
+                        const newPercentage = ((downloadedCount / filesToDownload.length) * 100).toFixed(0);
+                        manager.updateProgress(taskId, newPercentage, `已保存 ${downloadedCount}/${filesToDownload.length}`);
+                        
+                    } catch (err) {
+                        console.warn(`跳过文件 ${file.name}:`, err.message);
+                    }
+                }
+                
+                manager.completeTask(taskId);
+                showToast(`${folder.name} 已保存到目录`);
+                
+            } catch (error) {
+                if (error.message === '用户取消') {
+                    // 已取消
+                } else if (error.name === 'AbortError') {
+                    // 用户取消选择目录
+                    showToast('已取消');
+                } else {
+                    console.error('保存失败:', error);
+                    manager.errorTask(taskId, '保存失败');
+                }
+            }
+        };
+        
+        taskId = manager.addTask(
+            'download',
+            `📁 ${folder.name}`,
+            `${filesToDownload.length} 个文件`,
+            {
+                start: () => startDirectoryDownload(),
+                pause: null,
+                resume: null,
+                cancel: () => { isCancelled = true; }
+            }
+        );
+        
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            showToast('已取消选择');
+        } else {
+            console.error('无法访问目录:', error);
+            showToast('无法访问目录，将下载为 ZIP');
+            await handleFolderDownloadAsZip(folder, filesToDownload);
+        }
+    }
+}
+
+// ZIP 下载（作为备用方案）
+async function handleFolderDownloadAsZip(folder, filesToDownload) {
+    const folderName = folder.name;
+    const zipFileName = `${folderName}.zip`;
+    
+    let taskId;
+    let isCancelled = false;
+    let downloadedCount = 0;
+    
+    const startZipDownload = async () => {
+        try {
+            const zip = new JSZip();
+            
+            for (let i = 0; i < filesToDownload.length; i++) {
+                if (isCancelled) throw new Error('用户取消');
+                
+                const file = filesToDownload[i];
+                const shortName = file.name.length > 12 ? file.name.substring(0, 12) + '...' : file.name;
+                
+                const basePercent = (i / filesToDownload.length) * 70;
+                manager.updateProgress(taskId, basePercent.toFixed(0), `下载: ${shortName}`);
+                
+                try {
+                    const response = await fetch(file.url);
+                    if (!response.ok) continue;
+                    
+                    const blob = await response.blob();
+                    zip.file(file.path, blob);
+                    
+                    downloadedCount++;
+                    const percentage = ((downloadedCount / filesToDownload.length) * 70).toFixed(0);
+                    manager.updateProgress(taskId, percentage, `已获取 ${downloadedCount}/${filesToDownload.length}`);
+                    
+                } catch (err) {
+                    console.warn(`跳过文件 ${file.name}:`, err.message);
+                }
+            }
+            
+            if (isCancelled) throw new Error('用户取消');
+            
+            manager.updateProgress(taskId, 70, '压缩中...');
+            
+            const zipBlob = await zip.generateAsync({ 
+                type: 'blob',
+                compression: 'DEFLATE',
+                compressionOptions: { level: 6 }
+            }, (metadata) => {
+                if (metadata.percent !== undefined) {
+                    const overallPercent = 70 + (metadata.percent * 0.3);
+                    manager.updateProgress(taskId, overallPercent.toFixed(0), `压缩 ${Math.round(metadata.percent)}%`);
+                }
+            });
+            
+            const url = window.URL.createObjectURL(zipBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = zipFileName;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            manager.completeTask(taskId);
+            showToast(`${folderName}.zip 下载完成`);
+            
+        } catch (error) {
+            if (error.message !== '用户取消') {
+                console.error('ZIP 下载失败:', error);
+                manager.errorTask(taskId, '下载失败');
+            }
+        }
+    };
+    
+    taskId = manager.addTask(
+        'download',
+        `📁 ${folderName}.zip`,
+        `${filesToDownload.length} 个文件`,
+        {
+            start: () => startZipDownload(),
+            pause: null,
+            resume: null,
+            cancel: () => { isCancelled = true; }
         }
     );
 }
@@ -1072,7 +1472,12 @@ async function handleDelete() {
             const idsToRemove = collectIdsToRemove(selectedFile.id);
             files = files.filter(f => !idsToRemove.includes(f.id));
             
+            // 同步更新缓存
+            DBCache.set('files_all', files);
+            DBCache.invalidate('storage_info');
+            
             renderFiles();
+            updateStorageInfo(true);
             showToast('文件已永久删除');
         }
 
@@ -1122,6 +1527,8 @@ async function handleDelete() {
         } else {
             const file = files.find(f => f.id == selectedFile.id);
             if (file) file.is_deleted = true;
+            // 同步更新缓存
+            DBCache.set('files_all', files);
             renderFiles();
             showToast('文件已移至回收站');
         }
@@ -1251,11 +1658,16 @@ function setupEventListeners() {
                     document.getElementById('deleteText').textContent = '删除';
                 }
 
+                // 文件夹和文件都可以下载
+                downloadAction.style.display = 'flex';
+                
                 if (file.type === 'folder') {
-                    downloadAction.style.display = 'none'; 
-                    copyLinkAction.style.display = 'none'; 
+                    copyLinkAction.style.display = 'none';
+                    // 支持 File System Access API 的浏览器显示"下载"，否则显示"打包下载"
+                    document.getElementById('downloadText').textContent = 
+                        ('showDirectoryPicker' in window) ? '下载' : '打包下载';
                 } else {
-                    downloadAction.style.display = 'flex';
+                    document.getElementById('downloadText').textContent = '下载';
                 }
             }
         } else {
