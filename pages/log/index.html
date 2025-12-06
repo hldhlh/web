@@ -5,82 +5,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>日志</title>
     <link rel="stylesheet" href="styles.css">
-    <!-- CDN加载优化脚本 -->
     <script>
-        const CDN_CONFIG = {
-            supabase: [
-                'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
-                'https://unpkg.com/@supabase/supabase-js@2',
-                'https://cdnjs.cloudflare.com/ajax/libs/supabase-js/2.45.4/supabase.min.js',
-                'https://fastly.jsdelivr.net/npm/@supabase/supabase-js@2',
-                'https://cdn.skypack.dev/@supabase/supabase-js@2'
-            ]
-        };
-
-        class CDNLoader {
-            constructor() { this.timeout = 8000; }
-            loadScript(url) {
-                return new Promise((resolve, reject) => {
+        const CDN = [
+            'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+            'https://unpkg.com/@supabase/supabase-js@2'
+        ];
+        
+        const load = {
+            script(url) {
+                return new Promise((ok, fail) => {
                     const s = document.createElement('script');
                     s.src = url;
-                    const t = setTimeout(() => { s.remove(); reject(new Error(`加载超时: ${url}`)); }, this.timeout);
-                    s.onload = () => { clearTimeout(t); resolve(url); };
-                    s.onerror = () => { clearTimeout(t); s.remove(); reject(new Error(`加载失败: ${url}`)); };
+                    const t = setTimeout(() => { s.remove(); fail(); }, 6000);
+                    s.onload = () => { clearTimeout(t); ok(); };
+                    s.onerror = () => { clearTimeout(t); s.remove(); fail(); };
                     document.head.appendChild(s);
                 });
-            }
-            async loadWithFallback(name, urls) {
-                console.log(`🚀 开始加载 ${name}，尝试顺序`, urls);
-                for (let i = 0; i < urls.length; i++) {
-                    try {
-                        const u = urls[i];
-                        await this.loadScript(u);
-                        if (name === 'supabase') await this.waitForSupabase();
-                        console.log(`✅ ${name} 加载成功: ${u}`);
-                        return u;
-                    } catch (e) {
-                        console.warn(`${name} CDN失败 (${i+1}/${urls.length}):`, e.message);
-                        if (i === urls.length - 1) throw new Error(`所有 ${name} CDN 源均不可用`);
-                        await new Promise(r => setTimeout(r, 500));
+            },
+            wait() {
+                return new Promise((ok, fail) => {
+                    let n = 0;
+                    const c = () => {
+                        if (window.supabase?.createClient) return ok();
+                        if (++n > 30) return fail();
+                        setTimeout(c, 100);
+                    };
+                    c();
+                });
+            },
+            async init() {
+                const race = CDN.map(async u => { await this.script(u); await this.wait(); return u; });
+                try {
+                    await Promise.race(race);
+                    window.dispatchEvent(new Event('cdnReady'));
+                } catch {
+                    for (const u of CDN) {
+                        try { await this.script(u); await this.wait(); window.dispatchEvent(new Event('cdnReady')); return; } catch {}
                     }
+                    window.dispatchEvent(new Event('cdnError'));
                 }
             }
-            waitForSupabase() {
-                return new Promise((resolve, reject) => {
-                    let n = 0; const max = 50;
-                    const check = () => {
-                        n++;
-                        if (window.supabase && typeof window.supabase.createClient === 'function') return resolve();
-                        if (n >= max) return reject(new Error('Supabase 验证超时'));
-                        setTimeout(check, 100);
-                    };
-                    check();
-                });
-            }
-            showLoadingStatus(message, type = 'info') {
-                const ex = document.querySelector('.status-indicator');
-                if (ex) ex.remove();
-                const el = document.createElement('div');
-                el.className = `status-indicator ${type}`;
-                el.textContent = message;
-                document.body.appendChild(el);
-                setTimeout(() => { if (el && el.parentNode) el.remove(); }, type === 'error' ? 8000 : 3000);
-            }
-        }
-        const cdnLoader = new CDNLoader();
-        document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                cdnLoader.showLoadingStatus('正在加载数据库连接...', 'info');
-                const supabaseUrl = await cdnLoader.loadWithFallback('supabase', CDN_CONFIG.supabase);
-                cdnLoader.showLoadingStatus('CDN加载完成', 'success');
-                console.log('🎉 Supabase CDN加载完成', supabaseUrl);
-                window.dispatchEvent(new CustomEvent('cdnReady', { detail: { supabase: supabaseUrl } }));
-            } catch (error) {
-                console.error('❌ CDN加载失败:', error);
-                cdnLoader.showLoadingStatus('CDN加载失败，部分功能可能不可用', 'error');
-                window.dispatchEvent(new CustomEvent('cdnError', { detail: { error: error.message } }));
-            }
-        });
+        };
+        
+        document.addEventListener('DOMContentLoaded', () => load.init());
     </script>
 </head>
 <body>
@@ -93,7 +60,7 @@
                 <button type="submit" id="submitBtn" class="btn btn-primary">保存</button>
             </div>
         </form>
-        <div id="timeline" class="timeline-container"><!-- 日志条目 --></div>
+        <div id="timeline" class="timeline-container"></div>
         <div id="emptyState" class="empty-state hidden">暂无日志</div>
     </div>
     <div id="deleteModal" class="modal hidden">
@@ -108,4 +75,3 @@
     <script src="script.js"></script>
 </body>
 </html>
-
