@@ -1,9 +1,123 @@
-// Supabase Configuration
-// 原始 Supabase URL（用于 Tus 上传等需要直连的场景）
-const supabaseOriginalUrl = 'https://fmxddvjgkykuqwmasigo.supabase.co';
-// Cloudflare Worker 代理 URL（用于 API 请求，解决国内网络访问问题）
-const supabaseUrl = 'https://supabase-proxy.hulidehulihua.workers.dev';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
+// Supabase Configuration - 智能连接管理
+const SUPABASE_CONFIG = {
+    // 主节点配置
+    primaryUrl: 'https://fmxddvjgkykuqwmasigo.supabase.co',
+    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo',
+
+    // 如果有备用代理节点可以添加在这里
+    // 例如: Cloudflare Worker 代理, Vercel Edge Function 代理等
+    proxyUrls: [
+        // 'https://your-cf-worker.workers.dev/supabase',
+        // 'https://your-vercel-proxy.vercel.app/api/supabase',
+    ],
+
+    // 连接配置
+    timeout: 15000,          // 请求超时 15秒
+    retryCount: 3,           // 最大重试次数
+    retryDelay: 1000,        // 重试延迟 1秒
+    healthCheckInterval: 30000, // 健康检查间隔 30秒
+};
+
+// 当前使用的 URL
+let currentSupabaseUrl = SUPABASE_CONFIG.primaryUrl;
+const supabaseUrl = currentSupabaseUrl;
+const supabaseKey = SUPABASE_CONFIG.key;
+
+// 连接状态监测
+const ConnectionMonitor = {
+    isOnline: true,
+    lastSuccessTime: Date.now(),
+    failCount: 0,
+    latencyHistory: [],
+
+    // 记录成功请求
+    recordSuccess(latency) {
+        this.isOnline = true;
+        this.lastSuccessTime = Date.now();
+        this.failCount = 0;
+        this.latencyHistory.push({ time: Date.now(), latency, success: true });
+        if (this.latencyHistory.length > 50) this.latencyHistory.shift();
+    },
+
+    // 记录失败请求
+    recordFailure(error) {
+        this.failCount++;
+        this.latencyHistory.push({ time: Date.now(), latency: null, success: false, error: error?.message });
+        if (this.latencyHistory.length > 50) this.latencyHistory.shift();
+
+        // 连续失败3次认为离线
+        if (this.failCount >= 3) {
+            this.isOnline = false;
+            console.warn('[Supabase] 连接可能已中断');
+        }
+    },
+
+    // 获取平均延迟
+    getAvgLatency() {
+        const successful = this.latencyHistory.filter(h => h.success && h.latency);
+        if (successful.length === 0) return null;
+        return Math.round(successful.reduce((a, b) => a + b.latency, 0) / successful.length);
+    },
+
+    // 获取连接状态报告
+    getStatus() {
+        return {
+            isOnline: this.isOnline,
+            failCount: this.failCount,
+            avgLatency: this.getAvgLatency(),
+            lastSuccess: this.lastSuccessTime ? new Date(this.lastSuccessTime).toLocaleTimeString() : 'Never'
+        };
+    }
+};
+
+// 创建带有自定义 fetch 的 Supabase 客户端
+const customFetch = async (url, options = {}) => {
+    let lastError = null;
+
+    // 重试逻辑
+    for (let attempt = 0; attempt <= SUPABASE_CONFIG.retryCount; attempt++) {
+        // 每次尝试创建新的 AbortController
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), SUPABASE_CONFIG.timeout);
+        const startTime = performance.now();
+
+        try {
+            // 合并 signal - 如果 options 中已有 signal，需要处理
+            const fetchOptions = {
+                ...options,
+                signal: controller.signal
+            };
+
+            const response = await fetch(url, fetchOptions);
+
+            clearTimeout(timeoutId);
+
+            const latency = Math.round(performance.now() - startTime);
+            ConnectionMonitor.recordSuccess(latency);
+
+            return response;
+        } catch (error) {
+            clearTimeout(timeoutId);
+            lastError = error;
+
+            // 如果是用户主动取消（不是超时），直接抛出
+            if (error.name === 'AbortError' && !controller.signal.aborted) {
+                throw error;
+            }
+
+            ConnectionMonitor.recordFailure(error);
+
+            // 如果还有重试机会，等待后重试
+            if (attempt < SUPABASE_CONFIG.retryCount) {
+                const delay = SUPABASE_CONFIG.retryDelay * Math.pow(2, attempt); // 指数退避
+                console.log(`[Supabase] 请求失败，${delay}ms 后重试 (${attempt + 1}/${SUPABASE_CONFIG.retryCount})`);
+                await new Promise(r => setTimeout(r, delay));
+            }
+        }
+    }
+
+    throw lastError;
+};
 
 // 创建 Supabase 客户端 - 优化配置
 const client = supabase.createClient(supabaseUrl, supabaseKey, {
@@ -13,7 +127,8 @@ const client = supabase.createClient(supabaseUrl, supabaseKey, {
     global: {
         headers: {
             'x-client-info': 'cloud-space/1.0'
-        }
+        },
+        fetch: customFetch  // 使用自定义 fetch
     },
     realtime: {
         params: {
@@ -21,6 +136,23 @@ const client = supabase.createClient(supabaseUrl, supabaseKey, {
         }
     }
 });
+
+// 暴露连接状态监测器供调试
+window.SupabaseConnectionMonitor = ConnectionMonitor;
+
+// 定期健康检查
+setInterval(async () => {
+    if (document.hidden) return; // 页面不可见时跳过
+
+    try {
+        const startTime = performance.now();
+        await client.from('files').select('id').limit(1);
+        const latency = Math.round(performance.now() - startTime);
+        ConnectionMonitor.recordSuccess(latency);
+    } catch (error) {
+        ConnectionMonitor.recordFailure(error);
+    }
+}, SUPABASE_CONFIG.healthCheckInterval);
 
 // 数据库缓存管理器
 const DBCache = {
@@ -797,11 +929,11 @@ async function uploadFile(file) {
     const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`;
 
     // Configure TUS Upload
-    // 注意：Tus 上传使用代理 URL，让 Worker 转发请求
+    const projectId = supabaseUrl.split('//')[1].split('.')[0];
     const bucketName = 'cloud-files';
 
     const upload = new tus.Upload(file, {
-        endpoint: `${supabaseUrl}/storage/v1/upload/resumable`,
+        endpoint: `https://${projectId}.supabase.co/storage/v1/upload/resumable`,
         retryDelays: [0, 3000, 5000, 10000, 20000],
         headers: {
             authorization: `Bearer ${supabaseKey}`,
@@ -1724,3 +1856,267 @@ function showToast(message, duration = 3000) {
 
 // Start
 init();
+
+// ==================== 图片预览功能 ====================
+
+// 图片预览状态
+const imagePreview = {
+    modal: document.getElementById('imagePreviewModal'),
+    image: document.getElementById('previewImage'),
+    fileName: document.getElementById('previewFileName'),
+    fileSize: document.getElementById('previewFileSize'),
+    imageIndex: document.getElementById('previewImageIndex'),
+    closeBtn: document.getElementById('closePreview'),
+    prevBtn: document.getElementById('prevImage'),
+    nextBtn: document.getElementById('nextImage'),
+    zoomInBtn: document.getElementById('zoomIn'),
+    zoomOutBtn: document.getElementById('zoomOut'),
+    rotateLeftBtn: document.getElementById('rotateLeft'),
+    rotateRightBtn: document.getElementById('rotateRight'),
+    resetBtn: document.getElementById('resetImage'),
+    downloadBtn: document.getElementById('downloadImage'),
+
+    currentIndex: 0,
+    imageFiles: [],
+    scale: 1,
+    rotation: 0,
+    isDragging: false,
+    startX: 0,
+    startY: 0,
+    translateX: 0,
+    translateY: 0
+};
+
+// 获取所有图片文件
+function getImageFiles() {
+    return files.filter(f => {
+        if (f.is_deleted || f.type !== 'img') return false;
+
+        // 根据当前视图过滤
+        if (currentView === 'files') {
+            return f.parent_id === currentFolderId;
+        } else if (currentView === 'shared') {
+            return f.is_shared;
+        }
+        return true;
+    });
+}
+
+// 打开图片预览
+function openImagePreview(fileId) {
+    imagePreview.imageFiles = getImageFiles();
+    imagePreview.currentIndex = imagePreview.imageFiles.findIndex(f => f.id === fileId);
+
+    if (imagePreview.currentIndex === -1) return;
+
+    imagePreview.modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+
+    loadPreviewImage();
+}
+
+// 加载预览图片
+function loadPreviewImage() {
+    const file = imagePreview.imageFiles[imagePreview.currentIndex];
+    if (!file) return;
+
+    // 重置变换
+    imagePreview.scale = 1;
+    imagePreview.rotation = 0;
+    imagePreview.translateX = 0;
+    imagePreview.translateY = 0;
+
+    // 加载图片
+    imagePreview.image.src = file.url;
+    imagePreview.fileName.textContent = file.name;
+    imagePreview.fileSize.textContent = file.size;
+    imagePreview.imageIndex.textContent = `${imagePreview.currentIndex + 1} / ${imagePreview.imageFiles.length}`;
+
+    // 更新导航按钮状态
+    imagePreview.prevBtn.disabled = imagePreview.currentIndex === 0;
+    imagePreview.nextBtn.disabled = imagePreview.currentIndex === imagePreview.imageFiles.length - 1;
+
+    updateImageTransform();
+}
+
+// 更新图片变换
+function updateImageTransform() {
+    imagePreview.image.style.transform = `
+        translate(${imagePreview.translateX}px, ${imagePreview.translateY}px)
+        scale(${imagePreview.scale})
+        rotate(${imagePreview.rotation}deg)
+    `;
+}
+
+// 关闭预览
+function closeImagePreview() {
+    imagePreview.modal.classList.remove('active');
+    document.body.style.overflow = '';
+    imagePreview.image.src = '';
+}
+
+// 上一张图片
+function showPrevImage() {
+    if (imagePreview.currentIndex > 0) {
+        imagePreview.currentIndex--;
+        loadPreviewImage();
+    }
+}
+
+// 下一张图片
+function showNextImage() {
+    if (imagePreview.currentIndex < imagePreview.imageFiles.length - 1) {
+        imagePreview.currentIndex++;
+        loadPreviewImage();
+    }
+}
+
+// 放大
+function zoomIn() {
+    imagePreview.scale = Math.min(imagePreview.scale + 0.25, 5);
+    updateImageTransform();
+}
+
+// 缩小
+function zoomOut() {
+    imagePreview.scale = Math.max(imagePreview.scale - 0.25, 0.25);
+    updateImageTransform();
+}
+
+// 向左旋转
+function rotateLeft() {
+    imagePreview.rotation -= 90;
+    updateImageTransform();
+}
+
+// 向右旋转
+function rotateRight() {
+    imagePreview.rotation += 90;
+    updateImageTransform();
+}
+
+// 重置图片
+function resetImage() {
+    imagePreview.scale = 1;
+    imagePreview.rotation = 0;
+    imagePreview.translateX = 0;
+    imagePreview.translateY = 0;
+    updateImageTransform();
+}
+
+// 下载当前图片
+async function downloadCurrentImage() {
+    const file = imagePreview.imageFiles[imagePreview.currentIndex];
+    if (!file) return;
+
+    try {
+        const response = await fetch(file.url);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        showToast('图片下载成功');
+    } catch (error) {
+        console.error('下载失败:', error);
+        showToast('下载失败，请重试');
+    }
+}
+
+// 图片拖拽移动
+imagePreview.image.addEventListener('mousedown', (e) => {
+    if (imagePreview.scale <= 1) return;
+
+    imagePreview.isDragging = true;
+    imagePreview.startX = e.clientX - imagePreview.translateX;
+    imagePreview.startY = e.clientY - imagePreview.translateY;
+    imagePreview.image.style.cursor = 'grabbing';
+});
+
+document.addEventListener('mousemove', (e) => {
+    if (!imagePreview.isDragging) return;
+
+    imagePreview.translateX = e.clientX - imagePreview.startX;
+    imagePreview.translateY = e.clientY - imagePreview.startY;
+    updateImageTransform();
+});
+
+document.addEventListener('mouseup', () => {
+    if (imagePreview.isDragging) {
+        imagePreview.isDragging = false;
+        imagePreview.image.style.cursor = 'grab';
+    }
+});
+
+// 鼠标滚轮缩放
+imagePreview.image.addEventListener('wheel', (e) => {
+    e.preventDefault();
+
+    if (e.deltaY < 0) {
+        zoomIn();
+    } else {
+        zoomOut();
+    }
+});
+
+// 绑定按钮事件
+imagePreview.closeBtn.addEventListener('click', closeImagePreview);
+imagePreview.prevBtn.addEventListener('click', showPrevImage);
+imagePreview.nextBtn.addEventListener('click', showNextImage);
+imagePreview.zoomInBtn.addEventListener('click', zoomIn);
+imagePreview.zoomOutBtn.addEventListener('click', zoomOut);
+imagePreview.rotateLeftBtn.addEventListener('click', rotateLeft);
+imagePreview.rotateRightBtn.addEventListener('click', rotateRight);
+imagePreview.resetBtn.addEventListener('click', resetImage);
+imagePreview.downloadBtn.addEventListener('click', downloadCurrentImage);
+
+// 点击遮罩关闭
+document.querySelector('.image-preview-overlay').addEventListener('click', closeImagePreview);
+
+// 键盘快捷键
+document.addEventListener('keydown', (e) => {
+    if (!imagePreview.modal.classList.contains('active')) return;
+
+    switch (e.key) {
+        case 'Escape':
+            closeImagePreview();
+            break;
+        case 'ArrowLeft':
+            showPrevImage();
+            break;
+        case 'ArrowRight':
+            showNextImage();
+            break;
+        case '+':
+        case '=':
+            zoomIn();
+            break;
+        case '-':
+            zoomOut();
+            break;
+        case '0':
+            resetImage();
+            break;
+    }
+});
+
+// 修改文件卡片的双击事件，图片文件双击打开预览
+document.addEventListener('dblclick', (e) => {
+    const card = e.target.closest('.file-card');
+    if (!card) return;
+
+    const fileType = card.dataset.type;
+    const fileId = card.dataset.id;
+
+    if (fileType === 'img') {
+        e.preventDefault();
+        openImagePreview(fileId);
+    }
+});
+
+// 暴露到全局供调试使用
+window.openImagePreview = openImagePreview;
