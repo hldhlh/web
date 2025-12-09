@@ -57,6 +57,8 @@ class LogManager {
         this.logs = [];
         this.editingId = null;
         this.channel = null;
+        this.isSubmitting = false;  // 提交状态锁
+        this.isDeleting = false;    // 删除状态锁
         this.init();
     }
 
@@ -72,11 +74,11 @@ class LogManager {
         try {
             const data = localStorage.getItem(CACHE_KEY);
             if (data) this.logs = JSON.parse(data);
-        } catch {}
+        } catch { }
     }
 
     saveCache() {
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify(this.logs)); } catch {}
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify(this.logs)); } catch { }
     }
 
     bindEvents() {
@@ -92,7 +94,9 @@ class LogManager {
     async submit(e) {
         e.preventDefault();
         const content = new FormData(e.target).get('content').trim();
-        if (!content || !supabase) return;
+        if (!content || !supabase || this.isSubmitting) return;
+
+        this.setSubmitting(true);
         try {
             if (this.editingId) {
                 await network.retry(() => supabase.from('logs').update({ content }).eq('id', this.editingId));
@@ -100,26 +104,51 @@ class LogManager {
                 await network.retry(() => supabase.from('logs').insert([{ content }]));
             }
             this.resetForm();
-        } catch {}
+        } catch (err) {
+            // 失败时恢复状态
+        } finally {
+            this.setSubmitting(false);
+        }
+    }
+
+    // 设置提交状态
+    setSubmitting(loading) {
+        this.isSubmitting = loading;
+        const btn = document.getElementById('submitBtn');
+        const textarea = document.getElementById('logContent');
+        const cancelBtn = document.getElementById('cancelBtn');
+
+        btn.disabled = loading;
+        textarea.disabled = loading;
+        cancelBtn.disabled = loading;
+
+        if (loading) {
+            btn.dataset.originalText = btn.textContent;
+            btn.textContent = this.editingId ? '更新中...' : '保存中...';
+            btn.classList.add('loading');
+        } else {
+            btn.textContent = btn.dataset.originalText || '保存';
+            btn.classList.remove('loading');
+        }
     }
 
     async loadLogs() {
         if (!supabase) return;
         try {
-            const { data } = await network.retry(() => 
+            const { data } = await network.retry(() =>
                 supabase.from('logs').select('*').order('created_at', { ascending: false })
             );
             if (data) {
                 this.logs = data;
                 this.saveCache();
             }
-        } catch {}
+        } catch { }
     }
 
     setupRealtime() {
         if (!supabase) return;
         if (this.channel) supabase.removeChannel(this.channel);
-        
+
         this.channel = supabase
             .channel('logs')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'logs' }, p => {
@@ -167,30 +196,56 @@ class LogManager {
     }
 
     async doDelete() {
-        if (!this.deleteId || !supabase) return;
+        if (!this.deleteId || !supabase || this.isDeleting) return;
+
+        this.setDeleting(true);
         try {
             await network.retry(() => supabase.from('logs').delete().eq('id', this.deleteId));
             this.hideModal();
-        } catch {}
+        } catch (err) {
+            // 失败时恢复状态
+        } finally {
+            this.setDeleting(false);
+        }
+    }
+
+    // 设置删除状态
+    setDeleting(loading) {
+        this.isDeleting = loading;
+        const confirmBtn = document.getElementById('confirmDelete');
+        const cancelBtn = document.getElementById('cancelDelete');
+
+        confirmBtn.disabled = loading;
+        cancelBtn.disabled = loading;
+
+        if (loading) {
+            confirmBtn.dataset.originalText = confirmBtn.textContent;
+            confirmBtn.textContent = '删除中...';
+            confirmBtn.classList.add('loading');
+        } else {
+            confirmBtn.textContent = confirmBtn.dataset.originalText || '删除';
+            confirmBtn.classList.remove('loading');
+        }
     }
 
     render() {
         const timeline = document.getElementById('timeline');
         const empty = document.getElementById('emptyState');
-        
+
         if (!this.logs.length) {
             timeline.innerHTML = '';
             empty.classList.remove('hidden');
             return;
         }
-        
+
         empty.classList.add('hidden');
         timeline.innerHTML = this.logs.map(log => {
             const t = this.formatTime(log.created_at);
             const edited = log.updated_at && log.updated_at !== log.created_at;
+            const tooltip = this.buildTooltip(log.created_at, log.updated_at);
             return `
                 <div class="timeline-item">
-                    <div class="timeline-dot"></div>
+                    <div class="timeline-dot" data-tooltip="${tooltip}"></div>
                     <div class="timeline-content">
                         <div class="timeline-header">
                             <p class="timeline-text">${this.escape(log.content)}</p>
@@ -203,6 +258,28 @@ class LogManager {
                     </div>
                 </div>`;
         }).join('');
+    }
+
+    // 构建 tooltip 内容
+    buildTooltip(createdAt, updatedAt) {
+        const created = this.formatFullDate(createdAt);
+        const edited = updatedAt && updatedAt !== createdAt;
+        if (edited) {
+            const updated = this.formatFullDate(updatedAt);
+            return `创建: ${created}&#10;修改: ${updated}`;
+        }
+        return `创建: ${created}`;
+    }
+
+    // 格式化完整日期时间
+    formatFullDate(ts) {
+        const d = new Date(ts);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const hour = String(d.getHours()).padStart(2, '0');
+        const min = String(d.getMinutes()).padStart(2, '0');
+        return `${year}-${month}-${day} ${hour}:${min}`;
     }
 
     formatTime(ts) {
