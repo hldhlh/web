@@ -1,9 +1,0 @@
-name = "supabase-proxy"
-main = "src/index.js"
-compatibility_date = "2024-12-01"
-
-[vars]
-# Supabase 配置 - 这些会在 Worker 中作为环境变量使用
-SUPABASE_URL = "https://fmxddvjgkykuqwmasigo.supabase.co"
-# 注意：API Key 应该在 Cloudflare Dashboard 中设置为 Secret，不要放在这里
-# SUPABASE_ANON_KEY = "your-anon-key"

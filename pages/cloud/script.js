@@ -1,5 +1,8 @@
 // Supabase Configuration
-const supabaseUrl = 'https://fmxddvjgkykuqwmasigo.supabase.co';
+// 原始 Supabase URL（用于 Tus 上传等需要直连的场景）
+const supabaseOriginalUrl = 'https://fmxddvjgkykuqwmasigo.supabase.co';
+// Cloudflare Worker 代理 URL（用于 API 请求，解决国内网络访问问题）
+const supabaseUrl = 'https://supabase-proxy.hulidehulihua.workers.dev';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
 
 // 创建 Supabase 客户端 - 优化配置
@@ -24,12 +27,12 @@ const DBCache = {
     _cache: new Map(),
     _timestamps: new Map(),
     TTL: 30000, // 缓存有效期 30 秒
-    
+
     set(key, data) {
         this._cache.set(key, data);
         this._timestamps.set(key, Date.now());
     },
-    
+
     get(key) {
         const timestamp = this._timestamps.get(key);
         if (!timestamp || Date.now() - timestamp > this.TTL) {
@@ -39,7 +42,7 @@ const DBCache = {
         }
         return this._cache.get(key);
     },
-    
+
     invalidate(key) {
         if (key) {
             this._cache.delete(key);
@@ -49,7 +52,7 @@ const DBCache = {
             this._timestamps.clear();
         }
     },
-    
+
     // 预热缓存
     async warmup() {
         try {
@@ -57,7 +60,7 @@ const DBCache = {
                 .from('files')
                 .select('*')
                 .order('created_at', { ascending: false });
-            
+
             if (!error && data) {
                 this.set('files_all', data);
                 return data;
@@ -72,17 +75,17 @@ const DBCache = {
 // 请求去重和批处理
 const RequestBatcher = {
     _pending: new Map(),
-    
+
     // 去重请求 - 相同请求只发送一次
     async dedupe(key, requestFn) {
         if (this._pending.has(key)) {
             return this._pending.get(key);
         }
-        
+
         const promise = requestFn().finally(() => {
             this._pending.delete(key);
         });
-        
+
         this._pending.set(key, promise);
         return promise;
     }
@@ -152,7 +155,7 @@ class TaskManager {
             status: 'pending', // pending, running, paused, completed, error
             callbacks, // { start, pause, resume, cancel }
         };
-        
+
         this.tasks.set(id, task);
         this.renderTask(task);
         this.updateBadge();
@@ -176,7 +179,7 @@ class TaskManager {
         if (speedStr) task.speed = speedStr;
         if (loadedStr) task.loadedStr = loadedStr;
         task.status = 'running';
-        
+
         this.updateTaskUI(id);
     }
 
@@ -229,7 +232,7 @@ class TaskManager {
         if (task.callbacks.cancel) {
             task.callbacks.cancel();
         }
-        
+
         // Remove from UI with animation
         const el = document.getElementById(`task-${id}`);
         if (el) {
@@ -245,10 +248,10 @@ class TaskManager {
 
     updateBadge() {
         // Count active tasks (running or paused)
-        const activeCount = Array.from(this.tasks.values()).filter(t => 
+        const activeCount = Array.from(this.tasks.values()).filter(t =>
             t.status === 'running' || t.status === 'paused' || t.status === 'pending'
         ).length;
-        
+
         taskBadge.textContent = activeCount;
         taskBadge.style.display = activeCount > 0 ? 'inline-block' : 'none';
     }
@@ -265,8 +268,8 @@ class TaskManager {
         const el = document.createElement('div');
         el.className = 'task-item';
         el.id = `task-${task.id}`;
-        
-        const typeIcon = task.type === 'upload' 
+
+        const typeIcon = task.type === 'upload'
             ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>'
             : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
 
@@ -328,7 +331,7 @@ class TaskManager {
         const playIcon = el.querySelector('.play-icon');
 
         progressBar.style.width = `${task.progress}%`;
-        
+
         // Remove classes
         el.classList.remove('completed', 'error', 'paused');
 
@@ -366,16 +369,16 @@ const manager = new TaskManager();
 // Initialize
 async function init() {
     const start = performance.now();
-    
+
     // 并行初始化 - 同时获取文件和存储信息
     await Promise.all([
         fetchFiles(),
         updateStorageInfo()
     ]);
-    
+
     setupRealtimeSubscription();
     setupEventListeners();
-    
+
     console.log(`[App] 就绪 (${(performance.now() - start).toFixed(0)}ms)`);
 }
 
@@ -390,7 +393,7 @@ async function fetchFiles(forceRefresh = false) {
             return cached;
         }
     }
-    
+
     // 使用请求去重，避免重复请求
     return RequestBatcher.dedupe('fetchFiles', async () => {
         const { data, error } = await client
@@ -405,7 +408,7 @@ async function fetchFiles(forceRefresh = false) {
 
         // 更新缓存
         DBCache.set('files_all', data);
-        
+
         files = data;
         renderFiles();
         return data;
@@ -422,9 +425,9 @@ async function updateStorageInfo(forceRefresh = false) {
             return;
         }
     }
-    
+
     const { data, error } = await client.rpc('get_storage_summary');
-    
+
     if (error) {
         // 静默处理，不影响主功能
         return;
@@ -434,10 +437,10 @@ async function updateStorageInfo(forceRefresh = false) {
         usedBytes: data.used || 0,
         totalBytes: data.limit || 1073741824 // Fallback to 1GB if missing
     };
-    
+
     // 缓存存储信息
     DBCache.set('storage_info', storageData);
-    
+
     renderStorageUI(storageData);
 }
 
@@ -484,10 +487,10 @@ function setupRealtimeSubscription() {
                         files[index] = payload.new;
                     }
                 }
-                
+
                 // 同步更新缓存
                 DBCache.set('files_all', files);
-                
+
                 renderFiles();
                 if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
                     // 文件增删时强制刷新存储信息
@@ -502,15 +505,15 @@ function setupRealtimeSubscription() {
 // Navigation Helper
 function getBreadcrumbs() {
     if (!currentFolderId) return [{ id: null, name: '根目录' }];
-    
+
     const path = [];
     let current = files.find(f => f.id === currentFolderId);
-    
+
     while (current) {
         path.unshift({ id: current.id, name: current.name });
         current = files.find(f => f.id === current.parent_id);
     }
-    
+
     path.unshift({ id: null, name: '根目录' });
     return path;
 }
@@ -523,7 +526,7 @@ function navigateToFolder(folderId) {
 // Move File Logic
 async function moveFile(fileId, targetFolderId) {
     if (fileId === targetFolderId) return; // Can't move folder into itself (simple check)
-    
+
     // Check for circular dependency
     let parent = files.find(f => f.id === targetFolderId);
     while (parent) {
@@ -620,7 +623,7 @@ function renderFiles() {
     filteredFiles.sort((a, b) => {
         if (a.type === 'folder' && b.type !== 'folder') return -1;
         if (a.type !== 'folder' && b.type === 'folder') return 1;
-        return 0; 
+        return 0;
     });
 
     if (filteredFiles.length === 0) {
@@ -641,7 +644,7 @@ function renderFiles() {
             hour: '2-digit',
             minute: '2-digit'
         });
-        
+
         let displayName = file.name;
         if (searchQuery) {
             const escapedQuery = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -784,7 +787,7 @@ async function uploadFile(file) {
 
     // Generate a URL-safe filename
     const lastDotIndex = file.name.lastIndexOf('.');
-    let ext = 'bin'; 
+    let ext = 'bin';
     if (lastDotIndex !== -1 && lastDotIndex < file.name.length - 1) {
         const rawExt = file.name.substring(lastDotIndex + 1);
         const cleanExt = rawExt.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
@@ -792,53 +795,53 @@ async function uploadFile(file) {
     }
 
     const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`;
-    
+
     // Configure TUS Upload
-    const projectId = supabaseUrl.split('//')[1].split('.')[0]; 
+    // 注意：Tus 上传使用代理 URL，让 Worker 转发请求
     const bucketName = 'cloud-files';
-    
+
     const upload = new tus.Upload(file, {
-        endpoint: `https://${projectId}.supabase.co/storage/v1/upload/resumable`,
+        endpoint: `${supabaseUrl}/storage/v1/upload/resumable`,
         retryDelays: [0, 3000, 5000, 10000, 20000],
         headers: {
             authorization: `Bearer ${supabaseKey}`,
-            'x-upsert': 'true', 
+            'x-upsert': 'true',
         },
         uploadDataDuringCreation: true,
-        removeFingerprintOnSuccess: true, 
+        removeFingerprintOnSuccess: true,
         metadata: {
             bucketName: bucketName,
             objectName: fileName,
             contentType: file.type,
             cacheControl: 3600,
         },
-        chunkSize: 6 * 1024 * 1024, 
-        onError: function(error) {
+        chunkSize: 6 * 1024 * 1024,
+        onError: function (error) {
             console.error('Failed because: ' + error);
             manager.errorTask(taskId, '上传失败: ' + error.message);
         },
-        onProgress: function(bytesUploaded, bytesTotal) {
+        onProgress: function (bytesUploaded, bytesTotal) {
             const percentage = (bytesUploaded / bytesTotal * 100).toFixed(2);
-            
+
             // Calculate speed
             const now = Date.now();
-            const timeDiff = (now - lastTime) / 1000; 
-            if (timeDiff >= 1) { 
+            const timeDiff = (now - lastTime) / 1000;
+            if (timeDiff >= 1) {
                 const loadedDiff = bytesUploaded - lastLoaded;
                 const speed = formatSize(loadedDiff) + '/s';
                 const loadedStr = formatSize(bytesUploaded) + ' / ' + formatSize(bytesTotal);
-                
+
                 manager.updateProgress(taskId, percentage, speed, loadedStr);
-                
+
                 lastLoaded = bytesUploaded;
                 lastTime = now;
             } else {
                 manager.updateProgress(taskId, percentage, null, null);
             }
         },
-        onSuccess: async function() {
+        onSuccess: async function () {
             manager.completeTask(taskId);
-            
+
             // Get public URL
             const { data: { publicUrl } } = client.storage
                 .from(bucketName)
@@ -867,32 +870,32 @@ async function uploadFile(file) {
                 showToast('文件上传完成');
                 // Manually add to list to ensure immediate update
                 if (insertedData && insertedData.length > 0) {
-                     const newFile = insertedData[0];
-                     if (!files.some(f => f.id === newFile.id)) {
-                         files.unshift(newFile);
-                         // 同步更新缓存
-                         DBCache.set('files_all', files);
-                         DBCache.invalidate('storage_info');
-                         renderFiles();
-                         updateStorageInfo(true);
-                     }
+                    const newFile = insertedData[0];
+                    if (!files.some(f => f.id === newFile.id)) {
+                        files.unshift(newFile);
+                        // 同步更新缓存
+                        DBCache.set('files_all', files);
+                        DBCache.invalidate('storage_info');
+                        renderFiles();
+                        updateStorageInfo(true);
+                    }
                 }
             }
         }
     });
 
     taskId = manager.addTask(
-        'upload', 
-        file.name, 
-        formatSize(file.size), 
+        'upload',
+        file.name,
+        formatSize(file.size),
         {
             start: () => upload.start(),
-            pause: () => upload.abort(), 
+            pause: () => upload.abort(),
             resume: () => upload.start(),
             cancel: () => upload.abort()
         }
     );
-    
+
     showToast('已添加到传输列表');
 }
 
@@ -901,7 +904,7 @@ async function handleFileUpload(event) {
     if (!file) return;
 
     await uploadFile(file);
-    
+
     // Reset input
     event.target.value = '';
 }
@@ -925,8 +928,8 @@ async function handleFileDownload(file) {
 
     const fileUrl = file.url;
     const fileName = file.name;
-    const fileSizeStr = file.size; 
-    
+    const fileSizeStr = file.size;
+
     // Start Download Task
     let taskId;
     let abortController = new AbortController();
@@ -934,7 +937,7 @@ async function handleFileDownload(file) {
     let receivedLength = 0;
     let totalLength = 0;
     let isPaused = false;
-    
+
     // Speed calc
     let lastLoaded = 0;
     let lastTime = Date.now();
@@ -974,7 +977,7 @@ async function handleFileDownload(file) {
                 // Progress Update
                 const now = Date.now();
                 const timeDiff = (now - lastTime) / 1000;
-                
+
                 let speedStr = null;
                 if (timeDiff >= 1) {
                     const loadedDiff = receivedLength - lastLoaded;
@@ -999,7 +1002,7 @@ async function handleFileDownload(file) {
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
-            
+
             manager.completeTask(taskId);
 
         } catch (error) {
@@ -1033,7 +1036,7 @@ async function handleFileDownload(file) {
             cancel: () => {
                 isPaused = false;
                 abortController.abort();
-                downloadedChunks = []; 
+                downloadedChunks = [];
             }
         }
     );
@@ -1045,10 +1048,10 @@ async function handleFolderDownload(folder) {
     const collectFilesInFolder = (folderId, basePath = '') => {
         const result = { files: [], folders: [] };
         const children = files.filter(f => f.parent_id === folderId && !f.is_deleted);
-        
+
         for (const child of children) {
             const childPath = basePath ? `${basePath}/${child.name}` : child.name;
-            
+
             if (child.type === 'folder') {
                 result.folders.push(childPath);
                 const subResult = collectFilesInFolder(child.id, childPath);
@@ -1065,14 +1068,14 @@ async function handleFolderDownload(folder) {
         }
         return result;
     };
-    
+
     const { files: filesToDownload, folders: foldersToCreate } = collectFilesInFolder(folder.id);
-    
+
     if (filesToDownload.length === 0) {
         showToast('文件夹为空，无法下载');
         return;
     }
-    
+
     // 检查是否支持 File System Access API
     if ('showDirectoryPicker' in window) {
         await handleFolderDownloadToDirectory(folder, filesToDownload, foldersToCreate);
@@ -1092,28 +1095,28 @@ async function handleFolderDownloadToDirectory(folder, filesToDownload, foldersT
             mode: 'readwrite',
             startIn: 'downloads'
         });
-        
+
         // 在选择的目录中创建文件夹
         const folderHandle = await dirHandle.getDirectoryHandle(folder.name, { create: true });
-        
+
         // 创建下载任务
         let taskId;
         let isCancelled = false;
         let downloadedCount = 0;
-        
+
         const startDirectoryDownload = async () => {
             try {
                 // 预先创建所有子文件夹
                 const folderHandles = new Map();
                 folderHandles.set('', folderHandle);
-                
+
                 for (const folderPath of foldersToCreate) {
                     if (isCancelled) throw new Error('用户取消');
-                    
+
                     const parts = folderPath.split('/');
                     let currentHandle = folderHandle;
                     let currentPath = '';
-                    
+
                     for (const part of parts) {
                         currentPath = currentPath ? `${currentPath}/${part}` : part;
                         if (!folderHandles.has(currentPath)) {
@@ -1124,17 +1127,17 @@ async function handleFolderDownloadToDirectory(folder, filesToDownload, foldersT
                         }
                     }
                 }
-                
+
                 // 下载并保存所有文件
                 for (let i = 0; i < filesToDownload.length; i++) {
                     if (isCancelled) throw new Error('用户取消');
-                    
+
                     const file = filesToDownload[i];
                     const shortName = file.name.length > 15 ? file.name.substring(0, 15) + '...' : file.name;
-                    
+
                     const percentage = ((i / filesToDownload.length) * 100).toFixed(0);
                     manager.updateProgress(taskId, percentage, `保存: ${shortName}`);
-                    
+
                     try {
                         // 下载文件
                         const response = await fetch(file.url);
@@ -1142,33 +1145,33 @@ async function handleFolderDownloadToDirectory(folder, filesToDownload, foldersT
                             console.warn(`跳过文件 ${file.name}: 下载失败`);
                             continue;
                         }
-                        
+
                         const blob = await response.blob();
-                        
+
                         // 获取父目录 handle
                         const pathParts = file.path.split('/');
                         const fileName = pathParts.pop();
                         const parentPath = pathParts.join('/');
                         const parentHandle = folderHandles.get(parentPath) || folderHandle;
-                        
+
                         // 创建并写入文件
                         const fileHandle = await parentHandle.getFileHandle(fileName, { create: true });
                         const writable = await fileHandle.createWritable();
                         await writable.write(blob);
                         await writable.close();
-                        
+
                         downloadedCount++;
                         const newPercentage = ((downloadedCount / filesToDownload.length) * 100).toFixed(0);
                         manager.updateProgress(taskId, newPercentage, `已保存 ${downloadedCount}/${filesToDownload.length}`);
-                        
+
                     } catch (err) {
                         console.warn(`跳过文件 ${file.name}:`, err.message);
                     }
                 }
-                
+
                 manager.completeTask(taskId);
                 showToast(`${folder.name} 已保存到目录`);
-                
+
             } catch (error) {
                 if (error.message === '用户取消') {
                     // 已取消
@@ -1181,7 +1184,7 @@ async function handleFolderDownloadToDirectory(folder, filesToDownload, foldersT
                 }
             }
         };
-        
+
         taskId = manager.addTask(
             'download',
             `📁 ${folder.name}`,
@@ -1193,7 +1196,7 @@ async function handleFolderDownloadToDirectory(folder, filesToDownload, foldersT
                 cancel: () => { isCancelled = true; }
             }
         );
-        
+
     } catch (error) {
         if (error.name === 'AbortError') {
             showToast('已取消选择');
@@ -1209,45 +1212,45 @@ async function handleFolderDownloadToDirectory(folder, filesToDownload, foldersT
 async function handleFolderDownloadAsZip(folder, filesToDownload) {
     const folderName = folder.name;
     const zipFileName = `${folderName}.zip`;
-    
+
     let taskId;
     let isCancelled = false;
     let downloadedCount = 0;
-    
+
     const startZipDownload = async () => {
         try {
             const zip = new JSZip();
-            
+
             for (let i = 0; i < filesToDownload.length; i++) {
                 if (isCancelled) throw new Error('用户取消');
-                
+
                 const file = filesToDownload[i];
                 const shortName = file.name.length > 12 ? file.name.substring(0, 12) + '...' : file.name;
-                
+
                 const basePercent = (i / filesToDownload.length) * 70;
                 manager.updateProgress(taskId, basePercent.toFixed(0), `下载: ${shortName}`);
-                
+
                 try {
                     const response = await fetch(file.url);
                     if (!response.ok) continue;
-                    
+
                     const blob = await response.blob();
                     zip.file(file.path, blob);
-                    
+
                     downloadedCount++;
                     const percentage = ((downloadedCount / filesToDownload.length) * 70).toFixed(0);
                     manager.updateProgress(taskId, percentage, `已获取 ${downloadedCount}/${filesToDownload.length}`);
-                    
+
                 } catch (err) {
                     console.warn(`跳过文件 ${file.name}:`, err.message);
                 }
             }
-            
+
             if (isCancelled) throw new Error('用户取消');
-            
+
             manager.updateProgress(taskId, 70, '压缩中...');
-            
-            const zipBlob = await zip.generateAsync({ 
+
+            const zipBlob = await zip.generateAsync({
                 type: 'blob',
                 compression: 'DEFLATE',
                 compressionOptions: { level: 6 }
@@ -1257,7 +1260,7 @@ async function handleFolderDownloadAsZip(folder, filesToDownload) {
                     manager.updateProgress(taskId, overallPercent.toFixed(0), `压缩 ${Math.round(metadata.percent)}%`);
                 }
             });
-            
+
             const url = window.URL.createObjectURL(zipBlob);
             const a = document.createElement('a');
             a.href = url;
@@ -1266,10 +1269,10 @@ async function handleFolderDownloadAsZip(folder, filesToDownload) {
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
-            
+
             manager.completeTask(taskId);
             showToast(`${folderName}.zip 下载完成`);
-            
+
         } catch (error) {
             if (error.message !== '用户取消') {
                 console.error('ZIP 下载失败:', error);
@@ -1277,7 +1280,7 @@ async function handleFolderDownloadAsZip(folder, filesToDownload) {
             }
         }
     };
-    
+
     taskId = manager.addTask(
         'download',
         `📁 ${folderName}.zip`,
@@ -1322,7 +1325,7 @@ async function handleShare() {
         const file = files.find(f => f.id == selectedFile.id);
         if (file) file.is_shared = newStatus;
         renderFiles();
-        
+
         if (newStatus) {
             showToast('已添加到收藏');
         } else {
@@ -1355,7 +1358,7 @@ async function handleRestore() {
 async function handleNewFolder() {
     contextMenu.style.display = 'none';
     const folderName = prompt('请输入文件夹名称', '新建文件夹');
-    
+
     if (!folderName || folderName.trim() === '') return;
 
     showToast('正在创建文件夹...');
@@ -1386,7 +1389,7 @@ async function handleRename() {
     contextMenu.style.display = 'none';
 
     const newName = prompt('请输入新名称', selectedFile.name);
-    
+
     if (!newName || newName.trim() === '' || newName === selectedFile.name) return;
 
     showToast('正在重命名...');
@@ -1417,7 +1420,7 @@ async function handleDelete() {
         if (!confirm('确定要永久删除此文件吗？此操作无法撤销。')) return;
 
         showToast('正在删除...');
-        
+
         // Helper to recursively collect all descendant file paths
         const collectStoragePaths = (file) => {
             let paths = [];
@@ -1425,9 +1428,9 @@ async function handleDelete() {
                 try {
                     const path = file.url.split('/').pop();
                     if (path) paths.push(path);
-                } catch (e) {}
+                } catch (e) { }
             }
-            
+
             // Find children
             const children = files.filter(f => f.parent_id === file.id);
             for (const child of children) {
@@ -1437,7 +1440,7 @@ async function handleDelete() {
         };
 
         const pathsToDelete = collectStoragePaths(selectedFile);
-        
+
         if (pathsToDelete.length > 0) {
             try {
                 // Delete in chunks if needed, but for now single call
@@ -1458,7 +1461,7 @@ async function handleDelete() {
             // Optimistic update logic
             // Since we have ON DELETE CASCADE, DB will delete children.
             // But we need to update our local 'files' array to reflect this.
-            
+
             // Helper to recursively find all IDs to remove from local state
             const collectIdsToRemove = (fileId) => {
                 let ids = [fileId];
@@ -1471,11 +1474,11 @@ async function handleDelete() {
 
             const idsToRemove = collectIdsToRemove(selectedFile.id);
             files = files.filter(f => !idsToRemove.includes(f.id));
-            
+
             // 同步更新缓存
             DBCache.set('files_all', files);
             DBCache.invalidate('storage_info');
-            
+
             renderFiles();
             updateStorageInfo(true);
             showToast('文件已永久删除');
@@ -1487,7 +1490,7 @@ async function handleDelete() {
         // Or does moving a folder to trash imply moving all contents?
         // Usually yes. But if we restore, do we restore all?
         // Let's implement soft delete cascading logic here for consistency
-        
+
         // Actually, Windows logic: if you move folder to trash, you just move the folder.
         // The contents are "inside" it.
         // Since my view filters by parent_id, if the folder is in trash (is_deleted=true),
@@ -1496,7 +1499,7 @@ async function handleDelete() {
         // However, 'trash' view shows a flat list currently?
         // Let's check renderFiles logic for trash:
         // filteredFiles = files.filter(f => f.is_deleted);
-        
+
         // If I soft-delete ONLY the folder, its children still have is_deleted=false.
         // But since their parent is deleted, they are effectively orphaned in the UI if navigation depends on parent.
         // BUT, the Trash view currently shows ALL files where is_deleted=true.
@@ -1505,7 +1508,7 @@ async function handleDelete() {
         // Windows Trash shows the FOLDER. It doesn't show the children separately.
         // My current logic:
         // case 'trash': filteredFiles = files.filter(f => f.is_deleted);
-        
+
         // If I only mark parent as deleted:
         // 1. Parent shows in Trash.
         // 2. Children (is_deleted=false) - where do they show?
@@ -1514,9 +1517,9 @@ async function handleDelete() {
         //    They won't show in Trash.
         //    So they are hidden. This is actually correct behavior for "Folder in Trash".
         //    When we Restore the folder, children become visible again because we can navigate into the folder.
-        
+
         // So for Soft Delete, we ONLY update the target folder.
-        
+
         const { error } = await client
             .from('files')
             .update({ is_deleted: true })
@@ -1562,7 +1565,7 @@ function setupEventListeners() {
             e.preventDefault();
             e.stopPropagation();
             contentArea.classList.remove('drag-over-upload');
-            
+
             const files = e.dataTransfer.files;
             if (files && files.length > 0) {
                 Array.from(files).forEach(file => {
@@ -1582,7 +1585,7 @@ function setupEventListeners() {
             // Update active state
             navItems.forEach(nav => nav.classList.remove('active'));
             item.classList.add('active');
-            
+
             // Set current view
             const view = item.dataset.view;
             if (view) {
@@ -1590,7 +1593,7 @@ function setupEventListeners() {
                 if (view !== 'files') {
                     currentFolderId = null; // Reset folder nav when switching views
                 }
-                renderFiles(); 
+                renderFiles();
             }
 
             if (window.innerWidth <= 768) {
@@ -1616,7 +1619,7 @@ function setupEventListeners() {
     // Context Menu (Right Click)
     fileGrid.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        
+
         // Positioning
         const { clientX: mouseX, clientY: mouseY } = e;
         contextMenu.style.left = `${mouseX}px`;
@@ -1624,21 +1627,21 @@ function setupEventListeners() {
         contextMenu.style.display = 'block';
 
         const card = e.target.closest('.file-card');
-        
+
         if (card) {
             // Clicked on a file/folder
             const id = card.dataset.id;
             const file = files.find(f => f.id == id);
-            
+
             if (file) {
                 selectedFile = file;
-                
+
                 // Show file options, hide New Folder
                 newFolderAction.style.display = 'none';
                 renameAction.style.display = 'flex';
-                
+
                 if (currentView === 'trash') {
-                    renameAction.style.display = 'none'; 
+                    renameAction.style.display = 'none';
                     shareAction.style.display = 'none';
                     copyLinkAction.style.display = 'none';
                     restoreAction.style.display = 'flex';
@@ -1647,11 +1650,11 @@ function setupEventListeners() {
                 } else {
                     shareAction.style.display = 'flex';
                     if (file.url) {
-                         copyLinkAction.style.display = 'flex';
+                        copyLinkAction.style.display = 'flex';
                     } else {
-                         copyLinkAction.style.display = 'none';
+                        copyLinkAction.style.display = 'none';
                     }
-                    
+
                     restoreAction.style.display = 'none';
                     deleteAction.style.display = 'flex';
                     document.getElementById('shareText').textContent = file.is_shared ? '取消收藏' : '收藏';
@@ -1660,11 +1663,11 @@ function setupEventListeners() {
 
                 // 文件夹和文件都可以下载
                 downloadAction.style.display = 'flex';
-                
+
                 if (file.type === 'folder') {
                     copyLinkAction.style.display = 'none';
                     // 支持 File System Access API 的浏览器显示"下载"，否则显示"打包下载"
-                    document.getElementById('downloadText').textContent = 
+                    document.getElementById('downloadText').textContent =
                         ('showDirectoryPicker' in window) ? '下载' : '打包下载';
                 } else {
                     document.getElementById('downloadText').textContent = '下载';
@@ -1673,7 +1676,7 @@ function setupEventListeners() {
         } else {
             // Clicked on background
             selectedFile = null;
-            
+
             // Show New Folder, Hide others
             newFolderAction.style.display = 'flex';
             renameAction.style.display = 'none';
