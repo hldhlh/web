@@ -609,6 +609,16 @@
                 transform: translateX(8px);
             }
         }
+
+        /* 搜索匹配高亮下划线样式 */
+        .search-highlight {
+            text-decoration: underline;
+            text-decoration-color: var(--highlight);
+            text-decoration-thickness: 2px;
+            text-underline-offset: 3px;
+            color: var(--highlight);
+            font-weight: 500;
+        }
     </style>
 </head>
 
@@ -926,21 +936,89 @@
 
             // ==================== 搜索过滤工具 ====================
             function filterAndRender() {
-                const searchKey = DOM.input.value.toLowerCase();
+                const searchKey = DOM.input.value.trim();
                 if (searchKey) {
                     const filtered = db.filter(i => {
                         const titleMatch = PinyinUtil.match(i.title, searchKey);
 
                         // 移除WEBAPP块后再搜索内容
                         const contentWithoutWebapp = i.info.replace(WEBAPP_PARSER.REGEX, '');
-                        const infoMatch = contentWithoutWebapp && contentWithoutWebapp.toLowerCase().includes(searchKey);
+                        const infoMatch = contentWithoutWebapp && contentWithoutWebapp.toLowerCase().includes(searchKey.toLowerCase());
 
                         return titleMatch || infoMatch;
                     });
-                    render(filtered, true);
+                    render(filtered, true, searchKey);
                 } else {
-                    render(db, false);
+                    render(db, false, '');
                 }
+            }
+
+            /**
+             * 高亮匹配的文本
+             * @param {string} text - 原始文本
+             * @param {string} keyword - 搜索关键词
+             * @returns {string} 带高亮标记的HTML
+             */
+            function highlightText(text, keyword) {
+                if (!keyword || !text) return text;
+
+                const lowerText = text.toLowerCase();
+                const lowerKey = keyword.toLowerCase();
+
+                // 1. 尝试直接文本匹配
+                let index = lowerText.indexOf(lowerKey);
+                if (index !== -1) {
+                    const before = text.substring(0, index);
+                    const match = text.substring(index, index + lowerKey.length);
+                    const after = text.substring(index + lowerKey.length);
+                    return `${before}<span class="search-highlight">${match}</span>${after}`;
+                }
+
+                // 2. 尝试拼音全拼匹配
+                if (PinyinUtil.isAvailable()) {
+                    const { pinyin, initial } = PinyinUtil.generate(text);
+
+                    // 全拼匹配
+                    const pinyinIndex = pinyin.toLowerCase().indexOf(lowerKey);
+                    if (pinyinIndex !== -1) {
+                        // 计算匹配的字符位置
+                        let currentPinyinLength = 0;
+
+                        for (let i = 0; i < text.length; i++) {
+                            const charPinyin = pinyinPro.pinyin(text[i], { toneType: 'none' });
+                            if (currentPinyinLength + charPinyin.length > pinyinIndex) {
+                                // 找到起始字符
+                                let matchLength = 1;
+                                let tempPinyinLength = currentPinyinLength + charPinyin.length;
+
+                                // 计算需要高亮多少个字符
+                                for (let j = i + 1; j < text.length && tempPinyinLength < pinyinIndex + lowerKey.length; j++) {
+                                    const nextCharPinyin = pinyinPro.pinyin(text[j], { toneType: 'none' });
+                                    tempPinyinLength += nextCharPinyin.length;
+                                    matchLength++;
+                                }
+
+                                const before = text.substring(0, i);
+                                const match = text.substring(i, i + matchLength);
+                                const after = text.substring(i + matchLength);
+                                return `${before}<span class="search-highlight">${match}</span>${after}`;
+                            }
+                            currentPinyinLength += charPinyin.length;
+                        }
+                    }
+
+                    // 3. 简拼匹配
+                    const initialIndex = initial.toLowerCase().indexOf(lowerKey);
+                    if (initialIndex !== -1) {
+                        const matchLength = lowerKey.length;
+                        const before = text.substring(0, initialIndex);
+                        const match = text.substring(initialIndex, initialIndex + matchLength);
+                        const after = text.substring(initialIndex + matchLength);
+                        return `${before}<span class="search-highlight">${match}</span>${after}`;
+                    }
+                }
+
+                return text;
             }
 
             // 处理实时插入
@@ -1206,7 +1284,7 @@
 
             // ==================== 渲染函数 ====================
             // ==================== 渲染函数 ====================
-            function render(list, showDate = false) {
+            function render(list, showDate = false, searchKeyword = '') {
                 if (!list.length) {
                     DOM.results.innerHTML = '<div style="color:var(--muted);padding-top:20px;">暂无数据</div>';
                     return;
@@ -1230,7 +1308,7 @@
                     return `
         <div class="list-item" onclick="toggleExpand(this)" data-webapp-blocks='${webappData.replace(/'/g, '&apos;')}'>
             <div class="item-header">
-                <span class="title">${item.title}</span>
+                <span class="title">${searchKeyword ? highlightText(item.title, searchKeyword) : item.title}</span>
                 <div>
                     ${showDate ? `<span style="font-size:12px;color:var(--muted);margin-right:8px;">${formatDate(item.created_at)}</span>` : ''}
                     <span class="tag">${item.tag || 'MISC'}</span>
