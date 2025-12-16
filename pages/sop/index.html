@@ -937,9 +937,9 @@
 
                         return titleMatch || infoMatch;
                     });
-                    render(filtered);
+                    render(filtered, true);
                 } else {
-                    render(db);
+                    render(db, false);
                 }
             }
 
@@ -1205,7 +1205,8 @@
             }
 
             // ==================== 渲染函数 ====================
-            function render(list) {
+            // ==================== 渲染函数 ====================
+            function render(list, showDate = false) {
                 if (!list.length) {
                     DOM.results.innerHTML = '<div style="color:var(--muted);padding-top:20px;">暂无数据</div>';
                     return;
@@ -1230,7 +1231,10 @@
         <div class="list-item" onclick="toggleExpand(this)" data-webapp-blocks='${webappData.replace(/'/g, '&apos;')}'>
             <div class="item-header">
                 <span class="title">${item.title}</span>
-                <span class="tag">${item.tag || 'MISC'}</span>
+                <div>
+                    ${showDate ? `<span style="font-size:12px;color:var(--muted);margin-right:8px;">${formatDate(item.created_at)}</span>` : ''}
+                    <span class="tag">${item.tag || 'MISC'}</span>
+                </div>
             </div>
             <div class="content" onclick="event.stopPropagation()">${highlightedContent}
                 <button class="btn-delete" onclick="editItem(${item.id})">[ 编辑 ]</button>
