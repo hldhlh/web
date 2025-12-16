@@ -1,963 +1,1101 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SOP 终端数据库</title>
-<script src="https://unpkg.com/pinyin-pro@3.19.5/dist/index.js"></script>
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-<style>
-:root {
-    --bg: #1a1a2e;
-    --border: #8b7fa8;
-    --text: #e6e6f0;
-    --highlight: #9b86bd;
-    --muted: #7a7a8c;
-    --overlay-bg: rgba(26, 26, 46, 0.9);
-    --panel-bg: #232339;
-}
-body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    margin: 0;
-    padding: 20px;
-    line-height: 1.5;
-    min-height: 100vh;
-}
-.container {
-    max-width: 700px;
-    margin: 0 auto;
-}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOP 终端数据库</title>
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+    <script src="https://unpkg.com/pinyin-pro@3.19.5/dist/index.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --border: #8b7fa8;
+            --text: #e6e6f0;
+            --highlight: #9b86bd;
+            --muted: #7a7a8c;
+            --overlay-bg: rgba(26, 26, 46, 0.9);
+            --panel-bg: #232339;
+        }
 
-.top-bar {
-    position: sticky;
-    top: 0;
-    background: var(--bg);
-    z-index: 10;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-.input-group { flex: 1; }
-input {
-    background: transparent;
-    border: none;
-    color: var(--text);
-    font-size: 16px;
-    width: 100%;
-    outline: none;
-    font-family: inherit;
-}
-input::placeholder { color: var(--muted); }
-.btn-icon {
-    cursor: pointer;
-    color: var(--muted);
-    font-size: 20px;
-    user-select: none;
-    transition: all 0.3s ease;
-    padding: 4px 8px;
-    border: 1px solid transparent;
-    position: relative;
-}
-.btn-icon:hover {
-    color: var(--highlight);
-    border-color: var(--border);
-    box-shadow: 0 0 10px rgba(155, 134, 189, 0.3);
-}
-.btn-icon:active {
-    transform: scale(0.95);
-}
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.5;
+            min-height: 100vh;
+        }
 
-/* 编辑面板遮罩 */
-#panelOverlay {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000;
-    background-color: var(--overlay-bg);
-    display: flex; justify-content: center; align-items: center;
-    opacity: 0; visibility: hidden; transition: opacity 0.3s ease-in-out;
-}
-#panelOverlay.active { opacity: 1; visibility: visible; }
-.panel {
-    width: 90%;
-    max-width: 600px;
-    background: var(--panel-bg);
-    border: 1px solid var(--border);
-    padding: 20px;
-    transform: scale(0.9) translateY(20px);
-    transition: transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
-}
-#panelOverlay.active .panel {
-    transform: scale(1) translateY(0);
-}
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+        }
 
-/* 全局加载遮罩 */
-#loadingOverlay {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000;
-    background: rgba(26, 26, 46, 0.85);
-    display: flex; flex-direction: column; justify-content: center; align-items: center;
-    opacity: 0; visibility: hidden; transition: opacity 0.2s;
-    color: var(--highlight); font-size: 16px;
-}
-#loadingOverlay.active { opacity: 1; visibility: visible; }
-.spinner {
-    width: 50px; height: 50px;
-    border: 3px solid rgba(155, 134, 189, 0.2);
-    border-top-color: var(--highlight);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin-bottom: 20px;
-}
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
+        .top-bar {
+            position: sticky;
+            top: 0;
+            background: var(--bg);
+            z-index: 10;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
 
-.form-row { margin-bottom: 14px; }
-.form-label {
-    font-size: 12px;
-    color: var(--highlight);
-    margin-bottom: 5px;
-    display: block;
-}
-.form-input {
-    width: 100%;
-    background: #1a1a2e;
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 8px 10px;
-    font-family: inherit;
-    box-sizing: border-box;
-    transition: border-color 0.2s;
-}
-.form-input:focus {
-    border-color: var(--highlight);
-    outline: none;
-}
-textarea.form-input {
-    min-height: 120px;
-    max-height: 60vh;
-    resize: vertical;
-    overflow-y: auto;
-    line-height: 1.5;
-}
-.btn-save {
-    background: var(--panel-bg);
-    color: var(--text);
-    border: 1px solid var(--border);
-    padding: 8px 20px;
-    font-family: inherit;
-    cursor: pointer;
-    margin-top: 6px;
-    transition: all 0.2s ease;
-    position: relative;
-    overflow: hidden;
-}
-.btn-save::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(155, 134, 189, 0.3), transparent);
-    transition: left 0.5s ease;
-}
-.btn-save:hover:not(:disabled) {
-    background: var(--border);
-    color: var(--bg);
-    border-color: var(--highlight);
-    box-shadow: 0 0 12px rgba(155, 134, 189, 0.4);
-}
-.btn-save:hover:not(:disabled)::before {
-    left: 100%;
-}
-.btn-save:active:not(:disabled) {
-    transform: translateY(1px);
-    box-shadow: 0 0 8px rgba(155, 134, 189, 0.3);
-}
-.btn-save:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    border-color: var(--muted);
-}
+        .input-group {
+            flex: 1;
+        }
 
-/* 取消按钮样式 */
-.btn-cancel {
-    background: transparent;
-    color: var(--muted);
-    border: 1px solid transparent;
-    padding: 8px 20px;
-    font-family: inherit;
-    cursor: pointer;
-    margin-top: 6px;
-    transition: all 0.2s ease;
-}
-.btn-cancel:hover {
-    color: var(--text);
-    border-color: var(--border);
-    box-shadow: 0 0 10px rgba(139, 127, 168, 0.3);
-}
-.btn-cancel:active {
-    transform: translateY(1px);
-}
+        input {
+            background: transparent;
+            border: none;
+            color: var(--text);
+            font-size: 16px;
+            width: 100%;
+            outline: none;
+            font-family: inherit;
+        }
 
-/* 删除按钮样式（面板中） */
-.btn-danger {
-    background: transparent;
-    color: #c47a9f;
-    border: 1px solid transparent;
-    padding: 8px 20px;
-    font-family: inherit;
-    cursor: pointer;
-    margin-top: 6px;
-    transition: all 0.2s ease;
-    float: right;
-}
-.btn-danger:hover {
-    color: #e8a0bf;
-    border-color: #c47a9f;
-    box-shadow: 0 0 10px rgba(196, 122, 159, 0.4);
-}
-.btn-danger:active {
-    transform: translateY(1px);
-}
+        input::placeholder {
+            color: var(--muted);
+        }
 
-.list-item {
-    padding: 15px 0;
-    border-bottom: 1px solid #3a3a4a;
-    cursor: pointer;
-    transition: color 0.2s;
-}
-.list-item:hover {
-    color: var(--highlight);
-}
-.item-header { display: flex; justify-content: space-between; align-items: baseline; }
-.title {
-    font-size: 16px;
-    transition: color 0.2s;
-}
-.tag {
-    font-size: 11px;
-    color: var(--muted);
-    border: 1px solid var(--muted);
-    padding: 2px 6px;
-    text-transform: uppercase;
-}
-.content {
-    display: none;
-    margin-top: 10px;
-    color: #c0c0d0;
-    font-size: 14px;
-    padding-left: 12px;
-    border-left: 2px solid var(--border);
-    white-space: pre-wrap;
-    line-height: 1.6;
-}
-.list-item.expanded .content { display: block; }
-.list-item.expanded .title {
-    color: var(--highlight);
-}
-.btn-delete {
-    float: right;
-    font-size: 12px;
-    color: #c47a9f;
-    margin-top: 10px;
-    border: 1px solid transparent;
-    background: none;
-    cursor: pointer;
-    display: none;
-    padding: 4px 8px;
-    transition: all 0.2s ease;
-}
-.btn-delete:hover {
-    color: #e8a0bf;
-    border-color: #c47a9f;
-    box-shadow: 0 0 10px rgba(196, 122, 159, 0.4);
-}
-.btn-delete:active {
-    transform: translateY(1px);
-}
-.list-item.expanded .btn-delete { display: inline-block; }
+        .btn-icon {
+            cursor: pointer;
+            color: var(--muted);
+            font-size: 20px;
+            user-select: none;
+            transition: all 0.3s ease;
+            padding: 4px 8px;
+            border: 1px solid transparent;
+            position: relative;
+        }
 
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb {
-    background: var(--border);
-}
-::-webkit-scrollbar-thumb:hover {
-    background: var(--highlight);
-}
+        .btn-icon:hover {
+            color: var(--highlight);
+            border-color: var(--border);
+            box-shadow: 0 0 10px rgba(155, 134, 189, 0.3);
+        }
 
-/* WEBAPP 小程序容器样式 */
-.webapp-container {
-    margin: 15px 0;
-    padding: 15px;
-    background: rgba(155, 134, 189, 0.05);
-    border: 1px dashed var(--border);
-    border-radius: 4px;
-    position: relative;
-    min-height: 40px;
-}
+        .btn-icon:active {
+            transform: scale(0.95);
+        }
 
-.webapp-container.webapp-active {
-    background: rgba(155, 134, 189, 0.08);
-    border-style: solid;
-    border-color: var(--highlight);
-    box-shadow: 0 0 8px rgba(155, 134, 189, 0.2);
-}
+        /* 编辑面板遮罩 */
+        #panelOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1000;
+            background-color: var(--overlay-bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease-in-out;
+        }
 
-.webapp-container::before {
-    content: 'Mini App';
-    position: absolute;
-    top: -10px;
-    left: 10px;
-    background: var(--bg);
-    padding: 0 8px;
-    font-size: 11px;
-    color: var(--highlight);
-    letter-spacing: 0.5px;
-}
+        #panelOverlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
 
-/* WEBAPP 内部样式重置（可选） */
-.webapp-container * {
-    box-sizing: border-box;
-}
+        .panel {
+            width: 90%;
+            max-width: 600px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            padding: 20px;
+            transform: scale(0.9) translateY(20px);
+            transition: transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+        }
 
-/* 密码输入弹窗 */
-#passwordOverlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 3000;
-    background-color: var(--overlay-bg);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.3s ease-in-out;
-}
-#passwordOverlay.active {
-    opacity: 1;
-    visibility: visible;
-}
+        #panelOverlay.active .panel {
+            transform: scale(1) translateY(0);
+        }
 
-/* 删除确认弹窗 */
-#confirmOverlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 3000;
-    background-color: var(--overlay-bg);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.3s ease-in-out;
-}
-#confirmOverlay.active {
-    opacity: 1;
-    visibility: visible;
-}
+        /* 全局加载遮罩 */
+        #loadingOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2000;
+            background: rgba(26, 26, 46, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s;
+            color: var(--highlight);
+            font-size: 16px;
+        }
 
-.password-panel {
-    width: 90%;
-    max-width: 400px;
-    background: var(--panel-bg);
-    border: 1px solid var(--border);
-    padding: 20px;
-    transform: scale(0.9) translateY(20px);
-    transition: transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
-}
-#passwordOverlay.active .password-panel,
-#confirmOverlay.active .password-panel {
-    transform: scale(1) translateY(0);
-}
-.password-title {
-    font-size: 14px;
-    color: var(--highlight);
-    margin-bottom: 15px;
-}
-.password-input {
-    width: 100%;
-    background: #1a1a2e;
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 8px 10px;
-    font-family: inherit;
-    box-sizing: border-box;
-    margin-bottom: 15px;
-}
-.password-input:focus {
-    border-color: var(--highlight);
-    outline: none;
-}
-.password-buttons {
-    display: flex;
-    gap: 10px;
-}
-.password-btn {
-    flex: 1;
-    background: var(--panel-bg);
-    color: var(--text);
-    border: 1px solid var(--border);
-    padding: 8px 20px;
-    font-family: inherit;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    position: relative;
-    overflow: hidden;
-}
-.password-btn::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(155, 134, 189, 0.3), transparent);
-    transition: left 0.5s ease;
-}
-.password-btn:hover {
-    background: var(--border);
-    color: var(--bg);
-    border-color: var(--highlight);
-    box-shadow: 0 0 12px rgba(155, 134, 189, 0.4);
-}
-.password-btn:hover::before {
-    left: 100%;
-}
-.password-btn:active {
-    transform: translateY(1px);
-    box-shadow: 0 0 8px rgba(155, 134, 189, 0.3);
-}
-.password-btn.cancel {
-    background: transparent;
-    color: var(--muted);
-    border: 1px solid transparent;
-}
-.password-btn.cancel:hover {
-    color: var(--text);
-    border-color: var(--border);
-    box-shadow: 0 0 10px rgba(139, 127, 168, 0.3);
-}
-.password-btn.cancel::before {
-    display: none;
-}
-.password-btn.delete {
-    background: transparent;
-    color: #c47a9f;
-    border: 1px solid transparent;
-}
-.password-btn.delete:hover {
-    color: #e8a0bf;
-    border-color: #c47a9f;
-    box-shadow: 0 0 10px rgba(196, 122, 159, 0.4);
-}
-.password-btn.delete::before {
-    display: none;
-}
-.password-error {
-    color: #c47a9f;
-    font-size: 12px;
-    margin-top: -10px;
-    margin-bottom: 10px;
-    display: none;
-}
+        #loadingOverlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
 
-@keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-8px); }
-    75% { transform: translateX(8px); }
-}
-</style>
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(155, 134, 189, 0.2);
+            border-top-color: var(--highlight);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .form-row {
+            margin-bottom: 14px;
+        }
+
+        .form-label {
+            font-size: 12px;
+            color: var(--highlight);
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .form-input {
+            width: 100%;
+            background: #1a1a2e;
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 8px 10px;
+            font-family: inherit;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+            border-color: var(--highlight);
+            outline: none;
+        }
+
+        textarea.form-input {
+            min-height: 120px;
+            max-height: 60vh;
+            resize: vertical;
+            overflow-y: auto;
+            line-height: 1.5;
+        }
+
+        .btn-save {
+            background: var(--panel-bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 8px 20px;
+            font-family: inherit;
+            cursor: pointer;
+            margin-top: 6px;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-save::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(155, 134, 189, 0.3), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .btn-save:hover:not(:disabled) {
+            background: var(--border);
+            color: var(--bg);
+            border-color: var(--highlight);
+            box-shadow: 0 0 12px rgba(155, 134, 189, 0.4);
+        }
+
+        .btn-save:hover:not(:disabled)::before {
+            left: 100%;
+        }
+
+        .btn-save:active:not(:disabled) {
+            transform: translateY(1px);
+            box-shadow: 0 0 8px rgba(155, 134, 189, 0.3);
+        }
+
+        .btn-save:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            border-color: var(--muted);
+        }
+
+        /* 取消按钮样式 */
+        .btn-cancel {
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid transparent;
+            padding: 8px 20px;
+            font-family: inherit;
+            cursor: pointer;
+            margin-top: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-cancel:hover {
+            color: var(--text);
+            border-color: var(--border);
+            box-shadow: 0 0 10px rgba(139, 127, 168, 0.3);
+        }
+
+        .btn-cancel:active {
+            transform: translateY(1px);
+        }
+
+        /* 删除按钮样式（面板中） */
+        .btn-danger {
+            background: transparent;
+            color: #c47a9f;
+            border: 1px solid transparent;
+            padding: 8px 20px;
+            font-family: inherit;
+            cursor: pointer;
+            margin-top: 6px;
+            transition: all 0.2s ease;
+            float: right;
+        }
+
+        .btn-danger:hover {
+            color: #e8a0bf;
+            border-color: #c47a9f;
+            box-shadow: 0 0 10px rgba(196, 122, 159, 0.4);
+        }
+
+        .btn-danger:active {
+            transform: translateY(1px);
+        }
+
+        .list-item {
+            padding: 15px 0;
+            border-bottom: 1px solid #3a3a4a;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .list-item:hover {
+            color: var(--highlight);
+        }
+
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+        }
+
+        .title {
+            font-size: 16px;
+            transition: color 0.2s;
+        }
+
+        .tag {
+            font-size: 11px;
+            color: var(--muted);
+            border: 1px solid var(--muted);
+            padding: 2px 6px;
+            text-transform: uppercase;
+        }
+
+        .content {
+            display: none;
+            margin-top: 10px;
+            color: #c0c0d0;
+            font-size: 14px;
+            padding-left: 12px;
+            border-left: 2px solid var(--border);
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+
+        .list-item.expanded .content {
+            display: block;
+        }
+
+        .list-item.expanded .title {
+            color: var(--highlight);
+        }
+
+        .btn-delete {
+            float: right;
+            font-size: 12px;
+            color: #c47a9f;
+            margin-top: 10px;
+            border: 1px solid transparent;
+            background: none;
+            cursor: pointer;
+            display: none;
+            padding: 4px 8px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-delete:hover {
+            color: #e8a0bf;
+            border-color: #c47a9f;
+            box-shadow: 0 0 10px rgba(196, 122, 159, 0.4);
+        }
+
+        .btn-delete:active {
+            transform: translateY(1px);
+        }
+
+        .list-item.expanded .btn-delete {
+            display: inline-block;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--highlight);
+        }
+
+        /* WEBAPP 小程序容器样式 */
+        .webapp-container {
+            margin: 15px 0;
+            padding: 15px;
+            background: rgba(155, 134, 189, 0.05);
+            border: 1px dashed var(--border);
+            border-radius: 4px;
+            position: relative;
+            min-height: 40px;
+        }
+
+        .webapp-container.webapp-active {
+            background: rgba(155, 134, 189, 0.08);
+            border-style: solid;
+            border-color: var(--highlight);
+            box-shadow: 0 0 8px rgba(155, 134, 189, 0.2);
+        }
+
+        .webapp-container::before {
+            content: 'Mini App';
+            position: absolute;
+            top: -10px;
+            left: 10px;
+            background: var(--bg);
+            padding: 0 8px;
+            font-size: 11px;
+            color: var(--highlight);
+            letter-spacing: 0.5px;
+        }
+
+        /* WEBAPP 内部样式重置（可选） */
+        .webapp-container * {
+            box-sizing: border-box;
+        }
+
+        /* 密码输入弹窗 */
+        #passwordOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 3000;
+            background-color: var(--overlay-bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        #passwordOverlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* 删除确认弹窗 */
+        #confirmOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 3000;
+            background-color: var(--overlay-bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        #confirmOverlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .password-panel {
+            width: 90%;
+            max-width: 400px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            padding: 20px;
+            transform: scale(0.9) translateY(20px);
+            transition: transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+        }
+
+        #passwordOverlay.active .password-panel,
+        #confirmOverlay.active .password-panel {
+            transform: scale(1) translateY(0);
+        }
+
+        .password-title {
+            font-size: 14px;
+            color: var(--highlight);
+            margin-bottom: 15px;
+        }
+
+        .password-input {
+            width: 100%;
+            background: #1a1a2e;
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 8px 10px;
+            font-family: inherit;
+            box-sizing: border-box;
+            margin-bottom: 15px;
+        }
+
+        .password-input:focus {
+            border-color: var(--highlight);
+            outline: none;
+        }
+
+        .password-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .password-btn {
+            flex: 1;
+            background: var(--panel-bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 8px 20px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .password-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(155, 134, 189, 0.3), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .password-btn:hover {
+            background: var(--border);
+            color: var(--bg);
+            border-color: var(--highlight);
+            box-shadow: 0 0 12px rgba(155, 134, 189, 0.4);
+        }
+
+        .password-btn:hover::before {
+            left: 100%;
+        }
+
+        .password-btn:active {
+            transform: translateY(1px);
+            box-shadow: 0 0 8px rgba(155, 134, 189, 0.3);
+        }
+
+        .password-btn.cancel {
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid transparent;
+        }
+
+        .password-btn.cancel:hover {
+            color: var(--text);
+            border-color: var(--border);
+            box-shadow: 0 0 10px rgba(139, 127, 168, 0.3);
+        }
+
+        .password-btn.cancel::before {
+            display: none;
+        }
+
+        .password-btn.delete {
+            background: transparent;
+            color: #c47a9f;
+            border: 1px solid transparent;
+        }
+
+        .password-btn.delete:hover {
+            color: #e8a0bf;
+            border-color: #c47a9f;
+            box-shadow: 0 0 10px rgba(196, 122, 159, 0.4);
+        }
+
+        .password-btn.delete::before {
+            display: none;
+        }
+
+        .password-error {
+            color: #c47a9f;
+            font-size: 12px;
+            margin-top: -10px;
+            margin-bottom: 10px;
+            display: none;
+        }
+
+        @keyframes shake {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            25% {
+                transform: translateX(-8px);
+            }
+
+            75% {
+                transform: translateX(8px);
+            }
+        }
+    </style>
 </head>
+
 <body>
-<div class="container">
-    <div class="top-bar">
-        <div class="input-group">
-            <input type="text" id="search" placeholder="> 输入关键词或简拼..." autofocus autocomplete="off" name="search-field">
+    <div class="container">
+        <div class="top-bar">
+            <div class="input-group">
+                <input type="text" id="search" placeholder="> 输入关键词或简拼..." autofocus autocomplete="off"
+                    name="search-field">
+            </div>
+            <div class="btn-icon" onclick="togglePanel()" title="Add New Entry">[ + ]</div>
         </div>
-        <div class="btn-icon" onclick="togglePanel()" title="Add New Entry">[ + ]</div>
+        <div id="results"></div>
     </div>
-    <div id="results"></div>
-</div>
 
-<!-- 编辑面板遮罩 -->
-<div id="panelOverlay" onclick="handleOverlayClick(event)">
-    <div class="panel" id="addPanel">
-        <!-- 隐藏的诱饵输入框，防止浏览器自动填充 -->
-        <input type="text" style="position:absolute;top:-9999px;left:-9999px;" tabindex="-1" autocomplete="off">
-        <input type="password" style="position:absolute;top:-9999px;left:-9999px;" tabindex="-1" autocomplete="new-password">
-        <div style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">
-            数据编辑面板
-            <span id="lastModifiedDisplay" style="float: right; color: var(--muted); font-size: 10px;"></span>
-        </div>
+    <!-- 编辑面板遮罩 -->
+    <div id="panelOverlay" onclick="handleOverlayClick(event)">
+        <div class="panel" id="addPanel">
+            <!-- 隐藏的诱饵输入框，防止浏览器自动填充 -->
+            <input type="text" style="position:absolute;top:-9999px;left:-9999px;" tabindex="-1" autocomplete="off">
+            <input type="password" style="position:absolute;top:-9999px;left:-9999px;" tabindex="-1"
+                autocomplete="new-password">
+            <div style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">
+                数据编辑面板
+                <span id="lastModifiedDisplay" style="float: right; color: var(--muted); font-size: 10px;"></span>
+            </div>
             <div class="form-row">
-            <label class="form-label">> 标题</label>
-            <input type="text" id="newTitle" class="form-input" placeholder="例如: 前厅开早SOP" autocomplete="off">
-        </div>
-        <div class="form-row">
-            <label class="form-label">> 分类</label>
-            <input type="text" id="newTag" class="form-input" placeholder="例如: TYPE, SOP, TAG" autocomplete="off">
-        </div>
-        <div class="form-row">
-            <label class="form-label">> 内容详情</label>
-            <textarea id="newContent" class="form-input" placeholder="在此输入详细配方或流程..."></textarea>
-        </div>
-        <div style="margin-top: 15px;">
-            <button class="btn-save" id="btnSave" onclick="saveData()">[ 保存 ]</button>
-            <button class="btn-cancel" onclick="togglePanel()">[ 取消 ]</button>
-            <button class="btn-danger" id="btnDelete" onclick="deleteCurrentItem()">[ 删除 ]</button>
-        </div>
-    </div>
-</div>
-
-<!-- 全局加载遮罩 -->
-<div id="loadingOverlay">
-    <div class="spinner"></div>
-    <div id="loadingText">正在处理...</div>
-</div>
-
-<!-- 密码输入弹窗 -->
-<div id="passwordOverlay" onclick="handlePasswordOverlayClick(event)">
-    <div class="password-panel">
-        <div class="password-title">请输入密码</div>
-        <!-- 隐藏的诱饵输入框，防止浏览器自动填充 -->
-        <input type="text" style="position:absolute;top:-9999px;left:-9999px;" tabindex="-1" autocomplete="off">
-        <input type="password" style="position:absolute;top:-9999px;left:-9999px;" tabindex="-1" autocomplete="new-password">
-        <input type="password" id="passwordInput" class="password-input" placeholder="输入密码以继续..." autocomplete="off" name="password-field" />
-        <div class="password-error" id="passwordError">密码错误！</div>
-        <div class="password-buttons">
-            <button class="password-btn cancel" onclick="closePasswordDialog()">取消</button>
-            <button class="password-btn" onclick="confirmPassword()">确认</button>
+                <label class="form-label">> 标题</label>
+                <input type="text" id="newTitle" class="form-input" placeholder="例如: 前厅开早SOP" autocomplete="off">
+            </div>
+            <div class="form-row">
+                <label class="form-label">> 分类</label>
+                <input type="text" id="newTag" class="form-input" placeholder="例如: TYPE, SOP, TAG" autocomplete="off">
+            </div>
+            <div class="form-row">
+                <label class="form-label">> 内容详情</label>
+                <textarea id="newContent" class="form-input" placeholder="在此输入详细配方或流程..."></textarea>
+            </div>
+            <div style="margin-top: 15px;">
+                <button class="btn-save" id="btnSave" onclick="saveData()">[ 保存 ]</button>
+                <button class="btn-cancel" onclick="togglePanel()">[ 取消 ]</button>
+                <button class="btn-danger" id="btnDelete" onclick="deleteCurrentItem()">[ 删除 ]</button>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- 删除确认弹窗 -->
-<div id="confirmOverlay" onclick="handleConfirmOverlayClick(event)">
-    <div class="password-panel">
-        <div class="password-title">确认删除</div>
-        <div style="color: var(--muted); font-size: 14px; margin-bottom: 20px;">此操作无法撤销，确认要永久删除此条目吗？</div>
-        <div class="password-buttons">
-            <button class="password-btn cancel" onclick="closeConfirmDialog()">取消</button>
-            <button class="password-btn delete" onclick="confirmDelete()">删除</button>
+    <!-- 全局加载遮罩 -->
+    <div id="loadingOverlay">
+        <div class="spinner"></div>
+        <div id="loadingText">正在处理...</div>
+    </div>
+
+    <!-- 密码输入弹窗 -->
+    <div id="passwordOverlay" onclick="handlePasswordOverlayClick(event)">
+        <div class="password-panel">
+            <div class="password-title">请输入密码</div>
+            <!-- 隐藏的诱饵输入框，防止浏览器自动填充 -->
+            <input type="text" style="position:absolute;top:-9999px;left:-9999px;" tabindex="-1" autocomplete="off">
+            <input type="password" style="position:absolute;top:-9999px;left:-9999px;" tabindex="-1"
+                autocomplete="new-password">
+            <input type="password" id="passwordInput" class="password-input" placeholder="输入密码以继续..." autocomplete="off"
+                name="password-field" />
+            <div class="password-error" id="passwordError">密码错误！</div>
+            <div class="password-buttons">
+                <button class="password-btn cancel" onclick="closePasswordDialog()">取消</button>
+                <button class="password-btn" onclick="confirmPassword()">确认</button>
+            </div>
         </div>
     </div>
-</div>
 
-<script>
-// ==================== 拼音工具（只声明一次） ====================
-const PinyinUtil = {
-    isAvailable() { return typeof pinyinPro !== 'undefined'; },
-    generate(text) {
-        if (!text || !this.isAvailable()) return { pinyin: '', initial: '' };
-        const pinyin = pinyinPro.pinyin(text, { toneType: 'none', type: 'array' }).join('');
-        const initial = pinyinPro.pinyin(text, { pattern: 'first', toneType: 'none' }).replace(/\s+/g, '');
-        return { pinyin, initial };
-    },
-    match(text, keyword) {
-        if (!text) return false;
-        const lowerText = text.toLowerCase();
-        const lowerKey = keyword.toLowerCase();
-        if (lowerText.includes(lowerKey)) return true;
-        if (this.isAvailable()) {
-            const { pinyin, initial } = this.generate(text);
-            return pinyin.toLowerCase().includes(lowerKey) || initial.toLowerCase().includes(lowerKey);
-        }
-        return false;
-    }
-};
+    <!-- 删除确认弹窗 -->
+    <div id="confirmOverlay" onclick="handleConfirmOverlayClick(event)">
+        <div class="password-panel">
+            <div class="password-title">确认删除</div>
+            <div style="color: var(--muted); font-size: 14px; margin-bottom: 20px;">此操作无法撤销，确认要永久删除此条目吗？</div>
+            <div class="password-buttons">
+                <button class="password-btn cancel" onclick="closeConfirmDialog()">取消</button>
+                <button class="password-btn delete" onclick="confirmDelete()">删除</button>
+            </div>
+        </div>
+    </div>
 
-// ==================== 配置 ====================
-const CONFIG = {
-    SUPABASE_URL: 'https://fmxddvjgkykuqwmasigo.supabase.co',
-    SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo',
-    TABLE_NAME: 'sop_items',
-    DEFAULT_TAG: 'MISC',
-    PASSWORD: '654321'
-};
-
-const supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
-
-// ==================== WEBAPP 小程序配置 ====================
-const WEBAPP_PARSER = {
-    REGEX: /\[WEBAPP\]([\s\S]*?)\[\/WEBAPP\]/g,
-    UNIQUE_PREFIX: 'webapp_'
-};
-const WEBAPP_INSTANCES = new Map(); // 存储小程序实例的清理函数
-
-let db = [];
-let editingId = null;
-let passwordResolve = null;
-let hasShownCacheAlert = false; // 标记是否已显示过缓存提示
-
-// ==================== 加载遮罩控制 ====================
-const loadingOverlay = document.getElementById('loadingOverlay');
-const loadingText = document.getElementById('loadingText');
-
-function showLoading(msg = '正在处理...') {
-    loadingText.textContent = msg;
-    loadingOverlay.classList.add('active');
-    document.getElementById('btnSave').disabled = true;
-    document.getElementById('btnDelete').disabled = true;
-}
-function hideLoading() {
-    loadingOverlay.classList.remove('active');
-    document.getElementById('btnSave').disabled = false;
-    document.getElementById('btnDelete').disabled = false;
-}
-
-// ==================== DOM & 初始化 ====================
-const DOM = {};
-function initDOM() {
-    DOM.input = document.getElementById('search');
-    DOM.results = document.getElementById('results');
-    DOM.overlay = document.getElementById('panelOverlay');
-    DOM.panel = document.getElementById('addPanel');
-    DOM.newTag = document.getElementById('newTag');
-    DOM.newTitle = document.getElementById('newTitle');
-    DOM.newContent = document.getElementById('newContent');
-    DOM.lastModifiedDisplay = document.getElementById('lastModifiedDisplay');
-    setupTextareaAutoResize();
-}
-
-function formatDate(dateString) {
-    if (!dateString) return '';
-    const d = new Date(dateString);
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-
-async function initDB(retryCount = 0) {
-    const maxRetries = 3;
-    try {
-        showLoading(`正在加载数据...${retryCount > 0 ? ` (重试 ${retryCount}/${maxRetries})` : ''}`);
-
-        // 添加超时控制
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('请求超时')), 10000)
-        );
-
-        const fetchPromise = supabase
-            .from(CONFIG.TABLE_NAME)
-            .select('id, tag, title, info, created_at, updated_at')
-            .order('created_at', { ascending: false });
-
-        const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
-
-        if (error) throw error;
-
-        // 保存到本地缓存
-        db = data || [];
-        localStorage.setItem('sop_cache', JSON.stringify(db));
-        localStorage.setItem('sop_cache_time', Date.now().toString());
-
-        render(db);
-        setupRealtimeSubscription();
-        hideLoading();
-
-        // 如果之前显示过缓存提示，现在成功连接了，重置标记并提示用户
-        if (hasShownCacheAlert && retryCount > 0) {
-            hasShownCacheAlert = false;
-            console.log('✓ 网络已恢复，数据已更新');
-        }
-    } catch (e) {
-        console.error('数据加载失败:', e);
-
-        // 尝试从缓存加载
-        const cachedData = localStorage.getItem('sop_cache');
-        if (cachedData) {
-            try {
-                db = JSON.parse(cachedData);
-                const cacheTime = localStorage.getItem('sop_cache_time');
-                const timeDiff = Date.now() - parseInt(cacheTime || '0');
-                const hours = Math.floor(timeDiff / 1000 / 60 / 60);
-                render(db);
-                hideLoading();
-
-                // 只在第一次失败时显示 alert，后续静默重试
-                if (!hasShownCacheAlert) {
-                    hasShownCacheAlert = true;
-                    alert(`网络连接失败，已加载缓存数据 (${hours}小时前)\n将在后台继续尝试连接...`);
-                } else {
-                    // 后台重试失败，只在控制台输出日志
-                    console.log(`后台重试 ${retryCount}/${maxRetries} 失败，继续使用缓存数据`);
-                }
-
-                // 后台继续重试
-                if (retryCount < maxRetries) {
-                    setTimeout(() => initDB(retryCount + 1), 5000); // 增加重试间隔到5秒
-                }
-                return;
-            } catch (parseError) {
-                console.error('缓存解析失败:', parseError);
-            }
-        }
-
-        // 没有缓存或缓存失败，尝试重试
-        if (retryCount < maxRetries) {
-            hideLoading();
-            setTimeout(() => initDB(retryCount + 1), 2000);
+    <script>
+        // 防止脚本重复执行
+        if (window.__sopInitialized) {
+            console.warn('⚠️ SOP 应用已初始化，跳过重复执行');
         } else {
-            hideLoading();
-            alert('加载失败: ' + e.message + '\n\n请检查网络连接或刷新页面重试');
-        }
-    }
-}
+            window.__sopInitialized = true;
+            // 所有初始化代码都在这个 else 块中
 
-let realtimeChannel = null;
+            // ==================== 拼音工具（只声明一次） ====================
+            const PinyinUtil = {
+                isAvailable() { return typeof pinyinPro !== 'undefined'; },
+                generate(text) {
+                    if (!text || !this.isAvailable()) return { pinyin: '', initial: '' };
+                    const pinyin = pinyinPro.pinyin(text, { toneType: 'none', type: 'array' }).join('');
+                    const initial = pinyinPro.pinyin(text, { pattern: 'first', toneType: 'none' }).replace(/\s+/g, '');
+                    return { pinyin, initial };
+                },
+                match(text, keyword) {
+                    if (!text) return false;
+                    const lowerText = text.toLowerCase();
+                    const lowerKey = keyword.toLowerCase();
+                    if (lowerText.includes(lowerKey)) return true;
+                    if (this.isAvailable()) {
+                        const { pinyin, initial } = this.generate(text);
+                        return pinyin.toLowerCase().includes(lowerKey) || initial.toLowerCase().includes(lowerKey);
+                    }
+                    return false;
+                }
+            };
 
-function setupRealtimeSubscription() {
-    // 如果已存在订阅，先取消
-    if (realtimeChannel) {
-        supabase.removeChannel(realtimeChannel);
-    }
+            // ==================== 配置 ====================
+            const CONFIG = {
+                SUPABASE_URL: 'https://fmxddvjgkykuqwmasigo.supabase.co',
+                SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo',
+                TABLE_NAME: 'sop_items',
+                DEFAULT_TAG: 'MISC',
+                PASSWORD: '654321'
+            };
 
-    // 创建新的订阅通道
-    realtimeChannel = supabase
-        .channel(`${CONFIG.TABLE_NAME}_realtime`)
-        .on(
-            'postgres_changes',
-            {
-                event: 'INSERT',
-                schema: 'public',
-                table: CONFIG.TABLE_NAME
-            },
-            (payload) => {
-                handleRealtimeInsert(payload.new);
+            // 防止重复初始化 - 使用 window 对象存储实例
+            if (!window.__sopSupabaseClient) {
+                window.__sopSupabaseClient = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
             }
-        )
-        .on(
-            'postgres_changes',
-            {
-                event: 'UPDATE',
-                schema: 'public',
-                table: CONFIG.TABLE_NAME
-            },
-            (payload) => {
-                handleRealtimeUpdate(payload.new);
+            const supabase = window.__sopSupabaseClient;
+
+            // ==================== WEBAPP 小程序配置 ====================
+            const WEBAPP_PARSER = {
+                REGEX: /\[WEBAPP\]([\s\S]*?)\[\/WEBAPP\]/g,
+                UNIQUE_PREFIX: 'webapp_'
+            };
+            const WEBAPP_INSTANCES = new Map(); // 存储小程序实例的清理函数
+
+            let db = [];
+            let editingId = null;
+            let passwordResolve = null;
+            let hasShownCacheAlert = false; // 标记是否已显示过缓存提示
+
+            // ==================== 加载遮罩控制 ====================
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const loadingText = document.getElementById('loadingText');
+
+            function showLoading(msg = '正在处理...') {
+                loadingText.textContent = msg;
+                loadingOverlay.classList.add('active');
+                document.getElementById('btnSave').disabled = true;
+                document.getElementById('btnDelete').disabled = true;
             }
-        )
-        .on(
-            'postgres_changes',
-            {
-                event: 'DELETE',
-                schema: 'public',
-                table: CONFIG.TABLE_NAME
-            },
-            (payload) => {
-                handleRealtimeDelete(payload.old);
+            function hideLoading() {
+                loadingOverlay.classList.remove('active');
+                document.getElementById('btnSave').disabled = false;
+                document.getElementById('btnDelete').disabled = false;
             }
-        )
-        .subscribe((status) => {
-            if (status === 'SUBSCRIBED') {
-                console.log('✓ 实时同步已连接');
-            } else if (status === 'CHANNEL_ERROR') {
-                console.error('✗ 实时同步连接失败，将在5秒后重试...');
-                setTimeout(() => setupRealtimeSubscription(), 5000);
-            } else if (status === 'TIMED_OUT') {
-                console.error('✗ 实时同步连接超时，将在5秒后重试...');
-                setTimeout(() => setupRealtimeSubscription(), 5000);
+
+            // ==================== DOM & 初始化 ====================
+            const DOM = {};
+            function initDOM() {
+                DOM.input = document.getElementById('search');
+                DOM.results = document.getElementById('results');
+                DOM.overlay = document.getElementById('panelOverlay');
+                DOM.panel = document.getElementById('addPanel');
+                DOM.newTag = document.getElementById('newTag');
+                DOM.newTitle = document.getElementById('newTitle');
+                DOM.newContent = document.getElementById('newContent');
+                DOM.lastModifiedDisplay = document.getElementById('lastModifiedDisplay');
+                setupTextareaAutoResize();
             }
-        });
-}
 
-// ==================== 搜索过滤工具 ====================
-function filterAndRender() {
-    const searchKey = DOM.input.value.toLowerCase();
-    if (searchKey) {
-        const filtered = db.filter(i => {
-            const titleMatch = PinyinUtil.match(i.title, searchKey);
-
-            // 移除WEBAPP块后再搜索内容
-            const contentWithoutWebapp = i.info.replace(WEBAPP_PARSER.REGEX, '');
-            const infoMatch = contentWithoutWebapp && contentWithoutWebapp.toLowerCase().includes(searchKey);
-
-            return titleMatch || infoMatch;
-        });
-        render(filtered);
-    } else {
-        render(db);
-    }
-}
-
-// 处理实时插入
-function handleRealtimeInsert(newItem) {
-    // 避免重复添加
-    if (db.find(item => item.id === newItem.id)) return;
-    db.unshift(newItem);
-    filterAndRender();
-}
-
-// 处理实时更新
-function handleRealtimeUpdate(updatedItem) {
-    const index = db.findIndex(item => item.id === updatedItem.id);
-    if (index !== -1) {
-        db[index] = updatedItem;
-        filterAndRender();
-    }
-}
-
-// 处理实时删除
-function handleRealtimeDelete(deletedItem) {
-    const index = db.findIndex(item => item.id === deletedItem.id);
-    if (index !== -1) {
-        db.splice(index, 1);
-        filterAndRender();
-    }
-}
-
-// ==================== WEBAPP 小程序解析和执行引擎 ====================
-
-/**
- * 解析单个 WEBAPP 块
- * @param {string} webappCode - WEBAPP块内的代码
- * @param {number} itemId - 所属SOP条目的ID
- * @param {number} blockIndex - 该条目中的第几个WEBAPP块
- * @returns {object} 解析后的结构化对象
- */
-function parseWebappBlock(webappCode, itemId, blockIndex) {
-    const uniqueId = `${WEBAPP_PARSER.UNIQUE_PREFIX}${itemId}_${blockIndex}`;
-
-    let html = '', css = '', js = '';
-
-    // 提取 <style> 标签
-    const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
-    let styleMatch;
-    while ((styleMatch = styleRegex.exec(webappCode)) !== null) {
-        css += styleMatch[1] + '\n';
-    }
-
-    // 提取 <script> 标签
-    const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
-    let scriptMatch;
-    while ((scriptMatch = scriptRegex.exec(webappCode)) !== null) {
-        js += scriptMatch[1] + '\n';
-    }
-
-    // 移除style和script后，剩余的就是HTML
-    html = webappCode
-        .replace(styleRegex, '')
-        .replace(scriptRegex, '')
-        .trim();
-
-    return {
-        id: uniqueId,
-        html: html,
-        css: css,
-        js: js,
-        itemId: itemId,
-        blockIndex: blockIndex
-    };
-}
-
-/**
- * 处理内容字符串，解析所有WEBAPP块
- * @param {string} content - 原始内容
- * @param {number} itemId - SOP条目ID
- * @returns {object} { renderedContent, webappBlocks }
- */
-function processContentWithWebapps(content, itemId) {
-    const webappBlocks = [];
-    let blockIndex = 0;
-
-    // 替换所有WEBAPP块为占位符，并收集解析结果
-    const renderedContent = content.replace(WEBAPP_PARSER.REGEX, (match, webappCode) => {
-        const parsed = parseWebappBlock(webappCode, itemId, blockIndex);
-        webappBlocks.push(parsed);
-        blockIndex++;
-
-        // 返回占位容器
-        return `<div class="webapp-container" data-webapp-id="${parsed.id}"></div>`;
-    });
-
-    return { renderedContent, webappBlocks };
-}
-
-/**
- * 重写HTML中的ID，避免冲突
- * @param {string} html - 原始HTML
- * @param {string} scopeId - 唯一的作用域ID
- * @returns {object} { html, idMap } - 处理后的HTML和ID映射表
- */
-function rewriteHtmlIds(html, scopeId) {
-    const idMap = {}; // 原始ID -> 新ID 的映射
-
-    const processedHtml = html.replace(/\bid\s*=\s*["']([^"']+)["']/gi, (match, originalId) => {
-        const newId = `${scopeId}_${originalId}`;
-        idMap[originalId] = newId;
-        return `id="${newId}"`;
-    });
-
-    return { html: processedHtml, idMap };
-}
-
-/**
- * 处理CSS作用域隔离
- * @param {string} css - 原始CSS代码
- * @param {string} scopeId - 唯一的作用域ID
- * @returns {string} 带作用域前缀的CSS
- */
-function scopeCss(css, scopeId) {
-    if (!css.trim()) return '';
-
-    // 为每个选择器添加作用域前缀
-    const scopedCss = css.replace(/([^{}]+)\s*{/g, (match, selector) => {
-        // 跳过 @media, @keyframes 等规则
-        if (selector.trim().startsWith('@')) {
-            return match;
-        }
-
-        // 为每个逗号分隔的选择器添加前缀
-        const selectors = selector.split(',').map(s => {
-            s = s.trim();
-            // 特殊处理：body/html -> 直接替换为容器
-            if (s === 'body' || s === 'html') {
-                return `[data-webapp-scope="${scopeId}"]`;
+            function formatDate(dateString) {
+                if (!dateString) return '';
+                const d = new Date(dateString);
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
             }
-            return `[data-webapp-scope="${scopeId}"] ${s}`;
-        }).join(', ');
 
-        return `${selectors} {`;
-    });
+            async function initDB(retryCount = 0) {
+                const maxRetries = 3;
+                try {
+                    showLoading(`正在加载数据...${retryCount > 0 ? ` (重试 ${retryCount}/${maxRetries})` : ''}`);
 
-    return scopedCss;
-}
+                    // 添加超时控制
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('请求超时')), 10000)
+                    );
 
-/**
- * 在隔离作用域中执行JavaScript
- * @param {string} jsCode - JavaScript代码
- * @param {string} scopeId - 作用域ID
- * @param {object} idMap - ID映射表
- * @param {HTMLElement} containerElement - 容器DOM元素
- */
-function executeIsolatedJs(jsCode, scopeId, idMap, containerElement) {
-    if (!jsCode.trim()) return;
+                    const fetchPromise = supabase
+                        .from(CONFIG.TABLE_NAME)
+                        .select('id, tag, title, info, created_at, updated_at')
+                        .order('created_at', { ascending: false });
 
-    // 重写代码中的 getElementById 调用
-    let rewrittenJs = jsCode;
+                    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
-    // 替换 document.getElementById('xxx') 为新ID
-    Object.keys(idMap).forEach(oldId => {
-        const regex = new RegExp(`getElementById\\s*\\(\\s*['"\`]${oldId}['"\`]\\s*\\)`, 'g');
-        rewrittenJs = rewrittenJs.replace(regex, `getElementById('${idMap[oldId]}')`);
-    });
+                    if (error) throw error;
 
-    // 创建隔离的执行环境
-    try {
-        // 使用Function构造器创建闭包，限制全局污染
-        const isolatedFunction = new Function(
-            'container',
-            'scopeId',
-            `
+                    // 保存到本地缓存
+                    db = data || [];
+                    localStorage.setItem('sop_cache', JSON.stringify(db));
+                    localStorage.setItem('sop_cache_time', Date.now().toString());
+
+                    render(db);
+                    setupRealtimeSubscription();
+                    hideLoading();
+
+                    // 如果之前显示过缓存提示，现在成功连接了，重置标记并提示用户
+                    if (hasShownCacheAlert && retryCount > 0) {
+                        hasShownCacheAlert = false;
+                        console.log('✓ 网络已恢复，数据已更新');
+                    }
+                } catch (e) {
+                    console.error('数据加载失败:', e);
+
+                    // 尝试从缓存加载
+                    const cachedData = localStorage.getItem('sop_cache');
+                    if (cachedData) {
+                        try {
+                            db = JSON.parse(cachedData);
+                            const cacheTime = localStorage.getItem('sop_cache_time');
+                            const timeDiff = Date.now() - parseInt(cacheTime || '0');
+                            const hours = Math.floor(timeDiff / 1000 / 60 / 60);
+                            render(db);
+                            hideLoading();
+
+                            // 只在第一次失败时显示 alert，后续静默重试
+                            if (!hasShownCacheAlert) {
+                                hasShownCacheAlert = true;
+                                alert(`网络连接失败，已加载缓存数据 (${hours}小时前)\n将在后台继续尝试连接...`);
+                            } else {
+                                // 后台重试失败，只在控制台输出日志
+                                console.log(`后台重试 ${retryCount}/${maxRetries} 失败，继续使用缓存数据`);
+                            }
+
+                            // 后台继续重试
+                            if (retryCount < maxRetries) {
+                                setTimeout(() => initDB(retryCount + 1), 5000); // 增加重试间隔到5秒
+                            }
+                            return;
+                        } catch (parseError) {
+                            console.error('缓存解析失败:', parseError);
+                        }
+                    }
+
+                    // 没有缓存或缓存失败，尝试重试
+                    if (retryCount < maxRetries) {
+                        hideLoading();
+                        setTimeout(() => initDB(retryCount + 1), 2000);
+                    } else {
+                        hideLoading();
+                        alert('加载失败: ' + e.message + '\n\n请检查网络连接或刷新页面重试');
+                    }
+                }
+            }
+
+            let realtimeChannel = null;
+
+            function setupRealtimeSubscription() {
+                // 如果已存在订阅，先取消
+                if (realtimeChannel) {
+                    supabase.removeChannel(realtimeChannel);
+                }
+
+                // 创建新的订阅通道
+                realtimeChannel = supabase
+                    .channel(`${CONFIG.TABLE_NAME}_realtime`)
+                    .on(
+                        'postgres_changes',
+                        {
+                            event: 'INSERT',
+                            schema: 'public',
+                            table: CONFIG.TABLE_NAME
+                        },
+                        (payload) => {
+                            handleRealtimeInsert(payload.new);
+                        }
+                    )
+                    .on(
+                        'postgres_changes',
+                        {
+                            event: 'UPDATE',
+                            schema: 'public',
+                            table: CONFIG.TABLE_NAME
+                        },
+                        (payload) => {
+                            handleRealtimeUpdate(payload.new);
+                        }
+                    )
+                    .on(
+                        'postgres_changes',
+                        {
+                            event: 'DELETE',
+                            schema: 'public',
+                            table: CONFIG.TABLE_NAME
+                        },
+                        (payload) => {
+                            handleRealtimeDelete(payload.old);
+                        }
+                    )
+                    .subscribe((status) => {
+                        if (status === 'SUBSCRIBED') {
+                            console.log('✓ 实时同步已连接');
+                        } else if (status === 'CHANNEL_ERROR') {
+                            console.error('✗ 实时同步连接失败，将在5秒后重试...');
+                            setTimeout(() => setupRealtimeSubscription(), 5000);
+                        } else if (status === 'TIMED_OUT') {
+                            console.error('✗ 实时同步连接超时，将在5秒后重试...');
+                            setTimeout(() => setupRealtimeSubscription(), 5000);
+                        }
+                    });
+            }
+
+            // ==================== 搜索过滤工具 ====================
+            function filterAndRender() {
+                const searchKey = DOM.input.value.toLowerCase();
+                if (searchKey) {
+                    const filtered = db.filter(i => {
+                        const titleMatch = PinyinUtil.match(i.title, searchKey);
+
+                        // 移除WEBAPP块后再搜索内容
+                        const contentWithoutWebapp = i.info.replace(WEBAPP_PARSER.REGEX, '');
+                        const infoMatch = contentWithoutWebapp && contentWithoutWebapp.toLowerCase().includes(searchKey);
+
+                        return titleMatch || infoMatch;
+                    });
+                    render(filtered);
+                } else {
+                    render(db);
+                }
+            }
+
+            // 处理实时插入
+            function handleRealtimeInsert(newItem) {
+                // 避免重复添加
+                if (db.find(item => item.id === newItem.id)) return;
+                db.unshift(newItem);
+                filterAndRender();
+            }
+
+            // 处理实时更新
+            function handleRealtimeUpdate(updatedItem) {
+                const index = db.findIndex(item => item.id === updatedItem.id);
+                if (index !== -1) {
+                    db[index] = updatedItem;
+                    filterAndRender();
+                }
+            }
+
+            // 处理实时删除
+            function handleRealtimeDelete(deletedItem) {
+                const index = db.findIndex(item => item.id === deletedItem.id);
+                if (index !== -1) {
+                    db.splice(index, 1);
+                    filterAndRender();
+                }
+            }
+
+            // ==================== WEBAPP 小程序解析和执行引擎 ====================
+
+            /**
+             * 解析单个 WEBAPP 块
+             * @param {string} webappCode - WEBAPP块内的代码
+             * @param {number} itemId - 所属SOP条目的ID
+             * @param {number} blockIndex - 该条目中的第几个WEBAPP块
+             * @returns {object} 解析后的结构化对象
+             */
+            function parseWebappBlock(webappCode, itemId, blockIndex) {
+                const uniqueId = `${WEBAPP_PARSER.UNIQUE_PREFIX}${itemId}_${blockIndex}`;
+
+                let html = '', css = '', js = '';
+
+                // 提取 <style> 标签
+                const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+                let styleMatch;
+                while ((styleMatch = styleRegex.exec(webappCode)) !== null) {
+                    css += styleMatch[1] + '\n';
+                }
+
+                // 提取 <script> 标签
+                const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+                let scriptMatch;
+                while ((scriptMatch = scriptRegex.exec(webappCode)) !== null) {
+                    js += scriptMatch[1] + '\n';
+                }
+
+                // 移除style和script后，剩余的就是HTML
+                html = webappCode
+                    .replace(styleRegex, '')
+                    .replace(scriptRegex, '')
+                    .trim();
+
+                return {
+                    id: uniqueId,
+                    html: html,
+                    css: css,
+                    js: js,
+                    itemId: itemId,
+                    blockIndex: blockIndex
+                };
+            }
+
+            /**
+             * 处理内容字符串，解析所有WEBAPP块
+             * @param {string} content - 原始内容
+             * @param {number} itemId - SOP条目ID
+             * @returns {object} { renderedContent, webappBlocks }
+             */
+            function processContentWithWebapps(content, itemId) {
+                const webappBlocks = [];
+                let blockIndex = 0;
+
+                // 替换所有WEBAPP块为占位符，并收集解析结果
+                const renderedContent = content.replace(WEBAPP_PARSER.REGEX, (match, webappCode) => {
+                    const parsed = parseWebappBlock(webappCode, itemId, blockIndex);
+                    webappBlocks.push(parsed);
+                    blockIndex++;
+
+                    // 返回占位容器
+                    return `<div class="webapp-container" data-webapp-id="${parsed.id}"></div>`;
+                });
+
+                return { renderedContent, webappBlocks };
+            }
+
+            /**
+             * 重写HTML中的ID，避免冲突
+             * @param {string} html - 原始HTML
+             * @param {string} scopeId - 唯一的作用域ID
+             * @returns {object} { html, idMap } - 处理后的HTML和ID映射表
+             */
+            function rewriteHtmlIds(html, scopeId) {
+                const idMap = {}; // 原始ID -> 新ID 的映射
+
+                const processedHtml = html.replace(/\bid\s*=\s*["']([^"']+)["']/gi, (match, originalId) => {
+                    const newId = `${scopeId}_${originalId}`;
+                    idMap[originalId] = newId;
+                    return `id="${newId}"`;
+                });
+
+                return { html: processedHtml, idMap };
+            }
+
+            /**
+             * 处理CSS作用域隔离
+             * @param {string} css - 原始CSS代码
+             * @param {string} scopeId - 唯一的作用域ID
+             * @returns {string} 带作用域前缀的CSS
+             */
+            function scopeCss(css, scopeId) {
+                if (!css.trim()) return '';
+
+                // 为每个选择器添加作用域前缀
+                const scopedCss = css.replace(/([^{}]+)\s*{/g, (match, selector) => {
+                    // 跳过 @media, @keyframes 等规则
+                    if (selector.trim().startsWith('@')) {
+                        return match;
+                    }
+
+                    // 为每个逗号分隔的选择器添加前缀
+                    const selectors = selector.split(',').map(s => {
+                        s = s.trim();
+                        // 特殊处理：body/html -> 直接替换为容器
+                        if (s === 'body' || s === 'html') {
+                            return `[data-webapp-scope="${scopeId}"]`;
+                        }
+                        return `[data-webapp-scope="${scopeId}"] ${s}`;
+                    }).join(', ');
+
+                    return `${selectors} {`;
+                });
+
+                return scopedCss;
+            }
+
+            /**
+             * 在隔离作用域中执行JavaScript
+             * @param {string} jsCode - JavaScript代码
+             * @param {string} scopeId - 作用域ID
+             * @param {object} idMap - ID映射表
+             * @param {HTMLElement} containerElement - 容器DOM元素
+             */
+            function executeIsolatedJs(jsCode, scopeId, idMap, containerElement) {
+                if (!jsCode.trim()) return;
+
+                // 重写代码中的 getElementById 调用
+                let rewrittenJs = jsCode;
+
+                // 替换 document.getElementById('xxx') 为新ID
+                Object.keys(idMap).forEach(oldId => {
+                    const regex = new RegExp(`getElementById\\s*\\(\\s*['"\`]${oldId}['"\`]\\s*\\)`, 'g');
+                    rewrittenJs = rewrittenJs.replace(regex, `getElementById('${idMap[oldId]}')`);
+                });
+
+                // 创建隔离的执行环境
+                try {
+                    // 使用Function构造器创建闭包，限制全局污染
+                    const isolatedFunction = new Function(
+                        'container',
+                        'scopeId',
+                        `
             // 创建局部作用域的 $ 查询函数（可选）
             const $ = (selector) => container.querySelector(selector);
             const $$ = (selector) => container.querySelectorAll(selector);
@@ -965,114 +1103,114 @@ function executeIsolatedJs(jsCode, scopeId, idMap, containerElement) {
             // 执行用户代码
             ${rewrittenJs}
             `
-        );
+                    );
 
-        // 异步执行，避免阻塞主渲染
-        setTimeout(() => {
-            isolatedFunction(containerElement, scopeId);
-        }, 0);
+                    // 异步执行，避免阻塞主渲染
+                    setTimeout(() => {
+                        isolatedFunction(containerElement, scopeId);
+                    }, 0);
 
-    } catch (error) {
-        console.error(`[WEBAPP ${scopeId}] 执行错误:`, error);
-        containerElement.innerHTML += `<div style="color:#c47a9f;padding:10px;border:1px solid #c47a9f;margin-top:10px;">⚠ 小程序执行失败: ${error.message}</div>`;
-    }
-}
-
-/**
- * 注册WEBAPP实例的清理函数
- */
-function registerWebappCleanup(scopeId, cleanupFn) {
-    WEBAPP_INSTANCES.set(scopeId, { cleanup: cleanupFn });
-}
-
-/**
- * 清理特定WEBAPP实例
- */
-function cleanupWebapps(listItemElement) {
-    const webappBlocks = JSON.parse(listItemElement.dataset.webappBlocks || '[]');
-
-    webappBlocks.forEach(block => {
-        const instance = WEBAPP_INSTANCES.get(block.id);
-        if (instance && instance.cleanup) {
-            instance.cleanup();
-        }
-        WEBAPP_INSTANCES.delete(block.id);
-    });
-}
-
-/**
- * 执行列表项中的所有WEBAPP
- * @param {HTMLElement} listItemElement - list-item元素
- */
-function executeWebapps(listItemElement) {
-    const webappBlocks = JSON.parse(listItemElement.dataset.webappBlocks || '[]');
-    if (!webappBlocks.length) return;
-
-    webappBlocks.forEach(block => {
-        const container = listItemElement.querySelector(`[data-webapp-id="${block.id}"]`);
-        if (!container) return;
-
-        // 1. 处理HTML（ID重写）
-        const { html, idMap } = rewriteHtmlIds(block.html, block.id);
-
-        // 2. 创建隔离容器
-        container.setAttribute('data-webapp-scope', block.id);
-        container.className = 'webapp-container webapp-active';
-        container.innerHTML = html;
-
-        // 3. 注入作用域CSS
-        if (block.css) {
-            const styleId = `style_${block.id}`;
-            let styleElement = document.getElementById(styleId);
-
-            if (!styleElement) {
-                styleElement = document.createElement('style');
-                styleElement.id = styleId;
-                document.head.appendChild(styleElement);
+                } catch (error) {
+                    console.error(`[WEBAPP ${scopeId}] 执行错误:`, error);
+                    containerElement.innerHTML += `<div style="color:#c47a9f;padding:10px;border:1px solid #c47a9f;margin-top:10px;">⚠ 小程序执行失败: ${error.message}</div>`;
+                }
             }
 
-            styleElement.textContent = scopeCss(block.css, block.id);
-        }
+            /**
+             * 注册WEBAPP实例的清理函数
+             */
+            function registerWebappCleanup(scopeId, cleanupFn) {
+                WEBAPP_INSTANCES.set(scopeId, { cleanup: cleanupFn });
+            }
 
-        // 4. 执行隔离的JavaScript
-        executeIsolatedJs(block.js, block.id, idMap, container);
+            /**
+             * 清理特定WEBAPP实例
+             */
+            function cleanupWebapps(listItemElement) {
+                const webappBlocks = JSON.parse(listItemElement.dataset.webappBlocks || '[]');
 
-        // 5. 注册清理函数
-        registerWebappCleanup(block.id, () => {
-            // 移除style标签
-            const styleElement = document.getElementById(`style_${block.id}`);
-            if (styleElement) styleElement.remove();
+                webappBlocks.forEach(block => {
+                    const instance = WEBAPP_INSTANCES.get(block.id);
+                    if (instance && instance.cleanup) {
+                        instance.cleanup();
+                    }
+                    WEBAPP_INSTANCES.delete(block.id);
+                });
+            }
 
-            // 清空容器
-            container.innerHTML = '';
-            container.className = 'webapp-container';
-        });
-    });
-}
+            /**
+             * 执行列表项中的所有WEBAPP
+             * @param {HTMLElement} listItemElement - list-item元素
+             */
+            function executeWebapps(listItemElement) {
+                const webappBlocks = JSON.parse(listItemElement.dataset.webappBlocks || '[]');
+                if (!webappBlocks.length) return;
 
-// ==================== 渲染函数 ====================
-function render(list) {
-    if (!list.length) {
-        DOM.results.innerHTML = '<div style="color:var(--muted);padding-top:20px;">暂无数据</div>';
-        return;
-    }
+                webappBlocks.forEach(block => {
+                    const container = listItemElement.querySelector(`[data-webapp-id="${block.id}"]`);
+                    if (!container) return;
 
-    // 第一步：生成基础HTML结构（带WEBAPP占位符）
-    DOM.results.innerHTML = list.map(item => {
-        const { renderedContent, webappBlocks } = processContentWithWebapps(item.info, item.id);
+                    // 1. 处理HTML（ID重写）
+                    const { html, idMap } = rewriteHtmlIds(block.html, block.id);
 
-        // 高亮列表编号（如 1. 2. 3.）
-        const highlightedContent = renderedContent.replace(/(^|\n)(\d+)\./g, '$1<span style="color:var(--highlight);">$2.</span>');
+                    // 2. 创建隔离容器
+                    container.setAttribute('data-webapp-scope', block.id);
+                    container.className = 'webapp-container webapp-active';
+                    container.innerHTML = html;
 
-        // 将webappBlocks存储到元素的dataset中，供后续使用
-        const webappData = JSON.stringify(webappBlocks.map(b => ({
-            id: b.id,
-            html: b.html,
-            css: b.css,
-            js: b.js
-        })));
+                    // 3. 注入作用域CSS
+                    if (block.css) {
+                        const styleId = `style_${block.id}`;
+                        let styleElement = document.getElementById(styleId);
 
-        return `
+                        if (!styleElement) {
+                            styleElement = document.createElement('style');
+                            styleElement.id = styleId;
+                            document.head.appendChild(styleElement);
+                        }
+
+                        styleElement.textContent = scopeCss(block.css, block.id);
+                    }
+
+                    // 4. 执行隔离的JavaScript
+                    executeIsolatedJs(block.js, block.id, idMap, container);
+
+                    // 5. 注册清理函数
+                    registerWebappCleanup(block.id, () => {
+                        // 移除style标签
+                        const styleElement = document.getElementById(`style_${block.id}`);
+                        if (styleElement) styleElement.remove();
+
+                        // 清空容器
+                        container.innerHTML = '';
+                        container.className = 'webapp-container';
+                    });
+                });
+            }
+
+            // ==================== 渲染函数 ====================
+            function render(list) {
+                if (!list.length) {
+                    DOM.results.innerHTML = '<div style="color:var(--muted);padding-top:20px;">暂无数据</div>';
+                    return;
+                }
+
+                // 第一步：生成基础HTML结构（带WEBAPP占位符）
+                DOM.results.innerHTML = list.map(item => {
+                    const { renderedContent, webappBlocks } = processContentWithWebapps(item.info, item.id);
+
+                    // 高亮列表编号（如 1. 2. 3.）
+                    const highlightedContent = renderedContent.replace(/(^|\n)(\d+)\./g, '$1<span style="color:var(--highlight);">$2.</span>');
+
+                    // 将webappBlocks存储到元素的dataset中，供后续使用
+                    const webappData = JSON.stringify(webappBlocks.map(b => ({
+                        id: b.id,
+                        html: b.html,
+                        css: b.css,
+                        js: b.js
+                    })));
+
+                    return `
         <div class="list-item" onclick="toggleExpand(this)" data-webapp-blocks='${webappData.replace(/'/g, '&apos;')}'>
             <div class="item-header">
                 <span class="title">${item.title}</span>
@@ -1082,316 +1220,320 @@ function render(list) {
                 <button class="btn-delete" onclick="editItem(${item.id})">[ 编辑 ]</button>
             </div>
         </div>`;
-    }).join('');
-}
-
-function toggleExpand(el) {
-    const wasExpanded = el.classList.contains('expanded');
-    el.classList.toggle('expanded');
-
-    // 如果是展开操作，执行WEBAPP
-    if (!wasExpanded) {
-        executeWebapps(el);
-    } else {
-        // 收起时清理WEBAPP
-        cleanupWebapps(el);
-    }
-}
-
-// ==================== 密码弹窗控制 ====================
-function showPasswordDialog() {
-    return new Promise((resolve) => {
-        passwordResolve = resolve;
-        const overlay = document.getElementById('passwordOverlay');
-        const input = document.getElementById('passwordInput');
-        const error = document.getElementById('passwordError');
-
-        input.value = '';
-        error.style.display = 'none';
-        overlay.classList.add('active');
-        setTimeout(() => input.focus(), 100);
-    });
-}
-
-function closePasswordDialog() {
-    const overlay = document.getElementById('passwordOverlay');
-    overlay.classList.remove('active');
-    if (passwordResolve) {
-        passwordResolve(null);
-        passwordResolve = null;
-    }
-}
-
-function confirmPassword() {
-    const input = document.getElementById('passwordInput');
-    const error = document.getElementById('passwordError');
-    const password = input.value.trim();
-
-    if (password === CONFIG.PASSWORD) {
-        // 先保存 resolve 引用
-        const resolveFunc = passwordResolve;
-        passwordResolve = null;
-
-        // 关闭弹窗
-        const overlay = document.getElementById('passwordOverlay');
-        overlay.classList.remove('active');
-
-        // 执行 resolve
-        if (resolveFunc) {
-            resolveFunc(password);
-        }
-    } else {
-        // 显示错误状态
-        error.style.display = 'block';
-        input.value = '';
-        input.focus();
-
-        // 添加输入框抖动动画
-        input.style.animation = 'shake 0.3s';
-        setTimeout(() => {
-            input.style.animation = '';
-        }, 300);
-    }
-}
-
-function handlePasswordOverlayClick(e) {
-    if (e.target === document.getElementById('passwordOverlay')) {
-        closePasswordDialog();
-    }
-}
-
-// 密码输入框回车键监听
-document.addEventListener('DOMContentLoaded', () => {
-    const passwordInput = document.getElementById('passwordInput');
-    if (passwordInput) {
-        passwordInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                confirmPassword();
-            } else if (e.key === 'Escape') {
-                closePasswordDialog();
+                }).join('');
             }
-        });
-    }
-});
 
-// ==================== 删除确认弹窗控制 ====================
-let confirmResolve = null;
+            function toggleExpand(el) {
+                const wasExpanded = el.classList.contains('expanded');
+                el.classList.toggle('expanded');
 
-function showConfirmDialog() {
-    return new Promise((resolve) => {
-        confirmResolve = resolve;
-        const overlay = document.getElementById('confirmOverlay');
-        overlay.classList.add('active');
-    });
-}
-
-function closeConfirmDialog() {
-    const overlay = document.getElementById('confirmOverlay');
-    overlay.classList.remove('active');
-    if (confirmResolve) {
-        confirmResolve(false);
-        confirmResolve = null;
-    }
-}
-
-function confirmDelete() {
-    const resolveFunc = confirmResolve;
-    confirmResolve = null;
-
-    const overlay = document.getElementById('confirmOverlay');
-    overlay.classList.remove('active');
-
-    if (resolveFunc) {
-        resolveFunc(true);
-    }
-}
-
-function handleConfirmOverlayClick(e) {
-    if (e.target === document.getElementById('confirmOverlay')) {
-        closeConfirmDialog();
-    }
-}
-
-// ==================== 面板控制 ====================
-function togglePanel() {
-    const active = DOM.overlay.classList.contains('active');
-    if (active) {
-        DOM.overlay.classList.remove('active');
-        setTimeout(() => { if (!DOM.overlay.classList.contains('active')) clearForm(); }, 300);
-    } else {
-        DOM.overlay.classList.add('active');
-        DOM.newTag.focus();
-    }
-}
-window.handleOverlayClick = e => { if (e.target === DOM.overlay) togglePanel(); };
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && DOM.overlay.classList.contains('active')) togglePanel(); });
-
-function clearForm() {
-    editingId = null;
-    DOM.newTag.value = ''; DOM.newTitle.value = ''; DOM.newContent.value = '';
-    DOM.lastModifiedDisplay.textContent = '';
-    DOM.newContent.style.height = '120px';
-}
-
-// ==================== 保存与删除（乐观更新 + 实时同步） ====================
-async function saveData() {
-    const tag = DOM.newTag.value.trim().toUpperCase();
-    const title = DOM.newTitle.value.trim();
-    const content = DOM.newContent.value.trim();
-    if (!title || !content) { alert('标题和内容不能为空'); return; }
-
-    const pwd = await showPasswordDialog();
-    if (!pwd) return;
-
-    showLoading(editingId ? '正在更新...' : '正在保存...');
-
-    try {
-        if (editingId) {
-            // 更新操作 - 添加超时控制
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('请求超时')), 15000)
-            );
-
-            const updatePromise = supabase
-                .from(CONFIG.TABLE_NAME)
-                .update({ tag: tag || CONFIG.DEFAULT_TAG, title, info: content })
-                .eq('id', editingId)
-                .select('id, tag, title, info, created_at, updated_at');
-
-            const { data, error } = await Promise.race([updatePromise, timeoutPromise]);
-
-            if (error) throw error;
-
-            // 立即更新本地数据
-            if (data && data[0]) {
-                const index = db.findIndex(item => item.id === editingId);
-                if (index !== -1) {
-                    db[index] = data[0];
+                // 如果是展开操作，执行WEBAPP
+                if (!wasExpanded) {
+                    executeWebapps(el);
+                } else {
+                    // 收起时清理WEBAPP
+                    cleanupWebapps(el);
                 }
             }
-        } else {
-            // 插入操作 - 添加超时控制
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('请求超时')), 15000)
-            );
 
-            const insertPromise = supabase
-                .from(CONFIG.TABLE_NAME)
-                .insert([{ tag: tag || CONFIG.DEFAULT_TAG, title, info: content }])
-                .select('id, tag, title, info, created_at, updated_at');
+            // ==================== 密码弹窗控制 ====================
+            function showPasswordDialog() {
+                return new Promise((resolve) => {
+                    passwordResolve = resolve;
+                    const overlay = document.getElementById('passwordOverlay');
+                    const input = document.getElementById('passwordInput');
+                    const error = document.getElementById('passwordError');
 
-            const { data, error } = await Promise.race([insertPromise, timeoutPromise]);
-
-            if (error) throw error;
-
-            // 立即添加到本地数据
-            if (data && data[0]) {
-                db.unshift(data[0]);
+                    input.value = '';
+                    error.style.display = 'none';
+                    overlay.classList.add('active');
+                    setTimeout(() => input.focus(), 100);
+                });
             }
-        }
 
-        // 更新缓存
-        localStorage.setItem('sop_cache', JSON.stringify(db));
-        localStorage.setItem('sop_cache_time', Date.now().toString());
+            function closePasswordDialog() {
+                const overlay = document.getElementById('passwordOverlay');
+                overlay.classList.remove('active');
+                if (passwordResolve) {
+                    passwordResolve(null);
+                    passwordResolve = null;
+                }
+            }
 
-        // 立即重新渲染
-        filterAndRender();
+            function confirmPassword() {
+                const input = document.getElementById('passwordInput');
+                const error = document.getElementById('passwordError');
+                const password = input.value.trim();
 
-        hideLoading();
-        togglePanel();
-        clearForm();
-        DOM.input.focus();
-    } catch (err) {
-        hideLoading();
-        alert('保存失败: ' + err.message + '\n\n请检查网络连接后重试');
-    }
-}
+                if (password === CONFIG.PASSWORD) {
+                    // 先保存 resolve 引用
+                    const resolveFunc = passwordResolve;
+                    passwordResolve = null;
 
-function editItem(id) {
-    const item = db.find(i => i.id === id);
-    if (!item) return;
-    DOM.newTag.value = item.tag || '';
-    DOM.newTitle.value = item.title;
-    DOM.newContent.value = item.info;
-    DOM.lastModifiedDisplay.textContent = formatDate(item.updated_at || item.created_at) ? `最后更新: ${formatDate(item.updated_at || item.created_at)}` : '';
-    editingId = id;
-    DOM.overlay.classList.add('active');
-    DOM.newTag.focus();
-    setTimeout(() => DOM.newContent.dispatchEvent(new Event('input')), 0);
-}
+                    // 关闭弹窗
+                    const overlay = document.getElementById('passwordOverlay');
+                    overlay.classList.remove('active');
 
-async function deleteCurrentItem() {
-    if (!editingId) { alert('没有正在编辑的条目'); return; }
+                    // 执行 resolve
+                    if (resolveFunc) {
+                        resolveFunc(password);
+                    }
+                } else {
+                    // 显示错误状态
+                    error.style.display = 'block';
+                    input.value = '';
+                    input.focus();
 
-    const confirmed = await showConfirmDialog();
-    if (!confirmed) return;
+                    // 添加输入框抖动动画
+                    input.style.animation = 'shake 0.3s';
+                    setTimeout(() => {
+                        input.style.animation = '';
+                    }, 300);
+                }
+            }
 
-    const pwd = await showPasswordDialog();
-    if (!pwd) return;
+            function handlePasswordOverlayClick(e) {
+                if (e.target === document.getElementById('passwordOverlay')) {
+                    closePasswordDialog();
+                }
+            }
 
-    showLoading('正在删除...');
+            // 密码输入框回车键监听
+            document.addEventListener('DOMContentLoaded', () => {
+                const passwordInput = document.getElementById('passwordInput');
+                if (passwordInput) {
+                    passwordInput.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') {
+                            confirmPassword();
+                        } else if (e.key === 'Escape') {
+                            closePasswordDialog();
+                        }
+                    });
+                }
+            });
 
-    try {
-        // 添加超时控制
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('请求超时')), 15000)
-        );
+            // ==================== 删除确认弹窗控制 ====================
+            let confirmResolve = null;
 
-        const deletePromise = supabase
-            .from(CONFIG.TABLE_NAME)
-            .delete()
-            .eq('id', editingId);
+            function showConfirmDialog() {
+                return new Promise((resolve) => {
+                    confirmResolve = resolve;
+                    const overlay = document.getElementById('confirmOverlay');
+                    overlay.classList.add('active');
+                });
+            }
 
-        const { error } = await Promise.race([deletePromise, timeoutPromise]);
+            function closeConfirmDialog() {
+                const overlay = document.getElementById('confirmOverlay');
+                overlay.classList.remove('active');
+                if (confirmResolve) {
+                    confirmResolve(false);
+                    confirmResolve = null;
+                }
+            }
 
-        if (error) throw error;
+            function confirmDelete() {
+                const resolveFunc = confirmResolve;
+                confirmResolve = null;
 
-        // 立即从本地数据中删除
-        const index = db.findIndex(item => item.id === editingId);
-        if (index !== -1) {
-            db.splice(index, 1);
-        }
+                const overlay = document.getElementById('confirmOverlay');
+                overlay.classList.remove('active');
 
-        // 更新缓存
-        localStorage.setItem('sop_cache', JSON.stringify(db));
-        localStorage.setItem('sop_cache_time', Date.now().toString());
+                if (resolveFunc) {
+                    resolveFunc(true);
+                }
+            }
 
-        // 立即重新渲染
-        filterAndRender();
+            function handleConfirmOverlayClick(e) {
+                if (e.target === document.getElementById('confirmOverlay')) {
+                    closeConfirmDialog();
+                }
+            }
 
-        hideLoading();
-        togglePanel();
-        clearForm();
-    } catch (err) {
-        hideLoading();
-        alert('删除失败: ' + err.message + '\n\n请检查网络连接后重试');
-    }
-}
+            // ==================== 面板控制 ====================
+            function togglePanel() {
+                const active = DOM.overlay.classList.contains('active');
+                if (active) {
+                    DOM.overlay.classList.remove('active');
+                    setTimeout(() => { if (!DOM.overlay.classList.contains('active')) clearForm(); }, 300);
+                } else {
+                    DOM.overlay.classList.add('active');
+                    DOM.newTag.focus();
+                }
+            }
+            window.handleOverlayClick = e => { if (e.target === DOM.overlay) togglePanel(); };
+            document.addEventListener('keydown', e => { if (e.key === 'Escape' && DOM.overlay.classList.contains('active')) togglePanel(); });
 
-// ==================== 其他辅助函数 ====================
-function setupTextareaAutoResize() {
-    const textarea = DOM.newContent;
-    const minHeight = 120;
-    const maxHeight = window.innerHeight * 0.6;
-    const resize = () => {
-        textarea.style.height = 'auto';
-        textarea.style.height = Math.max(minHeight, Math.min(textarea.scrollHeight, maxHeight)) + 'px';
-    };
-    textarea.addEventListener('input', resize);
-    resize();
-}
+            function clearForm() {
+                editingId = null;
+                DOM.newTag.value = ''; DOM.newTitle.value = ''; DOM.newContent.value = '';
+                DOM.lastModifiedDisplay.textContent = '';
+                DOM.newContent.style.height = '120px';
+            }
 
-function setupSearch() {
-    DOM.input.addEventListener('input', () => filterAndRender());
-}
+            // ==================== 保存与删除（乐观更新 + 实时同步） ====================
+            async function saveData() {
+                const tag = DOM.newTag.value.trim().toUpperCase();
+                const title = DOM.newTitle.value.trim();
+                const content = DOM.newContent.value.trim();
+                if (!title || !content) { alert('标题和内容不能为空'); return; }
 
-function init() {
-    initDOM();
-    initDB();
-    setupSearch();
-}
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-else init();
-</script>
+                const pwd = await showPasswordDialog();
+                if (!pwd) return;
+
+                showLoading(editingId ? '正在更新...' : '正在保存...');
+
+                try {
+                    if (editingId) {
+                        // 更新操作 - 添加超时控制
+                        const timeoutPromise = new Promise((_, reject) =>
+                            setTimeout(() => reject(new Error('请求超时')), 15000)
+                        );
+
+                        const updatePromise = supabase
+                            .from(CONFIG.TABLE_NAME)
+                            .update({ tag: tag || CONFIG.DEFAULT_TAG, title, info: content })
+                            .eq('id', editingId)
+                            .select('id, tag, title, info, created_at, updated_at');
+
+                        const { data, error } = await Promise.race([updatePromise, timeoutPromise]);
+
+                        if (error) throw error;
+
+                        // 立即更新本地数据
+                        if (data && data[0]) {
+                            const index = db.findIndex(item => item.id === editingId);
+                            if (index !== -1) {
+                                db[index] = data[0];
+                            }
+                        }
+                    } else {
+                        // 插入操作 - 添加超时控制
+                        const timeoutPromise = new Promise((_, reject) =>
+                            setTimeout(() => reject(new Error('请求超时')), 15000)
+                        );
+
+                        const insertPromise = supabase
+                            .from(CONFIG.TABLE_NAME)
+                            .insert([{ tag: tag || CONFIG.DEFAULT_TAG, title, info: content }])
+                            .select('id, tag, title, info, created_at, updated_at');
+
+                        const { data, error } = await Promise.race([insertPromise, timeoutPromise]);
+
+                        if (error) throw error;
+
+                        // 立即添加到本地数据
+                        if (data && data[0]) {
+                            db.unshift(data[0]);
+                        }
+                    }
+
+                    // 更新缓存
+                    localStorage.setItem('sop_cache', JSON.stringify(db));
+                    localStorage.setItem('sop_cache_time', Date.now().toString());
+
+                    // 立即重新渲染
+                    filterAndRender();
+
+                    hideLoading();
+                    togglePanel();
+                    clearForm();
+                    DOM.input.focus();
+                } catch (err) {
+                    hideLoading();
+                    alert('保存失败: ' + err.message + '\n\n请检查网络连接后重试');
+                }
+            }
+
+            function editItem(id) {
+                const item = db.find(i => i.id === id);
+                if (!item) return;
+                DOM.newTag.value = item.tag || '';
+                DOM.newTitle.value = item.title;
+                DOM.newContent.value = item.info;
+                DOM.lastModifiedDisplay.textContent = formatDate(item.updated_at || item.created_at) ? `最后更新: ${formatDate(item.updated_at || item.created_at)}` : '';
+                editingId = id;
+                DOM.overlay.classList.add('active');
+                DOM.newTag.focus();
+                setTimeout(() => DOM.newContent.dispatchEvent(new Event('input')), 0);
+            }
+
+            async function deleteCurrentItem() {
+                if (!editingId) { alert('没有正在编辑的条目'); return; }
+
+                const confirmed = await showConfirmDialog();
+                if (!confirmed) return;
+
+                const pwd = await showPasswordDialog();
+                if (!pwd) return;
+
+                showLoading('正在删除...');
+
+                try {
+                    // 添加超时控制
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('请求超时')), 15000)
+                    );
+
+                    const deletePromise = supabase
+                        .from(CONFIG.TABLE_NAME)
+                        .delete()
+                        .eq('id', editingId);
+
+                    const { error } = await Promise.race([deletePromise, timeoutPromise]);
+
+                    if (error) throw error;
+
+                    // 立即从本地数据中删除
+                    const index = db.findIndex(item => item.id === editingId);
+                    if (index !== -1) {
+                        db.splice(index, 1);
+                    }
+
+                    // 更新缓存
+                    localStorage.setItem('sop_cache', JSON.stringify(db));
+                    localStorage.setItem('sop_cache_time', Date.now().toString());
+
+                    // 立即重新渲染
+                    filterAndRender();
+
+                    hideLoading();
+                    togglePanel();
+                    clearForm();
+                } catch (err) {
+                    hideLoading();
+                    alert('删除失败: ' + err.message + '\n\n请检查网络连接后重试');
+                }
+            }
+
+            // ==================== 其他辅助函数 ====================
+            function setupTextareaAutoResize() {
+                const textarea = DOM.newContent;
+                const minHeight = 120;
+                const maxHeight = window.innerHeight * 0.6;
+                const resize = () => {
+                    textarea.style.height = 'auto';
+                    textarea.style.height = Math.max(minHeight, Math.min(textarea.scrollHeight, maxHeight)) + 'px';
+                };
+                textarea.addEventListener('input', resize);
+                resize();
+            }
+
+            function setupSearch() {
+                DOM.input.addEventListener('input', () => filterAndRender());
+            }
+
+            function init() {
+                initDOM();
+                initDB();
+                setupSearch();
+            }
+
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+            else init();
+
+        } // 结束 else 块（防止重复初始化）
+    </script>
 </body>
+
 </html>
