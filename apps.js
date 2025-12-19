@@ -10,6 +10,7 @@
     { name: "云盘",     path: "cloud/index.html" },
     { name: "吃什么",   path: "eatwhat/index.html" },
     { name: "今岭SOP",   path: "sop/index.html" },
+    { name: "PPT",   path: "ppt/index.html" },
     { name: "日志",     path: "log/index.html" }
   ];
 }
