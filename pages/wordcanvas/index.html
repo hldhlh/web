@@ -1,892 +1,602 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>云词灵感画布</title>
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>WordCanvas | 无限灵感矩阵</title>
+    <script src="https://cdn.staticfile.org/tailwindcss/2.2.19/tailwind.min.js"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;400&family=Noto+Sans+SC:wght@200;400&display=swap"
+        rel="stylesheet">
     <style>
-        /* 基础样式 */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --primary: #818cf8;
+            --bg-deep: #020617;
+            --grid-line: rgba(255, 255, 255, 0.03);
+            --grid-dot: rgba(255, 255, 255, 0.08);
         }
-        
+
         body {
-            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
-            background-color: #f8f9fa;
+            font-family: 'Outfit', 'Noto Sans SC', sans-serif;
             overflow: hidden;
             height: 100vh;
+            background: var(--bg-deep);
+            color: #f8fafc;
+            touch-action: none;
             user-select: none;
+            -webkit-user-select: none;
         }
-        
-        /* 画布相关样式 */
-        #canvas {
-            width: 100%;
-            height: 100%;
+
+        #viewport {
+            width: 100vw;
+            height: 100vh;
             position: relative;
-            background-color: white;
-            cursor: default;
             overflow: hidden;
+            background: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
+            cursor: crosshair;
         }
-        
-        .canvas-container {
+
+        .infinite-grid {
             position: absolute;
-            width: 5000px;
-            height: 5000px;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            transform-origin: center center;
+            inset: -5000px;
+            background-image:
+                radial-gradient(var(--grid-dot) 1px, transparent 1px),
+                linear-gradient(var(--grid-line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+            background-size: 40px 40px, 200px 200px, 200px 200px;
+            background-position: center center;
+            pointer-events: none;
+            z-index: 0;
             will-change: transform;
         }
-        
-        /* 标签样式 */
+
+        .content-layer {
+            position: absolute;
+            width: 0;
+            height: 0;
+            left: 50%;
+            top: 50%;
+            transform-origin: 0 0;
+            will-change: transform;
+            z-index: 1;
+        }
+
         .tag {
             position: absolute;
-            background-color: rgba(255, 255, 255, 0.9);
-            padding: 8px 12px;
-            border-radius: 4px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-            cursor: move;
-            border: 1px solid #e6e6e6;
-            z-index: 1;
-            font-size: 16px;
-            max-width: 300px;
-            word-wrap: break-word;
-            will-change: transform, left, top;
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
-        }
-        
-        .tag:hover { box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); z-index: 2; }
-        .tag.dragging { opacity: 0.9; z-index: 3; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15); }
-        .tag.selected { 
-            border: 2px solid #4a90e2;
-            box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.3);
-            z-index: 2;
-            background-color: rgba(74, 144, 226, 0.1);
-        }
-        
-        /* 选区样式 */
-        .selection-area {
-            position: absolute;
-            border: 2px dashed #4a90e2;
-            background-color: rgba(74, 144, 226, 0.15);
-            z-index: 9000;
-            pointer-events: none;
-        }
-        
-        /* 输入框样式 */
-        .input-modal {
-            display: none;
-            position: fixed;
-            z-index: 10;
-            background-color: white;
-            border-radius: 4px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            padding: 10px;
-            width: 250px;
-        }
-        
-        .input-modal input {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-            outline: none;
-        }
-        
-        .input-modal input:focus { border-color: #4a90e2; }
-        
-        /* 按钮样式 */
-        .buttons {
-            display: flex;
-            justify-content: flex-end;
-            margin-top: 10px;
-            gap: 10px;
-        }
-        
-        .btn {
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        
-        .save-btn { background-color: #4a90e2; color: white; }
-        .cancel-btn { background-color: #f1f1f1; color: #333; }
-        
-        /* 帮助按钮样式 */
-        .help-button, .reset-button {
-            position: fixed;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background-color: #4a90e2;
-            color: white;
+            will-change: transform;
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            padding: 12px 24px;
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.3);
+            transition: background-color 0.4s, border-color 0.4s;
+            cursor: grab;
             display: flex;
             align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            cursor: pointer;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            z-index: 5;
+            transform: translate(-50%, -50%);
         }
-        
-        .help-button { bottom: 20px; right: 20px; }
-        .reset-button { bottom: 20px; left: 20px; }
-        
-        /* 帮助提示样式 */
-        .help-tooltip {
-            display: none;
-            position: fixed;
-            bottom: 70px;
-            right: 20px;
-            width: 250px;
-            background-color: white;
-            padding: 15px;
-            border-radius: 6px;
-            box-shadow: 0 3px 15px rgba(0, 0, 0, 0.2);
-            font-size: 14px;
-            line-height: 1.5;
-            z-index: 5;
+
+        .tag span {
+            font-weight: 400;
+            letter-spacing: 0.02em;
+            background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            white-space: nowrap;
+            font-size: 1.05rem;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
         }
-        
-        /* 右键菜单样式 */
-        .context-menu {
+
+        .tag.dragging {
+            cursor: grabbing;
+            opacity: 0.7;
+            border-color: var(--primary);
+            z-index: 10000 !important;
+        }
+
+        .tag.selected {
+            background: rgba(129, 140, 248, 0.1);
+            border-color: rgba(129, 140, 248, 0.4);
+        }
+
+        .selection-box {
             position: absolute;
-            background-color: white;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            border-radius: 6px;
-            padding: 6px 0;
-            min-width: 120px;
-            z-index: 1000;
+            border: 0.5px solid rgba(129, 140, 248, 0.5);
+            background: rgba(129, 140, 248, 0.03);
+            pointer-events: none;
+            z-index: 5000;
+        }
+
+        #floatingInput {
+            position: fixed;
+            z-index: 9999;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: white;
+            font-family: inherit;
+            font-weight: 400;
+            font-size: 1.1rem;
+            caret-color: var(--primary);
+            display: none;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .minimal-menu {
+            position: fixed;
+            z-index: 10000;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 6px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
             opacity: 0;
             transform: scale(0.95);
-            transform-origin: top left;
-            transition: opacity 0.15s ease, transform 0.15s ease;
             pointer-events: none;
+            transition: all 0.2s cubic-bezier(0.2, 1, 0.3, 1);
         }
-        
-        .context-menu.active {
+
+        .minimal-menu.show {
             opacity: 1;
             transform: scale(1);
             pointer-events: auto;
         }
-        
-        .context-menu-item {
-            padding: 8px 12px;
+
+        .menu-item {
+            padding: 12px 20px;
+            border-radius: 14px;
+            color: #cbd5e1;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
             cursor: pointer;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            color: var(--text-primary, #333);
-            transition: background-color 0.15s ease;
+            transition: all 0.2s;
         }
-        
-        .context-menu-item:hover { background-color: rgba(0, 0, 0, 0.05); }
-        .context-menu-item.delete { color: #ff3b30; }
-        .context-menu-item i { margin-right: 8px; font-size: 16px; width: 18px; text-align: center; }
-        .context-menu-divider { height: 1px; background-color: rgba(0, 0, 0, 0.1); margin: 4px 0; }
+
+        .menu-item:hover {
+            color: white;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .menu-item.danger {
+            color: #f43f5e;
+        }
+
+        .connection-line {
+            stroke: #818cf8;
+            stroke-width: 2;
+            stroke-linecap: round;
+            opacity: 0.8;
+        }
+
+        .line-preview {
+            stroke-dasharray: 8;
+            stroke-opacity: 0.8;
+            animation: dashScroll 1s linear infinite;
+        }
+
+        @keyframes dashScroll {
+            from {
+                stroke-dashoffset: 16;
+            }
+
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        ::-webkit-scrollbar {
+            display: none;
+        }
+
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
     </style>
 </head>
-<body>
-    <div id="canvas">
-        <div class="canvas-container" id="canvasContainer"></div>
-    </div>
-    
-    <div class="input-modal" id="inputModal">
-        <input type="text" id="tagInput" placeholder="输入词条或句子" autofocus>
-        <div class="buttons">
-            <button class="btn cancel-btn" id="cancelBtn">取消</button>
-            <button class="btn save-btn" id="saveBtn">保存</button>
-        </div>
-    </div>
-    
-    <div class="help-tooltip" id="helpTooltip"></div>
-    <div class="context-menu" id="tagContextMenu">
-        <div class="context-menu-item" id="editTagItem"><i>✏️</i>重命名</div>
-        <div class="context-menu-item" id="copyTagItem"><i>📋</i>复制</div>
-        <div class="context-menu-divider"></div>
-        <div class="context-menu-item delete" id="deleteTagItem"><i>🗑️</i>删除</div>
-    </div>
-    
-    <div class="help-button" id="helpBtn">?</div>
-    <div class="reset-button" id="resetBtn">⟲</div>
 
+<body class="antialiased select-none">
+    <div id="viewport">
+        <div id="grid" class="infinite-grid"></div>
+        <svg id="globalSvg"
+            style="position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:2; overflow:visible;">
+            <defs>
+                <marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto">
+                    <path d="M0,0 L10,5 L0,10 Z" fill="#818cf8" />
+                </marker>
+            </defs>
+            <g id="lineGroups"></g>
+        </svg>
+        <div id="content" class="content-layer"></div>
+    </div>
+
+    <input type="text" id="floatingInput" spellcheck="false" autocomplete="off">
+
+    <div id="minimalMenu" class="minimal-menu">
+        <div class="menu-item" id="menuReset">重置星空 (Reset)</div>
+        <div class="menu-item danger" id="menuDelete">抹除此灵感 (Delete)</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        // 核心配置
-        const CONFIG = {
-            canvas: {
-                width: 5000,
-                height: 5000,
-                centerX: 2500,
-                centerY: 2500,
-                scale: 1,
-                minScale: 0.5,
-                maxScale: 2.0
-            },
-            interaction: {
-                clickThreshold: 5,
-                clickDuration: 200,
-                touchThreshold: 5,
-                touchDuration: 300,
-                selectionThreshold: 5,
-                longPressDelay: 800
-            }
-        };
+        const SUPABASE_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
+        const _client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // 状态管理
         const State = {
-            mouse: {
-                startTime: 0,
-                startPos: { x: 0, y: 0 },
-                clickPos: { x: 0, y: 0 }
-            },
-            canvas: {
-                offset: { x: 0, y: 0 },
-                viewportCenter: { x: 0, y: 0 }
-            },
+            transform: { x: 0, y: 0, scale: 1 },
+            mouse: { lastX: 0, lastY: 0, startX: 0, startY: 0, startTime: 0 },
             interaction: {
-                isDragging: false,
-                isPanning: false,
-                isSelecting: false,
-                currentTag: null,
-                editingTag: null,
-                selectedTags: [],
-                dragOffset: { x: 0, y: 0 }
-            }
+                isPanning: false, isDragging: false, isSelecting: false, isLinking: false,
+                linkingFrom: null, currentTag: null, selectedTags: [], dragOffset: { x: 0, y: 0 },
+                contextEntity: null, lastTap: 0
+            },
+            connections: []
         };
 
-        // DOM元素缓存
         const DOM = {
-            canvas: document.getElementById('canvas'),
-            container: document.getElementById('canvasContainer'),
-            inputModal: document.getElementById('inputModal'),
-            tagInput: document.getElementById('tagInput'),
-            saveBtn: document.getElementById('saveBtn'),
-            cancelBtn: document.getElementById('cancelBtn'),
-            helpBtn: document.getElementById('helpBtn'),
-            resetBtn: document.getElementById('resetBtn'),
-            helpTooltip: document.getElementById('helpTooltip'),
-            contextMenu: document.getElementById('tagContextMenu'),
-            selectionArea: document.createElement('div')
+            viewport: document.getElementById('viewport'),
+            grid: document.getElementById('grid'),
+            content: document.getElementById('content'),
+            input: document.getElementById('floatingInput'),
+            menu: document.getElementById('minimalMenu'),
+            svgGroup: document.getElementById('lineGroups'),
+            selection: document.createElement('div')
         };
 
-        // 工具函数
-        const Utils = {
-            // 防抖动
-            debounce(func, wait) {
-                let timeout;
-                return function(...args) {
-                    clearTimeout(timeout);
-                    timeout = setTimeout(() => func.apply(this, args), wait);
-                };
-            },
-
-            // 计算距离
-            getDistance(point1, point2) {
-                return Math.sqrt(
-                    Math.pow(point2.x - point1.x, 2) + 
-                    Math.pow(point2.y - point1.y, 2)
-                );
-            },
-
-            // 判断是否为有效点击
-            isValidClick(startPos, endPos, startTime) {
-                const distance = this.getDistance(startPos, endPos);
-                const duration = Date.now() - startTime;
-                return distance <= CONFIG.interaction.clickThreshold && 
-                       duration <= CONFIG.interaction.clickDuration;
-            },
-
-            // 检查设备类型
-            isMobileDevice() {
-                return (('ontouchstart' in window) ||
-                       (navigator.maxTouchPoints > 0) ||
-                       (navigator.msMaxTouchPoints > 0));
-            },
-
-            // 阻止默认事件
-            preventDefault(e) {
-                if (e.type === 'contextmenu' && e.target.classList.contains('tag')) {
-                    return;
-                }
-                e.preventDefault();
-            }
-        };
-
-        // 视口管理
-        const Viewport = {
-            // 更新视口中心
-            updateCenter() {
-                const rect = DOM.canvas.getBoundingClientRect();
-                State.canvas.viewportCenter = {
-                    x: rect.width / 2,
-                    y: rect.height / 2
-                };
-                this.updateOffset();
-                return State.canvas.viewportCenter;
-            },
-
-            // 更新画布偏移
-            updateOffset() {
-                const leftPercent = parseFloat(DOM.container.style.left) || 50;
-                const topPercent = parseFloat(DOM.container.style.top) || 50;
-                
-                State.canvas.offset = {
-                    x: (leftPercent - 50) / 100 * DOM.canvas.offsetWidth / CONFIG.canvas.scale,
-                    y: (topPercent - 50) / 100 * DOM.canvas.offsetHeight / CONFIG.canvas.scale
-                };
-            },
-
-            // 视口坐标转画布坐标
-            toCanvas(viewportX, viewportY) {
-                this.updateCenter();
-                const scale = CONFIG.canvas.scale;
-                const offsetX = Math.round((viewportX - State.canvas.viewportCenter.x) / scale);
-                const offsetY = Math.round((viewportY - State.canvas.viewportCenter.y) / scale);
-                
-                return {
-                    x: CONFIG.canvas.centerX + offsetX - State.canvas.offset.x,
-                    y: CONFIG.canvas.centerY + offsetY - State.canvas.offset.y
-                };
-            },
-
-            // 画布坐标转视口坐标
-            toViewport(canvasX, canvasY) {
-                this.updateCenter();
-                const scale = CONFIG.canvas.scale;
-                const offsetX = (canvasX - CONFIG.canvas.centerX + State.canvas.offset.x) * scale;
-                const offsetY = (canvasY - CONFIG.canvas.centerY + State.canvas.offset.y) * scale;
-                
-                return {
-                    x: Math.round(State.canvas.viewportCenter.x + offsetX),
-                    y: Math.round(State.canvas.viewportCenter.y + offsetY)
-                };
-            }
-        };
-
-        // 标签管理
-        const TagManager = {
-            // 创建标签
-            create(text, canvasX, canvasY) {
-                const tag = document.createElement('div');
-                tag.className = 'tag';
-                tag.textContent = text;
-                
-                tag.dataset.canvasX = canvasX;
-                tag.dataset.canvasY = canvasY;
-                
-                tag.style.transform = 'none';
-                tag.style.left = `${canvasX}px`;
-                tag.style.top = `${canvasY}px`;
-                
-                this.setupTagEvents(tag);
-                DOM.container.appendChild(tag);
-                return tag;
-            },
-
-            // 设置标签事件
-            setupTagEvents(tag) {
-                tag.addEventListener('mousedown', EventHandler.tag.mouseDown);
-                tag.addEventListener('dblclick', EventHandler.tag.doubleClick);
-                tag.addEventListener('contextmenu', EventHandler.tag.contextMenu);
-                this.setupTagTouchEvents(tag);
-            },
-
-            // 设置标签触摸事件
-            setupTagTouchEvents(tag) {
-                let longPressTimer;
-                let touchMoved = false;
-
-                tag.addEventListener('touchstart', e => {
-                    touchMoved = false;
-                    longPressTimer = setTimeout(() => {
-                        if (!touchMoved && !State.interaction.isDragging && !State.interaction.isPanning) {
-                            const touch = e.touches[0];
-                            ContextMenu.show(touch, tag);
-                        }
-                    }, CONFIG.interaction.longPressDelay);
-                });
-
-                tag.addEventListener('touchend', () => clearTimeout(longPressTimer));
-                tag.addEventListener('touchmove', () => {
-                    touchMoved = true;
-                    clearTimeout(longPressTimer);
-                });
-            },
-
-            // 更新标签位置
-            updatePosition(tag, canvasX, canvasY) {
-                const roundedX = Math.round(canvasX);
-                const roundedY = Math.round(canvasY);
-                
-                tag.dataset.canvasX = roundedX;
-                tag.dataset.canvasY = roundedY;
-                tag.style.left = `${roundedX}px`;
-                tag.style.top = `${roundedY}px`;
-            },
-
-            // 选择标签
-            select(tag) {
-                tag.classList.add('selected');
-                if (!State.interaction.selectedTags.includes(tag)) {
-                    State.interaction.selectedTags.push(tag);
-                }
-            },
-
-            // 取消选择所有标签
-            clearSelection() {
-                State.interaction.selectedTags.forEach(tag => {
-                    tag.classList.remove('selected');
-                });
-                State.interaction.selectedTags = [];
-            }
-        };
-
-        // 输入框管理
-        const InputModal = {
-            show(clientX, clientY, text = '') {
-                const canvasPos = Viewport.toCanvas(clientX, clientY);
-                State.mouse.clickPos = canvasPos;
-                
-                DOM.inputModal.style.display = 'block';
-                DOM.inputModal.style.left = `${clientX}px`;
-                DOM.inputModal.style.top = `${clientY}px`;
-                DOM.tagInput.value = text;
-                DOM.tagInput.focus();
-                
-                this.adjustPosition();
-            },
-
-            hide() {
-                DOM.inputModal.style.display = 'none';
-                DOM.tagInput.value = '';
-                State.interaction.editingTag = null;
-            },
-
-            adjustPosition() {
-                const rect = DOM.inputModal.getBoundingClientRect();
-                if (rect.right > window.innerWidth) {
-                    DOM.inputModal.style.left = `${window.innerWidth - rect.width - 10}px`;
-                }
-                if (rect.bottom > window.innerHeight) {
-                    DOM.inputModal.style.top = `${window.innerHeight - rect.height - 10}px`;
-                }
-            },
-
-            save() {
-                const text = DOM.tagInput.value.trim();
-                if (text) {
-                    if (State.interaction.editingTag) {
-                        State.interaction.editingTag.textContent = text;
-                    } else {
-                        TagManager.create(text, State.mouse.clickPos.x, State.mouse.clickPos.y);
-                    }
-                }
-                this.hide();
-            }
-        };
-
-        // 右键菜单管理
-        const ContextMenu = {
-            show(e, tag) {
-                e.preventDefault();
-                State.interaction.contextMenuTag = tag;
-                
-                if (State.interaction.selectedTags.length > 1 && State.interaction.selectedTags.includes(tag)) {
-                    this.updateMenuText(true);
-                } else {
-                    this.updateMenuText(false);
-                    TagManager.clearSelection();
-                    TagManager.select(tag);
-                }
-                
-                this.setPosition(e);
-                DOM.contextMenu.classList.add('active');
-            },
-
-            hide() {
-                DOM.contextMenu.classList.remove('active');
-                State.interaction.contextMenuTag = null;
-            },
-
-            updateMenuText(isMultiple) {
-                const items = DOM.contextMenu.querySelectorAll('.context-menu-item');
-                items[0].textContent = isMultiple ? "重命名选中标签" : "重命名";
-                items[1].textContent = isMultiple ? "复制选中标签" : "复制";
-                items[2].textContent = isMultiple ? "删除选中标签" : "删除";
-            },
-
-            setPosition(e) {
-                const x = e.clientX;
-                const y = e.clientY;
-                DOM.contextMenu.style.left = `${x}px`;
-                DOM.contextMenu.style.top = `${y}px`;
-                
-                const menuRect = DOM.contextMenu.getBoundingClientRect();
-                if (menuRect.right > window.innerWidth) {
-                    DOM.contextMenu.style.left = `${x - menuRect.width}px`;
-                }
-                if (menuRect.bottom > window.innerHeight) {
-                    DOM.contextMenu.style.top = `${y - menuRect.height}px`;
-                }
-            },
-
-            handleEdit() {
-                if (State.interaction.contextMenuTag) {
-                    const rect = State.interaction.contextMenuTag.getBoundingClientRect();
-                    State.interaction.editingTag = State.interaction.contextMenuTag;
-                    InputModal.show(rect.left, rect.top, State.interaction.contextMenuTag.textContent);
-                }
-                this.hide();
-            },
-
-            handleCopy() {
-                if (State.interaction.selectedTags.length > 0) {
-                    const text = State.interaction.selectedTags.length > 1 
-                        ? State.interaction.selectedTags.map(tag => tag.textContent).join('\n')
-                        : State.interaction.contextMenuTag.textContent;
-                    
-                    navigator.clipboard.writeText(text).catch(console.error);
-                }
-                this.hide();
-            },
-
-            handleDelete() {
-                if (State.interaction.selectedTags.length > 0) {
-                    State.interaction.selectedTags.forEach(tag => tag.remove());
-                    State.interaction.selectedTags = [];
-                }
-                this.hide();
-            }
-        };
-
-        // 选区管理
-        const SelectionArea = {
-            init() {
-                DOM.selectionArea.className = 'selection-area';
-                DOM.canvas.appendChild(DOM.selectionArea);
-            },
-
-            start(e) {
-                const rect = DOM.canvas.getBoundingClientRect();
-                State.mouse.startPos = {
-                    x: e.clientX - rect.left,
-                    y: e.clientY - rect.top
-                };
-                
-                DOM.selectionArea.style.left = `${State.mouse.startPos.x}px`;
-                DOM.selectionArea.style.top = `${State.mouse.startPos.y}px`;
-                DOM.selectionArea.style.width = '0';
-                DOM.selectionArea.style.height = '0';
-                DOM.selectionArea.style.display = 'none';
-            },
-
-            update(e) {
-                const rect = DOM.canvas.getBoundingClientRect();
-                const currentX = e.clientX - rect.left;
-                const currentY = e.clientY - rect.top;
-                
-                const left = Math.min(currentX, State.mouse.startPos.x);
-                const top = Math.min(currentY, State.mouse.startPos.y);
-                const width = Math.abs(currentX - State.mouse.startPos.x);
-                const height = Math.abs(currentY - State.mouse.startPos.y);
-                
-                if (width > CONFIG.interaction.selectionThreshold || 
-                    height > CONFIG.interaction.selectionThreshold) {
-                    State.interaction.isSelecting = true;
-                    DOM.selectionArea.style.display = 'block';
-                    
-                    DOM.selectionArea.style.left = `${left}px`;
-                    DOM.selectionArea.style.top = `${top}px`;
-                    DOM.selectionArea.style.width = `${width}px`;
-                    DOM.selectionArea.style.height = `${height}px`;
-                }
-            },
-
-            end(e) {
-                if (!State.interaction.isSelecting) return;
-                
-                const rect = DOM.canvas.getBoundingClientRect();
-                const width = parseFloat(DOM.selectionArea.style.width);
-                const height = parseFloat(DOM.selectionArea.style.height);
-                const left = parseFloat(DOM.selectionArea.style.left) + rect.left;
-                const top = parseFloat(DOM.selectionArea.style.top) + rect.top;
-                
-                if (width > CONFIG.interaction.selectionThreshold && 
-                    height > CONFIG.interaction.selectionThreshold) {
-                    const tags = DOM.container.querySelectorAll('.tag');
-                    
-                    tags.forEach(tag => {
-                        const tagRect = tag.getBoundingClientRect();
-                        const tagCenterX = tagRect.left + tagRect.width / 2;
-                        const tagCenterY = tagRect.top + tagRect.height / 2;
-                        
-                        if (tagCenterX >= left && tagCenterX <= left + width && 
-                            tagCenterY >= top && tagCenterY <= top + height) {
-                            TagManager.select(tag);
-                        }
-                    });
-                    
-                    e.stopPropagation();
-                    e.preventDefault();
-                }
-                
-                State.interaction.isSelecting = false;
-                DOM.selectionArea.style.display = 'none';
-            }
-        };
-
-        // 事件处理器
-        const EventHandler = {
-            canvas: {
-                click(e) {
-                    if (State.interaction.isSelecting || 
-                        State.interaction.isDragging || 
-                        State.interaction.isPanning) return;
-
-                    const isValidClick = Utils.isValidClick(
-                        State.mouse.startPos,
-                        { x: e.clientX, y: e.clientY },
-                        State.mouse.startTime
-                    );
-
-                    if (isValidClick && !e.target.classList.contains('tag')) {
-                        if (e.target === DOM.canvas || e.target === DOM.container) {
-                            TagManager.clearSelection();
-                            InputModal.show(e.clientX, e.clientY);
-                            e.stopPropagation();
-                        }
-                    }
-                },
-
-                mouseDown(e) {
-                    State.mouse.startTime = Date.now();
-                    State.mouse.startPos = { x: e.clientX, y: e.clientY };
-
-                    if (e.button === 1) {
-                        State.interaction.isPanning = true;
-                        State.mouse.panStart = { x: e.clientX, y: e.clientY };
-                        document.body.style.cursor = 'grabbing';
-                        e.preventDefault();
-                        return;
-                    }
-
-                    if (e.button === 0 && !State.interaction.isDragging && 
-                        !State.interaction.isPanning) {
-                        if (e.target === DOM.canvas || e.target === DOM.container) {
-                            if (!e.shiftKey) TagManager.clearSelection();
-                            SelectionArea.start(e);
-                        }
-                    }
-                },
-
-                mouseMove: Utils.debounce((e) => {
-                    if (State.interaction.isPanning) {
-                        const dx = e.clientX - State.mouse.panStart.x;
-                        const dy = e.clientY - State.mouse.panStart.y;
-                        
-                        const currentLeft = parseFloat(DOM.container.style.left) || 50;
-                        const currentTop = parseFloat(DOM.container.style.top) || 50;
-                        
-                        const newLeft = currentLeft + (dx / DOM.canvas.offsetWidth) * 100;
-                        const newTop = currentTop + (dy / DOM.canvas.offsetHeight) * 100;
-                        
-                        DOM.container.style.left = `${newLeft}%`;
-                        DOM.container.style.top = `${newTop}%`;
-                        
-                        State.mouse.panStart = { x: e.clientX, y: e.clientY };
-                        Viewport.updateCenter();
-                        
-                        e.preventDefault();
-                    } else if (!State.interaction.isDragging && 
-                              !State.interaction.isPanning && 
-                              e.buttons === 1) {
-                        SelectionArea.update(e);
-                    }
-                }, 16),
-
-                mouseUp(e) {
-                    if (State.interaction.isPanning) {
-                        State.interaction.isPanning = false;
-                        document.body.style.cursor = '';
-                        e.preventDefault();
-                    } else {
-                        SelectionArea.end(e);
-                    }
-                },
-
-                wheel(e) {
-                    e.preventDefault();
-                    const delta = Math.sign(e.deltaY) * -1;
-                    const scaleFactor = delta > 0 ? 1.1 : 0.9;
-                    
-                    let newScale = CONFIG.canvas.scale * scaleFactor;
-                    newScale = Math.max(CONFIG.canvas.minScale, 
-                                      Math.min(newScale, CONFIG.canvas.maxScale));
-                    
-                    DOM.container.style.transform = 
-                        `translate(-50%, -50%) scale(${newScale})`;
-                    CONFIG.canvas.scale = newScale;
-                }
-            },
-
-            tag: {
-                mouseDown(e) {
-                    if (e.button !== 0) return;
-                    
-                    State.interaction.isDragging = true;
-                    State.interaction.currentTag = this;
-                    this.classList.add('dragging');
-                    
-                    const rect = this.getBoundingClientRect();
-                    State.interaction.dragOffset = {
-                        x: e.clientX - rect.left,
-                        y: e.clientY - rect.top
-                    };
-                    
-                    e.stopPropagation();
-                    e.preventDefault();
-                },
-
-                doubleClick(e) {
-                    State.interaction.editingTag = this;
-                    const rect = this.getBoundingClientRect();
-                    InputModal.show(rect.left, rect.top, this.textContent);
-                    e.stopPropagation();
-                },
-
-                contextMenu(e) {
-                    ContextMenu.show(e, this);
-                }
-            },
-
-            input: {
-                keydown(e) {
-                    if (e.key === 'Enter') {
-                        InputModal.save();
-                    } else if (e.key === 'Escape') {
-                        InputModal.hide();
-                    }
-                }
-            },
-
-            document: {
-                click(e) {
-                    if (e.target !== DOM.inputModal && 
-                        !DOM.inputModal.contains(e.target) && 
-                        e.target !== DOM.tagInput &&
-                        DOM.inputModal.style.display === 'block') {
-                        if (e.target !== DOM.saveBtn && e.target !== DOM.cancelBtn) {
-                            InputModal.save();
-                        }
-                    }
-                    
-                    if (!DOM.contextMenu.contains(e.target)) {
-                        ContextMenu.hide();
-                    }
-                },
-
-                keydown(e) {
-                    if (e.key === 'Escape') {
-                        ContextMenu.hide();
-                    }
-                }
-            }
-        };
-
-        // 帮助提示管理
-        const HelpTip = {
-            init() {
-                DOM.helpTooltip.innerHTML = `
-                    <p><strong>使用说明：</strong></p>
-                    <p>• 点击空白处添加新词条</p>
-                    <p>• 拖动词条可改变位置</p>
-                    <p>• 双击词条可编辑内容</p>
-                    <p>• 右键点击词条显示菜单</p>
-                    <p>• 在空白处拖动鼠标可框选多个词条</p>
-                    <p>• 按住Shift拖动可添加到已选中的词条</p>
-                    <p>• 右键点击选中的词条可批量操作</p>
-                    <p>• 按住鼠标中键拖动画布</p>
-                    <p>• 滚轮可缩放画布</p>
-                    <p>• 移动设备：长按词条显示菜单</p>
-                    <p>• 移动设备：双指拖动画布</p>
-                `;
-            },
-
-            show() {
-                DOM.helpTooltip.style.display = 'block';
-            },
-
-            hide() {
-                DOM.helpTooltip.style.display = 'none';
-            }
-        };
-
-        // 初始化应用
-        function initApp() {
-            // 设置画布初始状态
-            DOM.container.style.width = `${CONFIG.canvas.width}px`;
-            DOM.container.style.height = `${CONFIG.canvas.height}px`;
-            DOM.container.style.left = '50%';
-            DOM.container.style.top = '50%';
-            DOM.container.style.transform = 'translate(-50%, -50%)';
-            
-            // 初始化组件
-            SelectionArea.init();
-            HelpTip.init();
-            Viewport.updateCenter();
-            
-            // 绑定事件
-            DOM.canvas.addEventListener('click', EventHandler.canvas.click);
-            DOM.container.addEventListener('click', EventHandler.canvas.click);
-            
-            document.addEventListener('mousedown', EventHandler.canvas.mouseDown);
-            document.addEventListener('mousemove', EventHandler.canvas.mouseMove);
-            document.addEventListener('mouseup', EventHandler.canvas.mouseUp);
-            
-            DOM.canvas.addEventListener('wheel', EventHandler.canvas.wheel, { passive: false });
-            
-            DOM.saveBtn.addEventListener('click', () => InputModal.save());
-            DOM.cancelBtn.addEventListener('click', () => InputModal.hide());
-            DOM.tagInput.addEventListener('keydown', EventHandler.input.keydown);
-            
-            document.addEventListener('click', EventHandler.document.click);
-            document.addEventListener('keydown', EventHandler.document.keydown);
-            
-            DOM.helpBtn.addEventListener('mouseenter', () => HelpTip.show());
-            DOM.helpBtn.addEventListener('mouseleave', () => HelpTip.hide());
-            DOM.helpBtn.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                DOM.helpTooltip.style.display === 'block' ? HelpTip.hide() : HelpTip.show();
-            });
-            
-            DOM.resetBtn.addEventListener('click', () => {
-                DOM.container.style.left = '50%';
-                DOM.container.style.top = '50%';
-                DOM.container.style.transform = 'translate(-50%, -50%)';
-                CONFIG.canvas.scale = 1;
-                Viewport.updateCenter();
-            });
-            
-            // 右键菜单事件
-            document.getElementById('editTagItem').addEventListener('click', () => ContextMenu.handleEdit());
-            document.getElementById('copyTagItem').addEventListener('click', () => ContextMenu.handleCopy());
-            document.getElementById('deleteTagItem').addEventListener('click', () => ContextMenu.handleDelete());
-            
-            // 防止默认行为
-            document.addEventListener('dragover', Utils.preventDefault);
-            document.addEventListener('drop', Utils.preventDefault);
-            document.addEventListener('contextmenu', Utils.preventDefault);
+        function updateMatrix() {
+            const { x, y, scale } = State.transform;
+            DOM.content.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+            DOM.grid.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+            LineManager.render();
         }
 
-        // 启动应用
-        initApp();
+        function screenToSpace(sx, sy) {
+            const rect = DOM.viewport.getBoundingClientRect();
+            const vx = sx - rect.left - rect.width / 2;
+            const vy = sy - rect.top - rect.height / 2;
+            return {
+                x: (vx - State.transform.x) / State.transform.scale,
+                y: (vy - State.transform.y) / State.transform.scale
+            };
+        }
+
+        function spaceToScreen(x, y) {
+            const rect = DOM.viewport.getBoundingClientRect();
+            return {
+                x: rect.width / 2 + State.transform.x + x * State.transform.scale,
+                y: rect.height / 2 + State.transform.y + y * State.transform.scale
+            };
+        }
+
+        const Tag = {
+            async create(text, x, y, id = null) {
+                const node = document.createElement('div');
+                node.id = id || `tag-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+                node.className = 'tag';
+                node.innerHTML = `<span>${text}</span>`;
+                node.style.left = `${x}px`;
+                node.style.top = `${y}px`;
+                node.dataset.x = x; node.dataset.y = y;
+                this.bind(node);
+                DOM.content.appendChild(node);
+
+                if (!id) {
+                    const { data, error } = await _client.from('canvas_nodes').insert({ text, x, y }).select().single();
+                    if (!error && data) node.id = data.id;
+                }
+                return node;
+            },
+            bind(node) {
+                node.addEventListener('mousedown', e => {
+                    e.stopPropagation(); e.preventDefault();
+                    if (e.button === 0) {
+                        State.interaction.isDragging = true;
+                        State.interaction.currentTag = node;
+                        node.classList.add('dragging');
+                        const spacePos = screenToSpace(e.clientX, e.clientY);
+                        State.interaction.dragOffset = { x: spacePos.x - parseFloat(node.dataset.x), y: spacePos.y - parseFloat(node.dataset.y) };
+                        if (!e.shiftKey && !State.interaction.selectedTags.includes(node)) this.deselect();
+                        this.select(node);
+                        DOM.viewport.style.cursor = 'grabbing';
+                    } else if (e.button === 2) {
+                        State.interaction.isLinking = true;
+                        State.interaction.linkingFrom = node;
+                    }
+                });
+                node.addEventListener('dblclick', e => {
+                    e.stopPropagation();
+                    Input.show(e.clientX, e.clientY, node.querySelector('span').textContent, node);
+                });
+                node.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); });
+
+                let timer;
+                node.addEventListener('touchstart', e => {
+                    if (e.touches.length > 1) return;
+                    const t = e.touches[0];
+                    State.interaction.isDragging = true;
+                    State.interaction.currentTag = node;
+                    node.classList.add('dragging');
+                    const spacePos = screenToSpace(t.clientX, t.clientY);
+                    State.interaction.dragOffset = { x: spacePos.x - parseFloat(node.dataset.x), y: spacePos.y - parseFloat(node.dataset.y) };
+                    timer = setTimeout(() => { if (State.interaction.isDragging) Menu.show(t.clientX, t.clientY, node); }, 600);
+                }, { passive: false });
+                node.addEventListener('touchend', () => { clearTimeout(timer); node.classList.remove('dragging'); State.interaction.isDragging = false; });
+            },
+            select(node) { node.classList.add('selected'); if (!State.interaction.selectedTags.includes(node)) State.interaction.selectedTags.push(node); },
+            deselect() { State.interaction.selectedTags.forEach(t => t.classList.remove('selected')); State.interaction.selectedTags = []; },
+            async updatePos(node) {
+                const id = node.id;
+                await _client.from('canvas_nodes').update({ x: parseFloat(node.dataset.x), y: parseFloat(node.dataset.y) }).eq('id', id);
+            }
+        };
+
+        const LineManager = {
+            render() {
+                DOM.svgGroup.innerHTML = '';
+                State.connections.forEach(conn => {
+                    const from = document.getElementById(conn.from_id || conn.fromId);
+                    const to = document.getElementById(conn.to_id || conn.toId);
+                    if (from && to) this.drawLine(from, to);
+                });
+            },
+            drawLine(fromNode, toNodeOrPos, isPreview = false) {
+                const fromRect = fromNode.getBoundingClientRect();
+                const fromCenter = { x: fromRect.left + fromRect.width / 2, y: fromRect.top + fromRect.height / 2 };
+
+                let toCenter, toRect;
+                if (isPreview) {
+                    toCenter = spaceToScreen(toNodeOrPos.x, toNodeOrPos.y);
+                } else {
+                    toRect = toNodeOrPos.getBoundingClientRect();
+                    toCenter = { x: toRect.left + toRect.width / 2, y: toRect.top + toRect.height / 2 };
+                }
+
+                const start = this.getEdgePoint(fromRect, toCenter);
+                const end = isPreview ? toCenter : this.getEdgePoint(toRect, fromCenter);
+
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute("x1", start.x);
+                line.setAttribute("y1", start.y);
+                line.setAttribute("x2", end.x);
+                line.setAttribute("y2", end.y);
+                line.setAttribute("class", isPreview ? "connection-line line-preview" : "connection-line");
+                if (!isPreview) line.setAttribute("marker-end", "url(#arrow)");
+                DOM.svgGroup.appendChild(line);
+            },
+            getEdgePoint(rect, target) {
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                const dx = target.x - centerX;
+                const dy = target.y - centerY;
+                if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return { x: centerX, y: centerY };
+                const angle = Math.atan2(dy, dx);
+                const absCos = Math.abs(Math.cos(angle)), absSin = Math.abs(Math.sin(angle));
+                const halfW = rect.width / 2, halfH = rect.height / 2;
+                let scale = (halfW * absSin <= halfH * absCos) ? halfW / absCos : halfH / absSin;
+                return { x: centerX + Math.cos(angle) * scale, y: centerY + Math.sin(angle) * scale };
+            }
+        };
+
+        const Input = {
+            show(x, y, text = '', node = null) {
+                State.interaction.contextEntity = node;
+                if (!node) State.interaction.targetSpacePos = screenToSpace(x, y);
+                DOM.input.style.display = 'block';
+                DOM.input.style.left = `${x}px`;
+                DOM.input.style.top = `${y}px`;
+                DOM.input.value = text;
+                setTimeout(() => { DOM.input.focus(); if (node) node.style.opacity = '0.2'; }, 50);
+            },
+            hide() {
+                if (State.interaction.contextEntity) State.interaction.contextEntity.style.opacity = '1';
+                DOM.input.style.display = 'none';
+                State.interaction.contextEntity = null;
+            },
+            async save() {
+                const val = DOM.input.value.trim();
+                const node = State.interaction.contextEntity;
+                if (val) {
+                    if (node) {
+                        node.querySelector('span').textContent = val;
+                        await _client.from('canvas_nodes').update({ text: val }).eq('id', node.id);
+                    } else {
+                        Tag.create(val, State.interaction.targetSpacePos.x, State.interaction.targetSpacePos.y);
+                    }
+                }
+                this.hide(); LineManager.render();
+            }
+        };
+
+        const Menu = {
+            show(x, y, node) {
+                State.interaction.contextEntity = node;
+                DOM.menu.style.left = `${Math.min(x, window.innerWidth - 200)}px`;
+                DOM.menu.style.top = `${Math.min(y, window.innerHeight - 150)}px`;
+                DOM.menu.classList.add('show');
+            },
+            hide() { DOM.menu.classList.remove('show'); }
+        };
+
+        const Selection = {
+            init() { DOM.selection.className = 'selection-box'; DOM.viewport.appendChild(DOM.selection); },
+            update(x, y) {
+                const l = Math.min(x, State.mouse.startX), t = Math.min(y, State.mouse.startY);
+                const w = Math.abs(x - State.mouse.startX), h = Math.abs(y - State.mouse.startY);
+                if (w > 5 || h > 5) {
+                    State.interaction.isSelecting = true; DOM.selection.style.display = 'block';
+                    Object.assign(DOM.selection.style, { left: `${l}px`, top: `${t}px`, width: `${w}px`, height: `${h}px` });
+                }
+            },
+            commit() {
+                if (!State.interaction.isSelecting) return;
+                const r = DOM.selection.getBoundingClientRect();
+                DOM.content.querySelectorAll('.tag').forEach(t => {
+                    const tr = t.getBoundingClientRect();
+                    if (tr.left >= r.left && tr.right <= r.right && tr.top >= r.top && tr.bottom <= r.bottom) Tag.select(t);
+                });
+                State.interaction.isSelecting = false; DOM.selection.style.display = 'none';
+            }
+        };
+
+        async function bootstrap() {
+            Selection.init();
+
+            // Load initial data
+            const { data: nodes } = await _client.from('canvas_nodes').select('*');
+            const { data: conns } = await _client.from('canvas_connections').select('*');
+
+            if (nodes) for (const n of nodes) await Tag.create(n.text, n.x, n.y, n.id);
+            if (conns) { State.connections = conns; LineManager.render(); }
+
+            updateMatrix();
+
+            // Realtime setup
+            _client.channel('canvas_changes')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'canvas_nodes' }, payload => {
+                    const { eventType, new: newTag, old: oldTag } = payload;
+                    if (eventType === 'INSERT') {
+                        if (!document.getElementById(newTag.id)) Tag.create(newTag.text, newTag.x, newTag.y, newTag.id);
+                    } else if (eventType === 'UPDATE') {
+                        const node = document.getElementById(newTag.id);
+                        if (node) {
+                            node.querySelector('span').textContent = newTag.text;
+                            node.style.left = `${newTag.x}px`;
+                            node.style.top = `${newTag.y}px`;
+                            node.dataset.x = newTag.x; node.dataset.y = newTag.y;
+                            LineManager.render();
+                        }
+                    } else if (eventType === 'DELETE') {
+                        const node = document.getElementById(oldTag.id);
+                        if (node) node.remove();
+                        LineManager.render();
+                    }
+                })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'canvas_connections' }, payload => {
+                    const { eventType, new: newConn, old: oldConn } = payload;
+                    if (eventType === 'INSERT') {
+                        if (!State.connections.find(c => c.id === newConn.id)) {
+                            State.connections.push(newConn);
+                            LineManager.render();
+                        }
+                    } else if (eventType === 'DELETE') {
+                        State.connections = State.connections.filter(c => c.id !== oldConn.id);
+                        LineManager.render();
+                    }
+                })
+                .subscribe();
+
+            window.addEventListener('mousedown', e => {
+                if (e.target.closest('.tag')) return;
+                State.mouse.startTime = Date.now();
+                State.mouse.startX = e.clientX; State.mouse.startY = e.clientY;
+                State.mouse.lastX = e.clientX; State.mouse.lastY = e.clientY;
+                if (e.button === 1 || (e.button === 0 && (e.altKey || e.ctrlKey))) {
+                    State.interaction.isPanning = true; DOM.viewport.style.cursor = 'grabbing';
+                }
+            });
+
+            window.addEventListener('mousemove', e => {
+                const dx = e.clientX - State.mouse.lastX, dy = e.clientY - State.mouse.lastY;
+                if (State.interaction.isPanning) {
+                    State.transform.x += dx; State.transform.y += dy; updateMatrix();
+                } else if (State.interaction.isDragging && State.interaction.currentTag) {
+                    const spacePos = screenToSpace(e.clientX, e.clientY);
+                    const tagX = spacePos.x - State.interaction.dragOffset.x, tagY = spacePos.y - State.interaction.dragOffset.y;
+                    const moveDx = tagX - parseFloat(State.interaction.currentTag.dataset.x), moveDy = tagY - parseFloat(State.interaction.currentTag.dataset.y);
+                    State.interaction.selectedTags.forEach(t => {
+                        const nx = parseFloat(t.dataset.x) + moveDx, ny = parseFloat(t.dataset.y) + moveDy;
+                        t.style.left = `${nx}px`; t.style.top = `${ny}px`; t.dataset.x = nx; t.dataset.y = ny;
+                    });
+                    LineManager.render();
+                } else if (State.interaction.isLinking) {
+                    LineManager.render();
+                    LineManager.drawLine(State.interaction.linkingFrom, screenToSpace(e.clientX, e.clientY), true);
+                } else if (e.buttons === 1 && !State.interaction.isDragging && !State.interaction.isPanning) {
+                    Selection.update(e.clientX, e.clientY);
+                }
+                State.mouse.lastX = e.clientX; State.mouse.lastY = e.clientY;
+            });
+
+            window.addEventListener('mouseup', async e => {
+                const dur = Date.now() - State.mouse.startTime;
+                if (State.interaction.isPanning) {
+                    State.interaction.isPanning = false; DOM.viewport.style.cursor = 'crosshair';
+                } else if (State.interaction.isDragging) {
+                    State.interaction.isDragging = false;
+                    State.interaction.selectedTags.forEach(t => Tag.updatePos(t));
+                    State.interaction.currentTag.classList.remove('dragging');
+                    DOM.viewport.style.cursor = 'crosshair';
+                } else if (State.interaction.isLinking) {
+                    const tagUnderMouse = document.elementFromPoint(e.clientX, e.clientY)?.closest('.tag');
+                    if (tagUnderMouse && tagUnderMouse !== State.interaction.linkingFrom) {
+                        const fromId = State.interaction.linkingFrom.id;
+                        const toId = tagUnderMouse.id;
+                        const exists = State.connections.some(c => (c.from_id === fromId && c.to_id === toId) || (c.from_id === toId && c.to_id === fromId));
+                        if (!exists) {
+                            await _client.from('canvas_connections').insert({ from_id: fromId, to_id: toId });
+                        }
+                    }
+                    State.interaction.isLinking = false; State.interaction.linkingFrom = null; LineManager.render();
+                } else if (State.interaction.isSelecting) {
+                    Selection.commit();
+                } else if (dur < 250 && e.target === DOM.viewport) {
+                    Tag.deselect(); Input.show(e.clientX, e.clientY);
+                } else if (dur < 250 && e.target.closest('.tag') && e.button === 2) {
+                    Menu.show(e.clientX, e.clientY, e.target.closest('.tag'));
+                }
+                Menu.hide();
+            });
+
+            DOM.viewport.addEventListener('wheel', e => {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                const newScale = Math.max(0.02, Math.min(State.transform.scale * delta, 8.0));
+                const rect = DOM.viewport.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left - rect.width / 2, mouseY = e.clientY - rect.top - rect.height / 2;
+                State.transform.x -= mouseX * (newScale / State.transform.scale - 1);
+                State.transform.y -= mouseY * (newScale / State.transform.scale - 1);
+                State.transform.scale = newScale; updateMatrix();
+            }, { passive: false });
+
+            DOM.input.addEventListener('keydown', e => {
+                if (e.key === 'Enter') { e.preventDefault(); Input.save(); }
+                if (e.key === 'Escape') { e.preventDefault(); Input.hide(); }
+            });
+            DOM.input.addEventListener('blur', () => Input.save());
+
+            window.addEventListener('keydown', e => {
+                if ((e.key === 'Delete' || e.key === 'Backspace') && State.interaction.selectedTags.length > 0 && document.activeElement !== DOM.input) {
+                    State.interaction.selectedTags.forEach(async t => {
+                        await _client.from('canvas_nodes').delete().eq('id', t.id);
+                        t.remove();
+                    });
+                    State.interaction.selectedTags = []; LineManager.render();
+                }
+            });
+
+            document.getElementById('menuReset').addEventListener('click', () => {
+                State.transform = { x: 0, y: 0, scale: 1 }; updateMatrix(); Menu.hide();
+            });
+            document.getElementById('menuDelete').addEventListener('click', async () => {
+                const node = State.interaction.contextEntity;
+                if (node) {
+                    await _client.from('canvas_nodes').delete().eq('id', node.id);
+                    node.remove(); Tag.deselect(); LineManager.render();
+                }
+                Menu.hide();
+            });
+            document.addEventListener('contextmenu', e => e.preventDefault());
+        }
+
+        bootstrap();
     </script>
 </body>
+
 </html>

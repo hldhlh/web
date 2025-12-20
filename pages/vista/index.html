@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>阅图 - 发现视觉之美</title>
+    <style>
+        :root {
+            --primary-color: #0071e3;
+            --bg-color: #f5f5f7;
+            --card-bg: #ffffff;
+            --text-main: #1d1d1f;
+            --text-sub: #86868b;
+            --glass-bg: rgba(255, 255, 255, 0.72);
+            --blur: 20px;
+        }
+
+        [data-theme='dark'] {
+            --bg-color: #000000;
+            --card-bg: #1c1c1e;
+            --text-main: #f5f5f7;
+            --text-sub: #86868b;
+            --glass-bg: rgba(28, 28, 30, 0.72);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro SC", "SF Pro Display", sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* 顶部导航层 */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 0 40px;
+            height: 64px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--blur));
+            -webkit-backdrop-filter: blur(var(--blur));
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        [data-theme='dark'] .header {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-back {
+            text-decoration: none;
+            color: var(--text-main);
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 15px;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+
+        .btn-back:hover {
+            opacity: 1;
+        }
+
+        .title-area h1 {
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+        }
+
+        .action-area {
+            display: flex;
+            gap: 16px;
+        }
+
+        .btn-refresh {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 18px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+        }
+
+        .btn-refresh:hover {
+            transform: scale(1.05);
+            background: #0077ed;
+        }
+
+        /* 收藏切换按钮 */
+        .btn-toggle-fav {
+            background: transparent;
+            color: var(--text-main);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            padding: 8px 16px;
+            border-radius: 18px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        [data-theme='dark'] .btn-toggle-fav {
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-toggle-fav:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .btn-toggle-fav.active {
+            background: var(--text-main);
+            color: var(--bg-color);
+            border-color: var(--text-main);
+        }
+
+        .btn-toggle-fav.active svg {
+            fill: #ff3b30;
+            stroke: #ff3b30;
+        }
+
+        /* 真正的多列瀑布流布局 */
+        .gallery-container {
+            max-width: 1400px;
+            margin: 84px auto 40px;
+            padding: 0 20px;
+        }
+
+        .gallery-grid {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .gallery-column {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .photo-item {
+            background: var(--card-bg);
+            border-radius: 16px;
+            overflow: hidden;
+            position: relative;
+            cursor: zoom-in;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: itemFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes heartPop {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.4);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        @keyframes itemFadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .photo-inner {
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .photo-item img {
+            width: 100%;
+            height: auto;
+            display: block;
+            transition: transform 0.6s cubic-bezier(0.2, 0, 0.2, 1);
+        }
+
+        .photo-item:hover img {
+            transform: scale(1.04);
+        }
+
+        .photo-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to bottom, transparent 60%, rgba(0, 0, 0, 0.4));
+            opacity: 0;
+            transition: opacity 0.3s;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 20px;
+            color: white;
+        }
+
+        .photo-item:hover .photo-overlay {
+            opacity: 1;
+        }
+
+        .photo-info h2 {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .photo-info p {
+            font-size: 11px;
+            opacity: 0.8;
+        }
+
+        /* 收藏按钮样式 */
+        .btn-favorite {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 38px;
+            height: 38px;
+            background: rgba(0, 0, 0, 0.25);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 100;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .photo-item:hover .btn-favorite {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .btn-favorite:hover {
+            background: rgba(255, 255, 255, 0.95);
+            transform: scale(1.1) !important;
+        }
+
+        .btn-favorite:hover svg {
+            stroke: #ff3b30;
+            transform: scale(1.1);
+        }
+
+        .btn-favorite.active {
+            opacity: 1;
+            background: white;
+            transform: scale(1);
+            border-color: transparent;
+        }
+
+        .btn-favorite.active svg {
+            fill: #ff3b30;
+            stroke: #ff3b30;
+            animation: heartPop 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* Lightbox 相关样式 */
+        .lightbox {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            backdrop-filter: blur(20px);
+            cursor: zoom-out;
+        }
+
+        .lightbox img {
+            max-width: 95%;
+            max-height: 95%;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 40px 100px rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            transform: scale(0.98);
+            transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .lightbox img.loaded {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* 顶部进度条 */
+        .progress-track {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            z-index: 2001;
+            overflow: hidden;
+            display: none;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: var(--primary-color);
+            box-shadow: 0 0 10px var(--primary-color);
+            transition: width 0.3s ease;
+        }
+
+        /* 居中加载器 */
+        .preview-loader {
+            position: absolute;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            color: white;
+            z-index: 2001;
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-indicator {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-sub);
+            font-size: 14px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+
+<body>
+    <header class="header">
+        <a href="../../index.html" class="btn-back">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            返回首页
+        </a>
+        <div class="title-area">
+            <h1>发现</h1>
+        </div>
+        <div class="action-area">
+            <button class="btn-toggle-fav" id="toggleFavBtn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path
+                        d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z">
+                    </path>
+                </svg>
+                我的收藏
+            </button>
+            <button class="btn-refresh" id="refreshBtn">换一批</button>
+        </div>
+    </header>
+
+    <main class="gallery-container">
+        <div class="gallery-grid" id="galleryGrid">
+            <!-- 动态生成列 -->
+        </div>
+        <div id="loading" class="loading-indicator">
+            正在探索更美的一面...
+        </div>
+    </main>
+
+    <div id="lightbox" class="lightbox">
+        <div class="progress-track" id="progressTrack">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <div class="preview-loader" id="previewLoader">
+            <div class="spinner"></div>
+            <span style="font-size: 13px; opacity: 0.8; letter-spacing: 1px;">LOADING</span>
+        </div>
+        <img id="lightbox-img" src="" alt="">
+    </div>
+
+    <script>
+        let isLoading = false;
+        let viewMode = 'all'; // 'all' 或 'favorites'
+        const galleryGrid = document.getElementById('galleryGrid');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const toggleFavBtn = document.getElementById('toggleFavBtn');
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = document.getElementById('lightbox-img');
+        const progressBar = document.getElementById('progressBar');
+        const progressTrack = document.getElementById('progressTrack');
+        const previewLoader = document.getElementById('previewLoader');
+
+        // 收藏状态管理
+        let favorites = JSON.parse(localStorage.getItem('photo-favorites') || '[]');
+
+        // 初始化列
+        function initColumns() {
+            galleryGrid.innerHTML = '';
+            const width = window.innerWidth;
+            let colCount = 4;
+            if (width < 500) colCount = 1;
+            else if (width < 800) colCount = 2;
+            else if (width < 1200) colCount = 3;
+
+            for (let i = 0; i < colCount; i++) {
+                const col = document.createElement('div');
+                col.className = 'gallery-column';
+                col.id = `col-${i}`;
+                galleryGrid.appendChild(col);
+            }
+            return colCount;
+        }
+
+        let currentColumns = initColumns();
+        window.onresize = () => {
+            const width = window.innerWidth;
+            let newCount = 4;
+            if (width < 500) newCount = 1;
+            else if (width < 800) newCount = 2;
+            else if (width < 1200) newCount = 3;
+
+            if (newCount !== currentColumns) {
+                const allItems = Array.from(document.querySelectorAll('.photo-item'));
+                currentColumns = initColumns();
+                distributeItems(allItems);
+            }
+        };
+
+        function distributeItems(items) {
+            items.forEach(item => {
+                const shortestCol = getShortestColumn();
+                shortestCol.appendChild(item);
+            });
+        }
+
+        function getShortestColumn() {
+            const columns = Array.from(document.querySelectorAll('.gallery-column'));
+            return columns.reduce((prev, curr) => {
+                return (prev.offsetHeight <= curr.offsetHeight) ? prev : curr;
+            });
+        }
+
+        function toggleFavorite(photo, btn, event) {
+            event.stopPropagation();
+            const index = favorites.findIndex(f => f.url === photo.url);
+            if (index > -1) {
+                favorites.splice(index, 1);
+                btn.classList.remove('active');
+                if (viewMode === 'favorites') {
+                    btn.closest('.photo-item').remove();
+                }
+            } else {
+                favorites.push(photo);
+                btn.classList.add('active');
+            }
+            localStorage.setItem('photo-favorites', JSON.stringify(favorites));
+        }
+
+        async function fetchRandomPhotos(count = 15) {
+            if (isLoading) return;
+            isLoading = true;
+            document.getElementById('loading').style.opacity = '1';
+
+            const newPhotos = [];
+            for (let i = 0; i < count; i++) {
+                const imgId = 100 + Math.floor(Math.random() * 800);
+                const w = Math.floor(Math.random() * 200 + 500);
+                const h = Math.floor(Math.random() * 300 + 400);
+                newPhotos.push({
+                    url: `https://picsum.photos/id/${imgId}/${w}/${h}`,
+                    title: `视觉艺术 #${imgId}`,
+                    author: `Artist ${imgId}`,
+                    aspectRatio: w / h
+                });
+            }
+
+            renderPhotos(newPhotos);
+            isLoading = false;
+            document.getElementById('loading').style.opacity = '0.3';
+        }
+
+        function renderPhotos(data) {
+            data.forEach((photo, index) => {
+                const isFavorited = favorites.some(f => f.url === photo.url);
+                const item = document.createElement('div');
+                item.className = 'photo-item';
+                item.style.animationDelay = `${index * 0.05}s`;
+
+                item.innerHTML = `
+                    <div class="photo-inner">
+                        <div class="btn-favorite ${isFavorited ? 'active' : ''}" onclick="toggleFavorite(${JSON.stringify(photo).replace(/"/g, '&quot;')}, this, event)">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" style="transition: transform 0.3s">
+                                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path>
+                            </svg>
+                        </div>
+                        <img src="${photo.url}" alt="${photo.title}" loading="lazy" 
+                             onload="this.parentElement.parentElement.style.opacity='1'"
+                             onerror="this.parentElement.parentElement.remove()">
+                        <div class="photo-overlay">
+                            <div class="photo-info">
+                                <h2>${photo.title}</h2>
+                                <p>@${photo.author}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                item.onclick = () => {
+                    const highRes = photo.url.replace(/\/\d+\/\d+$/, '/1200/1600');
+                    lightboxImg.classList.remove('loaded');
+                    lightboxImg.src = '';
+                    progressTrack.style.display = 'block';
+                    progressBar.style.width = '0%';
+                    previewLoader.style.display = 'flex';
+                    lightbox.style.display = 'flex';
+
+                    let p = 0;
+                    const interval = setInterval(() => {
+                        p += Math.random() * 15;
+                        if (p >= 90) { clearInterval(interval); p = 90; }
+                        progressBar.style.width = p + '%';
+                    }, 200);
+
+                    lightboxImg.onerror = () => {
+                        clearInterval(interval);
+                        lightbox.style.display = 'none';
+                    };
+
+                    lightboxImg.src = highRes;
+                    lightboxImg.onload = () => {
+                        clearInterval(interval);
+                        progressBar.style.width = '100%';
+                        setTimeout(() => {
+                            progressTrack.style.display = 'none';
+                            previewLoader.style.display = 'none';
+                            lightboxImg.classList.add('loaded');
+                        }, 300);
+                    };
+                };
+
+                const shortestCol = getShortestColumn();
+                shortestCol.appendChild(item);
+            });
+        }
+
+        refreshBtn.onclick = () => {
+            if (viewMode === 'favorites') return;
+            currentColumns = initColumns();
+            fetchRandomPhotos(20);
+        };
+
+        toggleFavBtn.onclick = () => {
+            viewMode = viewMode === 'all' ? 'favorites' : 'all';
+            toggleFavBtn.classList.toggle('active');
+            document.querySelector('.title-area h1').innerText = viewMode === 'all' ? '发现' : '我的收藏';
+            refreshBtn.style.display = viewMode === 'all' ? 'block' : 'none';
+
+            initColumns();
+            if (viewMode === 'all') {
+                fetchRandomPhotos(20);
+            } else {
+                renderPhotos(favorites);
+            }
+        };
+
+        window.onscroll = () => {
+            if (viewMode === 'favorites') return;
+            if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 800) {
+                fetchRandomPhotos(10);
+            }
+        };
+
+        lightbox.onclick = () => {
+            lightbox.style.display = 'none';
+            setTimeout(() => {
+                lightboxImg.src = '';
+                lightboxImg.classList.remove('loaded');
+            }, 300);
+        };
+
+        fetchRandomPhotos(20);
+    </script>
+</body>
+
+</html>

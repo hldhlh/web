@@ -1,16 +1,14 @@
 ﻿export async function getAppDirectories() {
   return [
-    { name: "邮件",     path: "mail/index.html" },
-    { name: "联系人",   path: "contacts/index.html" },
-    { name: "照片",     path: "photos/index.html" },
-    { name: "日历",     path: "calendar/index.html" },
+    { name: "日历", path: "calendar/index.html" },
     { name: "待办事项", path: "todo/index.html" },
-    { name: "测试",     path: "test/index.html" },
+    { name: "测试", path: "test/index.html" },
     { name: "灵感词云", path: "wordcanvas/index.html" },
-    { name: "云盘",     path: "cloud/index.html" },
-    { name: "吃什么",   path: "eatwhat/index.html" },
-    { name: "今岭SOP",   path: "sop/index.html" },
-    { name: "PPT",   path: "ppt/index.html" },
-    { name: "日志",     path: "log/index.html" }
+    { name: "云盘", path: "cloud/index.html" },
+    { name: "吃什么", path: "eatwhat/index.html" },
+    { name: "今岭SOP", path: "sop/index.html" },
+    { name: "PPT", path: "ppt/index.html" },
+    { name: "阅图", path: "vista/index.html" },
+    { name: "日志", path: "log/index.html" }
   ];
 }

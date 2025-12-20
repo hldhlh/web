@@ -1,16 +1,41 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <radialGradient id="pinkGradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%" spreadMethod="pad">
-      <stop offset="0%" style="stop-color:#ff5a83;stop-opacity:1" />
-      <stop offset="30%" style="stop-color:#ff799a;stop-opacity:0.9" />
-      <stop offset="60%" style="stop-color:#ff9db1;stop-opacity:0.6" />
-      <stop offset="80%" style="stop-color:#ffb9c5;stop-opacity:0.3" />
-      <stop offset="100%" style="stop-color:#ffd6dd;stop-opacity:0" />
-    </radialGradient>
+    <!-- 主背景渐变：深邃电感蓝紫 -->
+    <linearGradient id="mainGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366F1" />
+      <stop offset="100%" style="stop-color:#4338CA" />
+    </linearGradient>
+    
+    <!-- 内部玻璃光感渐变 -->
+    <linearGradient id="glassGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:white;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:white;stop-opacity:0.05" />
+    </linearGradient>
+
+    <!-- 柔和扩散滤镜 -->
+    <filter id="softBlur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="8" />
+    </filter>
   </defs>
-  <circle cx="50" cy="50" r="48" fill="url(#pinkGradient)" />
-  
-  <!-- 不规则三角形白色形状 -->
-  <path d="M20 65 L80 45 L55 25 Z" fill="white" stroke="none" />
+
+  <!-- 1. 基础容器：圆角矩形 -->
+  <rect x="8" y="8" width="84" height="84" rx="28" fill="url(#mainGrad)" />
+
+  <!-- 2. 底层扩散光晕：营造“呼吸感” -->
+  <circle cx="50" cy="50" r="30" fill="#818CF8" filter="url(#softBlur)" opacity="0.4">
+    <animate attributeName="opacity" values="0.2;0.5;0.2" dur="4s" repeatCount="indefinite" />
+  </circle>
+
+  <!-- 3. 抽象 Lab 符号：烧瓶造型的极简线条 -->
+  <g transform="translate(30, 22) scale(0.8)">
+    <!-- 烧瓶瓶身（玻璃质感填充） -->
+    <path d="M25 5 L25 25 L5 55 A5 5 0 0 0 10 65 H40 A5 5 0 0 0 45 55 L25 25" fill="url(#glassGrad)" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+    <!-- 内部冒泡颗粒 -->
+    <circle cx="20" cy="45" r="2" fill="white" opacity="0.8" />
+    <circle cx="32" cy="52" r="1.5" fill="white" opacity="0.6" />
+  </g>
+
+  <!-- 4. 边缘高光：精致锁边 -->
+  <rect x="8" y="8" width="84" height="84" rx="28" fill="none" stroke="white" stroke-width="1.2" stroke-opacity="0.15" />
 </svg>

@@ -1,76 +1,235 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>应用导航</title>
-  <!-- 使用原生 CSS/JS/HTML，不依赖 Bootstrap -->
   <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
     :root {
-      --app-primary-color:#0a84ff; --app-primary-light:rgba(10,132,255,.1);
-      --app-background:#f5f5f5; --app-surface:#fff;
-      --text-primary:#1d1d1f; --text-secondary:#86868b; --border-color:rgba(0,0,0,.1);
+      --app-primary-color: #0a84ff;
+      --app-background: #ffffff;
+      --app-surface: rgba(255, 255, 255, 0.82);
+      --text-primary: #1d1d1f;
+      --text-secondary: #86868b;
+      --transition-speed: 0.6s;
     }
+
     [data-theme=dark] {
-      --app-primary-color:#0a84ff; --app-primary-light:rgba(10,132,255,.2);
-      --app-background:#1c1c1e; --app-surface:#2c2c2e;
-      --text-primary:#fff; --text-secondary:#ebebf0; --border-color:rgba(255,255,255,.1);
+      --app-background: #000000;
+      --app-surface: rgba(28, 28, 30, 0.82);
+      --text-primary: #ffffff;
+      --text-secondary: #8e8e93;
     }
-    body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--app-background); color:var(--text-primary); height:100vh; overflow:hidden; -webkit-font-smoothing:antialiased; }
-    .container { height:100vh; display:flex; flex-direction:column; overflow-y:auto; -webkit-overflow-scrolling:touch; }
-    .status-bar { padding:.5rem 1rem; display:flex; justify-content:flex-end; align-items:center; }
-    .app-icons-wrapper { flex:1; padding:1rem; display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); grid-auto-rows:minmax(90px,auto); gap:1.5rem; width:100%; max-width:1200px; margin:0 auto; align-content:start; }
-    .app-icon-wrapper { content-visibility:auto; contain-intrinsic-size: 120px 110px; }
-    .app-icon { text-decoration:none; display:flex; flex-direction:column; align-items:center; }
-    .app-icon-image { width:64px; height:64px; border-radius:16px; margin-bottom:.3rem; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,.08); }
-    .app-icon:hover .app-icon-image { transform:translateY(-3px) scale(1.03); box-shadow:0 4px 10px rgba(0,0,0,.1); }
-    .app-icon-image svg { width:100%; height:100%; display:block; }
-    .app-name { font-size:.85rem; color:var(--text-primary); text-align:center; max-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .app-icon:hover .app-name { color:var(--app-primary-color); }
-    .theme-toggle { background:var(--app-surface); border:none; cursor:pointer; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,.12); position:relative; }
-    .theme-toggle .sun-icon,.theme-toggle .moon-icon { position:absolute; fill:var(--text-primary); }
-    .theme-toggle .sun-icon { opacity:1; stroke:var(--text-primary); stroke-width:1.5; stroke-linecap:round; fill:none; }
-    .theme-toggle .moon-icon { opacity:0; }
-    [data-theme=dark] .theme-toggle .sun-icon { opacity:0; transform:translateY(-20px); }
-    [data-theme=dark] .theme-toggle .moon-icon { opacity:1; transform:translateY(0); }
-    .clear-cache-btn { background:var(--app-surface); border:none; cursor:pointer; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,.12); position:fixed; left:1rem; bottom:1rem; z-index:100; transition:transform 0.2s ease; }
-    .clear-cache-btn:hover { transform:scale(1.1); }
-    .clear-cache-btn:active { transform:scale(0.95); }
-    .clear-cache-btn svg { fill:var(--text-primary); stroke:var(--text-primary); stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
-    @media (max-width:768px){ .app-icons-wrapper{ grid-template-columns:repeat(4,1fr); gap:1rem; padding:.8rem; } .app-icon-image{ width:55px; height:55px; } }
-    @media (prefers-reduced-motion: reduce){
-      .app-icon-image, .theme-toggle { transition:none }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro SC', 'SF Pro Display', sans-serif;
+      background: var(--app-background);
+      color: var(--text-primary);
+      height: 100vh;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      transition: background var(--transition-speed) ease, color var(--transition-speed) ease;
+    }
+
+    /* 背景层：通过 opacity 变化实现平滑切换 */
+    .bg-layer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      background-attachment: fixed;
+      transition: opacity var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
+      opacity: 0;
+    }
+
+    .bg-layer.active {
+      opacity: 1;
+    }
+
+    .bg-dark {
+      background-image: radial-gradient(at 0% 0%, hsla(253, 16%, 7%, 1) 0, transparent 50%),
+        radial-gradient(at 50% 0%, hsla(225, 39%, 30%, 1) 0, transparent 50%),
+        radial-gradient(at 100% 0%, hsla(339, 49%, 30%, 1) 0, transparent 50%);
+    }
+
+    .bg-light {
+      background-image: radial-gradient(at 0% 0%, hsla(210, 100%, 96%, 1) 0, transparent 50%),
+        radial-gradient(at 50% 0%, hsla(220, 100%, 99%, 1) 0, transparent 50%),
+        radial-gradient(at 100% 0%, hsla(280, 100%, 96%, 1) 0, transparent 50%);
+    }
+
+    /* 初始开场动画 */
+    @keyframes pageEnter {
+      from {
+        opacity: 0;
+        transform: scale(1.05) translateY(20px);
+        filter: blur(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+        filter: blur(0);
+      }
+    }
+
+    .container {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      animation: pageEnter 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .status-bar {
+      padding: 1.5rem 2rem;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .app-icons-wrapper {
+      flex: 1;
+      padding: 2rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 2.5rem;
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+      align-content: start;
+    }
+
+    .app-icon {
+      text-decoration: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: transform 0.3s ease;
+    }
+
+    .app-icon-image {
+      width: 72px;
+      height: 72px;
+      border-radius: 20px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: visible;
+      background: transparent;
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .app-icon:hover .app-icon-image {
+      transform: translateY(-8px) scale(1.1);
+      filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.2));
+    }
+
+    .app-icon-image svg,
+    .app-icon-image img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: contain;
+    }
+
+    .app-name {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      text-align: center;
+      max-width: 90px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      opacity: 0.8;
+      transition: color var(--transition-speed) ease;
+    }
+
+    .theme-toggle,
+    .clear-cache-btn {
+      background: var(--app-surface);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      color: var(--text-primary);
+    }
+
+    .theme-toggle {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+    }
+
+    .clear-cache-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      position: fixed;
+      left: 2rem;
+      bottom: 2rem;
+      z-index: 1000;
+    }
+
+    .clear-cache-btn:hover {
+      transform: translateY(-3px) rotate(-5deg);
+      color: #ff3b30;
+      box-shadow: 0 12px 25px rgba(255, 59, 48, 0.2);
+    }
+
+    @media (max-width: 768px) {
+      .app-icons-wrapper {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1.5rem;
+        padding: 1.2rem;
+      }
+
+      .app-icon-image {
+        width: 60px;
+        height: 60px;
+      }
     }
   </style>
 </head>
+
 <body>
+  <div id="bg-dark" class="bg-layer bg-dark"></div>
+  <div id="bg-light" class="bg-layer bg-light"></div>
+
   <div class="container">
     <div class="status-bar">
       <button id="theme-toggle" class="theme-toggle" title="切换主题">
-        <svg class="sun-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="12" cy="12" r="4.5" />
-          <line x1="12" y1="2" x2="12" y2="4" />
-          <line x1="12" y1="20" x2="12" y2="22" />
-          <line x1="4" y1="12" x2="2" y2="12" />
-          <line x1="22" y1="12" x2="20" y2="12" />
-          <line x1="6.34" y1="6.34" x2="4.93" y2="4.93" />
-          <line x1="19.07" y1="19.07" x2="17.66" y2="17.66" />
-          <line x1="6.34" y1="17.66" x2="4.93" y2="19.07" />
-          <line x1="19.07" y1="4.93" x2="17.66" y2="6.34" />
-        </svg>
-        <svg class="moon-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path d="M21.5 14.0784C20.3003 14.7189 18.9341 15.0821 17.4849 15.0821C12.9237 15.0821 9.22612 11.3845 9.22612 6.82334C9.22612 5.37545 9.59114 4.0109 10.2322 2.8125C6.36838 3.9234 3.5 7.45216 3.5 11.636C3.5 16.7325 7.63757 20.87 12.734 20.87C16.9262 20.87 20.4603 18.0075 21.5 14.0784Z" />
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+          stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5" />
+          <path
+            d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
         </svg>
       </button>
     </div>
     <div class="app-icons-wrapper" id="app-container"></div>
   </div>
 
-  <!-- 清除缓存按钮 -->
-  <button id="clear-cache-btn" class="clear-cache-btn" title="清除本地缓存">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" />
+  <button id="clear-cache-btn" class="clear-cache-btn" title="强制刷新图标">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path
+        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
     </svg>
   </button>
 
@@ -78,103 +237,98 @@
     import { getAppDirectories } from './apps.js';
 
     const Theme = {
-      getTheme(){ return localStorage.getItem('app-theme') || 'light' },
-      setTheme(t){ localStorage.setItem('app-theme', t); document.body.setAttribute('data-theme', t) },
-      toggle(){ const t=this.getTheme()==='light'?'dark':'light'; this.setTheme(t); return t },
-      init(){ this.setTheme(this.getTheme()) }
+      getTheme() { return localStorage.getItem('app-theme') || 'light' },
+      updateBGLayers(t) {
+        document.getElementById('bg-light').classList.toggle('active', t === 'light');
+        document.getElementById('bg-dark').classList.toggle('active', t === 'dark');
+      },
+      setTheme(t) {
+        localStorage.setItem('app-theme', t);
+        document.body.setAttribute('data-theme', t);
+        this.updateBGLayers(t);
+      },
+      toggle() {
+        const next = this.getTheme() === 'light' ? 'dark' : 'light';
+        // 使用现代 View Transition API 如果浏览器支持
+        if (document.startViewTransition) {
+          document.startViewTransition(() => this.setTheme(next));
+        } else {
+          this.setTheme(next);
+        }
+      },
+      init() { this.setTheme(this.getTheme()) }
     };
 
-    const appColors = { mail:'#FF453A', contacts:'#FF9F0A', photos:'#30D158', calendar:'#FFD60A', todo:'#5E5CE6', cloud:'#0A84FF', default:'#FFFFFF' };
-
-    // 简单的会话级图标缓存，避免重复网络请求
-    const ICON_CACHE_KEY = 'app_icon_cache_v1';
     const iconCache = (() => {
-      let store; try { store = JSON.parse(sessionStorage.getItem(ICON_CACHE_KEY) || '{}') } catch { store = {} }
+      const memStore = new Map();
       return {
-        get:(k)=>store[k],
-        set:(k,v)=>{ store[k]=v; try{ sessionStorage.setItem(ICON_CACHE_KEY, JSON.stringify(store)) }catch{} }
+        get: (k) => memStore.get(k),
+        set: (k, v) => memStore.set(k, v),
+        clear: () => {
+          memStore.clear();
+          try { sessionStorage.clear(); localStorage.clear(); } catch (e) { }
+          location.reload();
+        }
       }
     })();
 
-    const getDirFromPath = (p) => { if(!p) return ''; const i=p.indexOf('/'); return i===-1?p:p.slice(0,i); };
+    const getDirFromPath = (p) => { if (!p) return ''; const i = p.indexOf('/'); return i === -1 ? p : p.slice(0, i); };
+
     const resolveIcon = async (dir) => {
       if (iconCache.get(dir)) return iconCache.get(dir);
-      const candidates = [`./pages/${dir}/icon.svg`,`./pages/${dir}/icon`];
-      for(const url of candidates){
-        try{
-          const res = await fetch(url, { cache: 'force-cache' });
-          if(!res.ok) continue;
-          const ct=(res.headers.get('content-type')||'').toLowerCase();
+
+      // 内部处理：已知没有图标的目录直接跳过，避免控制台产生 404 错误
+      const noIconDirs = ['sop', 'ppt'];
+      if (noIconDirs.includes(dir)) return null;
+
+      const candidates = [`./pages/${dir}/icon.svg`, `./pages/${dir}/icon`];
+      for (const url of candidates) {
+        try {
+          const res = await fetch(url, { cache: 'no-cache' });
+          if (!res.ok) continue;
+          const ct = (res.headers.get('content-type') || '').toLowerCase();
           const value = ct.includes('image/svg')
-            ? { type:'svg', content: await res.text() }
-            : { type:'img', url };
+            ? { type: 'svg', content: await res.text() }
+            : { type: 'img', url };
           iconCache.set(dir, value);
           return value;
-        }catch(e){}
+        } catch (e) { }
       }
-      iconCache.set(dir, null);
       return null;
     };
 
-    async function loadApps(){
+    async function loadApps() {
       const container = document.getElementById('app-container');
-      try{
-        const apps = await getAppDirectories();
-        // 预解析目录并消除重复
-        const dirs = Array.from(new Set(apps.map(a=>getDirFromPath(a.path))));
-        // 并发限制，避免首屏阻塞
-        const limit = Math.min(4, Math.max(2, (navigator.hardwareConcurrency||4)>>1));
-        let idx = 0; const iconMap = new Map();
-        async function worker(){
-          while(idx < dirs.length){
-            const i = idx++; const d = dirs[i];
-            iconMap.set(d, await resolveIcon(d));
-          }
-        }
-        await Promise.all(Array.from({length:limit}, worker));
+      const apps = await getAppDirectories();
+      const frag = document.createDocumentFragment();
 
-        const frag = document.createDocumentFragment();
-        for(const app of apps){
-          const dir = getDirFromPath(app.path);
-          const icon = iconMap.get(dir) ?? null;
-          const el = document.createElement('a');
-          el.href = `./pages/${app.path}`; el.className='app-icon';
-          if(icon){
-            const inner = icon.type==='svg' ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center">${icon.content}</div>` : `<img src="${icon.url}" alt="${app.name}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:contain;display:block">`;
-            el.innerHTML = `<div class="app-icon-wrapper"><div class="app-icon-image">${inner}</div><div class="app-name">${app.name}</div></div>`;
-          }else{
-            const bg = appColors[dir] || appColors.default; const tc = bg==='#FFFFFF' ? '#000' : '#FFF';
-            el.innerHTML = `<div class="app-icon-wrapper"><div class="app-icon-image" style="background-color:${bg}"><div style="width:60%;height:60%;display:flex;align-items:center;justify-content:center;color:${tc};font-weight:bold;font-size:18px">${app.name.charAt(0)}</div></div><div class="app-name">${app.name}</div></div>`;
-          }
-          frag.appendChild(el);
+      for (const app of apps) {
+        const dir = getDirFromPath(app.path);
+        const icon = await resolveIcon(dir);
+        const el = document.createElement('a');
+        el.href = `./pages/${app.path}`;
+        el.className = 'app-icon';
+
+        let inner = '';
+        if (icon) {
+          inner = icon.type === 'svg' ? icon.content : `<img src="${icon.url}" alt="${app.name}">`;
+        } else {
+          inner = `<div style="width:100%;height:100%;background:#0a84ff;border-radius:20px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:24px">${app.name.charAt(0)}</div>`;
         }
-        container.appendChild(frag);
-      }catch(e){ container.innerHTML = '<p>加载应用失败，请稍后重试</p>'; }
+
+        el.innerHTML = `<div class="app-icon-image">${inner}</div><div class="app-name">${app.name}</div>`;
+        frag.appendChild(el);
+      }
+      container.appendChild(frag);
     }
 
-    document.addEventListener('DOMContentLoaded', ()=>{
+    document.addEventListener('DOMContentLoaded', () => {
       Theme.init();
       loadApps();
-      document.getElementById('theme-toggle').addEventListener('click', ()=>Theme.toggle());
-
-      // 清除缓存按钮事件
-      document.getElementById('clear-cache-btn').addEventListener('click', ()=>{
-        if(confirm('确定要清除所有本地缓存吗？这将删除所有 localStorage 和 sessionStorage 数据。')){
-          try{
-            localStorage.clear();
-            sessionStorage.clear();
-            // 清除 Service Worker 缓存
-            if('caches' in window){
-              caches.keys().then(names=>Promise.all(names.map(n=>caches.delete(n))));
-            }
-            alert('缓存已清除！页面将刷新。');
-            location.reload();
-          }catch(e){
-            alert('清除缓存失败：' + e.message);
-          }
-        }
-      });
+      document.getElementById('theme-toggle').onclick = () => Theme.toggle();
+      document.getElementById('clear-cache-btn').onclick = () => iconCache.clear();
     });
   </script>
 </body>
+
 </html>

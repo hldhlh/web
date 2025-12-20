@@ -1,24 +1,55 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="232" height="164" viewBox="-20 -20 232 164" id="onedrive">
+<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1565C0"/>
-      <stop offset="50%" stop-color="#2196F3"/>
-      <stop offset="100%" stop-color="#64B5F6"/>
+    <!-- 1. 背景渐变 -->
+    <linearGradient id="nightBase" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1E1C31" />
+      <stop offset="100%" style="stop-color:#020617" />
     </linearGradient>
-    <filter id="shadow">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
-      <feOffset dx="2" dy="2" result="offsetblur"/>
-      <feComponentTransfer>
-        <feFuncA type="linear" slope="0.2"/>
-      </feComponentTransfer>
+
+    <!-- 2. 【核心修复】全局滤镜。filterUnits="userSpaceOnUse" 彻底消除矩形切边 -->
+    <filter id="pureDiffusion" filterUnits="userSpaceOnUse" x="0" y="0" width="100" height="100" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="glaze" />
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="rim" />
       <feMerge>
-        <feMergeNode/>
-        <feMergeNode in="SourceGraphic"/>
+        <feMergeNode in="glaze" />
+        <feMergeNode in="rim" />
+        <feMergeNode in="SourceGraphic" />
       </feMerge>
     </filter>
+
+    <!-- 3. 动态材质 -->
+    <radialGradient id="weavingLight" cx="45%" cy="35%" r="75%">
+      <stop offset="0%" style="stop-color:white">
+        <animate attributeName="stop-color" values="white;#F0F9FF;white" dur="8s" repeatCount="indefinite" />
+      </stop>
+      <stop offset="40%" style="stop-color:#E0E7FF;stop-opacity:0.95" />
+      <stop offset="100%" style="stop-color:#818CF8;stop-opacity:0.8" />
+    </radialGradient>
   </defs>
-  <path d="M97 0a55 55 0 1 1 0 110 55 55 0 0 1 0-110zm56 44c21.5 0 39 17.5 39 39 0 7-1.8 13.5-5 19.2L113 57.6l23.9-10.2c4.9-2.2 10.3-3.4 16.1-3.4zM48 26c10.5 0 20.1 3.3 28 9v-.1l37 22.7-104 45.3C3.3 95 0 84.5 0 74 0 47.5 21.5 26 48 26zm139 76.2c-6 10-17.3 19.3-29.4 20.8-8.1 1-44.7 1-110 0-15.8 0-29.8-8.3-38.6-20l104-45.3 74 44.5z" 
-        fill="url(#grad)"
-        filter="url(#shadow)"/>
+
+  <!-- 4. 基础容器 -->
+  <rect x="8" y="8" width="84" height="84" rx="28" fill="url(#nightBase)" />
+
+  <!-- 5. 环境光 -->
+  <circle cx="50" cy="50" r="28" fill="#6366F1" filter="url(#pureDiffusion)" opacity="0.3">
+    <animate attributeName="opacity" values="0.15;0.45;0.15" dur="10s" repeatCount="indefinite" />
+  </circle>
+
+  <!-- 6. 【核心修复】使用叠加式动画 additive="sum" 确保居中不失效 -->
+  <g filter="url(#pureDiffusion)">
+    <g transform="translate(27.5, 32)">
+      <path d="M5 25 A8 8 0 0 1 12 10 A14 14 0 0 1 36 12 A10 10 0 0 1 40 25 Z" fill="url(#weavingLight)" />
+      <path d="M12 10 A14 14 0 0 1 36 12" fill="none" stroke="white" stroke-width="0.8" stroke-linecap="round" opacity="0.5" />
+      
+      <!-- 动画设定为 additive="sum" 以累加到父级的 translate -->
+      <animateTransform attributeName="transform" type="translate" values="0 0; 1 -2; -1 1; 0 0" dur="12s" repeatCount="indefinite" additive="sum" />
+    </g>
+  </g>
+
+  <!-- 7. 极致锁边与核心 -->
+  <rect x="8" y="8" width="84" height="84" rx="28" fill="none" stroke="white" stroke-width="1" stroke-opacity="0.1" />
+  <circle cx="50" cy="50" r="1.5" fill="white">
+    <animate attributeName="opacity" values="0.4;1;0.4" dur="5s" repeatCount="indefinite" />
+  </circle>
 </svg>
