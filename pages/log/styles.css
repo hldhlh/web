@@ -353,13 +353,94 @@ body {
     gap: 0.75rem;
 }
 
-/* 移动端 */
+/* 状态指示器 */
+.header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 2rem;
+}
+
+.header-row .page-title {
+    margin-bottom: 0;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.7rem;
+    color: #999;
+    padding: 0.25rem 0.6rem;
+    background: #f9f9f9;
+    border-radius: 20px;
+    transition: all 0.3s ease;
+}
+
+.status-dot {
+    width: 6px;
+    height: 6px;
+    background: #ccc;
+    border-radius: 50%;
+    transition: background 0.3s ease;
+}
+
+.status-indicator.online .status-dot {
+    background: #4caf50;
+    box-shadow: 0 0 6px rgba(76, 175, 80, 0.4);
+}
+
+.status-indicator.offline .status-dot {
+    background: #f44336;
+}
+
+.status-indicator.loading .status-dot {
+    background: #2196f3;
+    animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+    from {
+        opacity: 0.5;
+        transform: scale(0.8);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1.1);
+    }
+}
+
+.loading-state,
+.error-wrapper {
+    text-align: center;
+    padding: 3rem 0;
+    color: #999;
+    font-size: 0.875rem;
+}
+
+.error-wrapper p {
+    color: #f44336;
+    margin-bottom: 1rem;
+}
+
+.btn-small {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.7rem;
+}
+
+/* 移动端优化 */
 @media (max-width: 640px) {
     .container {
         padding: 1.5rem 1rem;
     }
 
     .timeline-actions {
-        opacity: 0.5;
+        opacity: 0.6;
+        /* 移动端默认可见一些，方便点击 */
+    }
+
+    .status-indicator {
+        transform: scale(0.9);
     }
 }

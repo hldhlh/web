@@ -1,67 +1,101 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>日志</title>
     <link rel="stylesheet" href="styles.css">
     <script>
+        // 移除 esm.sh 以避免 ESM 模块错误，仅保留稳定的 UMD 源
         const CDN = [
             'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+            'https://fastly.jsdelivr.net/npm/@supabase/supabase-js@2',
             'https://unpkg.com/@supabase/supabase-js@2'
         ];
-        
+
         const load = {
             script(url) {
                 return new Promise((ok, fail) => {
+                    // 如果已经由于之前的 CDN 加载成功了，则直接返回
+                    if (window.supabase && window.supabase.createClient) return ok();
+
                     const s = document.createElement('script');
                     s.src = url;
-                    const t = setTimeout(() => { s.remove(); fail(); }, 6000);
+                    const t = setTimeout(() => { s.remove(); fail('timeout'); }, 10000);
                     s.onload = () => { clearTimeout(t); ok(); };
-                    s.onerror = () => { clearTimeout(t); s.remove(); fail(); };
+                    s.onerror = () => { clearTimeout(t); s.remove(); fail('error'); };
                     document.head.appendChild(s);
                 });
             },
             wait() {
                 return new Promise((ok, fail) => {
+                    if (window.supabase && window.supabase.createClient) return ok();
                     let n = 0;
                     const c = () => {
-                        if (window.supabase?.createClient) return ok();
-                        if (++n > 30) return fail();
+                        if (window.supabase && window.supabase.createClient) return ok();
+                        if (++n > 50) return fail('wait_timeout');
                         setTimeout(c, 100);
                     };
                     c();
                 });
             },
             async init() {
-                const race = CDN.map(async u => { await this.script(u); await this.wait(); return u; });
-                try {
-                    await Promise.race(race);
+                // 如果已经存在，直接发信号
+                if (window.supabase && window.supabase.createClient) {
                     window.dispatchEvent(new Event('cdnReady'));
-                } catch {
-                    for (const u of CDN) {
-                        try { await this.script(u); await this.wait(); window.dispatchEvent(new Event('cdnReady')); return; } catch {}
-                    }
-                    window.dispatchEvent(new Event('cdnError'));
+                    return;
                 }
+
+                // 为了避免变量声明冲突，我们按照顺序尝试 CDN，而不是竞速加载
+                // 因为部分 CDN 库如果不小心加载了两次且库内部使用了 const，会导致闪退
+                console.log('正在加载数据库服务...');
+                for (const u of CDN) {
+                    try {
+                        await this.script(u);
+                        await this.wait();
+                        console.log('CDN 加载成功:', u);
+                        window.dispatchEvent(new Event('cdnReady'));
+                        return;
+                    } catch (e) {
+                        console.warn('CDN 加载失败，切换源:', u);
+                    }
+                }
+
+                // 所有源都失败
+                window.dispatchEvent(new Event('cdnError'));
             }
         };
-        
+
         document.addEventListener('DOMContentLoaded', () => load.init());
     </script>
 </head>
+
 <body>
     <div class="container">
-        <h1 class="page-title">日志</h1>
+        <div class="header-row">
+            <h1 class="page-title">日志</h1>
+            <div id="statusIndicator" class="status-indicator">
+                <span class="status-dot"></span>
+                <span class="status-text">初始化中...</span>
+            </div>
+        </div>
         <form id="logForm" class="form-container">
-            <textarea id="logContent" name="content" rows="3" class="form-textarea" placeholder="随手记录点什么..." required></textarea>
+            <textarea id="logContent" name="content" rows="3" class="form-textarea" placeholder="随手记录点什么..."
+                required></textarea>
             <div class="form-actions">
                 <button type="button" id="cancelBtn" class="btn btn-cancel hidden">取消</button>
                 <button type="submit" id="submitBtn" class="btn btn-primary">保存</button>
             </div>
         </form>
-        <div id="timeline" class="timeline-container"></div>
+        <div id="timeline" class="timeline-container">
+            <div id="loadingLogs" class="loading-state">正在加载日志...</div>
+        </div>
         <div id="emptyState" class="empty-state hidden">暂无日志</div>
+        <div id="errorState" class="error-wrapper hidden">
+            <p>连接失败，请检查网络</p>
+            <button onclick="location.reload()" class="btn btn-small">重试</button>
+        </div>
     </div>
     <div id="deleteModal" class="modal hidden">
         <div class="modal-content">
@@ -74,4 +108,5 @@
     </div>
     <script src="script.js"></script>
 </body>
+
 </html>
