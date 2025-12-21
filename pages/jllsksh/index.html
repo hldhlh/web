@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>今岭流水数据可视化</title>
+    <link rel="stylesheet" href="index.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@1.1.1/dist/chartjs-chart-matrix.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="container">
+        <header class="animate-fade">
+            <h1>今岭流水数据可视化</h1>
+            <p>基于数据驱动的一站式经营深度可视化</p>
+        </header>
+
+        <!-- 彻底修复图片中显示的原生上传按钮问题 -->
+        <div class="upload-section animate-fade" id="dropZone">
+            <span class="upload-icon">💠</span>
+            <div class="upload-btn-styled">选择 EXCEL 数据文件</div>
+            <p style="color: var(--text-dim); font-weight: 600;">或者将文件拖拽至此处进行解析</p>
+            <p style="margin-top: 1rem; font-size: 0.8rem; color: rgba(255,255,255,0.2);">支持格式: .XLS, .XLSX</p>
+            <input type="file" id="fileInput" accept=".xls,.xlsx">
+        </div>
+
+        <div id="dashboard" class="hidden">
+            <div class="stats-grid animate-fade">
+                <div class="stat-card">
+                    <div class="stat-value" id="val-total-revenue">¥0</div>
+                    <div class="stat-label">总实收金额</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="val-avg-order">¥0</div>
+                    <div class="stat-label">平均客单价</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="val-order-count">0</div>
+                    <div class="stat-label">总订单量</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="val-customer-count">0</div>
+                    <div class="stat-label">总就餐人数</div>
+                </div>
+            </div>
+
+            <div class="charts-grid animate-fade">
+                <div class="chart-container span-4">
+                    <canvas id="weeklyHeatmapChart"></canvas>
+                </div>
+                <div class="chart-container span-2">
+                    <canvas id="orderTypeChart"></canvas>
+                </div>
+                <div class="chart-container span-3">
+                    <canvas id="deliveryVsDineInChart"></canvas>
+                </div>
+                <div class="chart-container span-3">
+                    <canvas id="inventoryForecastChart"></canvas>
+                </div>
+                <div class="chart-container span-4">
+                    <canvas id="tableAnalysisChart"></canvas>
+                </div>
+                <div class="chart-container span-2">
+                    <canvas id="orderBucketChart"></canvas>
+                </div>
+                <div class="chart-container span-3">
+                    <canvas id="discountAnalysisChart"></canvas>
+                </div>
+                <div class="chart-container span-3">
+                    <canvas id="spendingTrendChart"></canvas>
+                </div>
+                <div class="chart-container span-6" style="min-height: 550px;">
+                    <canvas id="guestValueBubbleChart"></canvas>
+                </div>
+                <div class="chart-container span-6" style="min-height: 400px;">
+                    <canvas id="guestPatternChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const dashboard = document.getElementById('dashboard');
+        const uploadSection = document.getElementById('dropZone');
+
+        let charts = {};
+
+        // --- 系统通知系统 (Toast) ---
+        function showToast(message, type = 'error') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<span>${type === 'error' ? '🚫' : '⚠️'}</span> ${message.replace(/\n/g, '<br>')}`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.animation = 'toastOut 0.5s forwards';
+                setTimeout(() => toast.remove(), 500);
+            }, 5000);
+        }
+
+        // 全局 Chart.js 默认配置增强
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.font.family = "'Outfit', 'Inter', sans-serif";
+        Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15, 23, 42, 0.95)';
+        Chart.defaults.plugins.tooltip.padding = 15;
+        Chart.defaults.plugins.tooltip.cornerRadius = 12;
+        Chart.defaults.plugins.tooltip.titleFont = { size: 14, weight: 'bold' };
+        Chart.defaults.plugins.tooltip.borderColor = 'rgba(255, 255, 255, 0.1)';
+        Chart.defaults.plugins.tooltip.borderWidth = 1;
+
+        fileInput.addEventListener('change', handleFile);
+
+        function createGradient(ctx, color) {
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, color.replace('1)', '0.5)'));
+            gradient.addColorStop(1, color.replace('1)', '0)'));
+            return gradient;
+        }
+
+        function handleFile(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                const rawJson = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                processData(rawJson);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function processData(rows) {
+            let headerIdx = -1;
+            for (let i = 0; i < rows.length; i++) {
+                if (rows[i].includes('营业流水号') || rows[i].includes('实收金额')) {
+                    headerIdx = i;
+                    break;
+                }
+            }
+
+            if (headerIdx === -1 || !rows[headerIdx]) {
+                showToast('【解析失败】无法在 Excel 中定位到标题行（需包含“营业流水号”或“实收金额”）。', 'error');
+                return;
+            }
+
+            const headers = rows[headerIdx].map(h => String(h || "").trim());
+            const dataRows = rows.slice(headerIdx + 1);
+
+            // 严谨的列查找函数，防止处理非字符串或空值时崩溃
+            const findCol = (possibleNames) => headers.findIndex(h => {
+                if (typeof h !== 'string' || !h) return false;
+                return possibleNames.some(p => h.includes(p));
+            });
+
+            const idx = {
+                actual: findCol(['实收金额']),
+                receivable: findCol(['应收金额']),
+                discount: findCol(['优惠金额']),
+                time: findCol(['结算时间', '结账时间']),
+                people: findCol(['就餐人数', '人数']),
+                tableName: findCol(['客位名称', '桌号', '桌名'])
+            };
+
+            // 【核心防线】如果缺失“实收”或“时间”，可视化将没有任何意义，直接拦截
+            if (idx.actual === -1 || idx.time === -1) {
+                const missing = [];
+                if (idx.actual === -1) missing.push('“实收金额”');
+                if (idx.time === -1) missing.push('“结算时间”');
+
+                showToast(`【规则冲突】上传的文件不符合解析规则！缺失关键数据列：${missing.join(' 和 ')}`, 'warn');
+                return;
+            }
+
+            let totalActual = 0;
+            let totalPeople = 0;
+            let validOrders = 0;
+            const dailyRevenue = {};
+            const tableTypes = {};
+            const tableUsage = {};
+            const guestComposition = { '一人食': 0, '双人餐': 0, '多人聚餐': 0 };
+            const orderBuckets = { '¥0-30': 0, '¥30-60': 0, '¥60-100': 0, '¥100+': 0 };
+            const compareTrend = {};
+            const heatmapRaw = {};
+            const dailyProfitStats = {};
+            const dailySpendingStats = {};
+            const guestValueStats = {};
+
+            dataRows.forEach(row => {
+                const actual = parseFloat(row[idx.actual]) || 0;
+                const receivable = parseFloat(row[idx.receivable]) || 0;
+                const discount = parseFloat(row[idx.discount]) || (receivable - actual);
+                const people = parseInt(row[idx.people]) || 1;
+                const timeStr = row[idx.time];
+                const tableName = String(row[idx.tableName] || '未知');
+
+                if (isNaN(actual) && isNaN(receivable)) return;
+
+                totalActual += actual;
+                totalPeople += people;
+                validOrders++;
+
+                if (actual <= 30) orderBuckets['¥0-30']++;
+                else if (actual <= 60) orderBuckets['¥30-60']++;
+                else if (actual <= 100) orderBuckets['¥60-100']++;
+                else orderBuckets['¥100+']++;
+
+                const isTakeout = tableName.includes('WM') || tableName.includes('外卖');
+
+                if (!isTakeout) {
+                    if (people === 1) guestComposition['一人食']++;
+                    else if (people === 2) guestComposition['双人餐']++;
+                    else if (people >= 3) guestComposition['多人聚餐']++;
+                    tableUsage[tableName] = (tableUsage[tableName] || 0) + 1;
+                    if (!guestValueStats[people]) guestValueStats[people] = { totalRev: 0, orderCount: 0 };
+                    guestValueStats[people].totalRev += actual;
+                    guestValueStats[people].orderCount++;
+                }
+
+                if (timeStr) {
+                    const date = timeStr.split(' ')[0];
+                    if (!compareTrend[date]) compareTrend[date] = { takeout: 0, dinein: 0 };
+                    if (isTakeout) compareTrend[date].takeout += actual;
+                    else compareTrend[date].dinein += actual;
+
+                    if (!dailyProfitStats[date]) dailyProfitStats[date] = { actual: 0, discount: 0 };
+                    dailyProfitStats[date].actual += actual;
+                    dailyProfitStats[date].discount += Math.max(0, discount);
+
+                    if (!dailySpendingStats[date]) dailySpendingStats[date] = { actual: 0, people: 0 };
+                    dailySpendingStats[date].actual += actual;
+                    dailySpendingStats[date].people += people;
+
+                    const d = new Date(date.replace(/-/g, '/'));
+                    const dayIdx = (d.getDay() + 6) % 7;
+                    const hourMatch = timeStr.match(/(\d{2}):/);
+                    if (hourMatch) {
+                        const hour = parseInt(hourMatch[1]);
+                        const key = `${dayIdx}-${hour}`;
+                        heatmapRaw[key] = (heatmapRaw[key] || 0) + actual;
+                    }
+                    dailyRevenue[date] = (dailyRevenue[date] || 0) + actual;
+                }
+                const category = isTakeout ? '外卖' : '堂食';
+                tableTypes[category] = (tableTypes[category] || 0) + 1;
+            });
+
+            const heatmapData = [];
+            for (let d = 0; d < 7; d++) {
+                for (let h = 0; h < 24; h++) {
+                    heatmapData.push({ x: h, y: d, v: heatmapRaw[`${d}-${h}`] || 0 });
+                }
+            }
+
+            const uniqueDates = Object.keys(dailyRevenue);
+            const daysCount = uniqueDates.length || 1;
+            const weekdayRevenue = new Array(24).fill(0);
+            const weekendRevenue = new Array(24).fill(0);
+            let weekdayCount = 0, weekendCount = 0;
+
+            const dayTypes = {};
+            uniqueDates.forEach(d => {
+                const day = new Date(d.replace(/-/g, '/')).getDay();
+                const isWeekend = (day === 0 || day === 6);
+                dayTypes[d] = isWeekend;
+                if (isWeekend) weekendCount++; else weekdayCount++;
+            });
+
+            dataRows.forEach(row => {
+                const actual = parseFloat(row[idx.actual]);
+                if (isNaN(actual)) return;
+                const timeStr = row[idx.time];
+                if (!timeStr) return;
+                const date = timeStr.split(' ')[0];
+                const isWeekend = dayTypes[date];
+                const hourMatch = timeStr.match(/(\d{2}):/);
+                if (hourMatch) {
+                    const hour = parseInt(hourMatch[1]);
+                    if (isWeekend) weekendRevenue[hour] += actual; else weekdayRevenue[hour] += actual;
+                }
+            });
+
+            const avgWeekdayHourly = weekdayRevenue.map(v => weekdayCount > 0 ? (v / weekdayCount).toFixed(2) : 0);
+            const avgWeekendHourly = weekendRevenue.map(v => weekendCount > 0 ? (v / weekendCount).toFixed(2) : 0);
+
+            document.getElementById('val-total-revenue').innerText = `¥${totalActual.toLocaleString(undefined, { minimumFractionDigits: 1 })}`;
+            document.getElementById('val-avg-order').innerText = `¥${totalPeople > 0 ? (totalActual / totalPeople).toFixed(2) : 0}`;
+            document.getElementById('val-order-count').innerText = validOrders;
+            document.getElementById('val-customer-count').innerText = totalPeople;
+
+            dashboard.classList.remove('hidden');
+            uploadSection.classList.add('hidden');
+
+            renderCharts(dailyRevenue, tableTypes, guestComposition, heatmapData, compareTrend, orderBuckets, tableUsage, daysCount, {
+                weekday: avgWeekdayHourly,
+                weekend: avgWeekendHourly
+            }, dailyProfitStats, dailySpendingStats, guestValueStats);
+        }
+
+        function renderCharts(dailyRevenue, tableTypes, guestComposition, heatmap, compareTrend, buckets, tableUsage, daysCount, forecast, profitStats, spendingStats, guestValueStats) {
+            Object.values(charts).forEach(c => c.destroy());
+
+            const commonOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { color: '#94a3b8', font: { weight: '600', size: 12 }, padding: 20 } }
+                }
+            };
+
+            const gridStyle = { color: 'rgba(255, 255, 255, 0.03)', borderColor: 'rgba(255, 255, 255, 0.05)', drawBorder: false };
+            const titleStyle = (text) => ({ display: true, text, color: '#fff', font: { size: 18, weight: '800' }, padding: { bottom: 25 }, align: 'start' });
+            const sortedDates = Object.keys(dailyRevenue).sort();
+
+            // 1. Heatmap
+            const ctxHeat = document.getElementById('weeklyHeatmapChart').getContext('2d');
+            const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+            const maxVal = Math.max(...heatmap.map(d => d.v), 1);
+            charts.heatmap = new Chart(ctxHeat, {
+                type: 'matrix',
+                data: {
+                    datasets: [{
+                        label: '营收热力',
+                        data: heatmap,
+                        backgroundColor(c) {
+                            const val = c.dataset.data[c.dataIndex].v;
+                            return `rgba(129, 140, 248, ${0.1 + (val / maxVal) * 0.9})`;
+                        },
+                        borderWidth: 1, borderRadius: 8,
+                        width: ({ chart }) => (chart.chartArea || {}).width / 24 - 4,
+                        height: ({ chart }) => (chart.chartArea || {}).height / 7 - 4
+                    }]
+                },
+                options: {
+                    ...commonOptions,
+                    plugins: { ...commonOptions.plugins, title: titleStyle('营收周期热力图') },
+                    scales: {
+                        x: { type: 'linear', min: -0.5, max: 23.5, ticks: { stepSize: 1, callback: (v) => v + 'h' }, grid: { display: false } },
+                        y: { type: 'linear', min: -0.5, max: 6.5, ticks: { stepSize: 1, callback: (v) => dayNames[v] }, grid: { display: false } }
+                    }
+                }
+            });
+
+            // 2. Channels
+            const ctxPie = document.getElementById('orderTypeChart').getContext('2d');
+            charts.pie = new Chart(ctxPie, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(tableTypes),
+                    datasets: [{
+                        data: Object.values(tableTypes),
+                        backgroundColor: ['#f43f5e', '#6366f1'],
+                        borderColor: '#0f172a', borderWidth: 4, hoverOffset: 15
+                    }]
+                },
+                options: { ...commonOptions, cutout: '70%', plugins: { ...commonOptions.plugins, title: titleStyle('收入渠道来源') } }
+            });
+
+            // 3. Trend
+            const ctxCompare = document.getElementById('deliveryVsDineInChart').getContext('2d');
+            charts.compare = new Chart(ctxCompare, {
+                type: 'line',
+                data: {
+                    labels: sortedDates,
+                    datasets: [
+                        { label: '堂食', data: sortedDates.map(d => compareTrend[d].dinein), borderColor: '#818cf8', backgroundColor: createGradient(ctxCompare, 'rgba(129, 140, 248, 1)'), fill: true, tension: 0.4 },
+                        { label: '外卖', data: sortedDates.map(d => compareTrend[d].takeout), borderColor: '#f472b6', backgroundColor: createGradient(ctxCompare, 'rgba(244, 114, 182, 1)'), fill: true, tension: 0.4 }
+                    ]
+                },
+                options: { ...commonOptions, plugins: { ...commonOptions.plugins, title: titleStyle('核心业务趋势对比') }, scales: { y: { grid: gridStyle }, x: { grid: { display: false } } } }
+            });
+
+            // 4. Forecast
+            const ctxInv = document.getElementById('inventoryForecastChart').getContext('2d');
+            charts.inventory = new Chart(ctxInv, {
+                type: 'line',
+                data: {
+                    labels: Array.from({ length: 24 }, (_, i) => i + ':00'),
+                    datasets: [
+                        { label: '平日压力', data: forecast.weekday, borderColor: '#10b981', borderDash: [5, 5], tension: 0.3 },
+                        { label: '周末压力', data: forecast.weekend, borderColor: '#fbbf24', backgroundColor: createGradient(ctxInv, 'rgba(251, 191, 36, 1)'), fill: true, tension: 0.3 }
+                    ]
+                },
+                options: { ...commonOptions, plugins: { ...commonOptions.plugins, title: titleStyle('时段负载预测 (平日 vs 周末)') }, scales: { y: { grid: gridStyle }, x: { grid: { display: false } } } }
+            });
+
+            // 5. Tables (高频桌位与翻台率)
+            const ctxTable = document.getElementById('tableAnalysisChart').getContext('2d');
+            const sortedTables = Object.entries(tableUsage).sort((a, b) => b[1] - a[1]).slice(0, 15);
+            charts.tables = new Chart(ctxTable, {
+                type: 'bar',
+                data: {
+                    labels: sortedTables.map(t => t[0]),
+                    datasets: [
+                        {
+                            label: '订单量',
+                            data: sortedTables.map(t => t[1]),
+                            backgroundColor: 'rgba(99, 102, 241, 0.5)',
+                            borderRadius: 10,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: '日均翻台率',
+                            data: sortedTables.map(t => (t[1] / daysCount).toFixed(1)),
+                            type: 'line',
+                            borderColor: '#fbbf24',
+                            borderWidth: 3,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#fbbf24',
+                            yAxisID: 'y1',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    ...commonOptions,
+                    plugins: { ...commonOptions.plugins, title: titleStyle('高频桌位分布 (订单量 vs 翻台率)') },
+                    scales: {
+                        y: {
+                            grid: gridStyle,
+                            title: { display: true, text: '总订单数', color: '#94a3b8' }
+                        },
+                        y1: {
+                            position: 'right',
+                            grid: { display: false },
+                            ticks: { color: '#fbbf24' },
+                            title: { display: true, text: '日均翻台', color: '#fbbf24' }
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // 6. Buckets
+            const ctxBucket = document.getElementById('orderBucketChart').getContext('2d');
+            charts.bucket = new Chart(ctxBucket, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(buckets),
+                    datasets: [{ data: Object.values(buckets), backgroundColor: ['#818cf8', '#6366f1', '#4f46e5', '#3730a3'], borderRadius: 20 }]
+                },
+                options: { ...commonOptions, indexAxis: 'y', plugins: { ...commonOptions.plugins, title: titleStyle('客单收益分布'), legend: { display: false } } }
+            });
+
+            // 7. Profit Loss
+            const ctxProfit = document.getElementById('discountAnalysisChart').getContext('2d');
+            charts.profit = new Chart(ctxProfit, {
+                type: 'bar',
+                data: {
+                    labels: sortedDates,
+                    datasets: [
+                        { label: '实收', data: sortedDates.map(d => profitStats[d].actual), backgroundColor: '#10b981', borderRadius: 4 },
+                        { label: '优损', data: sortedDates.map(d => profitStats[d].discount), backgroundColor: 'rgba(244, 63, 94, 0.3)', borderRadius: 4 }
+                    ]
+                },
+                options: {
+                    ...commonOptions,
+                    plugins: {
+                        ...commonOptions.plugins,
+                        title: titleStyle('实收 vs 优惠损耗'),
+                        tooltip: {
+                            callbacks: {
+                                title: (items) => {
+                                    const d = new Date(items[0].label.replace(/-/g, '/'));
+                                    const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+                                    return `${items[0].label} (${days[d.getDay()]})`;
+                                }
+                            }
+                        }
+                    },
+                    scales: { x: { stacked: true }, y: { stacked: true, grid: gridStyle } }
+                }
+            });
+
+            // 8. Spending (客单价波动监测)
+            const ctxSpend = document.getElementById('spendingTrendChart').getContext('2d');
+            charts.spending = new Chart(ctxSpend, {
+                type: 'line',
+                data: {
+                    labels: sortedDates,
+                    datasets: [{
+                        label: '平均客单价',
+                        data: sortedDates.map(d => {
+                            const stats = spendingStats[d];
+                            return stats.people > 0 ? (stats.actual / stats.people).toFixed(1) : 0;
+                        }),
+                        borderColor: '#fbbf24',
+                        backgroundColor: createGradient(ctxSpend, 'rgba(251, 191, 36, 1)'),
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 6,
+                        pointHoverRadius: 8,
+                        pointBackgroundColor: '#fbbf24',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2
+                    }]
+                },
+                options: {
+                    ...commonOptions,
+                    plugins: {
+                        ...commonOptions.plugins,
+                        title: titleStyle('客单价波动监测 (人均消费)'),
+                        tooltip: {
+                            callbacks: {
+                                title: (items) => {
+                                    const d = new Date(items[0].label.replace(/-/g, '/'));
+                                    const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+                                    return `${items[0].label} (${days[d.getDay()]})`;
+                                },
+                                label: (item) => `人均消费: ¥${item.formattedValue}`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: gridStyle,
+                            ticks: { callback: v => '¥' + v }
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // 9. Bubble (客群价值动态模型)
+            const ctxBubble = document.getElementById('guestValueBubbleChart').getContext('2d');
+            const totalActualRevenue = Object.values(guestValueStats).reduce((sum, s) => sum + s.totalRev, 0);
+
+            charts.bubble = new Chart(ctxBubble, {
+                type: 'bubble',
+                data: {
+                    datasets: [{
+                        label: '客群价值',
+                        data: Object.entries(guestValueStats).map(([p, s]) => ({
+                            x: parseInt(p), // 就餐人数
+                            y: s.totalRev / s.orderCount, // 平均收益
+                            v: s.totalRev, // 总收益
+                            c: s.orderCount, // 订单量
+                            r: Math.sqrt(s.totalRev / totalActualRevenue) * 60 + 5
+                        })).sort((a, b) => a.x - b.x),
+                        backgroundColor: (c) => `hsla(${260 - c.raw.x * 25}, 70%, 65%, 0.6)`,
+                        borderColor: (c) => `hsla(${260 - c.raw.x * 25}, 70%, 65%, 1)`,
+                        borderWidth: 2,
+                        hoverRadius: 5
+                    }]
+                },
+                options: {
+                    ...commonOptions,
+                    plugins: {
+                        ...commonOptions.plugins,
+                        title: titleStyle('什么样的客人最划算？ (客群模型：人数 vs 单笔收益)'),
+                        tooltip: {
+                            callbacks: {
+                                label: (item) => {
+                                    const raw = item.raw;
+                                    return [
+                                        `就餐人数: ${raw.x}人`,
+                                        `平均单单收益: ¥${raw.y.toFixed(1)}`,
+                                        `总订单量: ${raw.c}`,
+                                        `总营收贡献: ¥${raw.v.toLocaleString()}`
+                                    ];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            min: 0,
+                            title: { display: true, text: '就餐人数 (人)', color: '#64748b', font: { weight: 'bold' } },
+                            grid: { display: false },
+                            ticks: { stepSize: 1 }
+                        },
+                        y: {
+                            title: { display: true, text: '平均单笔收益 (元)', color: '#64748b', font: { weight: 'bold' } },
+                            grid: gridStyle
+                        }
+                    }
+                }
+            });
+
+            // 10. Guests
+            const ctxGuests = document.getElementById('guestPatternChart').getContext('2d');
+            charts.guests = new Chart(ctxGuests, {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(guestComposition),
+                    datasets: [{ data: Object.values(guestComposition), backgroundColor: ['#6366f1', '#f472b6', '#fbbf24'] }]
+                },
+                options: { ...commonOptions, plugins: { ...commonOptions.plugins, title: titleStyle('堂食客群特征') } }
+            });
+        }
+    </script>
+</body>
+
+</html>

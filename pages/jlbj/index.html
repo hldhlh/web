@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SOP 终端数据库</title>
+    <title>今岭笔记</title>
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
     <script src="https://unpkg.com/pinyin-pro@3.19.5/dist/index.js"></script>
@@ -648,11 +648,11 @@
             </div>
             <div class="form-row">
                 <label class="form-label">> 标题</label>
-                <input type="text" id="newTitle" class="form-input" placeholder="例如: 前厅开早SOP" autocomplete="off">
+                <input type="text" id="newTitle" class="form-input" placeholder="例如: 前厅开早流程" autocomplete="off">
             </div>
             <div class="form-row">
                 <label class="form-label">> 分类</label>
-                <input type="text" id="newTag" class="form-input" placeholder="例如: TYPE, SOP, TAG" autocomplete="off">
+                <input type="text" id="newTag" class="form-input" placeholder="例如: 笔记, 流程, 资料" autocomplete="off">
             </div>
             <div class="form-row">
                 <label class="form-label">> 内容详情</label>
@@ -704,10 +704,10 @@
 
     <script>
         // 防止脚本重复执行
-        if (window.__sopInitialized) {
-            console.warn('⚠️ SOP 应用已初始化，跳过重复执行');
+        if (window.__jlbjInitialized) {
+            console.warn('⚠️ 今岭笔记应用已初始化，跳过重复执行');
         } else {
-            window.__sopInitialized = true;
+            window.__jlbjInitialized = true;
             // 所有初始化代码都在这个 else 块中
 
             // ==================== 拼音工具（只声明一次） ====================
@@ -742,10 +742,10 @@
             };
 
             // 防止重复初始化 - 使用 window 对象存储实例
-            if (!window.__sopSupabaseClient) {
-                window.__sopSupabaseClient = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
+            if (!window.__jlbjSupabaseClient) {
+                window.__jlbjSupabaseClient = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
             }
-            const supabase = window.__sopSupabaseClient;
+            const supabase = window.__jlbjSupabaseClient;
 
             // ==================== WEBAPP 小程序配置 ====================
             const WEBAPP_PARSER = {
@@ -816,8 +816,8 @@
 
                     // 保存到本地缓存
                     db = data || [];
-                    localStorage.setItem('sop_cache', JSON.stringify(db));
-                    localStorage.setItem('sop_cache_time', Date.now().toString());
+                    localStorage.setItem('jlbj_cache', JSON.stringify(db));
+                    localStorage.setItem('jlbj_cache_time', Date.now().toString());
 
                     render(db);
                     setupRealtimeSubscription();
@@ -832,11 +832,11 @@
                     console.error('数据加载失败:', e);
 
                     // 尝试从缓存加载
-                    const cachedData = localStorage.getItem('sop_cache');
+                    const cachedData = localStorage.getItem('jlbj_cache');
                     if (cachedData) {
                         try {
                             db = JSON.parse(cachedData);
-                            const cacheTime = localStorage.getItem('sop_cache_time');
+                            const cacheTime = localStorage.getItem('jlbj_cache_time');
                             const timeDiff = Date.now() - parseInt(cacheTime || '0');
                             const hours = Math.floor(timeDiff / 1000 / 60 / 60);
                             render(db);
@@ -884,7 +884,7 @@
 
                 // 创建新的订阅通道
                 realtimeChannel = supabase
-                    .channel('sop_db_changes')
+                    .channel('jlbj_db_changes')
                     .on(
                         'postgres_changes',
                         {
@@ -1052,7 +1052,7 @@
             /**
              * 解析单个 WEBAPP 块
              * @param {string} webappCode - WEBAPP块内的代码
-             * @param {number} itemId - 所属SOP条目的ID
+             * @param {number} itemId - 所属笔记条目的ID
              * @param {number} blockIndex - 该条目中的第几个WEBAPP块
              * @returns {object} 解析后的结构化对象
              */
@@ -1094,7 +1094,7 @@
             /**
              * 处理内容字符串，解析所有WEBAPP块
              * @param {string} content - 原始内容
-             * @param {number} itemId - SOP条目ID
+             * @param {number} itemId - 笔记条目ID
              * @returns {object} { renderedContent, webappBlocks }
              */
             function processContentWithWebapps(content, itemId) {
