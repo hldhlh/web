@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="./icon.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://picsum.photos">
     <title>阅图 - 发现视觉之美</title>
     <style>
         :root {
@@ -39,7 +40,6 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* 顶部导航层 */
         .header {
             position: fixed;
             top: 0;
@@ -83,6 +83,26 @@
             letter-spacing: -0.02em;
         }
 
+        .sync-status {
+            font-size: 11px;
+            color: var(--text-sub);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 2px;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #ffcc00;
+        }
+
+        .status-dot.online {
+            background: #34c759;
+        }
+
         .action-area {
             display: flex;
             gap: 16px;
@@ -105,7 +125,6 @@
             background: #0077ed;
         }
 
-        /* 收藏切换按钮 */
         .btn-toggle-fav {
             background: transparent;
             color: var(--text-main);
@@ -129,18 +148,11 @@
             background: rgba(0, 0, 0, 0.05);
         }
 
-        .btn-toggle-fav.active {
-            background: var(--text-main);
-            color: var(--bg-color);
-            border-color: var(--text-main);
-        }
-
         .btn-toggle-fav.active svg {
             fill: #ff3b30;
             stroke: #ff3b30;
         }
 
-        /* 真正的多列瀑布流布局 */
         .gallery-container {
             max-width: 1400px;
             margin: 84px auto 40px;
@@ -171,6 +183,13 @@
             animation: itemFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
 
+        @keyframes itemFadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         @keyframes heartPop {
             0% {
                 transform: scale(1);
@@ -182,13 +201,6 @@
 
             100% {
                 transform: scale(1);
-            }
-        }
-
-        @keyframes itemFadeIn {
-            to {
-                opacity: 1;
-                transform: translateY(0);
             }
         }
 
@@ -237,7 +249,6 @@
             opacity: 0.8;
         }
 
-        /* 收藏按钮样式 */
         .btn-favorite {
             position: absolute;
             top: 15px;
@@ -269,15 +280,9 @@
             transform: scale(1.1) !important;
         }
 
-        .btn-favorite:hover svg {
-            stroke: #ff3b30;
-            transform: scale(1.1);
-        }
-
         .btn-favorite.active {
             opacity: 1;
             background: white;
-            transform: scale(1);
             border-color: transparent;
         }
 
@@ -287,7 +292,6 @@
             animation: heartPop 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
-        /* Lightbox 相关样式 */
         .lightbox {
             position: fixed;
             inset: 0;
@@ -316,7 +320,6 @@
             transform: scale(1);
         }
 
-        /* 顶部进度条 */
         .progress-track {
             position: absolute;
             top: 0;
@@ -337,7 +340,6 @@
             transition: width 0.3s ease;
         }
 
-        /* 居中加载器 */
         .preview-loader {
             position: absolute;
             display: none;
@@ -379,11 +381,14 @@
         <a href="../../index.html" class="btn-back">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <path d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
-            返回首页
+            </svg> 返回首页
         </a>
         <div class="title-area">
             <h1>发现</h1>
+            <div class="sync-status">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">云正在同步...</span>
+            </div>
         </div>
         <div class="action-area">
             <button class="btn-toggle-fav" id="toggleFavBtn">
@@ -391,20 +396,15 @@
                     <path
                         d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z">
                     </path>
-                </svg>
-                我的收藏
+                </svg> 我的收藏
             </button>
             <button class="btn-refresh" id="refreshBtn">换一批</button>
         </div>
     </header>
 
     <main class="gallery-container">
-        <div class="gallery-grid" id="galleryGrid">
-            <!-- 动态生成列 -->
-        </div>
-        <div id="loading" class="loading-indicator">
-            正在探索更美的一面...
-        </div>
+        <div class="gallery-grid" id="galleryGrid"></div>
+        <div id="loading" class="loading-indicator">正在探索更美的一面...</div>
     </main>
 
     <div id="lightbox" class="lightbox">
@@ -412,298 +412,159 @@
             <div class="progress-bar" id="progressBar"></div>
         </div>
         <div class="preview-loader" id="previewLoader">
-            <div class="spinner"></div>
-            <span style="font-size: 13px; opacity: 0.8; letter-spacing: 1px;">LOADING</span>
+            <div class="spinner"></div><span style="font-size: 13px; opacity: 0.8; letter-spacing: 1px;">LOADING</span>
         </div>
         <img id="lightbox-img" src="" alt="">
     </div>
 
     <script>
-        let isLoading = false;
-        let viewMode = 'all'; // 'all' 或 'favorites'
-        const galleryGrid = document.getElementById('galleryGrid');
-        const refreshBtn = document.getElementById('refreshBtn');
-        const toggleFavBtn = document.getElementById('toggleFavBtn');
-        const lightbox = document.getElementById('lightbox');
-        const lightboxImg = document.getElementById('lightbox-img');
-        const progressBar = document.getElementById('progressBar');
-        const progressTrack = document.getElementById('progressTrack');
-        const previewLoader = document.getElementById('previewLoader');
+        let isLoading = false, viewMode = 'all';
+        const galleryGrid = document.getElementById('galleryGrid'), refreshBtn = document.getElementById('refreshBtn'),
+            toggleFavBtn = document.getElementById('toggleFavBtn'), lightbox = document.getElementById('lightbox'),
+            lightboxImg = document.getElementById('lightbox-img'), progressBar = document.getElementById('progressBar'),
+            progressTrack = document.getElementById('progressTrack'), previewLoader = document.getElementById('previewLoader'),
+            statusDot = document.getElementById('statusDot'), statusText = document.getElementById('statusText');
 
-        // Supabase 配置
         const SUPABASE_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        let realtimeChannel = null, userId = 'u_ag0saf7d8mjh9oo4j', favorites = [];
+        const CACHE_KEY = 'vista_photo_cache';
+        let photoCache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
 
-        // 用户身份识别（云存档用）
-        let userId = localStorage.getItem('vista_user_id');
-        if (!userId) {
-            userId = 'u_' + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
-            localStorage.setItem('vista_user_id', userId);
+        function generateHash(s) { let h = 0; for (let i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i), h &= h; return Math.abs(h).toString(36); }
+        function saveCache() { const keys = Object.keys(photoCache); if (keys.length > 500) delete photoCache[keys[0]]; localStorage.setItem(CACHE_KEY, JSON.stringify(photoCache)); }
+        function parsePhotoUrl(url) {
+            const m = url.match(/\/id\/(\d+)\/(\d+)\/(\d+)/);
+            if (m) return { url, title: `视觉艺术 #${m[1]}`, author: `Artist ${m[1]}`, aspectRatio: m[2] / m[3] };
+            return { url, title: '未知艺术', author: '匿名', aspectRatio: 1 };
+        }
+        function getCachedPhoto(url) {
+            const h = generateHash(url);
+            if (photoCache[h]) return photoCache[h];
+            const p = parsePhotoUrl(url); photoCache[h] = p; saveCache(); return p;
         }
 
-        // 收藏状态管理
-        let favorites = [];
-
-        // 从云端同步收藏
         async function syncFavorites() {
             try {
-                const { data, error } = await _supabase
-                    .from('vista_favorites')
-                    .select('*')
-                    .eq('user_id', userId)
-                    .order('created_at', { ascending: false });
-
+                const { data, error } = await _supabase.from('vista_favorites').select('url').eq('user_id', userId).order('created_at', { ascending: false });
                 if (error) throw error;
-
-                if (data) {
-                    favorites = data.map(item => ({
-                        url: item.url,
-                        title: item.title,
-                        author: item.author,
-                        aspectRatio: item.aspect_ratio
-                    }));
-                    console.log('云端同步成功:', favorites.length);
-                }
-
-                // 首次访问：如果本地有数据但云端没数据，进行一次迁移
-                const localFavs = JSON.parse(localStorage.getItem('photo-favorites') || '[]');
-                if (localFavs.length > 0 && favorites.length === 0) {
-                    console.log('执行本地数据迁移...');
-                    for (const fav of localFavs) {
-                        await addToCloud(fav);
-                    }
-                    await syncFavorites(); // 再次同步
-                }
-            } catch (err) {
-                console.error('同步云端收藏失败:', err);
-                // 降级使用本地存储
-                favorites = JSON.parse(localStorage.getItem('photo-favorites') || '[]');
-            }
+                if (data) { favorites = data.map(i => getCachedPhoto(i.url)); statusText.innerText = `同步成功 (${favorites.length})`; statusDot.classList.add('online'); }
+            } catch (err) { statusText.innerText = '云端连接失败'; statusDot.classList.remove('online'); favorites = JSON.parse(localStorage.getItem('photo-favorites') || '[]'); }
         }
 
-        async function addToCloud(photo) {
-            try {
-                const { error } = await _supabase
-                    .from('vista_favorites')
-                    .upsert({
-                        user_id: userId,
-                        url: photo.url,
-                        title: photo.title,
-                        author: photo.author,
-                        aspect_ratio: photo.aspectRatio
-                    }, { onConflict: 'user_id,url' });
-                if (error) throw error;
-            } catch (err) {
-                console.error('添加云端收藏失败:', err);
-            }
+        async function addToCloud(p) { try { await _supabase.from('vista_favorites').upsert({ user_id: userId, url: p.url }, { onConflict: 'user_id,url' }); } catch (e) { } }
+        async function removeFromCloud(u) { try { await _supabase.from('vista_favorites').delete().eq('user_id', userId).eq('url', u); } catch (e) { } }
+
+        function subscribeToRealtime() {
+            if (realtimeChannel) _supabase.removeChannel(realtimeChannel);
+            realtimeChannel = _supabase.channel('public:vista_favorites').on('postgres_changes', { event: '*', schema: 'public', table: 'vista_favorites', filter: `user_id=eq.${userId}` }, () => {
+                const timer = setTimeout(async () => { await syncFavorites(); if (viewMode === 'favorites') { initColumns(); renderPhotos(favorites); } else updateHeartIcons(); }, 300);
+            }).subscribe();
         }
 
-        async function removeFromCloud(photoUrl) {
-            try {
-                const { error } = await _supabase
-                    .from('vista_favorites')
-                    .delete()
-                    .eq('user_id', userId)
-                    .eq('url', photoUrl);
-                if (error) throw error;
-            } catch (err) {
-                console.error('删除云端收藏失败:', err);
-            }
+        function updateHeartIcons() {
+            document.querySelectorAll('.photo-item').forEach(item => {
+                const img = item.querySelector('img'), btn = item.querySelector('.btn-favorite');
+                if (img && btn) btn.classList.toggle('active', favorites.some(f => f.url === img.src));
+            });
         }
 
-        // 初始化列
         function initColumns() {
             galleryGrid.innerHTML = '';
-            const width = window.innerWidth;
-            let colCount = 4;
-            if (width < 500) colCount = 1;
-            else if (width < 800) colCount = 2;
-            else if (width < 1200) colCount = 3;
-
-            for (let i = 0; i < colCount; i++) {
-                const col = document.createElement('div');
-                col.className = 'gallery-column';
-                col.id = `col-${i}`;
-                galleryGrid.appendChild(col);
-            }
-            return colCount;
+            const w = window.innerWidth, count = w < 500 ? 1 : w < 800 ? 2 : w < 1200 ? 3 : 4;
+            for (let i = 0; i < count; i++) { const col = document.createElement('div'); col.className = 'gallery-column'; col.id = `col-${i}`; galleryGrid.appendChild(col); }
+            return count;
         }
 
-        let currentColumns = initColumns();
-        window.onresize = () => {
-            const width = window.innerWidth;
-            let newCount = 4;
-            if (width < 500) newCount = 1;
-            else if (width < 800) newCount = 2;
-            else if (width < 1200) newCount = 3;
-
-            if (newCount !== currentColumns) {
-                const allItems = Array.from(document.querySelectorAll('.photo-item'));
-                currentColumns = initColumns();
-                distributeItems(allItems);
-            }
-        };
-
-        function distributeItems(items) {
-            items.forEach(item => {
-                const shortestCol = getShortestColumn();
-                shortestCol.appendChild(item);
-            });
+        function debounce(func, wait) {
+            let timeout;
+            return function () {
+                const context = this, args = arguments;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(context, args), wait);
+            };
         }
 
+        window.onresize = debounce(() => {
+            const oldCols = document.querySelectorAll('.gallery-column').length;
+            const newCols = initColumns();
+            if (oldCols !== newCols && galleryGrid.hasChildNodes()) {
+                if (viewMode === 'all') { galleryGrid.innerHTML = ''; initColumns(); fetchRandomPhotos(20); }
+                else { galleryGrid.innerHTML = ''; initColumns(); renderPhotos(favorites); }
+            }
+        }, 300);
         function getShortestColumn() {
-            const columns = Array.from(document.querySelectorAll('.gallery-column'));
-            return columns.reduce((prev, curr) => {
-                return (prev.offsetHeight <= curr.offsetHeight) ? prev : curr;
-            });
+            let cols = Array.from(document.querySelectorAll('.gallery-column'));
+            if (cols.length === 0) { initColumns(); cols = Array.from(document.querySelectorAll('.gallery-column')); }
+            return cols.reduce((p, c) => p.offsetHeight <= c.offsetHeight ? p : c);
         }
 
-        async function toggleFavorite(photo, btn, event) {
-            event.stopPropagation();
-            const index = favorites.findIndex(f => f.url === photo.url);
-            if (index > -1) {
-                const removedItem = favorites.splice(index, 1);
-                btn.classList.remove('active');
-                if (viewMode === 'favorites') {
-                    btn.closest('.photo-item').remove();
-                }
-                await removeFromCloud(photo.url);
-            } else {
-                favorites.unshift(photo);
-                btn.classList.add('active');
-                await addToCloud(photo);
-            }
-            // 同时更新本地副本作为备份
+        async function toggleFavorite(p, btn, e) {
+            e.stopPropagation(); const idx = favorites.findIndex(f => f.url === p.url);
+            if (idx > -1) { favorites.splice(idx, 1); btn.classList.remove('active'); if (viewMode === 'favorites') btn.closest('.photo-item').remove(); await removeFromCloud(p.url); }
+            else { favorites.unshift(p); btn.classList.add('active'); await addToCloud(p); }
             localStorage.setItem('photo-favorites', JSON.stringify(favorites));
         }
 
-        async function fetchRandomPhotos(count = 15) {
-            if (isLoading) return;
-            isLoading = true;
-            document.getElementById('loading').style.opacity = '1';
-
-            const newPhotos = [];
-            for (let i = 0; i < count; i++) {
-                const imgId = 100 + Math.floor(Math.random() * 800);
-                const w = Math.floor(Math.random() * 200 + 500);
-                const h = Math.floor(Math.random() * 300 + 400);
-                newPhotos.push({
-                    url: `https://picsum.photos/id/${imgId}/${w}/${h}`,
-                    title: `视觉艺术 #${imgId}`,
-                    author: `Artist ${imgId}`,
-                    aspectRatio: w / h
-                });
+        async function fetchRandomPhotos(n = 15) {
+            if (isLoading) return; isLoading = true; document.getElementById('loading').style.opacity = '1';
+            const photos = []; for (let i = 0; i < n; i++) {
+                const id = 100 + Math.floor(Math.random() * 800), w = 500 + Math.floor(Math.random() * 200), h = 400 + Math.floor(Math.random() * 300);
+                // 使用 WebP 格式减少体积
+                photos.push(getCachedPhoto(`https://picsum.photos/id/${id}/${w}/${h}.webp`));
             }
-
-            renderPhotos(newPhotos);
-            isLoading = false;
-            document.getElementById('loading').style.opacity = '0.3';
+            renderPhotos(photos); isLoading = false; document.getElementById('loading').style.opacity = '0.3';
         }
 
         function renderPhotos(data) {
-            data.forEach((photo, index) => {
-                const isFavorited = favorites.some(f => f.url === photo.url);
-                const item = document.createElement('div');
-                item.className = 'photo-item';
-                item.style.animationDelay = `${index * 0.05}s`;
-
+            data.forEach((p, i) => {
+                const isFav = favorites.some(f => f.url === p.url), item = document.createElement('div');
+                item.className = 'photo-item'; item.style.animationDelay = `${i * 0.05}s`;
+                // 增加 aspect-ratio 占位，防止 CLS
                 item.innerHTML = `
                     <div class="photo-inner">
-                        <div class="btn-favorite ${isFavorited ? 'active' : ''}" onclick="toggleFavorite(${JSON.stringify(photo).replace(/"/g, '&quot;')}, this, event)">
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" style="transition: transform 0.3s">
-                                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path>
-                            </svg>
+                        <div class="btn-favorite ${isFav ? 'active' : ''}" onclick="toggleFavorite(${JSON.stringify(p).replace(/"/g, '&quot;')}, this, event)">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
                         </div>
-                        <img src="${photo.url}" alt="${photo.title}" loading="lazy" 
-                             onload="this.parentElement.parentElement.style.opacity='1'"
-                             onerror="this.parentElement.parentElement.remove()">
-                        <div class="photo-overlay">
-                            <div class="photo-info">
-                                <h2>${photo.title}</h2>
-                                <p>@${photo.author}</p>
-                            </div>
-                        </div>
-                    </div>
-                `;
-
+                        <img src="${p.url}" alt="${p.title}" style="aspect-ratio: ${p.aspectRatio};" loading="lazy" onload="this.style.opacity='1'" onerror="this.parentElement.parentElement.remove()">
+                        <div class="photo-overlay"><div class="photo-info"><h2>${p.title}</h2><p>@${p.author}</p></div></div>
+                    </div>`;
                 item.onclick = () => {
-                    const highRes = photo.url.replace(/\/\d+\/\d+$/, '/1200/1600');
-                    lightboxImg.classList.remove('loaded');
-                    lightboxImg.src = '';
-                    progressTrack.style.display = 'block';
-                    progressBar.style.width = '0%';
-                    previewLoader.style.display = 'flex';
-                    lightbox.style.display = 'flex';
-
-                    let p = 0;
-                    const interval = setInterval(() => {
-                        p += Math.random() * 15;
-                        if (p >= 90) { clearInterval(interval); p = 90; }
-                        progressBar.style.width = p + '%';
-                    }, 200);
-
-                    lightboxImg.onerror = () => {
-                        clearInterval(interval);
-                        lightbox.style.display = 'none';
-                    };
-
-                    lightboxImg.src = highRes;
-                    lightboxImg.onload = () => {
-                        clearInterval(interval);
-                        progressBar.style.width = '100%';
-                        setTimeout(() => {
-                            progressTrack.style.display = 'none';
-                            previewLoader.style.display = 'none';
-                            lightboxImg.classList.add('loaded');
-                        }, 300);
-                    };
+                    const highRes = p.url.replace(/\/\d+\/\d+$/, '/1200/1600');
+                    lightboxImg.classList.remove('loaded'); progressTrack.style.display = 'block'; progressBar.style.width = '0%';
+                    previewLoader.style.display = 'flex'; lightbox.style.display = 'flex';
+                    let pct = 0; const itv = setInterval(() => { pct += Math.random() * 15; if (pct >= 90) { clearInterval(itv); pct = 90; } progressBar.style.width = pct + '%'; }, 200);
+                    lightboxImg.src = highRes; lightboxImg.onload = () => { clearInterval(itv); progressBar.style.width = '100%'; setTimeout(() => { progressTrack.style.display = 'none'; previewLoader.style.display = 'none'; lightboxImg.classList.add('loaded'); }, 300); };
                 };
-
-                const shortestCol = getShortestColumn();
-                shortestCol.appendChild(item);
+                getShortestColumn().appendChild(item);
             });
         }
 
-        refreshBtn.onclick = () => {
-            if (viewMode === 'favorites') return;
-            currentColumns = initColumns();
-            fetchRandomPhotos(20);
-        };
-
+        refreshBtn.onclick = () => { if (viewMode === 'all') { initColumns(); fetchRandomPhotos(20); } };
         toggleFavBtn.onclick = () => {
-            viewMode = viewMode === 'all' ? 'favorites' : 'all';
-            toggleFavBtn.classList.toggle('active');
+            viewMode = viewMode === 'all' ? 'favorites' : 'all'; toggleFavBtn.classList.toggle('active');
             document.querySelector('.title-area h1').innerText = viewMode === 'all' ? '发现' : '我的收藏';
             refreshBtn.style.display = viewMode === 'all' ? 'block' : 'none';
-
-            initColumns();
-            if (viewMode === 'all') {
-                fetchRandomPhotos(20);
-            } else {
-                renderPhotos(favorites);
-            }
+            initColumns(); if (viewMode === 'all') fetchRandomPhotos(20); else renderPhotos(favorites);
         };
+        window.onscroll = debounce(() => { if (viewMode === 'all' && (window.innerHeight + window.scrollY) >= document.body.offsetHeight - 800) fetchRandomPhotos(10); }, 200);
+        lightbox.onclick = () => { lightbox.style.display = 'none'; setTimeout(() => { lightboxImg.src = ''; lightboxImg.classList.remove('loaded'); }, 300); };
 
-        window.onscroll = () => {
-            if (viewMode === 'favorites') return;
-            if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 800) {
-                fetchRandomPhotos(10);
-            }
-        };
-
-        lightbox.onclick = () => {
-            lightbox.style.display = 'none';
-            setTimeout(() => {
-                lightboxImg.src = '';
-                lightboxImg.classList.remove('loaded');
-            }, 300);
-        };
-
-        // 初始化加载
+        // 并行启动：先渲染内容，后台同步数据，不再阻塞首屏
         (async () => {
-            await syncFavorites();
+            // 1. 先尝试从本地缓存恢复收藏列表（如果有），这样能立刻显示正确的红心状态
+            if (favorites.length === 0) {
+                const localFav = localStorage.getItem('photo-favorites');
+                if (localFav) favorites = JSON.parse(localFav);
+            }
+
+            // 2. 立即开始加载图片，不等待云同步
             fetchRandomPhotos(20);
+
+            // 3. 后台启动云同步和实时订阅
+            syncFavorites().then(() => updateHeartIcons());
+            subscribeToRealtime();
         })();
     </script>
 </body>
