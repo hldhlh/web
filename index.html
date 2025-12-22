@@ -253,7 +253,6 @@
       },
       toggle() {
         const next = this.getTheme() === 'light' ? 'dark' : 'light';
-        // 使用现代 View Transition API 如果浏览器支持
         if (document.startViewTransition) {
           document.startViewTransition(() => this.setTheme(next));
         } else {
@@ -263,42 +262,140 @@
       init() { this.setTheme(this.getTheme()) }
     };
 
-    const iconCache = (() => {
-      const memStore = new Map();
-      return {
-        get: (k) => memStore.get(k),
-        set: (k, v) => memStore.set(k, v),
-        clear: () => {
-          memStore.clear();
-          try { sessionStorage.clear(); localStorage.clear(); } catch (e) { }
-          location.reload();
+    // 缓存管理
+    const CACHE_PREFIX = 'app_icon_v2_';
+    const iconCache = {
+      get(dir) {
+        try {
+          const item = localStorage.getItem(CACHE_PREFIX + dir);
+          return item ? JSON.parse(item) : null;
+        } catch (e) { console.error(e); return null; }
+      },
+      set(dir, data) {
+        try {
+          localStorage.setItem(CACHE_PREFIX + dir, JSON.stringify(data));
+        } catch (e) {
+          // 如果存储满了，清空旧缓存再试
+          console.warn('LocalStorage full, clearing icons...');
+          this.clear(false); // 不刷新页面
+          try { localStorage.setItem(CACHE_PREFIX + dir, JSON.stringify(data)); } catch (e2) { }
         }
+      },
+      clear(reload = true) {
+        Object.keys(localStorage).forEach(k => {
+          if (k.startsWith(CACHE_PREFIX)) localStorage.removeItem(k);
+        });
+        if (reload) location.reload();
       }
-    })();
+    };
+
+    // 工具函数：计算哈希 (SHA-256)
+    const computeHash = async (content) => {
+      const msgBuffer = new TextEncoder().encode(content);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    };
+
+    // 工具函数：Blob 转 Base64
+    const blobToBase64 = (blob) => {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+    };
 
     const getDirFromPath = (p) => { if (!p) return ''; const i = p.indexOf('/'); return i === -1 ? p : p.slice(0, i); };
 
-    const resolveIcon = async (dir) => {
-      if (iconCache.get(dir)) return iconCache.get(dir);
+    // 获取并处理图标数据
+    const fetchIconData = async (dir, url) => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return null;
 
-      // 内部处理：已知没有图标的目录直接跳过，避免控制台产生 404 错误
+        const etag = res.headers.get('ETag');
+        const ct = (res.headers.get('content-type') || '').toLowerCase();
+        let content, type, hash;
+
+        if (ct.includes('image/svg')) {
+          type = 'svg';
+          content = await res.text();
+          hash = etag || await computeHash(content);
+        } else {
+          type = 'img';
+          const blob = await res.blob();
+          content = await blobToBase64(blob); // 转换为 Base64 本地存储
+          hash = etag || await computeHash(content);
+        }
+
+        return { type, content, hash, url };
+      } catch (e) { return null; }
+    };
+
+    // 尝试获取新图标（用于初始化和更新）
+    const fetchAndCacheIcon = async (dir) => {
       const noIconDirs = ['jlbj', 'ppt'];
       if (noIconDirs.includes(dir)) return null;
 
-      const candidates = [`./pages/${dir}/icon.svg`, `./pages/${dir}/icon`];
+      const candidates = [`./pages/${dir}/icon.svg`, `./pages/${dir}/icon`, `./pages/${dir}/icon.png`, `./pages/${dir}/icon.jpg`];
+
       for (const url of candidates) {
-        try {
-          const res = await fetch(url, { cache: 'no-cache' });
-          if (!res.ok) continue;
-          const ct = (res.headers.get('content-type') || '').toLowerCase();
-          const value = ct.includes('image/svg')
-            ? { type: 'svg', content: await res.text() }
-            : { type: 'img', url };
-          iconCache.set(dir, value);
-          return value;
-        } catch (e) { }
+        const data = await fetchIconData(dir, url);
+        if (data) {
+          iconCache.set(dir, data);
+          return data;
+        }
       }
       return null;
+    };
+
+    // 检查更新
+    const revalidateIcon = async (dir, currentHash, currentUrl) => {
+      try {
+        // 先尝试 HEAD 请求比对 ETag
+        const headRes = await fetch(currentUrl, { method: 'HEAD', cache: 'no-cache' });
+        if (headRes.ok) {
+          const newEtag = headRes.headers.get('ETag');
+          // 如果有 ETag 且一致，直接返回
+          if (newEtag && newEtag === currentHash) return;
+        }
+
+        // 如果 ETag 不匹配或不存在，获取完整内容比对内容哈希
+        const newData = await fetchIconData(dir, currentUrl);
+        if (newData && newData.hash !== currentHash) {
+          console.log(`Icon updated for ${dir}`);
+          iconCache.set(dir, newData);
+          updateIconInDOM(dir, newData);
+        }
+      } catch (e) {
+        // 如果出错，或者 URL 失效，尝试重新完整寻找
+        const newData = await fetchAndCacheIcon(dir);
+        if (newData && newData.hash !== currentHash) {
+          iconCache.set(dir, newData);
+          updateIconInDOM(dir, newData);
+        }
+      }
+    };
+
+    // 更新 DOM 中的图标
+    const updateIconInDOM = (dir, iconData) => {
+      const imgContainer = document.querySelector(`.app-icon[data-dir="${dir}"] .app-icon-image`);
+      if (!imgContainer) return;
+
+      let inner = '';
+      if (iconData) {
+        inner = iconData.type === 'svg' ? iconData.content : `<img src="${iconData.content}" alt="icon">`;
+      } else {
+        // Fallback
+        inner = `<div style="width:100%;height:100%;background:#0a84ff;border-radius:20px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:24px">${dir.charAt(0).toUpperCase()}</div>`;
+      }
+
+      // 添加淡入动画效果
+      imgContainer.style.opacity = '0';
+      setTimeout(() => {
+        imgContainer.innerHTML = inner;
+        imgContainer.style.opacity = '1';
+      }, 200);
     };
 
     async function loadApps() {
@@ -306,25 +403,52 @@
       const apps = await getAppDirectories();
       const frag = document.createDocumentFragment();
 
-      for (const app of apps) {
+      // 并行处理所有 App
+      await Promise.all(apps.map(async (app) => {
         const dir = getDirFromPath(app.path);
-        const icon = await resolveIcon(dir);
+
+        // 1. 优先读取本地缓存
+        let icon = iconCache.get(dir);
+        let isCached = !!icon;
+
+        // 2. 如果没有缓存，则进行请求
+        if (!icon) {
+          icon = await fetchAndCacheIcon(dir);
+        }
+
         const el = document.createElement('a');
         el.href = `./pages/${app.path}`;
         el.className = 'app-icon';
         el.title = app.name;
+        el.setAttribute('data-dir', dir); // 标记以便更新
 
         let inner = '';
         if (icon) {
-          inner = icon.type === 'svg' ? icon.content : `<img src="${icon.url}" alt="${app.name}">`;
+          // 使用 content (可能是 SVG 源码或 Base64)
+          inner = icon.type === 'svg' ? icon.content : `<img src="${icon.content}" alt="${app.name}">`;
         } else {
           inner = `<div style="width:100%;height:100%;background:#0a84ff;border-radius:20px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:24px">${app.name.charAt(0)}</div>`;
         }
 
         el.innerHTML = `<div class="app-icon-image">${inner}</div><div class="app-name">${app.name}</div>`;
-        frag.appendChild(el);
-      }
-      container.appendChild(frag);
+
+        // 按原本顺序是不保证的，因为 Promise.all 是并行的。
+        // 但为了保持 apps.js 的顺序，我们需要按 index 排序，或者简单的 for loop.
+        // 为了简单且保持顺序，我们不直接 apply frag，而是收集 els
+        return { el, index: apps.indexOf(app), dir, icon };
+      })).then(results => {
+        // 按原始顺序排序
+        results.sort((a, b) => a.index - b.index).forEach(item => {
+          frag.appendChild(item.el);
+
+          // 3. 如果是读取的缓存，触发静默更新检查
+          if (item.icon) {
+            revalidateIcon(item.dir, item.icon.hash, item.icon.url);
+          }
+        });
+        container.innerHTML = '';
+        container.appendChild(frag);
+      });
     }
 
     document.addEventListener('DOMContentLoaded', () => {
