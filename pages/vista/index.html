@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="./icon.svg" type="image/svg+xml">
     <title>阅图 - 发现视觉之美</title>
     <style>
         :root {
@@ -370,6 +371,7 @@
             font-weight: 500;
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
@@ -428,8 +430,87 @@
         const progressTrack = document.getElementById('progressTrack');
         const previewLoader = document.getElementById('previewLoader');
 
+        // Supabase 配置
+        const SUPABASE_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // 用户身份识别（云存档用）
+        let userId = localStorage.getItem('vista_user_id');
+        if (!userId) {
+            userId = 'u_' + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+            localStorage.setItem('vista_user_id', userId);
+        }
+
         // 收藏状态管理
-        let favorites = JSON.parse(localStorage.getItem('photo-favorites') || '[]');
+        let favorites = [];
+
+        // 从云端同步收藏
+        async function syncFavorites() {
+            try {
+                const { data, error } = await _supabase
+                    .from('vista_favorites')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                if (data) {
+                    favorites = data.map(item => ({
+                        url: item.url,
+                        title: item.title,
+                        author: item.author,
+                        aspectRatio: item.aspect_ratio
+                    }));
+                    console.log('云端同步成功:', favorites.length);
+                }
+
+                // 首次访问：如果本地有数据但云端没数据，进行一次迁移
+                const localFavs = JSON.parse(localStorage.getItem('photo-favorites') || '[]');
+                if (localFavs.length > 0 && favorites.length === 0) {
+                    console.log('执行本地数据迁移...');
+                    for (const fav of localFavs) {
+                        await addToCloud(fav);
+                    }
+                    await syncFavorites(); // 再次同步
+                }
+            } catch (err) {
+                console.error('同步云端收藏失败:', err);
+                // 降级使用本地存储
+                favorites = JSON.parse(localStorage.getItem('photo-favorites') || '[]');
+            }
+        }
+
+        async function addToCloud(photo) {
+            try {
+                const { error } = await _supabase
+                    .from('vista_favorites')
+                    .upsert({
+                        user_id: userId,
+                        url: photo.url,
+                        title: photo.title,
+                        author: photo.author,
+                        aspect_ratio: photo.aspectRatio
+                    }, { onConflict: 'user_id,url' });
+                if (error) throw error;
+            } catch (err) {
+                console.error('添加云端收藏失败:', err);
+            }
+        }
+
+        async function removeFromCloud(photoUrl) {
+            try {
+                const { error } = await _supabase
+                    .from('vista_favorites')
+                    .delete()
+                    .eq('user_id', userId)
+                    .eq('url', photoUrl);
+                if (error) throw error;
+            } catch (err) {
+                console.error('删除云端收藏失败:', err);
+            }
+        }
 
         // 初始化列
         function initColumns() {
@@ -478,19 +559,22 @@
             });
         }
 
-        function toggleFavorite(photo, btn, event) {
+        async function toggleFavorite(photo, btn, event) {
             event.stopPropagation();
             const index = favorites.findIndex(f => f.url === photo.url);
             if (index > -1) {
-                favorites.splice(index, 1);
+                const removedItem = favorites.splice(index, 1);
                 btn.classList.remove('active');
                 if (viewMode === 'favorites') {
                     btn.closest('.photo-item').remove();
                 }
+                await removeFromCloud(photo.url);
             } else {
-                favorites.push(photo);
+                favorites.unshift(photo);
                 btn.classList.add('active');
+                await addToCloud(photo);
             }
+            // 同时更新本地副本作为备份
             localStorage.setItem('photo-favorites', JSON.stringify(favorites));
         }
 
@@ -616,7 +700,11 @@
             }, 300);
         };
 
-        fetchRandomPhotos(20);
+        // 初始化加载
+        (async () => {
+            await syncFavorites();
+            fetchRandomPhotos(20);
+        })();
     </script>
 </body>
 
