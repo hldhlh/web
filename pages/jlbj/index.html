@@ -409,6 +409,8 @@
             border-style: solid;
             border-color: var(--highlight);
             box-shadow: 0 0 8px rgba(155, 134, 189, 0.2);
+            padding: 0;
+            /* 移除内边距，让内容完全控制自己的空间 */
         }
 
         .webapp-container::before {
@@ -421,10 +423,58 @@
             font-size: 11px;
             color: var(--highlight);
             letter-spacing: 0.5px;
+            z-index: 1;
         }
 
-        /* WEBAPP 内部样式重置（可选） */
-        .webapp-container * {
+        /* WEBAPP 内容隔离包装器 */
+        .webapp-isolate {
+            /* 重置所有继承的样式 */
+            all: initial;
+
+            /* 重新设置必要的基础样式 */
+            display: block;
+            position: relative;
+
+            /* 确保使用标准盒模型 */
+            box-sizing: border-box;
+
+            /* 重置字体和文本样式 */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-size: 16px;
+            line-height: 1.5;
+            color: #000;
+
+            /* 重置背景 */
+            background: #fff;
+
+            /* 确保内容可见 */
+            overflow: auto;
+
+            /* 1:1 显示 - 不缩放 */
+            width: 100%;
+            min-height: 40px;
+        }
+
+        /* 重置 WEBAPP 内部所有元素的样式继承 */
+        .webapp-isolate * {
+            all: unset;
+            display: revert;
+            box-sizing: border-box;
+        }
+
+        /* 恢复常用 HTML 元素的默认样式 */
+        .webapp-isolate div,
+        .webapp-isolate span,
+        .webapp-isolate p,
+        .webapp-isolate a,
+        .webapp-isolate button,
+        .webapp-isolate input,
+        .webapp-isolate textarea,
+        .webapp-isolate select,
+        .webapp-isolate img,
+        .webapp-isolate canvas,
+        .webapp-isolate svg {
+            all: revert;
             box-sizing: border-box;
         }
 
@@ -1141,7 +1191,7 @@
             function scopeCss(css, scopeId) {
                 if (!css.trim()) return '';
 
-                // 为每个选择器添加作用域前缀
+                // 为每个选择器添加作用域前缀（限定到 .webapp-isolate 内部）
                 const scopedCss = css.replace(/([^{}]+)\s*{/g, (match, selector) => {
                     // 跳过 @media, @keyframes 等规则
                     if (selector.trim().startsWith('@')) {
@@ -1151,11 +1201,12 @@
                     // 为每个逗号分隔的选择器添加前缀
                     const selectors = selector.split(',').map(s => {
                         s = s.trim();
-                        // 特殊处理：body/html -> 直接替换为容器
+                        // 特殊处理：body/html -> 直接替换为隔离容器
                         if (s === 'body' || s === 'html') {
-                            return `[data-webapp-scope="${scopeId}"]`;
+                            return `.webapp-isolate[data-webapp-scope="${scopeId}"]`;
                         }
-                        return `[data-webapp-scope="${scopeId}"] ${s}`;
+                        // 其他选择器：添加 .webapp-isolate 前缀
+                        return `.webapp-isolate[data-webapp-scope="${scopeId}"] ${s}`;
                     }).join(', ');
 
                     return `${selectors} {`;
@@ -1247,12 +1298,21 @@
                     // 1. 处理HTML（ID重写）
                     const { html, idMap } = rewriteHtmlIds(block.html, block.id);
 
-                    // 2. 创建隔离容器
+                    // 2. 创建隔离容器和包装器
                     container.setAttribute('data-webapp-scope', block.id);
                     container.className = 'webapp-container webapp-active';
-                    container.innerHTML = html;
 
-                    // 3. 注入作用域CSS
+                    // 创建隔离包装器，确保 1:1 显示
+                    const isolateWrapper = document.createElement('div');
+                    isolateWrapper.className = 'webapp-isolate';
+                    isolateWrapper.setAttribute('data-webapp-scope', block.id); // 添加作用域属性
+                    isolateWrapper.innerHTML = html;
+
+                    // 清空容器并添加隔离包装器
+                    container.innerHTML = '';
+                    container.appendChild(isolateWrapper);
+
+                    // 3. 注入作用域CSS（应用到隔离包装器内部）
                     if (block.css) {
                         const styleId = `style_${block.id}`;
                         let styleElement = document.getElementById(styleId);
@@ -1263,11 +1323,13 @@
                             document.head.appendChild(styleElement);
                         }
 
-                        styleElement.textContent = scopeCss(block.css, block.id);
+                        // CSS 作用域限定到 .webapp-isolate 内部
+                        const scopedCssContent = scopeCss(block.css, block.id);
+                        styleElement.textContent = scopedCssContent;
                     }
 
-                    // 4. 执行隔离的JavaScript
-                    executeIsolatedJs(block.js, block.id, idMap, container);
+                    // 4. 执行隔离的JavaScript（传入隔离包装器作为容器）
+                    executeIsolatedJs(block.js, block.id, idMap, isolateWrapper);
 
                     // 5. 注册清理函数
                     registerWebappCleanup(block.id, () => {

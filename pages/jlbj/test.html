@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WEBAPP 1:1 显示测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        .description {
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .demo-link {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+
+        .demo-link:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="test-container">
+        <h1>✅ WEBAPP 1:1 显示功能已实现</h1>
+
+        <div class="description">
+            <h2>实现的功能:</h2>
+            <ul>
+                <li><strong>完全样式隔离</strong>: 使用 <code>.webapp-isolate</code> 包装器,通过 <code>all: initial</code> 重置所有继承样式
+                </li>
+                <li><strong>1:1 显示</strong>: WEBAPP 内部内容不受外部样式影响,浏览器怎么显示就怎么显示</li>
+                <li><strong>CSS 作用域</strong>: 所有 CSS 选择器自动添加 <code>.webapp-isolate[data-webapp-scope="id"]</code> 前缀
+                </li>
+                <li><strong>ID 隔离</strong>: 自动重写 HTML 中的 ID,避免冲突</li>
+                <li><strong>JavaScript 隔离</strong>: 在独立作用域中执行,提供 <code>$</code> 和 <code>$$</code> 查询函数</li>
+            </ul>
+
+            <h2>技术细节:</h2>
+            <ul>
+                <li>移除了 <code>.webapp-container.webapp-active</code> 的内边距,让内容完全控制自己的空间</li>
+                <li>创建 <code>.webapp-isolate</code> 包装器,使用 <code>all: initial</code> 重置所有样式</li>
+                <li>为常用 HTML 元素恢复默认样式 (使用 <code>all: revert</code>)</li>
+                <li>CSS 选择器自动添加作用域前缀,确保样式只应用到对应的 WEBAPP 实例</li>
+            </ul>
+
+            <h2>使用方法:</h2>
+            <p>在今岭笔记中,使用 <code>[WEBAPP]...[/WEBAPP]</code> 标签包裹你的小程序代码:</p>
+            <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
+[WEBAPP]
+&lt;style&gt;
+    body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
+        color: white;
+    }
+    .card {
+        background: rgba(255,255,255,0.1);
+        padding: 20px;
+        border-radius: 10px;
+    }
+&lt;/style&gt;
+
+&lt;div class="card"&gt;
+    &lt;h1&gt;Hello WEBAPP!&lt;/h1&gt;
+    &lt;p&gt;这个内容会 1:1 显示,不受外部样式影响&lt;/p&gt;
+&lt;/div&gt;
+
+&lt;script&gt;
+    console.log('WEBAPP 已加载');
+&lt;/script&gt;
+[/WEBAPP]
+            </pre>
+
+            <a href="index.html" class="demo-link">打开今岭笔记测试</a>
+        </div>
+    </div>
+</body>
+
+</html>
