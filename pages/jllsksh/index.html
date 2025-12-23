@@ -6,9 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>今岭流水数据可视化</title>
     <link rel="stylesheet" href="index.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@1.1.1/dist/chartjs-chart-matrix.min.js"></script>
+    <script src="./xlsx.full.min.js"></script>
+    <script src="./chart.min.js"></script>
+    <script src="./chartjs-plugin-datalabels.min.js"></script>
+    <script src="./chartjs-chart-matrix.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
 </head>
 
@@ -355,6 +356,7 @@
             const ctxPie = document.getElementById('orderTypeChart').getContext('2d');
             charts.pie = new Chart(ctxPie, {
                 type: 'doughnut',
+                plugins: [ChartDataLabels],
                 data: {
                     labels: Object.keys(tableTypes),
                     datasets: [{
@@ -363,7 +365,38 @@
                         borderColor: '#0f172a', borderWidth: 4, hoverOffset: 15
                     }]
                 },
-                options: { ...commonOptions, cutout: '70%', plugins: { ...commonOptions.plugins, title: titleStyle('收入渠道来源') } }
+                options: {
+                    ...commonOptions,
+                    cutout: '60%',
+                    plugins: {
+                        ...commonOptions.plugins,
+                        title: titleStyle('收入渠道来源'),
+                        datalabels: {
+                            color: '#ffffff',
+                            font: {
+                                weight: 'bold',
+                                size: 14
+                            },
+                            formatter: (value, ctx) => {
+                                const dataset = ctx.chart.data.datasets[0];
+                                const total = dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1) + '%';
+                                return percentage;
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    const value = context.parsed;
+                                    const dataset = context.chart.data.datasets[0];
+                                    const total = dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return `${context.label}: ${value}单 (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
             });
 
             // 3. Trend
@@ -591,11 +624,42 @@
             const ctxGuests = document.getElementById('guestPatternChart').getContext('2d');
             charts.guests = new Chart(ctxGuests, {
                 type: 'pie',
+                plugins: [ChartDataLabels],
                 data: {
                     labels: Object.keys(guestComposition),
                     datasets: [{ data: Object.values(guestComposition), backgroundColor: ['#6366f1', '#f472b6', '#fbbf24'] }]
                 },
-                options: { ...commonOptions, plugins: { ...commonOptions.plugins, title: titleStyle('堂食客群特征') } }
+                options: {
+                    ...commonOptions,
+                    plugins: {
+                        ...commonOptions.plugins,
+                        title: titleStyle('堂食客群特征'),
+                        datalabels: {
+                            color: '#ffffff',
+                            font: {
+                                weight: 'bold',
+                                size: 14
+                            },
+                            formatter: (value, ctx) => {
+                                const dataset = ctx.chart.data.datasets[0];
+                                const total = dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1) + '%';
+                                return percentage;
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    const value = context.parsed;
+                                    const dataset = context.chart.data.datasets[0];
+                                    const total = dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return `${context.label}: ${value}单 (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
             });
         }
     </script>
