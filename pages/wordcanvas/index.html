@@ -27,6 +27,8 @@
             touch-action: none;
             user-select: none;
             -webkit-user-select: none;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         #viewport {
@@ -40,7 +42,7 @@
 
         .infinite-grid {
             position: absolute;
-            inset: -5000px;
+            inset: 0;
             background-image:
                 radial-gradient(var(--grid-dot) 1px, transparent 1px),
                 linear-gradient(var(--grid-line) 1px, transparent 1px),
@@ -49,7 +51,6 @@
             background-position: center center;
             pointer-events: none;
             z-index: 0;
-            will-change: transform;
         }
 
         .content-layer {
@@ -59,13 +60,11 @@
             left: 50%;
             top: 50%;
             transform-origin: 0 0;
-            will-change: transform;
             z-index: 1;
         }
 
         .tag {
             position: absolute;
-            will-change: transform;
             background: rgba(255, 255, 255, 0.04);
             backdrop-filter: blur(25px);
             -webkit-backdrop-filter: blur(25px);
@@ -77,13 +76,13 @@
             cursor: grab;
             display: flex;
             align-items: center;
-            transform: translate(-50%, -50%);
         }
 
         .tag span {
             font-weight: 400;
             letter-spacing: 0.02em;
             background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%);
+            background-clip: text;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             white-space: nowrap;
@@ -117,13 +116,16 @@
             background: transparent;
             border: none;
             outline: none;
-            color: white;
-            font-family: inherit;
+            color: #eceff4;
+            font-family: 'Outfit', 'Noto Sans SC', sans-serif;
             font-weight: 400;
-            font-size: 1.1rem;
+            font-size: 1.05rem;
+            letter-spacing: 0.02em;
             caret-color: var(--primary);
             display: none;
-            text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            padding: 0;
+            margin: 0;
+            text-align: center;
         }
 
         .minimal-menu {
@@ -198,6 +200,34 @@
         * {
             -webkit-tap-highlight-color: transparent;
         }
+
+        .sync-indicator {
+            position: fixed;
+            top: 24px;
+            left: 24px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #4ade80;
+            box-shadow: 0 0 10px rgba(74, 222, 128, 0.3);
+            z-index: 10100;
+            transition: all 0.3s ease;
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        .sync-indicator.syncing {
+            background-color: #fbbf24;
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.5);
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        .sync-indicator.error {
+            background-color: #f87171;
+            box-shadow: 0 0 15px rgba(248, 113, 113, 0.5);
+            opacity: 1;
+        }
     </style>
 </head>
 
@@ -218,6 +248,8 @@
 
     <input type="text" id="floatingInput" spellcheck="false" autocomplete="off">
 
+    <div id="syncStatus" class="sync-indicator"></div>
+
     <div id="minimalMenu" class="minimal-menu">
         <div class="menu-item" id="menuReset">重置星空 (Reset)</div>
         <div class="menu-item danger" id="menuDelete">抹除此灵感 (Delete)</div>
@@ -235,9 +267,10 @@
             interaction: {
                 isPanning: false, isDragging: false, isSelecting: false, isLinking: false,
                 linkingFrom: null, currentTag: null, selectedTags: [], dragOffset: { x: 0, y: 0 },
-                contextEntity: null, lastTap: 0
+                contextEntity: null, contextType: null, lastTap: 0, lastBlurTime: 0
             },
-            connections: []
+            connections: [],
+            saveViewTimer: null
         };
 
         const DOM = {
@@ -247,14 +280,59 @@
             input: document.getElementById('floatingInput'),
             menu: document.getElementById('minimalMenu'),
             svgGroup: document.getElementById('lineGroups'),
-            selection: document.createElement('div')
+            selection: document.createElement('div'),
+            syncStatus: document.getElementById('syncStatus')
+        };
+
+        const SyncManager = {
+            set(status) {
+                DOM.syncStatus.className = 'sync-indicator';
+                if (status === 'syncing') DOM.syncStatus.classList.add('syncing');
+                if (status === 'error') DOM.syncStatus.classList.add('error');
+            },
+            async wrap(promise) {
+                this.set('syncing');
+                try {
+                    const res = await promise;
+                    // minimal delay to show success state
+                    setTimeout(() => this.set('idle'), 200);
+                    return res;
+                } catch (e) {
+                    console.error(e);
+                    this.set('error');
+                    throw e;
+                }
+            }
         };
 
         function updateMatrix() {
             const { x, y, scale } = State.transform;
             DOM.content.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
-            DOM.grid.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+
+            // Grid optimization: Update background instead of transforming container
+            // This ensures 1px lines remain 1px visually, implementing "High Definition" look
+            const ox = window.innerWidth / 2 + x;
+            const oy = window.innerHeight / 2 + y;
+            const s1 = 40 * scale;
+            const s2 = 200 * scale;
+
+            DOM.grid.style.backgroundSize = `${s1}px ${s1}px, ${s2}px ${s2}px, ${s2}px ${s2}px`;
+            DOM.grid.style.backgroundPosition = `
+                ${ox}px ${oy}px,
+                ${ox}px ${oy}px,
+                ${ox}px ${oy}px
+            `;
+
             LineManager.render();
+            saveViewState();
+        }
+
+        function saveViewState() {
+            if (State.saveViewTimer) clearTimeout(State.saveViewTimer);
+            State.saveViewTimer = setTimeout(async () => {
+                const { x, y, scale } = State.transform;
+                SyncManager.wrap(_client.from('canvas_state').upsert({ id: 1, x, y, scale }));
+            }, 300);
         }
 
         function screenToSpace(sx, sy) {
@@ -265,6 +343,15 @@
                 x: (vx - State.transform.x) / State.transform.scale,
                 y: (vy - State.transform.y) / State.transform.scale
             };
+        }
+
+        function getTextWidth(text, font) {
+            // Re-use canvas object for better performance
+            const canvas = getTextWidth.canvas || (getTextWidth.canvas = document.createElement("canvas"));
+            const context = canvas.getContext("2d");
+            context.font = font;
+            const metrics = context.measureText(text);
+            return metrics.width;
         }
 
         function spaceToScreen(x, y) {
@@ -288,7 +375,7 @@
                 DOM.content.appendChild(node);
 
                 if (!id) {
-                    const { data, error } = await _client.from('canvas_nodes').insert({ text, x, y }).select().single();
+                    const { data, error } = await SyncManager.wrap(_client.from('canvas_nodes').insert({ text, x, y }).select().single());
                     if (!error && data) node.id = data.id;
                 }
                 return node;
@@ -312,7 +399,10 @@
                 });
                 node.addEventListener('dblclick', e => {
                     e.stopPropagation();
-                    Input.show(e.clientX, e.clientY, node.querySelector('span').textContent, node);
+                    const rect = node.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    Input.show(centerX, centerY, node.querySelector('span').textContent, node);
                 });
                 node.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); });
 
@@ -333,7 +423,7 @@
             deselect() { State.interaction.selectedTags.forEach(t => t.classList.remove('selected')); State.interaction.selectedTags = []; },
             async updatePos(node) {
                 const id = node.id;
-                await _client.from('canvas_nodes').update({ x: parseFloat(node.dataset.x), y: parseFloat(node.dataset.y) }).eq('id', id);
+                await SyncManager.wrap(_client.from('canvas_nodes').update({ x: parseFloat(node.dataset.x), y: parseFloat(node.dataset.y) }).eq('id', id));
             }
         };
 
@@ -343,10 +433,10 @@
                 State.connections.forEach(conn => {
                     const from = document.getElementById(conn.from_id || conn.fromId);
                     const to = document.getElementById(conn.to_id || conn.toId);
-                    if (from && to) this.drawLine(from, to);
+                    if (from && to) this.drawLine(from, to, false, conn);
                 });
             },
-            drawLine(fromNode, toNodeOrPos, isPreview = false) {
+            drawLine(fromNode, toNodeOrPos, isPreview = false, connData = null) {
                 const fromRect = fromNode.getBoundingClientRect();
                 const fromCenter = { x: fromRect.left + fromRect.width / 2, y: fromRect.top + fromRect.height / 2 };
 
@@ -361,6 +451,8 @@
                 const start = this.getEdgePoint(fromRect, toCenter);
                 const end = isPreview ? toCenter : this.getEdgePoint(toRect, fromCenter);
 
+                const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+
                 const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
                 line.setAttribute("x1", start.x);
                 line.setAttribute("y1", start.y);
@@ -368,7 +460,61 @@
                 line.setAttribute("y2", end.y);
                 line.setAttribute("class", isPreview ? "connection-line line-preview" : "connection-line");
                 if (!isPreview) line.setAttribute("marker-end", "url(#arrow)");
-                DOM.svgGroup.appendChild(line);
+                group.appendChild(line);
+
+                if (!isPreview && connData) {
+                    const dx = end.x - start.x;
+                    const dy = end.y - start.y;
+                    let angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+                    // Keep text readable (not upside down)
+                    if (angle > 90 || angle < -90) {
+                        angle += 180;
+                    }
+
+                    // Hidden hit area
+                    const hitLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                    hitLine.setAttribute("x1", start.x);
+                    hitLine.setAttribute("y1", start.y);
+                    hitLine.setAttribute("x2", end.x);
+                    hitLine.setAttribute("y2", end.y);
+                    hitLine.setAttribute("stroke", "transparent");
+                    hitLine.setAttribute("stroke-width", "20");
+                    hitLine.style.cursor = "pointer";
+                    hitLine.style.pointerEvents = "stroke";
+
+                    hitLine.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        // Calculate screen center for input
+                        const midX = (start.x + end.x) / 2;
+                        const midY = (start.y + end.y) / 2;
+                        Input.show(midX, midY, connData.label || '', connData, 'connection', angle);
+                    });
+
+                    group.appendChild(hitLine);
+
+                    // Label
+                    if (connData.label) {
+                        const midX = (start.x + end.x) / 2;
+                        const midY = (start.y + end.y) / 2;
+
+                        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                        text.setAttribute("x", midX);
+                        text.setAttribute("y", midY);
+                        text.setAttribute("text-anchor", "middle");
+                        text.setAttribute("dominant-baseline", "middle");
+                        text.setAttribute("fill", "#e2e8f0");
+                        text.setAttribute("font-size", "12");
+                        text.setAttribute("dy", "-3"); // visual adjustment
+                        text.setAttribute("transform", `rotate(${angle}, ${midX}, ${midY})`);
+                        text.textContent = connData.label;
+                        text.style.pointerEvents = "none";
+                        text.style.textShadow = "0 0 4px #000, 0 0 8px #000"; // Stronger shadow
+                        group.appendChild(text);
+                    }
+                }
+
+                DOM.svgGroup.appendChild(group);
             },
             getEdgePoint(rect, target) {
                 const centerX = rect.left + rect.width / 2;
@@ -385,28 +531,87 @@
         };
 
         const Input = {
-            show(x, y, text = '', node = null) {
-                State.interaction.contextEntity = node;
-                if (!node) State.interaction.targetSpacePos = screenToSpace(x, y);
+            show(x, y, text = '', entity = null, type = 'node', angle = 0) {
+                State.interaction.contextEntity = entity;
+                State.interaction.contextType = type;
+                if (!entity) State.interaction.targetSpacePos = screenToSpace(x, y);
+
                 DOM.input.style.display = 'block';
-                DOM.input.style.left = `${x}px`;
-                DOM.input.style.top = `${y}px`;
                 DOM.input.value = text;
-                setTimeout(() => { DOM.input.focus(); if (node) node.style.opacity = '0.2'; }, 50);
+
+                if (type === 'connection') {
+                    DOM.input.style.left = `${x}px`;
+                    DOM.input.style.top = `${y}px`;
+                    DOM.input.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+                    DOM.input.style.textAlign = 'center';
+                    DOM.input.style.width = '200px';
+                } else if (type === 'node' && entity) {
+                    // Match exact position of the span within the tag
+                    const span = entity.querySelector('span');
+                    const rect = span.getBoundingClientRect();
+
+                    DOM.input.style.left = `${rect.left}px`;
+                    DOM.input.style.top = `${rect.top}px`;
+
+                    // Initial width based on text or min 20px
+                    const updateWidth = () => {
+                        const style = window.getComputedStyle(DOM.input);
+                        const font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+                        const textWidth = getTextWidth(DOM.input.value, font);
+                        DOM.input.style.width = `${Math.max(textWidth + 10, rect.width, 20)}px`;
+                    };
+
+                    DOM.input.oninput = updateWidth;
+
+                    DOM.input.style.height = `${rect.height}px`;
+                    DOM.input.style.transform = 'none';
+                    DOM.input.style.textAlign = 'left';
+
+                    // Initialize width
+                    updateWidth();
+
+                    // Hide just the text, keep the box/bg
+                    span.style.visibility = 'hidden';
+                    entity.classList.add('editing');
+                } else {
+                    // New node creation
+                    DOM.input.style.left = `${x}px`;
+                    DOM.input.style.top = `${y}px`;
+                    DOM.input.style.transform = "translate(-50%, -50%)";
+                    DOM.input.style.textAlign = 'center';
+                    DOM.input.style.width = '150px';
+                    DOM.input.oninput = null; // Reset for new nodes
+                }
+
+                setTimeout(() => {
+                    DOM.input.focus();
+                }, 10);
             },
             hide() {
-                if (State.interaction.contextEntity) State.interaction.contextEntity.style.opacity = '1';
+                if (State.interaction.contextEntity && State.interaction.contextType === 'node') {
+                    const span = State.interaction.contextEntity.querySelector('span');
+                    if (span) span.style.visibility = 'visible';
+                    State.interaction.contextEntity.classList.remove('editing');
+                }
                 DOM.input.style.display = 'none';
+                DOM.input.style.transform = "none";
                 State.interaction.contextEntity = null;
+                State.interaction.contextType = null;
             },
             async save() {
                 const val = DOM.input.value.trim();
-                const node = State.interaction.contextEntity;
-                if (val) {
-                    if (node) {
-                        node.querySelector('span').textContent = val;
-                        await _client.from('canvas_nodes').update({ text: val }).eq('id', node.id);
-                    } else {
+                const entity = State.interaction.contextEntity;
+                const type = State.interaction.contextType;
+
+                if (val || val === '') { // Allow clearing logic if needed, simplify to val exists
+                    if (type === 'connection' && entity) {
+                        // Optimistic update
+                        entity.label = val;
+                        await SyncManager.wrap(_client.from('canvas_connections').update({ label: val }).eq('id', entity.id));
+                    } else if (type === 'node' && entity) {
+                        entity.querySelector('span').textContent = val;
+                        await SyncManager.wrap(_client.from('canvas_nodes').update({ text: val }).eq('id', entity.id));
+                    } else if (!entity && val) {
                         Tag.create(val, State.interaction.targetSpacePos.x, State.interaction.targetSpacePos.y);
                     }
                 }
@@ -417,11 +622,12 @@
         const Menu = {
             show(x, y, node) {
                 State.interaction.contextEntity = node;
+                State.interaction.contextType = 'node';
                 DOM.menu.style.left = `${Math.min(x, window.innerWidth - 200)}px`;
                 DOM.menu.style.top = `${Math.min(y, window.innerHeight - 150)}px`;
                 DOM.menu.classList.add('show');
             },
-            hide() { DOM.menu.classList.remove('show'); }
+            hide() { DOM.menu.classList.remove('show'); State.interaction.contextEntity = null; }
         };
 
         const Selection = {
@@ -451,9 +657,13 @@
             // Load initial data
             const { data: nodes } = await _client.from('canvas_nodes').select('*');
             const { data: conns } = await _client.from('canvas_connections').select('*');
+            const { data: viewState } = await _client.from('canvas_state').select('*').eq('id', 1).single();
 
             if (nodes) for (const n of nodes) await Tag.create(n.text, n.x, n.y, n.id);
             if (conns) { State.connections = conns; LineManager.render(); }
+            if (viewState) {
+                State.transform = { x: viewState.x, y: viewState.y, scale: viewState.scale };
+            }
 
             updateMatrix();
 
@@ -475,6 +685,8 @@
                     } else if (eventType === 'DELETE') {
                         const node = document.getElementById(oldTag.id);
                         if (node) node.remove();
+                        // Remove related connections locally to prevent ghost lines before next refresh
+                        State.connections = State.connections.filter(c => c.from_id !== oldTag.id && c.to_id !== oldTag.id);
                         LineManager.render();
                     }
                 })
@@ -488,6 +700,12 @@
                     } else if (eventType === 'DELETE') {
                         State.connections = State.connections.filter(c => c.id !== oldConn.id);
                         LineManager.render();
+                    } else if (eventType === 'UPDATE') {
+                        const idx = State.connections.findIndex(c => c.id === newConn.id);
+                        if (idx !== -1) {
+                            State.connections[idx] = newConn;
+                            LineManager.render();
+                        }
                     }
                 })
                 .subscribe();
@@ -510,8 +728,17 @@
                     const spacePos = screenToSpace(e.clientX, e.clientY);
                     const tagX = spacePos.x - State.interaction.dragOffset.x, tagY = spacePos.y - State.interaction.dragOffset.y;
                     const moveDx = tagX - parseFloat(State.interaction.currentTag.dataset.x), moveDy = tagY - parseFloat(State.interaction.currentTag.dataset.y);
+
                     State.interaction.selectedTags.forEach(t => {
-                        const nx = parseFloat(t.dataset.x) + moveDx, ny = parseFloat(t.dataset.y) + moveDy;
+                        let nx = parseFloat(t.dataset.x) + moveDx;
+                        let ny = parseFloat(t.dataset.y) + moveDy;
+
+                        // Snap to grid if Ctrl is held (Grid size 40px)
+                        if (e.ctrlKey) {
+                            nx = Math.round(nx / 40) * 40;
+                            ny = Math.round(ny / 40) * 40;
+                        }
+
                         t.style.left = `${nx}px`; t.style.top = `${ny}px`; t.dataset.x = nx; t.dataset.y = ny;
                     });
                     LineManager.render();
@@ -540,14 +767,17 @@
                         const toId = tagUnderMouse.id;
                         const exists = State.connections.some(c => (c.from_id === fromId && c.to_id === toId) || (c.from_id === toId && c.to_id === fromId));
                         if (!exists) {
-                            await _client.from('canvas_connections').insert({ from_id: fromId, to_id: toId });
+                            await SyncManager.wrap(_client.from('canvas_connections').insert({ from_id: fromId, to_id: toId }));
                         }
                     }
                     State.interaction.isLinking = false; State.interaction.linkingFrom = null; LineManager.render();
                 } else if (State.interaction.isSelecting) {
                     Selection.commit();
                 } else if (dur < 250 && e.target === DOM.viewport) {
-                    Tag.deselect(); Input.show(e.clientX, e.clientY);
+                    if (Date.now() - State.interaction.lastBlurTime > 200) {
+                        Tag.deselect();
+                        Input.show(e.clientX, e.clientY);
+                    }
                 } else if (dur < 250 && e.target.closest('.tag') && e.button === 2) {
                     Menu.show(e.clientX, e.clientY, e.target.closest('.tag'));
                 }
@@ -566,15 +796,18 @@
             }, { passive: false });
 
             DOM.input.addEventListener('keydown', e => {
-                if (e.key === 'Enter') { e.preventDefault(); Input.save(); }
+                if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
                 if (e.key === 'Escape') { e.preventDefault(); Input.hide(); }
             });
-            DOM.input.addEventListener('blur', () => Input.save());
+            DOM.input.addEventListener('blur', () => {
+                State.interaction.lastBlurTime = Date.now();
+                if (DOM.input.style.display !== 'none') Input.save();
+            });
 
             window.addEventListener('keydown', e => {
                 if ((e.key === 'Delete' || e.key === 'Backspace') && State.interaction.selectedTags.length > 0 && document.activeElement !== DOM.input) {
                     State.interaction.selectedTags.forEach(async t => {
-                        await _client.from('canvas_nodes').delete().eq('id', t.id);
+                        await SyncManager.wrap(_client.from('canvas_nodes').delete().eq('id', t.id));
                         t.remove();
                     });
                     State.interaction.selectedTags = []; LineManager.render();
@@ -586,13 +819,14 @@
             });
             document.getElementById('menuDelete').addEventListener('click', async () => {
                 const node = State.interaction.contextEntity;
-                if (node) {
-                    await _client.from('canvas_nodes').delete().eq('id', node.id);
+                if (node && State.interaction.contextType === 'node') {
+                    await SyncManager.wrap(_client.from('canvas_nodes').delete().eq('id', node.id));
                     node.remove(); Tag.deselect(); LineManager.render();
                 }
                 Menu.hide();
             });
             document.addEventListener('contextmenu', e => e.preventDefault());
+            window.addEventListener('resize', updateMatrix);
         }
 
         bootstrap();
