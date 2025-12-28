@@ -408,16 +408,51 @@
 
                 let timer;
                 node.addEventListener('touchstart', e => {
+                    // If already pinching/panning with two fingers, ignore
                     if (e.touches.length > 1) return;
+
                     const t = e.touches[0];
                     State.interaction.isDragging = true;
                     State.interaction.currentTag = node;
                     node.classList.add('dragging');
                     const spacePos = screenToSpace(t.clientX, t.clientY);
                     State.interaction.dragOffset = { x: spacePos.x - parseFloat(node.dataset.x), y: spacePos.y - parseFloat(node.dataset.y) };
-                    timer = setTimeout(() => { if (State.interaction.isDragging) Menu.show(t.clientX, t.clientY, node); }, 600);
+
+                    // Select this tag
+                    if (!State.interaction.selectedTags.includes(node)) {
+                        Tag.deselect();
+                        Tag.select(node);
+                    }
+
+                    // Long press for context menu
+                    timer = setTimeout(() => {
+                        if (State.interaction.isDragging && State.interaction.currentTag === node) {
+                            Menu.show(t.clientX, t.clientY, node);
+                            // Vibrate on supported devices
+                            if (navigator.vibrate) navigator.vibrate(50);
+                        }
+                    }, 600);
                 }, { passive: false });
-                node.addEventListener('touchend', () => { clearTimeout(timer); node.classList.remove('dragging'); State.interaction.isDragging = false; });
+
+                node.addEventListener('touchmove', e => {
+                    // Cancel long press if moving
+                    if (timer) clearTimeout(timer);
+                }, { passive: true });
+
+                node.addEventListener('touchend', e => {
+                    clearTimeout(timer);
+                    node.classList.remove('dragging');
+                    if (State.interaction.isDragging && State.interaction.currentTag === node) {
+                        State.interaction.isDragging = false;
+                        State.interaction.selectedTags.forEach(t => Tag.updatePos(t));
+                    }
+                });
+
+                node.addEventListener('touchcancel', e => {
+                    clearTimeout(timer);
+                    node.classList.remove('dragging');
+                    State.interaction.isDragging = false;
+                });
             },
             select(node) { node.classList.add('selected'); if (!State.interaction.selectedTags.includes(node)) State.interaction.selectedTags.push(node); },
             deselect() { State.interaction.selectedTags.forEach(t => t.classList.remove('selected')); State.interaction.selectedTags = []; },
@@ -827,6 +862,199 @@
             });
             document.addEventListener('contextmenu', e => e.preventDefault());
             window.addEventListener('resize', updateMatrix);
+
+            // ========== Mobile Touch Support ==========
+            const TouchState = {
+                initialDistance: 0,
+                initialScale: 1,
+                initialCenter: { x: 0, y: 0 },
+                lastCenter: { x: 0, y: 0 },
+                isPinching: false,
+                isTwoFingerPanning: false,
+                startTime: 0,
+                lastTapTime: 0,
+                lastTapPos: { x: 0, y: 0 }
+            };
+
+            function getTouchDistance(touches) {
+                const dx = touches[0].clientX - touches[1].clientX;
+                const dy = touches[0].clientY - touches[1].clientY;
+                return Math.sqrt(dx * dx + dy * dy);
+            }
+
+            function getTouchCenter(touches) {
+                return {
+                    x: (touches[0].clientX + touches[1].clientX) / 2,
+                    y: (touches[0].clientY + touches[1].clientY) / 2
+                };
+            }
+
+            // Global touch handlers for viewport
+            DOM.viewport.addEventListener('touchstart', e => {
+                // Ignore if touching a tag (handled by tag's own listener)
+                if (e.target.closest('.tag')) return;
+
+                TouchState.startTime = Date.now();
+
+                if (e.touches.length === 1) {
+                    // Single finger - prepare for potential selection or tap
+                    const touch = e.touches[0];
+                    State.mouse.startX = touch.clientX;
+                    State.mouse.startY = touch.clientY;
+                    State.mouse.lastX = touch.clientX;
+                    State.mouse.lastY = touch.clientY;
+                    State.mouse.startTime = Date.now();
+                } else if (e.touches.length === 2) {
+                    e.preventDefault();
+                    // Two fingers - pinch/pan mode
+                    TouchState.isPinching = true;
+                    TouchState.isTwoFingerPanning = true;
+                    TouchState.initialDistance = getTouchDistance(e.touches);
+                    TouchState.initialScale = State.transform.scale;
+                    TouchState.initialCenter = getTouchCenter(e.touches);
+                    TouchState.lastCenter = TouchState.initialCenter;
+
+                    // Cancel any ongoing single-finger operations
+                    State.interaction.isDragging = false;
+                    State.interaction.isSelecting = false;
+                    DOM.selection.style.display = 'none';
+                }
+            }, { passive: false });
+
+            DOM.viewport.addEventListener('touchmove', e => {
+                if (e.touches.length === 2 && (TouchState.isPinching || TouchState.isTwoFingerPanning)) {
+                    e.preventDefault();
+
+                    const currentCenter = getTouchCenter(e.touches);
+                    const currentDistance = getTouchDistance(e.touches);
+
+                    // Pinch to zoom
+                    if (TouchState.isPinching) {
+                        const scaleRatio = currentDistance / TouchState.initialDistance;
+                        const newScale = Math.max(0.02, Math.min(TouchState.initialScale * scaleRatio, 8.0));
+
+                        // Zoom towards pinch center
+                        const rect = DOM.viewport.getBoundingClientRect();
+                        const centerX = TouchState.initialCenter.x - rect.left - rect.width / 2;
+                        const centerY = TouchState.initialCenter.y - rect.top - rect.height / 2;
+
+                        // Calculate new transform based on scale change from current scale
+                        const scaleDiff = newScale / State.transform.scale;
+                        State.transform.x -= centerX * (scaleDiff - 1);
+                        State.transform.y -= centerY * (scaleDiff - 1);
+                        State.transform.scale = newScale;
+                    }
+
+                    // Two-finger pan
+                    if (TouchState.isTwoFingerPanning) {
+                        const dx = currentCenter.x - TouchState.lastCenter.x;
+                        const dy = currentCenter.y - TouchState.lastCenter.y;
+                        State.transform.x += dx;
+                        State.transform.y += dy;
+                        TouchState.lastCenter = currentCenter;
+                    }
+
+                    updateMatrix();
+                } else if (e.touches.length === 1 && !e.target.closest('.tag')) {
+                    // Single finger pan (when not on a tag)
+                    const touch = e.touches[0];
+                    const dx = touch.clientX - State.mouse.lastX;
+                    const dy = touch.clientY - State.mouse.lastY;
+
+                    // Check if we moved enough to consider it a pan
+                    const totalDx = touch.clientX - State.mouse.startX;
+                    const totalDy = touch.clientY - State.mouse.startY;
+                    const totalDist = Math.sqrt(totalDx * totalDx + totalDy * totalDy);
+
+                    if (totalDist > 10) {
+                        State.interaction.isPanning = true;
+                        State.transform.x += dx;
+                        State.transform.y += dy;
+                        updateMatrix();
+                    }
+
+                    State.mouse.lastX = touch.clientX;
+                    State.mouse.lastY = touch.clientY;
+                } else if (e.touches.length === 1 && State.interaction.isDragging && State.interaction.currentTag) {
+                    // Single finger dragging a tag
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const spacePos = screenToSpace(touch.clientX, touch.clientY);
+                    const tagX = spacePos.x - State.interaction.dragOffset.x;
+                    const tagY = spacePos.y - State.interaction.dragOffset.y;
+                    const moveDx = tagX - parseFloat(State.interaction.currentTag.dataset.x);
+                    const moveDy = tagY - parseFloat(State.interaction.currentTag.dataset.y);
+
+                    State.interaction.selectedTags.forEach(t => {
+                        let nx = parseFloat(t.dataset.x) + moveDx;
+                        let ny = parseFloat(t.dataset.y) + moveDy;
+                        t.style.left = `${nx}px`;
+                        t.style.top = `${ny}px`;
+                        t.dataset.x = nx;
+                        t.dataset.y = ny;
+                    });
+                    LineManager.render();
+                }
+            }, { passive: false });
+
+            DOM.viewport.addEventListener('touchend', e => {
+                const duration = Date.now() - TouchState.startTime;
+
+                if (TouchState.isPinching || TouchState.isTwoFingerPanning) {
+                    // If still have one finger, don't immediately start new interaction
+                    if (e.touches.length < 2) {
+                        TouchState.isPinching = false;
+                        TouchState.isTwoFingerPanning = false;
+                        // Reset state for remaining touch if any
+                        if (e.touches.length === 1) {
+                            State.mouse.startX = e.touches[0].clientX;
+                            State.mouse.startY = e.touches[0].clientY;
+                            State.mouse.lastX = e.touches[0].clientX;
+                            State.mouse.lastY = e.touches[0].clientY;
+                            State.mouse.startTime = Date.now();
+                        }
+                    }
+                } else if (e.touches.length === 0) {
+                    // All fingers lifted
+                    if (State.interaction.isPanning) {
+                        State.interaction.isPanning = false;
+                    } else if (State.interaction.isDragging) {
+                        State.interaction.isDragging = false;
+                        State.interaction.selectedTags.forEach(t => Tag.updatePos(t));
+                        if (State.interaction.currentTag) {
+                            State.interaction.currentTag.classList.remove('dragging');
+                        }
+                    } else if (duration < 300 && !e.target.closest('.tag')) {
+                        // Quick tap - check for double tap
+                        const now = Date.now();
+                        const tapX = State.mouse.startX;
+                        const tapY = State.mouse.startY;
+                        const timeDiff = now - TouchState.lastTapTime;
+                        const posDiff = Math.sqrt(
+                            Math.pow(tapX - TouchState.lastTapPos.x, 2) +
+                            Math.pow(tapY - TouchState.lastTapPos.y, 2)
+                        );
+
+                        if (timeDiff < 400 && posDiff < 50) {
+                            // Double tap - create new node
+                            Tag.deselect();
+                            Input.show(tapX, tapY);
+                            TouchState.lastTapTime = 0; // Reset
+                        } else {
+                            // Single tap - record for potential double tap
+                            TouchState.lastTapTime = now;
+                            TouchState.lastTapPos = { x: tapX, y: tapY };
+                            // Also deselect on single tap on empty area
+                            Tag.deselect();
+                        }
+                    }
+                }
+            }, { passive: false });
+
+            // Prevent default touch behaviors
+            document.addEventListener('gesturestart', e => e.preventDefault(), { passive: false });
+            document.addEventListener('gesturechange', e => e.preventDefault(), { passive: false });
+            document.addEventListener('gestureend', e => e.preventDefault(), { passive: false });
         }
 
         bootstrap();
