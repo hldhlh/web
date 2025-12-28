@@ -198,20 +198,14 @@ class LogManager {
 
     async loadLogs() {
         if (!dbClient) return;
-        const loadingEl = document.getElementById('loadingLogs');
-        if (loadingEl) loadingEl.classList.remove('hidden');
 
-        try {
-            const result = await network.retry(() =>
-                dbClient.from('logs').select('*').order('created_at', { ascending: false })
-            );
-            const data = result.data;
-            if (data) {
-                this.logs = data;
-                this.saveCache();
-            }
-        } finally {
-            if (loadingEl) loadingEl.classList.add('hidden');
+        const result = await network.retry(() =>
+            dbClient.from('logs').select('*').order('created_at', { ascending: false })
+        );
+        const data = result.data;
+        if (data) {
+            this.logs = data;
+            this.saveCache();
         }
     }
 
@@ -323,19 +317,13 @@ class LogManager {
     render() {
         const timeline = document.getElementById('timeline');
         const empty = document.getElementById('emptyState');
-        const loadingLogs = document.getElementById('loadingLogs');
 
         if (!this.logs.length) {
-            const isLoading = loadingLogs && !loadingLogs.classList.contains('hidden');
             if (timeline) {
-                const loader = timeline.querySelector('#loadingLogs');
-                timeline.innerHTML = '';
-                if (loader) timeline.appendChild(loader);
+                const items = timeline.querySelectorAll('.timeline-item');
+                items.forEach(item => item.remove());
             }
-            if (empty) {
-                if (isLoading) empty.classList.add('hidden');
-                else empty.classList.remove('hidden');
-            }
+            if (empty) empty.classList.remove('hidden');
             return;
         }
 
@@ -361,11 +349,10 @@ class LogManager {
                     </div>`;
             }).join('');
 
-            const loader = timeline.querySelector('#loadingLogs');
-            timeline.innerHTML = html;
-            if (loader && !loader.classList.contains('hidden')) {
-                timeline.prepend(loader);
-            }
+            // 保留 loader，只更新日志内容
+            const items = timeline.querySelectorAll('.timeline-item');
+            items.forEach(item => item.remove());
+            timeline.insertAdjacentHTML('beforeend', html);
         }
     }
 
