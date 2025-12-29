@@ -81,8 +81,9 @@
             </div>
         </div>
         <form id="logForm" class="form-container">
-            <textarea id="logContent" name="content" rows="3" class="form-textarea" placeholder="随手记录点什么..."
-                required></textarea>
+            <textarea id="logContent" name="content" rows="3" class="form-textarea"
+                placeholder="随手记录点什么... (支持粘贴图片)"></textarea>
+            <div id="imagePreview" class="image-preview hidden"></div>
             <div class="form-actions">
                 <button type="button" id="cancelBtn" class="btn btn-cancel hidden">取消</button>
                 <button type="submit" id="submitBtn" class="btn btn-primary">保存</button>

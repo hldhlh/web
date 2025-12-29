@@ -104,6 +104,7 @@ class LogManager {
         this.channel = null;
         this.isSubmitting = false;
         this.isDeleting = false;
+        this.currentImages = [];
         this.init();
     }
 
@@ -151,20 +152,101 @@ class LogManager {
         if (modal) modal.addEventListener('click', e => {
             if (e.target.id === 'deleteModal') this.hideModal();
         });
+
+        // 粘贴事件
+        const textarea = document.getElementById('logContent');
+        if (textarea) {
+            textarea.addEventListener('paste', e => this.handlePaste(e));
+        }
+    }
+
+    handlePaste(e) {
+        // 检查是否有文件
+        const items = e.clipboardData && e.clipboardData.items;
+        if (!items) return;
+
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                const blob = items[i].getAsFile();
+                this.processImage(blob);
+                e.preventDefault(); // 阻止默认粘贴（避免文件名等出现在文本框）
+            }
+        }
+    }
+
+    processImage(blob) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const base64 = e.target.result;
+            this.addImage(base64);
+        };
+        reader.readAsDataURL(blob);
+    }
+
+    addImage(base64) {
+        this.currentImages.push(base64);
+        this.renderPreview();
+    }
+
+    removeImage(index) {
+        this.currentImages.splice(index, 1);
+        this.renderPreview();
+    }
+
+    renderPreview() {
+        const container = document.getElementById('imagePreview');
+        if (!container) return;
+
+        if (this.currentImages.length === 0) {
+            container.classList.add('hidden');
+            container.innerHTML = '';
+            return;
+        }
+
+        container.classList.remove('hidden');
+        container.innerHTML = this.currentImages.map((img, index) => `
+            <div class="preview-item">
+                <img src="${img}" alt="preview">
+                <div class="preview-remove" onclick="logManager.removeImage(${index})">×</div>
+            </div>
+        `).join('');
     }
 
     async submit(e) {
         e.preventDefault();
-        const content = new FormData(e.target).get('content').toString().trim();
+        let content = new FormData(e.target).get('content').toString().trim();
+
+        // 组合内容和图片
+        if (this.currentImages.length > 0) {
+            const imgData = JSON.stringify(this.currentImages);
+            content = content + '|||IMG|||' + imgData;
+        }
+
         if (!content || !dbClient || this.isSubmitting) return;
 
         this.setSubmitting(true);
         try {
+            let data = null;
             if (this.editingId) {
-                await network.retry(() => dbClient.from('logs').update({ content: content, updated_at: new Date() }).eq('id', this.editingId));
+                const res = await network.retry(() => dbClient.from('logs').update({ content: content, updated_at: new Date() }).eq('id', this.editingId).select());
+                data = res.data;
+                if (data && data[0]) {
+                    const i = this.logs.findIndex(l => l.id === this.editingId);
+                    if (i !== -1) this.logs[i] = data[0];
+                }
             } else {
-                await network.retry(() => dbClient.from('logs').insert([{ content: content }]));
+                const res = await network.retry(() => dbClient.from('logs').insert([{ content: content }]).select());
+                data = res.data;
+                if (data && data[0]) {
+                    this.logs.unshift(data[0]);
+                }
             }
+
+            if (data) {
+                this.saveCache();
+                this.render();
+            }
+
             this.resetForm();
             status.online();
         } catch (err) {
@@ -243,7 +325,20 @@ class LogManager {
         const btn = document.getElementById('submitBtn');
         const cancelBtn = document.getElementById('cancelBtn');
 
-        if (textarea) textarea.value = log.content;
+        // 解析内容和图片
+        const parts = log.content.split('|||IMG|||');
+        const text = parts[0];
+        let images = [];
+        if (parts.length > 1) {
+            try {
+                images = JSON.parse(parts[1]);
+            } catch (e) { console.error('Parse images error', e); }
+        }
+
+        if (textarea) textarea.value = text;
+        this.currentImages = images;
+        this.renderPreview();
+
         if (btn) btn.textContent = '更新';
         if (cancelBtn) cancelBtn.classList.remove('hidden');
         this.editingId = id;
@@ -256,6 +351,9 @@ class LogManager {
         const cancelBtn = document.getElementById('cancelBtn');
 
         if (form) form.reset();
+        this.currentImages = [];
+        this.renderPreview();
+
         if (btn) btn.textContent = '保存';
         if (cancelBtn) cancelBtn.classList.add('hidden');
         this.editingId = null;
@@ -333,12 +431,33 @@ class LogManager {
                 const t = this.formatTime(log.created_at);
                 const edited = log.updated_at && log.updated_at !== log.created_at;
                 const tooltip = this.buildTooltip(log.created_at, log.updated_at);
+
+                // 解析内容
+                const parts = log.content.split('|||IMG|||');
+                const text = this.escape(parts[0]);
+                const textHtml = text ? `<p class="timeline-text">${text}</p>` : '';
+                let imagesHtml = '';
+
+                if (parts.length > 1) {
+                    try {
+                        const images = JSON.parse(parts[1]);
+                        if (Array.isArray(images)) {
+                            imagesHtml = '<div class="timeline-imgs">' +
+                                images.map(src => `<div class="timeline-img-wrapper" onclick="window.open('${src}')"><img src="${src}" class="timeline-img"></div>`).join('') +
+                                '</div>';
+                        }
+                    } catch (e) { }
+                }
+
                 return `
                     <div class="timeline-item">
                         <div class="timeline-dot" data-tooltip="${tooltip}"></div>
                         <div class="timeline-content">
                             <div class="timeline-header">
-                                <p class="timeline-text">${this.escape(log.content)}</p>
+                                <div style="flex:1">
+                                    ${textHtml}
+                                    ${imagesHtml}
+                                </div>
                                 <div class="timeline-actions">
                                     <button onclick="logManager.edit('${log.id}')" class="timeline-action">编辑</button>
                                     <button onclick="logManager.showModal('${log.id}')" class="timeline-action">删除</button>
