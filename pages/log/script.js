@@ -104,7 +104,6 @@ class LogManager {
         this.channel = null;
         this.isSubmitting = false;
         this.isDeleting = false;
-        this.currentImages = [];
         this.init();
     }
 
@@ -154,23 +153,34 @@ class LogManager {
         });
 
         // 粘贴事件
-        const textarea = document.getElementById('logContent');
-        if (textarea) {
-            textarea.addEventListener('paste', e => this.handlePaste(e));
+        const contentDiv = document.getElementById('logContent');
+        if (contentDiv) {
+            contentDiv.addEventListener('paste', e => this.handlePaste(e));
         }
     }
 
     handlePaste(e) {
-        // 检查是否有文件
+        // 简单处理：如果是纯文本，让浏览器默认处理（或者清理样式）；如果是图片，拦截
         const items = e.clipboardData && e.clipboardData.items;
         if (!items) return;
 
+        let hasImage = false;
         for (let i = 0; i < items.length; i++) {
             if (items[i].type.indexOf('image') !== -1) {
+                hasImage = true;
                 const blob = items[i].getAsFile();
                 this.processImage(blob);
-                e.preventDefault(); // 阻止默认粘贴（避免文件名等出现在文本框）
+                e.preventDefault();
+                break; // 一次只处理一张或第一张图片
             }
+        }
+
+        if (!hasImage) {
+            // 如果是纯文本，为了防止粘贴进带样式的HTML（如Word），可以强制转为纯文本
+            // 这里为了简单，先让浏览器默认处理。如果需要纯文本：
+            e.preventDefault();
+            const text = e.clipboardData.getData('text/plain');
+            document.execCommand('insertText', false, text);
         }
     }
 
@@ -178,51 +188,25 @@ class LogManager {
         const reader = new FileReader();
         reader.onload = (e) => {
             const base64 = e.target.result;
-            this.addImage(base64);
+            // 在光标处插入图片
+            // 使用 execCommand 兼容性好，虽已废弃但仍稳健
+            // 或者用 Range API
+            const imgHtml = `<img src="${base64}"><div><br></div>`;
+            document.execCommand('insertHTML', false, imgHtml);
         };
         reader.readAsDataURL(blob);
     }
 
-    addImage(base64) {
-        this.currentImages.push(base64);
-        this.renderPreview();
-    }
-
-    removeImage(index) {
-        this.currentImages.splice(index, 1);
-        this.renderPreview();
-    }
-
-    renderPreview() {
-        const container = document.getElementById('imagePreview');
-        if (!container) return;
-
-        if (this.currentImages.length === 0) {
-            container.classList.add('hidden');
-            container.innerHTML = '';
-            return;
-        }
-
-        container.classList.remove('hidden');
-        container.innerHTML = this.currentImages.map((img, index) => `
-            <div class="preview-item">
-                <img src="${img}" alt="preview">
-                <div class="preview-remove" onclick="logManager.removeImage(${index})">×</div>
-            </div>
-        `).join('');
-    }
-
     async submit(e) {
         e.preventDefault();
-        let content = new FormData(e.target).get('content').toString().trim();
+        const div = document.getElementById('logContent');
+        if (!div) return;
 
-        // 组合内容和图片
-        if (this.currentImages.length > 0) {
-            const imgData = JSON.stringify(this.currentImages);
-            content = content + '|||IMG|||' + imgData;
-        }
+        let content = div.innerHTML.trim();
+        // 简单清理空标签
+        if (content === '<br>' || content === '') return;
 
-        if (!content || !dbClient || this.isSubmitting) return;
+        if (!dbClient || this.isSubmitting) return;
 
         this.setSubmitting(true);
         try {
@@ -260,7 +244,7 @@ class LogManager {
     setSubmitting(loading) {
         this.isSubmitting = loading;
         const btn = document.getElementById('submitBtn');
-        const textarea = document.getElementById('logContent');
+        const contentDiv = document.getElementById('logContent');
         const cancelBtn = document.getElementById('cancelBtn');
 
         if (btn) {
@@ -274,7 +258,11 @@ class LogManager {
                 btn.classList.remove('loading');
             }
         }
-        if (textarea) textarea.disabled = loading;
+        if (contentDiv) {
+            contentDiv.contentEditable = !loading;
+            if (loading) contentDiv.classList.add('disabled'); // 需要CSS配合
+            else contentDiv.classList.remove('disabled');
+        }
         if (cancelBtn) cancelBtn.disabled = loading;
     }
 
@@ -321,38 +309,30 @@ class LogManager {
     edit(id) {
         const log = this.logs.find(l => l.id === id);
         if (!log) return;
-        const textarea = document.getElementById('logContent');
+        const div = document.getElementById('logContent');
         const btn = document.getElementById('submitBtn');
         const cancelBtn = document.getElementById('cancelBtn');
 
-        // 解析内容和图片
-        const parts = log.content.split('|||IMG|||');
-        const text = parts[0];
-        let images = [];
-        if (parts.length > 1) {
-            try {
-                images = JSON.parse(parts[1]);
-            } catch (e) { console.error('Parse images error', e); }
+        // 需要兼容旧格式
+        let content = log.content;
+        if (content.includes('|||IMG|||')) {
+            content = this.convertOldFormat(content);
         }
 
-        if (textarea) textarea.value = text;
-        this.currentImages = images;
-        this.renderPreview();
+        if (div) div.innerHTML = content;
 
         if (btn) btn.textContent = '更新';
         if (cancelBtn) cancelBtn.classList.remove('hidden');
         this.editingId = id;
-        if (textarea) textarea.focus();
+        if (div) div.focus();
     }
 
     resetForm() {
-        const form = document.getElementById('logForm');
+        const div = document.getElementById('logContent');
         const btn = document.getElementById('submitBtn');
         const cancelBtn = document.getElementById('cancelBtn');
 
-        if (form) form.reset();
-        this.currentImages = [];
-        this.renderPreview();
+        if (div) div.innerHTML = '';
 
         if (btn) btn.textContent = '保存';
         if (cancelBtn) cancelBtn.classList.add('hidden');
@@ -432,31 +412,24 @@ class LogManager {
                 const edited = log.updated_at && log.updated_at !== log.created_at;
                 const tooltip = this.buildTooltip(log.created_at, log.updated_at);
 
-                // 解析内容
-                const parts = log.content.split('|||IMG|||');
-                const text = this.escape(parts[0]);
-                const textHtml = text ? `<p class="timeline-text">${text}</p>` : '';
-                let imagesHtml = '';
-
-                if (parts.length > 1) {
-                    try {
-                        const images = JSON.parse(parts[1]);
-                        if (Array.isArray(images)) {
-                            imagesHtml = '<div class="timeline-imgs">' +
-                                images.map(src => `<div class="timeline-img-wrapper" onclick="window.open('${src}')"><img src="${src}" class="timeline-img"></div>`).join('') +
-                                '</div>';
-                        }
-                    } catch (e) { }
+                // 内容处理：兼容旧格式，或者直接显示新格式
+                let contentHtml = log.content;
+                if (log.content.includes('|||IMG|||')) {
+                    contentHtml = this.convertOldFormat(log.content);
                 }
+
+                // 给图片添加点击放大功能
+                // 由于 contentHtml 现在是字符串，我们可以用简单的正则或者DOM解析来做，
+                // 或者在 click 事件委托里做图片放大（更优雅）。
+                // 这里先只负责输出 HTML。
 
                 return `
                     <div class="timeline-item">
                         <div class="timeline-dot" data-tooltip="${tooltip}"></div>
                         <div class="timeline-content">
                             <div class="timeline-header">
-                                <div style="flex:1">
-                                    ${textHtml}
-                                    ${imagesHtml}
+                                <div style="flex:1" class="timeline-body">
+                                    ${contentHtml}
                                 </div>
                                 <div class="timeline-actions">
                                     <button onclick="logManager.edit('${log.id}')" class="timeline-action">编辑</button>
@@ -473,6 +446,24 @@ class LogManager {
             items.forEach(item => item.remove());
             timeline.insertAdjacentHTML('beforeend', html);
         }
+    }
+
+    convertOldFormat(content) {
+        const parts = content.split('|||IMG|||');
+        const text = this.escape(parts[0]);
+        let html = text ? `<p>${text}</p>` : '';
+
+        if (parts.length > 1) {
+            try {
+                const images = JSON.parse(parts[1]);
+                if (Array.isArray(images)) {
+                    images.forEach(src => {
+                        html += `<img src="${src}">`;
+                    });
+                }
+            } catch (e) { }
+        }
+        return html;
     }
 
     buildTooltip(createdAt, updatedAt) {

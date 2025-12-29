@@ -28,26 +28,38 @@ body {
 /* 表单 */
 .form-container {
     margin-bottom: 3rem;
+    position: relative;
 }
 
-.form-textarea {
+.form-content {
     width: 100%;
+    min-height: 100px;
     padding: 0.75rem 0;
     border: none;
     border-bottom: 1px solid #000;
     background: transparent;
-    resize: none;
     font-size: 0.875rem;
     font-family: inherit;
+    outline: none;
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
-.form-textarea:focus {
-    outline: none;
+.form-content:focus {
     border-bottom-width: 2px;
 }
 
-.form-textarea::placeholder {
+.form-content:empty::before {
+    content: attr(placeholder);
     color: #999;
+}
+
+.form-content img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 10px 0;
+    border-radius: 4px;
 }
 
 .form-actions {
@@ -133,7 +145,7 @@ body {
     }
 }
 
-.form-textarea:disabled {
+.form-content[contenteditable="false"] {
     opacity: 0.6;
     background: #f5f5f5;
     cursor: not-allowed;
@@ -444,57 +456,16 @@ body {
     }
 }
 
-/* 图片相关样式 */
-.image-preview {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-top: 12px;
-}
+/* 图片相关样式 - 已移除预览区域样式，现在直接在编辑器内显示 */
 
-.preview-item {
-    position: relative;
-    width: 80px;
-    height: 80px;
+.timeline-content img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 8px 0;
+    border-radius: 4px;
+    cursor: zoom-in;
     border: 1px solid #eee;
-    border-radius: 8px;
-    overflow: hidden;
-    background: #f9f9f9;
-    transition: all 0.2s ease;
-}
-
-.preview-item:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    transform: translateY(-2px);
-}
-
-.preview-item img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.preview-remove {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    width: 20px;
-    height: 20px;
-    background: rgba(0, 0, 0, 0.7);
-    color: #fff;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    /* X character */
-    cursor: pointer;
-    backdrop-filter: blur(2px);
-    transition: background 0.2s;
-}
-
-.preview-remove:hover {
-    background: #000;
 }
 
 .timeline-imgs {
