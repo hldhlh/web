@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="./icon.svg" type="image/svg+xml">
-    <!-- <link rel="preconnect" href="https://picsum.photos"> -->
     <title>阅图 - 发现视觉之美</title>
     <style>
         :root {
@@ -435,9 +434,11 @@
         function generateHash(s) { let h = 0; for (let i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i), h &= h; return Math.abs(h).toString(36); }
         function saveCache() { const keys = Object.keys(photoCache); if (keys.length > 500) delete photoCache[keys[0]]; localStorage.setItem(CACHE_KEY, JSON.stringify(photoCache)); }
         function parsePhotoUrl(url) {
-            const m = url.match(/\/id\/(\d+)\/(\d+)\/(\d+)/);
-            if (m) return { url, title: `视觉艺术 #${m[1]}`, author: `Artist ${m[1]}`, aspectRatio: m[2] / m[3] };
-            return { url, title: '未知艺术', author: '匿名', aspectRatio: 1 };
+            const m = url.match(/images\/(\d+)\.webp/);
+            if (m) return { url, title: `视觉艺术 #${m[1]}`, author: `Artist ${m[1]}`, aspectRatio: 1.25 };
+            const m2 = url.match(/\/id\/(\d+)\/(\d+)\/(\d+)/);
+            if (m2) return { url, title: `视觉艺术 #${m2[1]}`, author: `Artist ${m2[1]}`, aspectRatio: m2[2] / m2[3] };
+            return { url, title: '未知艺术', author: '匿名', aspectRatio: 1.25 };
         }
         function getCachedPhoto(url) {
             const h = generateHash(url);
@@ -510,9 +511,9 @@
         async function fetchRandomPhotos(n = 15) {
             if (isLoading) return; isLoading = true; document.getElementById('loading').style.opacity = '1';
             const photos = []; for (let i = 0; i < n; i++) {
-                const id = 100 + Math.floor(Math.random() * 800), w = 500 + Math.floor(Math.random() * 200), h = 400 + Math.floor(Math.random() * 300);
-                // 使用 WebP 格式减少体积
-                photos.push(getCachedPhoto(`https://picsum.photos/id/${id}/${w}/${h}.webp`));
+                const imgIdx = Math.floor(Math.random() * 20) + 1;
+                // 使用本地 WebP 图片
+                photos.push(getCachedPhoto(`./images/${imgIdx}.webp`));
             }
             renderPhotos(photos); isLoading = false; document.getElementById('loading').style.opacity = '0.3';
         }
