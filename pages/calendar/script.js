@@ -3,6 +3,11 @@
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
+  // Supabase Configuration
+  const SUPABASE_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
+  const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
   // Elements
   const yearLabel = $('#yearLabel');
   const monthLabel = $('#monthLabel');
@@ -28,72 +33,125 @@
   let selected = new Date(today);
 
   // Localization
-  const monthsCN = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
-  const weekdayCN = ['一','二','三','四','五','六','日']; // Monday-first
-  const weekdayFull = ['周一','周二','周三','周四','周五','周六','周日'];
+  const monthsCN = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+  const weekdayCN = ['一', '二', '三', '四', '五', '六', '日']; // Monday-first
+  const weekdayFull = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 
   // Helpers
-  function stripTime(d) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
+  function stripTime(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
   function isSameDate(a, b) {
     return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
   }
   function pad2(n) { return String(n).padStart(2, '0'); }
-  function isoDate(d) { return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+  function isoDate(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
 
-  // Todo store (array by date) in localStorage; backward compatible with boolean
+  // Todo store (Using Supabase)
+  let todos = {};
   const TODO_KEY = 'wy-calendar-todos';
-  function loadTodos() {
-    try { return JSON.parse(localStorage.getItem(TODO_KEY) || '{}'); }
-    catch { return {}; }
-  }
-  function saveTodos() { localStorage.setItem(TODO_KEY, JSON.stringify(todos)); }
-  let todos = loadTodos();
-  function normalizeTodos() {
-    // migrate any legacy boolean flags to empty lists
-    let changed = false;
-    for (const k of Object.keys(todos)) {
-      if (todos[k] === true) { todos[k] = []; changed = true; }
+
+  async function fetchTodos() {
+    const { data, error } = await _supabase
+      .from('calendar_events')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true }); // Use ID as a stable tie-breaker
+
+    if (error) {
+      console.error('Fetch error:', error);
+      return;
     }
-    if (changed) saveTodos();
+
+    const newTodos = {};
+    data.forEach(item => {
+      const k = item.date;
+      if (!newTodos[k]) newTodos[k] = [];
+      newTodos[k].push({ id: item.id, text: item.text, done: item.done });
+    });
+    todos = newTodos;
+    render();
   }
+
+  // Set up Realtime
+  _supabase
+    .channel('calendar_changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar_events' }, payload => {
+      fetchTodos();
+    })
+    .subscribe();
+
+  async function migrateLocalData() {
+    const local = localStorage.getItem(TODO_KEY);
+    if (!local) return;
+    try {
+      const parsed = JSON.parse(local);
+      const toInsert = [];
+      for (const date of Object.keys(parsed)) {
+        const items = Array.isArray(parsed[date]) ? parsed[date] : (parsed[date] === true ? [] : []);
+        items.forEach(it => {
+          toInsert.push({ date: date, text: it.text || '任务', done: !!it.done });
+        });
+      }
+      if (toInsert.length > 0) {
+        console.log('Migrating local data to Supabase...', toInsert.length);
+        await _supabase.from('calendar_events').insert(toInsert);
+      }
+      localStorage.removeItem(TODO_KEY);
+      await fetchTodos();
+    } catch (e) {
+      console.error('Migration failed:', e);
+    }
+  }
+
   function dayData(key) { return todos[key]; }
   function hasTodo(d) {
     const v = dayData(isoDate(d));
-    if (Array.isArray(v)) return v.length > 0;
-    return !!v; // backward compat for boolean
+    return Array.isArray(v) && v.length > 0;
   }
   function listTodos(d) {
     const v = dayData(isoDate(d));
-    if (Array.isArray(v)) return v;
-    return []; // boolean treated as no named tasks
+    return Array.isArray(v) ? v : [];
   }
-  function setList(d, arr) { todos[isoDate(d)] = arr; saveTodos(); }
-  function addTodo(d, text) {
+
+  async function addTodo(d, text) {
     const k = isoDate(d);
-    const arr = Array.isArray(todos[k]) ? todos[k] : [];
-    const item = { id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`, text: text.trim(), done: false };
-    arr.push(item);
-    todos[k] = arr;
-    saveTodos();
+    const { error } = await _supabase
+      .from('calendar_events')
+      .insert([{ date: k, text: text.trim(), done: false }]);
+
+    if (error) console.error('Add error:', error);
+    // Realtime will trigger refetch
   }
-  function toggleDone(d, id) {
-    const k = isoDate(d);
-    const arr = Array.isArray(todos[k]) ? todos[k] : [];
+
+  async function toggleDone(d, id) {
+    const arr = listTodos(d);
     const it = arr.find(x => x.id === id);
-    if (it) it.done = !it.done;
-    todos[k] = arr; saveTodos();
+    if (!it) return;
+
+    const { error } = await _supabase
+      .from('calendar_events')
+      .update({ done: !it.done })
+      .eq('id', id);
+
+    if (error) console.error('Toggle error:', error);
   }
-  function deleteTodo(d, id) {
-    const k = isoDate(d);
-    const arr = Array.isArray(todos[k]) ? todos[k] : [];
-    const next = arr.filter(x => x.id !== id);
-    if (next.length) todos[k] = next; else delete todos[k];
-    saveTodos();
+
+  async function deleteTodo(d, id) {
+    const { error } = await _supabase
+      .from('calendar_events')
+      .delete()
+      .eq('id', id);
+
+    if (error) console.error('Delete error:', error);
   }
-  function clearTodos(d) {
+
+  async function clearTodos(d) {
     const k = isoDate(d);
-    delete todos[k];
-    saveTodos();
+    const { error } = await _supabase
+      .from('calendar_events')
+      .delete()
+      .eq('date', k);
+
+    if (error) console.error('Clear error:', error);
   }
 
   function monthInfo(year, month) {
@@ -172,7 +230,7 @@
     btn.dataset.date = isoDate(date);
     btn.setAttribute('role', 'gridcell');
     const wIndex = (date.getDay() + 6) % 7;
-    btn.title = `${date.getFullYear()}年${date.getMonth()+1}月${date.getDate()}日 ${weekdayFull[wIndex]}`;
+    btn.title = `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${weekdayFull[wIndex]}`;
     btn.setAttribute('aria-label', btn.title);
 
     btn.addEventListener('click', () => {
@@ -259,7 +317,8 @@
 
   // Init
   initTheme();
-  render();
+  fetchTodos();
+  migrateLocalData();
 
   // Info card logic
   function weekdayName(d) {
@@ -270,9 +329,8 @@
     const isToday = isSameDate(selected, today);
     // migrate legacy boolean flag to list on view
     const key = isoDate(selected);
-    if (todos[key] === true) { todos[key] = []; saveTodos(); }
     todoTitle.textContent = isToday ? '今日提示' : '日期提示';
-    todoDate.textContent = `${selected.getFullYear()}年${selected.getMonth()+1}月${selected.getDate()}日 ${weekdayName(selected)}`;
+    todoDate.textContent = `${selected.getFullYear()}年${selected.getMonth() + 1}月${selected.getDate()}日 ${weekdayName(selected)}`;
     const arr = listTodos(selected);
     const total = arr.length;
     const done = arr.filter(x => x.done).length;
@@ -345,7 +403,6 @@
   }
   function updateTimeline() {
     if (!tlList) return;
-    normalizeTodos();
     tlList.innerHTML = '';
     const keys = Object.keys(todos).filter(k => Array.isArray(todos[k]) && todos[k].length > 0);
     // Sort desc by date
@@ -359,7 +416,7 @@
       const title = document.createElement('div');
       title.className = 'tl-date-title';
       const idx = (date.getDay() + 6) % 7; // Monday-first
-      const label = `${date.getFullYear()}年${date.getMonth()+1}月${date.getDate()}日 ${weekdayFull[idx]}`;
+      const label = `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${weekdayFull[idx]}`;
       title.textContent = label;
 
       // Minimal: no badges or extra prompts

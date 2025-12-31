@@ -1,15 +1,18 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>物语日历 · Minimal</title>
-    <link rel="stylesheet" href="styles.css" />
-    <script defer src="script.js"></script>
-  </head>
-  <body>
-    <div class="bg"></div>
-    <div class="page-wrap">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>物语日历 · Minimal</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="supabase.js"></script>
+  <script defer src="script.js"></script>
+</head>
+
+<body>
+  <div class="bg"></div>
+  <div class="page-wrap">
     <main class="info-card timeline-shell" id="timeline" aria-label="时间线">
       <div class="info-top tl-head">
         <div class="info-label">时间线</div>
@@ -69,7 +72,7 @@
       </aside>
       -->
 
-      
+
     </main>
 
     <main class="info-card todo-shell" id="todoCard" aria-live="polite" aria-label="日期代办">
@@ -89,6 +92,7 @@
       <ul class="todo-list" id="todoList" aria-label="代办事项列表"></ul>
 
     </main>
-    </div>
-  </body>
-  </html>
+  </div>
+</body>
+
+</html>
