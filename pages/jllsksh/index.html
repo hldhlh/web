@@ -147,6 +147,18 @@
         Chart.defaults.plugins.tooltip.borderColor = 'rgba(255, 255, 255, 0.1)';
         Chart.defaults.plugins.tooltip.borderWidth = 1;
 
+        // 简易周显示助手
+        const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+        const getSimplifiedDate = (dateStr) => {
+            if (!dateStr) return '';
+            const pureDate = String(dateStr).split(' ')[0];
+            const d = new Date(pureDate.replace(/-/g, '/'));
+            if (isNaN(d.getTime())) return dateStr;
+            const m = d.getMonth() + 1;
+            const day = d.getDate();
+            return `${m}.${day} ${dayNames[d.getDay()]}`;
+        };
+
         fileInput.addEventListener('change', handleFile);
 
         function createGradient(ctx, color) {
@@ -164,53 +176,110 @@
             reader.onload = function (e) {
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
-                const sheetName = workbook.SheetNames[0];
-                const sheet = workbook.Sheets[sheetName];
-                const rawJson = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-                processData(rawJson);
+
+                let found = false;
+                const targetSheetName = workbook.SheetNames.find(n => n.includes('已结账单')) || workbook.SheetNames[0];
+
+                // 尝试优先处理目标 Sheet
+                const trySheet = (name) => {
+                    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1 });
+                    if (!rows || rows.length === 0) return null;
+
+                    const keywords = ['实收金额', '实收', '合计', '应付', '实付', '应收金额', '应收', '结算时间', '结账时间', '就餐人数', '人数', '客位名称', '桌号', '营业流水号', '流水号'];
+                    for (let i = 0; i < Math.min(rows.length, 60); i++) {
+                        const rowStr = (rows[i] || []).map(cell => String(cell || "").trim().toLowerCase());
+                        let matches = 0;
+                        keywords.forEach(k => {
+                            if (rowStr.some(cell => cell.includes(k.toLowerCase()))) matches++;
+                        });
+                        if (matches >= 2) return rows; // 至少匹配 2 个关键字段才认为是有效报表
+                    }
+                    return null;
+                };
+
+                let rows = trySheet(targetSheetName);
+                if (rows) {
+                    processData(rows);
+                    found = true;
+                } else {
+                    // 遍历所有 Sheet 寻找符合条件的
+                    for (const name of workbook.SheetNames) {
+                        if (name === targetSheetName) continue;
+                        rows = trySheet(name);
+                        if (rows) {
+                            processData(rows);
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!found) {
+                    showToast('【解析失败】无法在 Excel 中定位到具备关键数据列（实收金额）的表格。', 'error');
+                }
             };
             reader.readAsArrayBuffer(file);
         }
-
         function processData(rows) {
             let headerIdx = -1;
-            for (let i = 0; i < rows.length; i++) {
-                if (rows[i].includes('营业流水号') || rows[i].includes('实收金额')) {
+            let maxMatches = 0;
+            const keywords = ['实收金额', '实收', '合计', '应付', '实付', '应收金额', '应收', '结算时间', '结账时间', '就餐人数', '人数', '客位名称', '桌号', '营业流水号', '流水号'];
+
+            // 扫描前 60 行，寻找包含关键词最多的那一行作为标题行
+            for (let i = 0; i < Math.min(rows.length, 60); i++) {
+                const row = rows[i];
+                if (!Array.isArray(row)) continue;
+                const rowStr = row.map(cell => String(cell || "").trim().toLowerCase());
+                let matches = 0;
+                keywords.forEach(k => {
+                    if (rowStr.some(cell => cell.includes(k.toLowerCase()))) matches++;
+                });
+
+                if (matches > maxMatches) {
+                    maxMatches = matches;
                     headerIdx = i;
-                    break;
                 }
             }
 
-            if (headerIdx === -1 || !rows[headerIdx]) {
-                showToast('【解析失败】无法在 Excel 中定位到标题行（需包含“营业流水号”或“实收金额”）。', 'error');
+            // 如果匹配度太低（少于 2 个关键词），可能不是我们要找的表
+            if (headerIdx === -1 || maxMatches < 2) {
+                showToast('【解析失败】无法在 Excel 中定位到数据标题行。\n请确保文件包含“实收金额”和“结算时间”列。', 'error');
                 return;
             }
 
             const headers = rows[headerIdx].map(h => String(h || "").trim());
             const dataRows = rows.slice(headerIdx + 1);
 
-            // 严谨的列查找函数，防止处理非字符串或空值时崩溃
+            // 极大化列查找兼容性
             const findCol = (possibleNames) => headers.findIndex(h => {
                 if (typeof h !== 'string' || !h) return false;
-                return possibleNames.some(p => h.includes(p));
+                const normalizedH = h.replace(/\s+/g, '').toLowerCase();
+                return possibleNames.some(p => {
+                    const normalizedP = p.toLowerCase();
+                    return normalizedH.includes(normalizedP) || normalizedP.includes(normalizedH);
+                });
             });
 
             const idx = {
-                actual: findCol(['实收金额']),
-                receivable: findCol(['应收金额']),
-                discount: findCol(['优惠金额']),
-                time: findCol(['结算时间', '结账时间']),
-                people: findCol(['就餐人数', '人数']),
-                tableName: findCol(['客位名称', '桌号', '桌名'])
+                actual: findCol(['实收金额', '实收', '合计', '应付', '实付', '支付金额', '支付']),
+                receivable: findCol(['应收金额', '应收', '总额', '原价']),
+                discount: findCol(['优惠金额', '优惠', '减免', '折扣']),
+                time: findCol(['结算时间', '结账时间', '结算日期', '结账日期', '结账', '时间', '日期']),
+                people: findCol(['就餐人数', '人数', '客数']),
+                tableName: findCol(['客位名称', '桌号', '桌名', '区域', '台号'])
             };
+
+            // 如果还是找不到，进行最后一轮“强行猜测”
+            if (idx.actual === -1) idx.actual = findCol(['金额', '钱']);
+            if (idx.time === -1) idx.time = findCol(['time', 'date']);
 
             // 【核心防线】如果缺失“实收”或“时间”，可视化将没有任何意义，直接拦截
             if (idx.actual === -1 || idx.time === -1) {
                 const missing = [];
                 if (idx.actual === -1) missing.push('“实收金额”');
-                if (idx.time === -1) missing.push('“结算时间”');
+                if (idx.time === -1) missing.push('“时间/日期”');
 
-                showToast(`【规则冲突】上传的文件不符合解析规则！缺失关键数据列：${missing.join(' 和 ')}`, 'warn');
+                showToast(`【解析提醒】您的 Excel 列名与系统要求的（${missing.join(' 和 ')}）不匹配。\n建议打开 Excel 核对标题行名称，或尝试将相关列手动重命名。`, 'warn');
                 return;
             }
 
@@ -330,6 +399,8 @@
             document.getElementById('val-order-count').innerText = validOrders;
             document.getElementById('val-customer-count').innerText = totalPeople;
 
+
+
             dashboard.classList.remove('hidden');
             uploadSection.classList.add('hidden');
 
@@ -342,23 +413,37 @@
         function renderCharts(dailyRevenue, tableTypes, guestComposition, heatmap, compareTrend, buckets, tableUsage, daysCount, forecast, profitStats, spendingStats, guestValueStats) {
             Object.values(charts).forEach(c => c.destroy());
 
+            const sortedDates = Object.keys(dailyRevenue).sort();
+            const conciseLabels = sortedDates.map(d => getSimplifiedDate(d));
+
             const commonOptions = {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'top', labels: { color: '#94a3b8', font: { weight: '600', size: 12 }, padding: 20 } }
+                    legend: { position: 'top', labels: { color: '#94a3b8', font: { weight: '600', size: 12 }, padding: 20 } },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        padding: 15,
+                        cornerRadius: 12,
+                        titleFont: { size: 14, weight: 'bold' },
+                        callbacks: {
+                            title: (items) => {
+                                if (!items.length) return '';
+                                return getSimplifiedDate(sortedDates[items[0].dataIndex]);
+                            }
+                        }
+                    }
                 }
             };
 
             const gridStyle = { color: 'rgba(255, 255, 255, 0.03)', borderColor: 'rgba(255, 255, 255, 0.05)', drawBorder: false };
             const titleStyle = (text) => ({ display: true, text, color: '#fff', font: { size: 18, weight: '800' }, padding: { bottom: 25 }, align: 'start' });
-            const sortedDates = Object.keys(dailyRevenue).sort();
 
             // 1. Heatmap
             const ctxHeat = document.getElementById('weeklyHeatmapChart').getContext('2d');
-            const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
             const maxVal = Math.max(...heatmap.map(d => d.v), 1);
 
+            // 注意：此处使用全局 dayNames (周日开始)
             const isMatrixAvailable = typeof Chart.controllers !== 'undefined' &&
                 Chart.controllers.matrix !== undefined;
 
@@ -380,10 +465,23 @@
                     },
                     options: {
                         ...commonOptions,
-                        plugins: { ...commonOptions.plugins, title: titleStyle('营收周期热力图') },
+                        plugins: {
+                            ...commonOptions.plugins,
+                            title: titleStyle('营收周期热力图'),
+                            tooltip: {
+                                callbacks: {
+                                    title: () => '',
+                                    label: (item) => {
+                                        const d = item.raw;
+                                        // d.y=0 是周一，在全局 dayNames 中索引是 1
+                                        return `${dayNames[(d.y + 1) % 7]} ${d.x}h: ¥${d.v.toLocaleString()}`;
+                                    }
+                                }
+                            }
+                        },
                         scales: {
                             x: { type: 'linear', min: -0.5, max: 23.5, ticks: { stepSize: 1, callback: (v) => v + 'h' }, grid: { display: false } },
-                            y: { type: 'linear', min: -0.5, max: 6.5, ticks: { stepSize: 1, callback: (v) => dayNames[v] }, grid: { display: false } }
+                            y: { type: 'linear', min: -0.5, max: 6.5, ticks: { stepSize: 1, callback: (v) => dayNames[(v + 1) % 7] }, grid: { display: false } }
                         }
                     }
                 });
@@ -471,13 +569,32 @@
             charts.compare = new Chart(ctxCompare, {
                 type: 'line',
                 data: {
-                    labels: sortedDates,
+                    labels: conciseLabels,
                     datasets: [
                         { label: '堂食', data: sortedDates.map(d => compareTrend[d].dinein), borderColor: '#818cf8', backgroundColor: createGradient(ctxCompare, 'rgba(129, 140, 248, 1)'), fill: true, tension: 0.4 },
                         { label: '外卖', data: sortedDates.map(d => compareTrend[d].takeout), borderColor: '#f472b6', backgroundColor: createGradient(ctxCompare, 'rgba(244, 114, 182, 1)'), fill: true, tension: 0.4 }
                     ]
                 },
-                options: { ...commonOptions, plugins: { ...commonOptions.plugins, title: titleStyle('核心业务趋势对比') }, scales: { y: { grid: gridStyle }, x: { grid: { display: false } } } }
+                options: {
+                    ...commonOptions,
+                    plugins: {
+                        ...commonOptions.plugins,
+                        title: titleStyle('核心业务趋势对比'),
+                        tooltip: {
+                            ...commonOptions.plugins.tooltip,
+                            callbacks: {
+                                title: (items) => getSimplifiedDate(sortedDates[items[0].dataIndex])
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { grid: gridStyle },
+                        x: {
+                            grid: { display: false },
+                            ticks: { maxRotation: 0, autoSkip: true }
+                        }
+                    }
+                }
             });
 
             // 4. Forecast
@@ -557,7 +674,7 @@
             charts.profit = new Chart(ctxProfit, {
                 type: 'bar',
                 data: {
-                    labels: sortedDates,
+                    labels: conciseLabels,
                     datasets: [
                         { label: '实收', data: sortedDates.map(d => profitStats[d].actual), backgroundColor: '#10b981', borderRadius: 4 },
                         { label: '优损', data: sortedDates.map(d => profitStats[d].discount), backgroundColor: 'rgba(244, 63, 94, 0.3)', borderRadius: 4 }
@@ -567,16 +684,7 @@
                     ...commonOptions,
                     plugins: {
                         ...commonOptions.plugins,
-                        title: titleStyle('实收 vs 优惠损耗'),
-                        tooltip: {
-                            callbacks: {
-                                title: (items) => {
-                                    const d = new Date(items[0].label.replace(/-/g, '/'));
-                                    const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-                                    return `${items[0].label} (${days[d.getDay()]})`;
-                                }
-                            }
-                        }
+                        title: titleStyle('实收 vs 优惠损耗')
                     },
                     scales: { x: { stacked: true }, y: { stacked: true, grid: gridStyle } }
                 }
@@ -587,7 +695,7 @@
             charts.spending = new Chart(ctxSpend, {
                 type: 'line',
                 data: {
-                    labels: sortedDates,
+                    labels: conciseLabels,
                     datasets: [{
                         label: '平均客单价',
                         data: sortedDates.map(d => {
@@ -609,17 +717,7 @@
                     ...commonOptions,
                     plugins: {
                         ...commonOptions.plugins,
-                        title: titleStyle('客单价波动监测 (人均消费)'),
-                        tooltip: {
-                            callbacks: {
-                                title: (items) => {
-                                    const d = new Date(items[0].label.replace(/-/g, '/'));
-                                    const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-                                    return `${items[0].label} (${days[d.getDay()]})`;
-                                },
-                                label: (item) => `人均消费: ¥${item.formattedValue}`
-                            }
-                        }
+                        title: titleStyle('客单价波动监测 (人均消费)')
                     },
                     scales: {
                         y: {
