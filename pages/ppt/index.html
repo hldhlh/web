@@ -5,11 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI 天气预测：智慧交互演示</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@100;300;500;900&family=Outfit:wght@800&display=swap"
-        rel="stylesheet">
+    <script src="lib/gsap.min.js"></script>
+    <script src="lib/three.min.js"></script>
+
     <style>
         :root {
             --bg: #030306;
@@ -437,6 +435,7 @@
             pointer-events: none;
         }
     </style>
+    <link rel="stylesheet" href="../common/fonts/fonts.css">
 </head>
 
 <body>
@@ -476,7 +475,7 @@
                 </div>
             </div>
             <div class="img-wrap">
-                <div class="img-box"><img src="https://images.unsplash.com/photo-1592210454359-9043f067919b?q=80&w=1470"
+                <div class="img-box"><img loading="lazy" src="./images/1592210454359-9043f067919b.jpg"
                         alt="目录"></div>
             </div>
         </div>
@@ -498,7 +497,7 @@
                 <p>而现在，AI 天气预测仅需 <strong>几分钟</strong> 即可完成。</p>
             </div>
             <div class="img-wrap">
-                <div class="img-box"><img src="https://images.unsplash.com/photo-1501139083538-0139583c060f?q=80&w=1470"
+                <div class="img-box"><img loading="lazy" src="./images/1501139083538-0139583c060f.jpg"
                         alt="效率对比"></div>
             </div>
         </div>
@@ -524,7 +523,7 @@
                 <p>基于数学模型和超级计算，为精准、定量的预报提供科学支撑。</p>
             </div>
             <div class="img-wrap">
-                <div class="img-box"><img src="https://images.unsplash.com/photo-1532094349884-543bc11b234d?q=80&w=1470"
+                <div class="img-box"><img loading="lazy" src="./images/1532094349884-543bc11b234d.jpg"
                         alt="解方程"></div>
             </div>
         </div>
@@ -542,13 +541,13 @@
                 <!-- 第一张：隐喻混沌与复杂逻辑 -->
                 <div class="img-wrap">
                     <div class="img-box"><img
-                            src="https://images.unsplash.com/photo-1635070041078-e363dbe005cb?q=80&w=1470" alt="混沌效应意向">
+                            src="./images/1635070041078-e363dbe005cb.jpg" alt="混沌效应意向">
                     </div>
                 </div>
                 <!-- 第二张：隐喻观测盲点与地理局限 -->
                 <div class="img-wrap">
                     <div class="img-box"><img
-                            src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=1470" alt="观测死角意向">
+                            src="./images/1464822759023-fed622ff2c3b.jpg" alt="观测死角意向">
                     </div>
                 </div>
             </div>
@@ -567,7 +566,7 @@
                 <p>通过训练好的内化知识，快速计算并生成预报结果。</p>
             </div>
             <div class="img-wrap">
-                <div class="img-box"><img src="https://images.unsplash.com/photo-1677442136019-21780ecad995?q=80&w=1632"
+                <div class="img-box"><img loading="lazy" src="./images/1677442136019-21780ecad995.jpg"
                         alt="找规律"></div>
             </div>
         </div>
@@ -589,7 +588,7 @@
                 <p>全球 7 天核心预报误差实现 <strong>20% 以上</strong> 的整体降幅。</p>
             </div>
             <div class="img-wrap">
-                <div class="img-box"><img src="https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=1472"
+                <div class="img-box"><img loading="lazy" src="./images/1446776811953-b23d57bd21aa.jpg"
                         alt="精度"></div>
             </div>
         </div>
@@ -603,7 +602,7 @@
                 <p>采用分布式 GPU 集群，比超级计算机提速 <strong>3 倍</strong> 以上。</p>
             </div>
             <div class="img-wrap">
-                <div class="img-box"><img src="https://images.unsplash.com/photo-1639322537228-f710d846310a?q=80&w=1632"
+                <div class="img-box"><img loading="lazy" src="./images/1639322537228-f710d846310a.jpg"
                         alt="时效"></div>
             </div>
         </div>
@@ -618,7 +617,7 @@
                     <div class="sector-card">
                         <div class="img-wrap">
                             <div class="img-box"><img
-                                    src="https://images.unsplash.com/photo-1508514177221-188b1cf16e9d?q=80&w=1470"
+                                    src="./images/1508514177221-188b1cf16e9d.jpg"
                                     alt="能源"></div>
                         </div>
                         <h3>能源</h3>
@@ -628,7 +627,7 @@
                     <div class="sector-card">
                         <div class="img-wrap">
                             <div class="img-box"><img
-                                    src="https://images.unsplash.com/photo-1560493676-04071c5f467b?q=80&w=1468"
+                                    src="./images/1560493676-04071c5f467b.jpg"
                                     alt="农业"></div>
                         </div>
                         <h3>农业</h3>
@@ -638,7 +637,7 @@
                     <div class="sector-card">
                         <div class="img-wrap">
                             <div class="img-box"><img
-                                    src="https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?q=80&w=1470"
+                                    src="./images/1494412574643-ff11b0a5c1c3.jpg"
                                     alt="物流"></div>
                         </div>
                         <h3>物流</h3>
@@ -660,13 +659,13 @@
                 <!-- 第一张：技术感人物图 -->
                 <div class="img-wrap">
                     <div class="img-box"><img
-                            src="https://images.unsplash.com/photo-1593508512255-86ab42a8e620?q=80&w=1478"
+                            src="./images/1593508512255-86ab42a8e620.jpg"
                             alt="AR 虚拟现实体验"></div>
                 </div>
                 <!-- 第二张：震撼的自然气候图 -->
                 <div class="img-wrap">
                     <div class="img-box"><img
-                            src="https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1471" alt="极致自然风暴">
+                            src="./images/1534447677768-be436bb09401.jpg" alt="极致自然风暴">
                     </div>
                 </div>
             </div>
@@ -690,7 +689,7 @@
                 <p><strong>万物互联</strong>：物联网构成的秒级全球感知网。</p>
             </div>
             <div class="img-wrap">
-                <div class="img-box"><img src="https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1472"
+                <div class="img-box"><img loading="lazy" src="./images/1451187580459-43490279c0fa.jpg"
                         alt="未来趋势"></div>
             </div>
         </div>

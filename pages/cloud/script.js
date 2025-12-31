@@ -512,6 +512,13 @@ async function init() {
     setupEventListeners();
 
     console.log(`[App] 就绪 (${(performance.now() - start).toFixed(0)}ms)`);
+
+    // Remove loading overlay
+    const loadingEl = document.getElementById('loading-overlay');
+    if (loadingEl) {
+        loadingEl.style.opacity = '0';
+        setTimeout(() => loadingEl.remove(), 300);
+    }
 }
 
 // Fetch Initial Files - 优化版本，使用缓存
