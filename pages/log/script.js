@@ -157,6 +157,15 @@ class LogManager {
         if (contentDiv) {
             contentDiv.addEventListener('paste', e => this.handlePaste(e));
         }
+
+        // Ctrl+S 快捷键
+        window.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                e.stopPropagation();
+                this.submit(e);
+            }
+        });
     }
 
     handlePaste(e) {
@@ -198,7 +207,7 @@ class LogManager {
     }
 
     async submit(e) {
-        e.preventDefault();
+        if (e && e.preventDefault) e.preventDefault();
         const div = document.getElementById('logContent');
         if (!div) return;
 
@@ -221,9 +230,7 @@ class LogManager {
             } else {
                 const res = await network.retry(() => dbClient.from('logs').insert([{ content: content }]).select());
                 data = res.data;
-                if (data && data[0]) {
-                    this.logs.unshift(data[0]);
-                }
+                // 不再手动 unshift，交由 setupRealtime 的 INSERT 监听处理，防止重复
             }
 
             if (data) {
@@ -254,7 +261,7 @@ class LogManager {
                 btn.textContent = this.editingId ? '更新中...' : '保存中...';
                 btn.classList.add('loading');
             } else {
-                btn.textContent = btn.dataset.originalText || '保存';
+                btn.textContent = this.editingId ? '更新' : '保存';
                 btn.classList.remove('loading');
             }
         }
