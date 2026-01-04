@@ -7,7 +7,7 @@
     { name: "云盘", path: "cloud/index.html" },
     { name: "吃什么", path: "eatwhat/index.html" },
     { name: "今岭笔记", path: "jlbj/index.html" },
-    { name: "今岭流水可视化", path: "jllsksh/index.html" },
+    { name: "今岭流水可视化", path: "jlksh/index.html" },
     { name: "PPT", path: "ppt/index.html" },
     { name: "阅图", path: "vista/index.html" },
     { name: "日志", path: "log/index.html" }
