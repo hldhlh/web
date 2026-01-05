@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>火锅店采购成本分析</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Font Awesome for better food icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <header>
+        <div class="brand">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path
+                    d="M17 21v-2a1 1 0 0 0-1-1v-1a2 2 0 0 0-2-2H2a2 2 0 0 0-2 2v1a1 1 0 0 0-1 1v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z" />
+                <path d="M10 21V5a2 2 0 0 1 4 0v16" />
+                <circle cx="12" cy="11" r="9" />
+            </svg>
+            火锅店采购成本驾驶舱
+        </div>
+        <div class="controls-wrapper">
+            <label for="fileInput" class="file-upload-btn">
+                <i class="fas fa-file-excel"></i>
+                导入采购清单
+            </label>
+            <input type="file" id="fileInput" accept=".xlsx, .xls" />
+        </div>
+    </header>
+
+    <div class="dashboard-container">
+
+        <!-- KPI Row -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-icon money">
+                    <i class="fas fa-yen-sign"></i>
+                </div>
+                <div class="kpi-content">
+                    <div class="kpi-title">采购总支出</div>
+                    <div class="kpi-value" id="kpiCost">¥ 0.00</div>
+                    <div class="kpi-trend negative">应付金额合计</div>
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-icon order">
+                    <i class="fas fa-receipt"></i>
+                </div>
+                <div class="kpi-content">
+                    <div class="kpi-title">采购单数</div>
+                    <div class="kpi-value" id="kpiOrders">0</div>
+                    <div class="kpi-trend">补货频次</div>
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-icon product">
+                    <i class="fas fa-boxes-stacked"></i>
+                </div>
+                <div class="kpi-content">
+                    <div class="kpi-title">食材总件数</div>
+                    <div class="kpi-value" id="kpiItems">0</div>
+                    <div class="kpi-trend">总入库数量</div>
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-icon avg">
+                    <i class="fas fa-filter"></i>
+                </div>
+                <div class="kpi-content">
+                    <div class="kpi-title">涉及品类</div>
+                    <div class="kpi-value" id="kpiCategories">0</div>
+                    <div class="kpi-trend">大/小分类覆盖</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="charts-grid">
+            <!-- Row 1: Trend -->
+            <div class="chart-card full-width">
+                <div class="chart-header">
+                    <h3>采购成本趋势</h3>
+                    <div class="chart-actions">
+                        <select id="trendGranularity">
+                            <option value="day">按日统计</option>
+                            <option value="month">按月统计</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="trendChart" class="chart-body"></div>
+            </div>
+
+            <!-- Row 2: Category & Top Products -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h3>成本构成分析</h3>
+                </div>
+                <div id="categoryChart" class="chart-body"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h3>TOP 10 高成本食材</h3>
+                    <div class="chart-actions">
+                        <span style="font-size: 0.8rem; color: #666;">按金额排序</span>
+                    </div>
+                </div>
+                <div id="productChart" class="chart-body"></div>
+            </div>
+
+            <!-- Row 3: Weekly Pattern & Source -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h3>周采购规律分析</h3>
+                    <span style="font-size: 0.8rem; color: #666;">按周一至周日平均支出</span>
+                </div>
+                <div id="weeklyChart" class="chart-body"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h3>采购来源渠道</h3>
+                </div>
+                <div id="sourceChart" class="chart-body"></div>
+            </div>
+            <!-- Row 4: Advanced Analysis -->
+            <div class="chart-card full-width">
+                <div class="chart-header">
+                    <h3>核心食材单价走势 (Unit Price Monitor)</h3>
+                    <div class="chart-actions">
+                        <span style="font-size: 0.8rem; color: #666;">监测高频物资采购单价波动</span>
+                    </div>
+                </div>
+                <div id="priceTrendChart" class="chart-body"></div>
+            </div>
+
+            <div class="chart-card full-width">
+                <div class="chart-header">
+                    <h3>物资分类矩形树图 (Category Treemap)</h3>
+                    <span style="font-size: 0.8rem; color: #666;">面积大小代表采购金额占比</span>
+                </div>
+                <div id="treemapChart" class="chart-body" style="min-height: 500px;"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/xlsx.full.min.js"></script>
+    <script src="js/echarts.min.js"></script>
+    <script src="js/app.js"></script>
+</body>
+
+</html>
