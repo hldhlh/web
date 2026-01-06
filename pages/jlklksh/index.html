@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>火锅店采购成本分析</title>
+    <title>采购分析</title>
     <link rel="stylesheet" href="style.css">
     <!-- Font Awesome for better food icons -->
     <link rel="stylesheet" href="libs/font-awesome/css/all.min.css">
@@ -12,17 +12,31 @@
 
 <body>
     <header>
-        <div class="brand">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path
-                    d="M17 21v-2a1 1 0 0 0-1-1v-1a2 2 0 0 0-2-2H2a2 2 0 0 0-2 2v1a1 1 0 0 0-1 1v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z" />
-                <path d="M10 21V5a2 2 0 0 1 4 0v16" />
-                <circle cx="12" cy="11" r="9" />
-            </svg>
-            火锅店采购成本驾驶舱
-        </div>
+        <div class="brand">采购分析</div>
         <div class="controls-wrapper">
+            <!-- 时间选择器 -->
+            <div class="time-filter" id="timeFilter">
+                <div class="time-shortcuts">
+                    <button class="time-btn" data-range="today">今日</button>
+                    <button class="time-btn" data-range="week">本周</button>
+                    <button class="time-btn" data-range="month">本月</button>
+                    <button class="time-btn active" data-range="all">全部</button>
+                </div>
+                <div class="time-custom">
+                    <input type="date" id="dateStart" class="date-input" title="开始日期">
+                    <span class="date-separator">至</span>
+                    <input type="date" id="dateEnd" class="date-input" title="结束日期">
+                    <button class="time-apply-btn" id="applyDateRange" title="应用日期范围">
+                        <i class="fas fa-check"></i>
+                    </button>
+                </div>
+                <div class="time-display" id="timeDisplay">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>全部数据</span>
+                </div>
+            </div>
+
+            <!-- 文件上传 -->
             <label for="fileInput" class="file-upload-btn">
                 <i class="fas fa-file-excel"></i>
                 导入采购清单
@@ -138,6 +152,16 @@
                     </div>
                 </div>
                 <div id="priceTrendChart" class="chart-body"></div>
+            </div>
+
+            <div class="chart-card full-width">
+                <div class="chart-header">
+                    <h3>菜品价格波动监控</h3>
+                    <div class="chart-actions">
+                        <span style="font-size: 0.8rem; color: #666;">显示价格区间（最低价 ~ 最高价）及波动率</span>
+                    </div>
+                </div>
+                <div id="priceVolatilityChart" class="chart-body"></div>
             </div>
 
             <div class="chart-card full-width">
