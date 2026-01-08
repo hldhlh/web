@@ -51,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ========== 图表实例 ==========
     let charts = {
         trend: null,
+        dailyUsage: null,
         category: null,
         product: null,
         weekly: null,
@@ -547,6 +548,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             updateKPIs();
             updateTrendChart();
+            updateDailyUsageChart();
             updateCategoryChart();
             updateProductChart();
             updateWeeklyChart();
@@ -925,6 +927,232 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('趋势图更新错误:', error);
             showChartEmpty(charts.trend, '图表渲染失败');
+        }
+    }
+
+    /**
+     * 更新每日菜品用量分析图表
+     * 支持热力图和堆叠柱状图两种模式
+     */
+    function updateDailyUsageChart() {
+        if (!charts.dailyUsage) return;
+
+        try {
+            const data = getActiveData();
+            const viewMode = document.getElementById('usageViewMode')?.value || 'heatmap';
+            const topN = parseInt(document.getElementById('usageTopN')?.value || '10');
+
+            if (data.length === 0) {
+                showChartEmpty(charts.dailyUsage, '暂无数据');
+                return;
+            }
+
+            // 1. 统计每个菜品的总用量，获取TOP N
+            const itemTotalQty = {};
+            data.forEach(d => {
+                if (!itemTotalQty[d.item]) itemTotalQty[d.item] = 0;
+                itemTotalQty[d.item] += d.qty;
+            });
+
+            const topItems = Object.entries(itemTotalQty)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, topN)
+                .map(d => d[0]);
+
+            if (topItems.length === 0) {
+                showChartEmpty(charts.dailyUsage, '暂无菜品数据');
+                return;
+            }
+
+            // 2. 统计每日每个菜品的用量
+            const dailyItemQty = {}; // { dateKey: { item: qty } }
+            data.forEach(d => {
+                if (!d.date || !topItems.includes(d.item)) return;
+                const dateKey = formatDate(d.date, 'day');
+                if (!dailyItemQty[dateKey]) dailyItemQty[dateKey] = {};
+                if (!dailyItemQty[dateKey][d.item]) dailyItemQty[dateKey][d.item] = 0;
+                dailyItemQty[dateKey][d.item] += d.qty;
+            });
+
+            const sortedDates = Object.keys(dailyItemQty).sort();
+
+            if (sortedDates.length === 0) {
+                showChartEmpty(charts.dailyUsage, '无有效日期数据');
+                return;
+            }
+
+            let option;
+
+            if (viewMode === 'heatmap') {
+                // 热力图模式
+                const heatmapData = [];
+                let maxValue = 0;
+
+                sortedDates.forEach((dateKey, xIdx) => {
+                    topItems.forEach((item, yIdx) => {
+                        const qty = dailyItemQty[dateKey]?.[item] || 0;
+                        heatmapData.push([xIdx, yIdx, qty]);
+                        if (qty > maxValue) maxValue = qty;
+                    });
+                });
+
+                // 简化日期标签
+                const dateLabels = sortedDates.map(d => d.substring(5)); // MM-DD
+
+                option = {
+                    tooltip: {
+                        position: 'top',
+                        formatter: function (params) {
+                            const dateIdx = params.data[0];
+                            const itemIdx = params.data[1];
+                            const qty = params.data[2];
+                            const dateStr = sortedDates[dateIdx];
+                            const item = topItems[itemIdx];
+
+                            // 获取星期几
+                            const date = new Date(dateStr);
+                            const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+                            const weekday = weekdays[date.getDay()];
+
+                            return `${dateStr.substring(5)} ${weekday}<br/>${item}<br/>用量: <b>${qty}</b>`;
+                        },
+                        confine: true
+                    },
+                    grid: {
+                        left: '12%',
+                        right: '8%',
+                        bottom: '15%',
+                        top: '8%',
+                        containLabel: true
+                    },
+                    xAxis: {
+                        type: 'category',
+                        data: dateLabels,
+                        splitArea: { show: true },
+                        axisLabel: {
+                            rotate: sortedDates.length > 15 ? 45 : 0,
+                            fontSize: 10
+                        }
+                    },
+                    yAxis: {
+                        type: 'category',
+                        data: topItems,
+                        splitArea: { show: true },
+                        axisLabel: {
+                            fontSize: 10,
+                            width: 80,
+                            overflow: 'truncate'
+                        }
+                    },
+                    visualMap: {
+                        min: 0,
+                        max: maxValue || 1,
+                        calculable: true,
+                        orient: 'horizontal',
+                        left: 'center',
+                        bottom: '0%',
+                        inRange: {
+                            color: ['#f0fdf4', '#86efac', '#22c55e', '#15803d', '#14532d']
+                        },
+                        textStyle: { fontSize: 10 }
+                    },
+                    series: [{
+                        name: '用量',
+                        type: 'heatmap',
+                        data: heatmapData,
+                        label: {
+                            show: sortedDates.length <= 10 && topItems.length <= 10,
+                            fontSize: 9
+                        },
+                        emphasis: {
+                            itemStyle: {
+                                shadowBlur: 10,
+                                shadowColor: 'rgba(0, 0, 0, 0.5)'
+                            }
+                        }
+                    }]
+                };
+            } else {
+                // 堆叠柱状图模式
+                const dateLabels = sortedDates.map(d => d.substring(5)); // MM-DD
+
+                // 为每个菜品创建一个系列
+                const series = topItems.map((item, idx) => {
+                    const values = sortedDates.map(dateKey => {
+                        return dailyItemQty[dateKey]?.[item] || 0;
+                    });
+
+                    return {
+                        name: item,
+                        type: 'bar',
+                        stack: 'total',
+                        emphasis: { focus: 'series' },
+                        data: values
+                    };
+                });
+
+                option = {
+                    tooltip: {
+                        trigger: 'axis',
+                        axisPointer: { type: 'shadow' },
+                        formatter: function (params) {
+                            const dateIdx = params[0].dataIndex;
+                            const dateStr = sortedDates[dateIdx];
+
+                            // 获取星期几
+                            const date = new Date(dateStr);
+                            const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+                            const weekday = weekdays[date.getDay()];
+
+                            let result = `${dateStr.substring(5)} ${weekday}<br/>`;
+                            let total = 0;
+
+                            // 按用量排序显示
+                            params.sort((a, b) => b.value - a.value);
+                            params.forEach(p => {
+                                if (p.value > 0) {
+                                    result += `${p.marker}${p.seriesName}: ${p.value}<br/>`;
+                                    total += p.value;
+                                }
+                            });
+                            result += `<b>合计: ${total}</b>`;
+                            return result;
+                        },
+                        confine: true
+                    },
+                    legend: {
+                        type: 'scroll',
+                        bottom: 0,
+                        data: topItems,
+                        textStyle: { fontSize: 10 }
+                    },
+                    grid: {
+                        left: '3%',
+                        right: '4%',
+                        bottom: '15%',
+                        top: '8%',
+                        containLabel: true
+                    },
+                    xAxis: {
+                        type: 'category',
+                        data: dateLabels,
+                        axisLabel: {
+                            rotate: sortedDates.length > 15 ? 45 : 0,
+                            fontSize: 10
+                        }
+                    },
+                    yAxis: {
+                        type: 'value',
+                        name: '用量'
+                    },
+                    series: series
+                };
+            }
+
+            charts.dailyUsage.setOption(option, true);
+        } catch (error) {
+            console.error('每日用量图更新错误:', error);
+            showChartEmpty(charts.dailyUsage, '图表渲染失败');
         }
     }
 
@@ -1423,6 +1651,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function initCharts() {
         try {
             charts.trend = echarts.init(document.getElementById('trendChart'));
+            charts.dailyUsage = echarts.init(document.getElementById('dailyUsageChart'));
             charts.category = echarts.init(document.getElementById('categoryChart'));
             charts.product = echarts.init(document.getElementById('productChart'));
             charts.weekly = echarts.init(document.getElementById('weeklyChart'));
@@ -1483,6 +1712,27 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // 每日菜品用量图表选项切换
+    const usageViewModeSelect = document.getElementById('usageViewMode');
+    const usageTopNSelect = document.getElementById('usageTopN');
+
+    if (usageViewModeSelect) {
+        usageViewModeSelect.addEventListener('change', () => {
+            if (state.globalData.length > 0) {
+                updateDailyUsageChart();
+            }
+        });
+    }
+
+    if (usageTopNSelect) {
+        usageTopNSelect.addEventListener('change', () => {
+            if (state.globalData.length > 0) {
+                updateDailyUsageChart();
+            }
+        });
+    }
+
 
     // 页面可见性变化时重新调整图表
     document.addEventListener('visibilitychange', () => {

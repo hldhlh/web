@@ -110,6 +110,25 @@
                 <div id="trendChart" class="chart-body"></div>
             </div>
 
+            <!-- Daily Dish Usage Analysis -->
+            <div class="chart-card full-width">
+                <div class="chart-header">
+                    <h3>每日菜品用量分析</h3>
+                    <div class="chart-actions">
+                        <select id="usageViewMode">
+                            <option value="heatmap">热力图模式</option>
+                            <option value="stacked">堆叠柱状图</option>
+                        </select>
+                        <select id="usageTopN">
+                            <option value="10">TOP 10</option>
+                            <option value="15">TOP 15</option>
+                            <option value="20">TOP 20</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="dailyUsageChart" class="chart-body" style="min-height: 450px;"></div>
+            </div>
+
             <!-- Row 2: Category & Top Products -->
             <div class="chart-card">
                 <div class="chart-header">
