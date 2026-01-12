@@ -11,7 +11,7 @@
     { name: "今岭快驴可视化", path: "jlklksh/index.html" },
     { name: "PPT", path: "ppt/index.html" },
     { name: "阅图", path: "vista/index.html" },
-    { name: "阅图", path: "svg/index.html" },
+    { name: "SVG", path: "svg/index.html" },
     { name: "日志", path: "log/index.html" }
   ];
 }
