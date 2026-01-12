@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INTP Aesthetic: Mathematical Iconography</title>
+    <style>
+        :root {
+            --bg-color: #050508;
+            --card-bg: #0e0e16;
+            --text-primary: #e6e6fa;
+            --text-secondary: #9494b8;
+            --accent-purple: #2e317c;
+            --accent-glow: #4b4db8;
+            --border-color: rgba(255, 255, 255, 0.05);
+            --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        body.light-mode {
+            --bg-color: #f0f2f5;
+            --card-bg: #ffffff;
+            --text-primary: #1a1a2e;
+            --text-secondary: #5e5e80;
+            --accent-purple: #4b4db8;
+            --accent-glow: #2e317c;
+            --border-color: rgba(0, 0, 0, 0.05);
+            --card-shadow: 0 10px 30px rgba(46, 49, 124, 0.1);
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 2rem;
+            min-height: 100vh;
+            transition: background-color 0.5s ease, color 0.5s ease;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 4rem;
+            padding-top: 2rem;
+            position: relative;
+        }
+
+        .controls {
+            position: absolute;
+            top: 0;
+            right: 0;
+            display: flex;
+            gap: 1rem;
+            z-index: 100;
+        }
+
+        .control-btn {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            color: var(--text-primary);
+        }
+
+        .control-btn:hover {
+            transform: scale(1.1);
+            border-color: var(--accent-glow);
+            box-shadow: 0 0 15px var(--accent-purple);
+        }
+
+        .control-btn svg {
+            width: 24px;
+            height: 24px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            transition: all 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+        }
+
+        /* Enforce white icons in light mode (with shadow for visibility) */
+        body.light-mode .icon-container img {
+            filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+        }
+
+        .sun-icon {
+            display: none;
+        }
+
+        body.light-mode .moon-icon {
+            display: none;
+        }
+
+        body.light-mode .sun-icon {
+            display: block;
+            stroke: #ff9900;
+        }
+
+        h1 {
+            font-weight: 300;
+            font-size: 2.5rem;
+            letter-spacing: 2px;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-glow) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            transition: all 0.5s ease;
+        }
+
+        p.subtitle {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+            transition: color 0.5s ease;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--card-shadow);
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent-glow);
+            box-shadow: 0 15px 35px rgba(46, 49, 124, 0.15);
+            /* Sleek shadow */
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent-glow), transparent);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .icon-container {
+            width: 100px;
+            height: 100px;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: filter 0.3s;
+        }
+
+        body.light-mode .icon-container img {
+            /* Handled above, but ensuring no invert here if there was residual css */
+            filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+        }
+
+
+        img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            transition: filter 0.3s;
+        }
+
+        .card-info {
+            text-align: center;
+            width: 100%;
+        }
+
+        .card-title {
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: color 0.5s ease;
+        }
+
+        .card-id {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-family: 'Consolas', monospace;
+            opacity: 0.6;
+            transition: color 0.5s ease;
+        }
+
+        /* Hide text state */
+        body.hide-desc .card-desc {
+            display: none;
+        }
+
+        /* Active state for the button when text is HIDDEN (crossed out eye or similar?) 
+           Or just active style when it's enabled. 
+           Let's make the button "active" when text is visible, or vice versa.
+           Let's make it simple: standard button.
+        */
+
+
+        /* ... existing styles ... */
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="controls">
+            <button class="control-btn" id="textToggleBtn" aria-label="Toggle Text Descriptions"
+                title="Toggle Descriptions">
+                <svg viewBox="0 0 24 24">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <line x1="10" y1="9" x2="8" y2="9"></line>
+                </svg>
+            </button>
+            <button class="control-btn" id="themeToggle" aria-label="Toggle Dark/Light Mode" title="Toggle Theme">
+                <!-- Moon Icon -->
+                <svg class="moon-icon" viewBox="0 0 24 24">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+                <!-- Sun Icon -->
+                <svg class="sun-icon" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+            </button>
+        </div>
+        <h1>MATHEMATICAL AESTHETICS</h1>
+        <p class="subtitle">A curated collection of geometry, physics, and logic visualisations for the INTP mind.</p>
+    </header>
+
+    <div class="grid" id="gallery">
+        <!-- JS will populate this -->
+    </div>
+
+    <script src="./icons_data.js"></script>
+    <script>
+        // Toggle Logic
+        const toggleBtn = document.getElementById('themeToggle');
+        const body = document.body;
+
+        // Check for saved preference
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'light') {
+            body.classList.add('light-mode');
+        }
+
+        toggleBtn.addEventListener('click', () => {
+            body.classList.toggle('light-mode');
+            const theme = body.classList.contains('light-mode') ? 'light' : 'dark';
+            localStorage.setItem('theme', theme);
+        });
+
+        // Text Toggle Logic
+        const textBtn = document.getElementById('textToggleBtn');
+        const savedTextState = localStorage.getItem('hideDesc');
+
+        if (savedTextState === 'true') {
+            body.classList.add('hide-desc');
+        }
+
+        textBtn.addEventListener('click', () => {
+            body.classList.toggle('hide-desc');
+            const isHidden = body.classList.contains('hide-desc');
+            localStorage.setItem('hideDesc', isHidden);
+        });
+
+
+        // Helper to format the name from filename
+        // e.g., i_01_FibonacciSpiral.svg -> Fibonacci Spiral
+        function formatName(filename) {
+            if (filename === 'i.svg') return 'The Primary Icon';
+            // Remove 'i_XX_' prefix and '.svg' suffix
+            const clean = filename.replace(/^i_\d+_/, '').replace('.svg', '');
+            // Insert space before capital letters
+            return clean.replace(/([A-Z])/g, ' $1').trim();
+        }
+
+        // List of all generated files
+        const files = [
+            "i.svg",
+            // 01-20
+            "i_01_FibonacciSpiral.svg", "i_02_Tesseract.svg", "i_03_Sierpinski.svg", "i_04_Lorenz.svg",
+            "i_05_FlowerOfLife.svg", "i_06_Mobius.svg", "i_07_AtomModel.svg", "i_08_GameOfLife_Glider.svg",
+            "i_09_Dodecahedron.svg", "i_10_KochSnowflake.svg", "i_11_NeuralNet.svg", "i_12_BinaryMatrix.svg",
+            "i_13_UnitCircle.svg", "i_14_WaveFunction.svg", "i_15_ToroidalKnot.svg", "i_16_Voronoi.svg",
+            "i_17_HexGrid.svg", "i_18_Singularity.svg", "i_19_ComplexVector.svg", "i_20_PenroseTriangle.svg",
+            // 21-40
+            "i_21_Mandelbrot.svg", "i_22_DoubleSlit.svg", "i_23_KleinBottle.svg", "i_24_Feynman.svg",
+            "i_25_LogicGates.svg", "i_26_K5Graph.svg", "i_27_Lissajous.svg", "i_28_DNAHelix.svg",
+            "i_29_EulerLine.svg", "i_30_VectorField.svg", "i_31_Asymptote.svg", "i_32_Buckyball.svg",
+            "i_33_DragonCurve.svg", "i_34_HilbertCurve.svg", "i_35_E8Lattice.svg", "i_36_DiracDelta.svg",
+            "i_37_TuringTape.svg", "i_38_SphericalCoord.svg", "i_39_ImpossibleCube.svg", "i_40_ChaosPendulum.svg",
+            // 41-60
+            "i_41_FourierSeries.svg", "i_42_MaxwellEq.svg", "i_43_SchrodingerCat.svg", "i_44_EventHorizon.svg",
+            "i_45_Entropy.svg", "i_46_StandardModel.svg", "i_47_RiemannZeta.svg", "i_48_GoldenRect.svg",
+            "i_49_PascalTriangle.svg", "i_50_PrimeSieve.svg", "i_51_TuringPattern.svg", "i_52_Rule30.svg",
+            "i_53_VennDiagram.svg", "i_54_PoincareDisk.svg", "i_55_TrefoilKnot.svg", "i_56_Rossler.svg",
+            "i_57_Bifurcation.svg", "i_58_Dipole.svg", "i_59_MagneticFlux.svg", "i_60_FFT.svg",
+            // 61-80
+            "i_61_Laplace.svg", "i_62_Integral.svg", "i_63_TensorCube.svg", "i_64_Quaternions.svg",
+            "i_65_BraKet.svg", "i_66_CalabiYau.svg", "i_67_Multiverse.svg", "i_68_Wormhole.svg",
+            "i_69_LightCone.svg", "i_70_Uncertainty.svg", "i_71_Entanglement.svg", "i_72_LambdaCalculus.svg",
+            "i_73_BinaryTree.svg", "i_74_HashTable.svg", "i_75_ShortestPath.svg", "i_76_Perceptron.svg",
+            "i_77_ConvexHull.svg", "i_78_Delaunay.svg", "i_79_CrossProduct.svg", "i_80_Gradient.svg",
+            // 81-100
+            "i_81_Divergence.svg", "i_82_Curl.svg", "i_83_Zeno.svg", "i_84_NavierStokes.svg",
+            "i_85_Pythagoras.svg", "i_86_Conics.svg", "i_87_Cycloid.svg", "i_88_Cardioid.svg",
+            "i_89_LogSpiral.svg", "i_90_SevenBridges.svg", "i_91_TSP.svg", "i_92_PvsNP.svg",
+            "i_93_Halting.svg", "i_94_Information.svg", "i_95_Bayes.svg", "i_96_NormalDist.svg",
+            "i_97_MonteCarlo.svg", "i_98_RandomWalk.svg", "i_99_UlamPrime.svg", "i_100_Infinity.svg",
+            // 101-120
+            "i_101_EulerIdentity.svg", "i_102_GroupSym.svg", "i_103_Homotopy.svg", "i_104_Torus.svg",
+            "i_105_BoySurface.svg", "i_106_Brachistochrone.svg", "i_107_LagrangePoints.svg", "i_108_NoetherSym.svg",
+            "i_109_PathIntegral.svg", "i_110_Spinor.svg", "i_111_Superposition.svg", "i_112_Supercond.svg",
+            "i_113_Laser.svg", "i_114_Hologram.svg", "i_115_Drake.svg", "i_116_Fermi.svg",
+            "i_117_Dyson.svg", "i_118_HeatDeath.svg", "i_119_PenroseTile.svg", "i_120_ChaosGame.svg",
+            // 121-140
+            "i_121_Cantor.svg", "i_122_MengerSponge.svg", "i_123_JuliaSet.svg", "i_124_Fern.svg",
+            "i_125_Apollonian.svg", "i_126_HopfFibration.svg", "i_127_FanoPlane.svg", "i_128_Desargues.svg",
+            "i_129_Hyperboloid.svg", "i_130_Catenary.svg", "i_131_VonKarman.svg", "i_132_Soliton.svg",
+            "i_133_Diffraction.svg", "i_134_Polarization.svg", "i_135_Refraction.svg", "i_136_Doppler.svg",
+            "i_137_SonicBoom.svg", "i_138_Kepler.svg", "i_139_ThreeBody.svg", "i_140_StressTensor.svg",
+            // 141-160
+            "i_141_TangentBundle.svg", "i_142_Curvature.svg", "i_143_Geodesic.svg", "i_144_Holonomy.svg",
+            "i_145_Torsion.svg", "i_146_Simplex.svg", "i_147_ComplexPlane.svg", "i_148_Residue.svg",
+            "i_149_ContourIntegral.svg", "i_150_FieldLines.svg", "i_151_Isomorphism.svg", "i_152_Kernel.svg",
+            "i_153_Eigenvector.svg", "i_154_MarkovChain.svg", "i_155_StochasticProcess.svg", "i_156_BrownianBridge.svg",
+            "i_157_Martingale.svg", "i_158_GameTheory.svg", "i_159_NashEquilibrium.svg", "i_160_ParetoFront.svg",
+            // 161-180
+            "i_161_Stack.svg", "i_162_Queue.svg", "i_163_Heap.svg", "i_164_RedBlackTree.svg",
+            "i_165_Trie.svg", "i_166_BloomFilter.svg", "i_167_MerkleTree.svg", "i_168_Blockchain.svg",
+            "i_169_Encryption.svg", "i_170_PublicKey.svg", "i_171_FiniteAutomaton.svg", "i_172_RegEx.svg",
+            "i_173_BigO.svg", "i_174_Recursion.svg", "i_175_Deadlock.svg", "i_176_Semaphore.svg",
+            "i_177_Pipeline.svg", "i_178_LoadBalancer.svg", "i_179_DistributedSystem.svg", "i_180_NeuralActivation.svg",
+            // 181-200
+            "i_181_BlackBody.svg", "i_182_Photoelectric.svg", "i_183_ComptonScattering.svg", "i_184_Fusion.svg",
+            "i_185_Fission.svg", "i_186_HalfLife.svg", "i_187_Isotope.svg", "i_188_Crystallography.svg",
+            "i_189_BravaisLattice.svg", "i_190_MillerIndices.svg", "i_191_PhaseDiagram.svg", "i_192_TriplePoint.svg",
+            "i_193_CarnotCycle.svg", "i_194_Adiabatic.svg", "i_195_Bernoulli.svg", "i_196_ReynoldsNum.svg",
+            "i_197_MachCone.svg", "i_198_Coriolis.svg", "i_199_FoucaultPendulum.svg", "i_200_Gyroscope.svg",
+            // 201-220
+            "i_201_Syllogism.svg", "i_202_ModusPonens.svg", "i_203_TruthTable.svg", "i_204_Tautology.svg",
+            "i_205_Contradiction.svg", "i_206_Axiom.svg", "i_207_Lemma.svg", "i_208_Corollary.svg",
+            "i_209_QED.svg", "i_210_InfinityAleph.svg", "i_211_EmptySet.svg", "i_212_PowerSet.svg",
+            "i_213_Bijection.svg", "i_214_Injection.svg", "i_215_Surjection.svg", "i_216_Cardinality.svg",
+            "i_217_Ordinal.svg", "i_218_ZFC.svg", "i_219_CategoryTheory.svg", "i_220_Functor.svg",
+            // 221-240
+            "i_221_OccamsRazor.svg", "i_222_HanlonsRazor.svg", "i_223_ChekhovsGun.svg", "i_224_SchrodingersBox.svg",
+            "i_225_PlatosCave.svg", "i_226_Sisyphus.svg", "i_227_Vitruvian.svg", "i_228_Modulor.svg",
+            "i_229_GoldenAngle.svg", "i_230_SilverRatio.svg", "i_231_PlasticNumber.svg", "i_232_Superellipse.svg",
+            "i_233_Squircle.svg", "i_234_ReuleauxTriangle.svg", "i_235_Gomboc.svg", "i_236_Oloid.svg",
+            "i_237_Sphericon.svg", "i_238_Hexaflexagon.svg", "i_239_Tangram.svg", "i_240_Origami.svg"
+
+        ];
+
+        files.forEach(file => {
+            const card = document.createElement('div');
+            card.className = 'card';
+
+            // Get data from iconsData
+            const data = (typeof iconsData !== 'undefined' && iconsData[file]) ? iconsData[file] : {};
+            const title = data.title || formatName(file);
+            const desc = data.desc || "";
+            const id = file.split('_')[1] || '00';
+
+            card.innerHTML = `
+                <div class="icon-container">
+                    <img src="./${file}" alt="${title}" loading="lazy">
+                </div>
+                <div class="card-info">
+                    <div class="card-title" title="${desc}">${title}</div>
+                    <div class="card-id" style="font-size: 0.7rem; color: #666; margin-bottom: 0.2rem;">#${id}</div>
+                    ${desc ? `<div class="card-desc" style="font-size: 0.75rem; color: var(--text-secondary); opacity: 0.8; line-height: 1.4;">${desc}</div>` : ''}
+                </div>
+            `;
+
+            // Add click to copy path? Optional.
+            card.addEventListener('click', () => {
+                // Could act as a selection mechanic
+                console.log('Selected:', file);
+            });
+
+            gallery.appendChild(card);
+        });
+
+    </script>
+</body>
+
+</html>

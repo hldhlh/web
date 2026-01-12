@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="indigoGradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%" spreadMethod="pad">
+      <stop offset="0%" style="stop-color:#2e317c;stop-opacity:1" />
+      <stop offset="40%" style="stop-color:#2e317c;stop-opacity:0.65" />
+      <stop offset="65%" style="stop-color:#2e317c;stop-opacity:0.35" />
+      <stop offset="85%" style="stop-color:#2e317c;stop-opacity:0.1" />
+      <stop offset="95%" style="stop-color:#2e317c;stop-opacity:0.02" />
+      <stop offset="100%" style="stop-color:#2e317c;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+  <circle cx="50" cy="50" r="48" fill="url(#indigoGradient)" />
+  <!-- 娌冪綏璇轰紛鍥?-->
+  <g fill="none" stroke="white" stroke-width="1" opacity="0.8">
+    <path d="M50 50 L30 30 M50 50 L70 35 M50 50 L60 70 M50 50 L35 65 M50 50 L50 25" />
+    <path d="M30 30 L15 40 M30 30 L40 15" opacity="0.5"/>
+    <path d="M60 70 L75 80 M60 70 L45 80" opacity="0.5"/>
+  </g>
+</svg>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="indigoGradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%" spreadMethod="pad">
+      <stop offset="0%" style="stop-color:#2e317c;stop-opacity:1" />
+      <stop offset="40%" style="stop-color:#2e317c;stop-opacity:0.65" />
+      <stop offset="65%" style="stop-color:#2e317c;stop-opacity:0.35" />
+      <stop offset="85%" style="stop-color:#2e317c;stop-opacity:0.1" />
+      <stop offset="95%" style="stop-color:#2e317c;stop-opacity:0.02" />
+      <stop offset="100%" style="stop-color:#2e317c;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+  <circle cx="50" cy="50" r="48" fill="url(#indigoGradient)" />
+  
+  <!-- 斐波那契黄金螺旋 (Fibonacci Golden Spiral) -->
+  <!-- 展现数学之美，符合INTP对逻辑、结构与迭代的迷恋 -->
+  <path d="M 50 50 
+           L 50 51 
+           A 1 1 0 0 1 51 51 
+           A 1 1 0 0 1 51 50 
+           A 2 2 0 0 1 49 50 
+           A 3 3 0 0 1 49 53 
+           A 5 5 0 0 1 54 53 
+           A 8 8 0 0 1 54 45 
+           A 13 13 0 0 1 41 45 
+           A 21 21 0 0 1 41 66 
+           A 34 34 0 0 1 75 66" 
+        fill="none" stroke="white" stroke-width="1" stroke-opacity="0.9" stroke-linecap="round" />
+</svg>
