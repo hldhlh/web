@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>订单明细实时分析报告</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+            background: #ffffff;
+            padding: 40px 20px;
+            min-height: 100vh;
+            color: #000000;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #ffffff;
+        }
+
+        h1 {
+            text-align: center;
+            color: #000000;
+            font-size: 32px;
+            margin-bottom: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666666;
+            margin-bottom: 50px;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+
+        .file-selector {
+            text-align: center;
+            margin-bottom: 50px;
+            padding: 40px 20px;
+            background: #000000;
+            color: white;
+            display: none;
+        }
+
+        .file-selector.show {
+            display: block;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            margin-top: 15px;
+        }
+
+        .file-input-wrapper input[type="file"] {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .file-input-label {
+            display: inline-block;
+            padding: 12px 30px;
+            background: white;
+            color: #000000;
+            border: 1px solid #000000;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .file-input-label:hover {
+            background: #000000;
+            color: #ffffff;
+        }
+
+        .current-file {
+            margin-top: 15px;
+            font-size: 13px;
+        }
+
+        .section {
+            margin-bottom: 60px;
+            padding-bottom: 60px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .section:last-child {
+            border-bottom: none;
+        }
+
+        .section-title {
+            font-size: 20px;
+            color: #000000;
+            margin-bottom: 25px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1px;
+            background: #e0e0e0;
+            border: 1px solid #e0e0e0;
+        }
+
+        .stat-card {
+            background: #ffffff;
+            padding: 25px 20px;
+            color: #000000;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666666;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #000000;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th {
+            background: #000000;
+            color: white;
+            padding: 12px 15px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 14px;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover {
+            background: #fafafa;
+        }
+
+        .highlight {
+            color: #000000;
+            font-weight: 600;
+        }
+
+        .warning {
+            color: #000000;
+            font-weight: 600;
+        }
+
+        .success {
+            color: #000000;
+            font-weight: 600;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666666;
+        }
+
+        .info-badge {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #000000;
+            color: white;
+            font-size: 14px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        #content {
+            display: none;
+        }
+
+        #content.show {
+            display: block;
+        }
+
+        .toggle-btn {
+            display: inline-block;
+            margin: 20px 0 0 0;
+            padding: 10px 20px;
+            background: #ffffff;
+            color: #000000;
+            border: 1px solid #000000;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .toggle-btn:hover {
+            background: #000000;
+            color: #ffffff;
+        }
+
+        .toggle-btn:active {
+            transform: scale(0.98);
+        }
+
+        .hidden-row {
+            display: none;
+        }
+
+        .table-wrapper {
+            position: relative;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>📊 订单明细实时分析报告</h1>
+        <div class="subtitle">自动加载Excel文件，刷新即可查看最新数据 | 分析时间: <span id="analysisTime"></span></div>
+
+        <div class="file-selector">
+            <h2 style="margin-bottom: 10px;">📁 选择订单明细Excel文件</h2>
+            <p style="opacity: 0.9; margin-bottom: 15px;">支持 .xlsx 和 .xls 格式</p>
+            <div class="file-input-wrapper">
+                <input type="file" id="fileInput" accept=".xlsx,.xls">
+                <label class="file-input-label">📂 选择文件</label>
+            </div>
+            <div class="current-file" id="currentFile">未选择文件</div>
+        </div>
+
+        <div id="content"></div>
+    </div>
+
+    <script>
+        // 显示当前时间
+        document.getElementById('analysisTime').textContent = new Date().toLocaleString('zh-CN');
+
+        // 文件选择处理
+        document.getElementById('fileInput').addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (file) {
+                document.getElementById('currentFile').textContent = '正在分析: ' + file.name;
+                readExcelFile(file);
+            }
+        });
+
+        // 自动加载默认文件
+        window.addEventListener('load', function () {
+            loadDefaultFile();
+        });
+
+        async function loadDefaultFile() {
+            try {
+                // 显示加载状态
+                document.getElementById('currentFile').textContent = '正在加载默认文件...';
+
+                const response = await fetch('订单明细列表20260117.xlsx');
+                if (!response.ok) {
+                    throw new Error('文件未找到');
+                }
+
+                const blob = await response.blob();
+                const file = new File([blob], '订单明细列表20260117.xlsx');
+                document.getElementById('currentFile').textContent = '✅ 当前文件: 订单明细列表20260117.xlsx';
+                readExcelFile(file);
+            } catch (error) {
+                console.log('未找到默认文件，显示文件选择器');
+                // 显示文件选择器
+                document.querySelector('.file-selector').classList.add('show');
+                document.getElementById('currentFile').textContent = '⚠️ 未找到默认文件，请手动选择';
+            }
+        }
+
+        function readExcelFile(file) {
+            const reader = new FileReader();
+
+            reader.onload = function (e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+
+                    // 读取第一个工作表
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+
+                    // 转换为JSON
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+                    // 分析数据
+                    analyzeData(jsonData);
+
+                    // 显示内容
+                    document.getElementById('content').classList.add('show');
+
+                } catch (error) {
+                    alert('读取文件失败: ' + error.message);
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        function analyzeData(data) {
+            const content = document.getElementById('content');
+
+            // 基本统计
+            const totalRecords = data.length;
+            const columns = Object.keys(data[0] || {});
+
+            // 商品统计
+            const productCount = {};
+            const productPriceSum = {};  // 商品价格总和
+            const productQuantitySum = {};  // 商品数量总和
+            const productBrand = {};  // 商品品牌
+            const categoryCount = {};
+            const brandCount = {};
+            let totalAmount = 0;
+            let totalQuantity = 0;
+            const dateCount = {};
+
+            data.forEach(row => {
+                // 商品统计
+                const product = row['商品名称'];
+                const brand = row['品牌'];
+
+                if (product) {
+                    productCount[product] = (productCount[product] || 0) + 1;
+
+                    // 累加价格和数量用于计算均价
+                    const price = parseFloat(row['售价']) || 0;
+                    const quantity = parseFloat(row['数量']) || 0;
+
+                    productPriceSum[product] = (productPriceSum[product] || 0) + price;
+                    productQuantitySum[product] = (productQuantitySum[product] || 0) + quantity;
+
+                    // 记录品牌（如果还没记录过）
+                    if (!productBrand[product] && brand) {
+                        productBrand[product] = brand;
+                    }
+                }
+
+                // 分类统计
+                const category = row['商品分类'];
+                if (category) {
+                    categoryCount[category] = (categoryCount[category] || 0) + 1;
+                }
+
+                // 品牌统计
+                if (brand) {
+                    brandCount[brand] = (brandCount[brand] || 0) + 1;
+                }
+
+                // 金额统计
+                const amount = parseFloat(row['应结算金额']) || 0;
+                totalAmount += amount;
+
+                // 数量统计
+                const quantity = parseFloat(row['数量']) || 0;
+                totalQuantity += quantity;
+
+                // 日期统计
+                const date = row['下单日期'];
+                if (date) {
+                    dateCount[date] = (dateCount[date] || 0) + 1;
+                }
+            });
+
+            const uniqueProducts = Object.keys(productCount).length;
+            const avgAmount = totalAmount / totalRecords;
+
+            // 排序
+            const sortedProducts = Object.entries(productCount).sort((a, b) => b[1] - a[1]);
+            const sortedCategories = Object.entries(categoryCount).sort((a, b) => b[1] - a[1]);
+            const sortedBrands = Object.entries(brandCount).sort((a, b) => b[1] - a[1]);
+
+            // 生成HTML
+            let html = `
+                <div class="section">
+                    <div class="section-title">📋 数据概况</div>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">总记录数</div>
+                            <div class="stat-value">${totalRecords.toLocaleString()}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">商品种类</div>
+                            <div class="stat-value">${uniqueProducts}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">数据字段</div>
+                            <div class="stat-value">${columns.length}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">应结算总金额</div>
+                            <div class="stat-value">¥${totalAmount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">平均单笔金额</div>
+                            <div class="stat-value">¥${avgAmount.toFixed(2)}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">总采购数量</div>
+                            <div class="stat-value">${totalQuantity.toFixed(0)}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">🛒 商品统计详情</div>
+                    <div class="info-badge">
+                        <strong>共有 ${uniqueProducts} 种不同商品</strong>
+                    </div>
+                    
+                    <div class="section-title" style="font-size: 20px; margin-top: 30px;">🔥 商品列表 (共${sortedProducts.length}种，默认显示前10种)</div>
+                    <table>
+                        <tr>
+                            <th>排名</th>
+                            <th>商品名称</th>
+                            <th>品牌</th>
+                            <th>订购次数</th>
+                            <th>占比</th>
+                            <th>均价参考</th>
+                        </tr>
+                        ${generateExpandableTable('products', sortedProducts, totalRecords, ([product, count], index) => {
+                const avgPrice = productPriceSum[product] / productCount[product];
+                const brand = productBrand[product] || '-';
+                return `
+                            <td><strong>${index + 1}</strong></td>
+                            <td>${product}</td>
+                            <td>${brand}</td>
+                            <td class="highlight">${count} 次</td>
+                            <td>${(count / totalRecords * 100).toFixed(1)}%</td>
+                            <td>¥${avgPrice.toFixed(2)}</td>
+                        `;
+            })}
+                    </table>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">📦 商品分类 (共${sortedCategories.length}类，默认显示前10类)</div>
+                    <table>
+                        <tr>
+                            <th>排名</th>
+                            <th>商品分类</th>
+                            <th>订单数</th>
+                            <th>占比</th>
+                        </tr>
+                        ${generateExpandableTable('categories', sortedCategories, totalRecords, ([category, count], index) => `
+                            <td><strong>${index + 1}</strong></td>
+                            <td>${category}</td>
+                            <td class="highlight">${count}</td>
+                            <td>${(count / totalRecords * 100).toFixed(1)}%</td>
+                        `)}
+                    </table>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">🏷️ 品牌列表 (共${sortedBrands.length}个，默认显示前10个)</div>
+                    <table>
+                        <tr>
+                            <th>排名</th>
+                            <th>品牌</th>
+                            <th>订单数</th>
+                            <th>占比</th>
+                        </tr>
+                        ${generateExpandableTable('brands', sortedBrands, totalRecords, ([brand, count], index) => `
+                            <td><strong>${index + 1}</strong></td>
+                            <td>${brand}</td>
+                            <td class="highlight">${count}</td>
+                            <td>${(count / totalRecords * 100).toFixed(1)}%</td>
+                        `)}
+                    </table>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">📅 每日订单统计</div>
+                    <table>
+                        <tr>
+                            <th>日期</th>
+                            <th>订单数</th>
+                            <th>占比</th>
+                        </tr>
+                        ${Object.entries(dateCount)
+                    .sort((a, b) => a[0].localeCompare(b[0]))
+                    .map(([date, count]) => `
+                            <tr>
+                                <td>${date}</td>
+                                <td class="highlight">${count}</td>
+                                <td>${(count / totalRecords * 100).toFixed(1)}%</td>
+                            </tr>
+                        `).join('')}
+                    </table>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">👀 数据预览 (共${totalRecords}条，默认显示前10条)</div>
+                    <div style="overflow-x: auto;">
+                        <table>
+                            <tr>
+                                <th>序号</th>
+                                <th>门店名称</th>
+                                <th>下单日期</th>
+                                <th>商品名称</th>
+                                <th>规格型号</th>
+                                <th>数量</th>
+                                <th>售价</th>
+                                <th>应结算金额</th>
+                            </tr>
+                            ${generateExpandableTable('preview', data, totalRecords, (row, index) => `
+                                <td>${index + 1}</td>
+                                <td>${row['门店名称'] || '-'}</td>
+                                <td>${row['下单日期'] || '-'}</td>
+                                <td>${row['商品名称'] || '-'}</td>
+                                <td>${row['规格型号'] || '-'}</td>
+                                <td>${row['数量'] || '-'}</td>
+                                <td>¥${parseFloat(row['售价'] || 0).toFixed(2)}</td>
+                                <td class="highlight">¥${parseFloat(row['应结算金额'] || 0).toFixed(2)}</td>
+                            `)}
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            content.innerHTML = html;
+
+            // 添加展开/收起功能
+            addToggleFunctionality();
+        }
+
+        // 生成可展开的表格HTML
+        function generateExpandableTable(tableId, items, totalRecords, renderRow) {
+            const displayLimit = 10;
+            const hasMore = items.length > displayLimit;
+
+            let tableHtml = items.map((item, index) => {
+                const rowClass = index >= displayLimit ? 'hidden-row' : '';
+                return `<tr class="${rowClass}" data-table="${tableId}">${renderRow(item, index)}</tr>`;
+            }).join('');
+
+            if (hasMore) {
+                tableHtml += `
+                    <tr>
+                        <td colspan="10" style="text-align: center; padding: 20px;">
+                            <button class="toggle-btn" data-table="${tableId}">
+                                📋 展开显示全部 ${items.length} 条
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }
+
+            return tableHtml;
+        }
+
+        // 添加展开/收起功能
+        function addToggleFunctionality() {
+            const toggleButtons = document.querySelectorAll('.toggle-btn');
+
+            toggleButtons.forEach(button => {
+                button.addEventListener('click', function () {
+                    const tableId = this.getAttribute('data-table');
+                    // 选择所有相关的数据行（不仅仅是隐藏的）
+                    const allRows = document.querySelectorAll(`tr[data-table="${tableId}"]`);
+                    const isExpanded = this.classList.contains('expanded');
+
+                    if (isExpanded) {
+                        // 收起 - 隐藏第11行及以后的行
+                        allRows.forEach((row, index) => {
+                            if (index >= 10) {
+                                row.classList.add('hidden-row');
+                            }
+                        });
+                        this.textContent = `📋 展开显示全部 ${allRows.length} 条`;
+                        this.classList.remove('expanded');
+                    } else {
+                        // 展开 - 显示所有行
+                        allRows.forEach(row => {
+                            row.classList.remove('hidden-row');
+                        });
+                        this.textContent = '📋 收起';
+                        this.classList.add('expanded');
+                    }
+                });
+            });
+        }
+    </script>
+</body>
+
+</html>
