@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>今岭后厨订货</title>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Main CSS -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Supabase SDK -->
+    <script src="lib/supabase.js"></script>
+    <!-- Pinyin Pro -->
+    <script src="lib/pinyin-pro.js"></script>
+</head>
+
+<body>
+
+    <!-- 顶部导航 -->
+    <header class="app-header">
+        <div class="header-content">
+            <div style="display:flex;align-items:center;">
+                <div id="syncStatus" class="sync-status online" title="实时同步中"></div>
+                <h1>今岭后厨订货</h1>
+            </div>
+            <div class="header-actions">
+                <button id="refreshBtn" class="icon-btn" title="刷新"><i class="fas fa-sync-alt"></i></button>
+                <a href="orders.html" class="icon-btn" title="订货清单" style="position: relative;">
+                    <i class="fas fa-clipboard-list"></i>
+                </a>
+                <a href="admin.html" class="icon-btn" title="管理后台"><i class="fas fa-cog"></i></a>
+            </div>
+        </div>
+
+        <!-- 分类滚动条 -->
+        <nav class="category-nav">
+            <div class="category-scroll" id="categoryList">
+                <!-- 由 JS 生成: <button class="cat-btn active">全部</button> -->
+            </div>
+        </nav>
+    </header>
+
+    <!-- 搜索栏 -->
+    <div class="search-bar-container">
+        <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" id="searchInput" placeholder="搜索食材...">
+            <button id="clearSearch" class="hidden"><i class="fas fa-times-circle"></i></button>
+        </div>
+        <button id="filterFavBtn" class="filter-btn" title="只看收藏">
+            <i class="far fa-star"></i>
+            <span>收藏</span>
+        </button>
+    </div>
+
+    <!-- 主内容列表 -->
+    <main class="product-list-container" id="productList">
+        <!-- 骨架屏加载动画 -->
+        <div class="skeleton-loader">
+            <div class="skeleton-item"></div>
+            <div class="skeleton-item"></div>
+            <div class="skeleton-item"></div>
+            <div class="skeleton-item"></div>
+        </div>
+    </main>
+
+    <!-- 底部操作栏 -->
+    <footer class="app-footer">
+        <div class="footer-info">
+            <span class="total-label">已选种类:</span>
+            <span class="total-count" id="selectedCount">0</span>
+        </div>
+        <button id="reviewBtn" class="submit-btn">
+            去核对
+        </button>
+    </footer>
+
+    <!-- 提交成功/失败 提示 Toast -->
+    <div id="toast" class="toast">提示信息</div>
+
+    <!-- 提交确认弹窗 -->
+
+
+    <script src="app.js"></script>
+</body>
+
+</html>

@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>订单明细实时分析报告</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         * {
             margin: 0;
@@ -238,6 +239,79 @@
         .table-wrapper {
             position: relative;
         }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            border-radius: 8px;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .shorthand-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .shorthand-row label {
+            flex: 1;
+            font-size: 14px;
+        }
+
+        .shorthand-row input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            background: #000;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
     </style>
 </head>
 
@@ -245,6 +319,10 @@
     <div class="container">
         <h1>📊 订单明细实时分析报告</h1>
         <div class="subtitle">自动加载Excel文件，刷新即可查看最新数据 | 分析时间: <span id="analysisTime"></span></div>
+
+        <div style="text-align: center; margin-bottom: 20px;">
+            <button class="btn" onclick="openShorthandModal()">⚙️ 设置商品简称合并规则</button>
+        </div>
 
         <div class="file-selector">
             <h2 style="margin-bottom: 10px;">📁 选择订单明细Excel文件</h2>
@@ -257,9 +335,32 @@
         </div>
 
         <div id="content"></div>
+
+        <!-- Shorthand Modal -->
+        <div id="shorthandModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeShorthandModal()">&times;</span>
+                <h2 style="margin-bottom: 20px;">商品简称设置</h2>
+                <p style="margin-bottom: 20px; color: #666; font-size: 13px;">
+                    设置简称后，系统会将原商品名映射为简称进行合并统计。留空则保持原名。<br><strong>修改即自动保存并同步。</strong></p>
+                <div id="shorthandList"></div>
+            </div>
+        </div>
     </div>
 
     <script>
+        // Supabase Configuration
+        const SUPABASE_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+            auth: {
+                persistSession: false
+            }
+        });
+
+        // Global State
+        window.globalShorthandMap = {};
+
         // 显示当前时间
         document.getElementById('analysisTime').textContent = new Date().toLocaleString('zh-CN');
 
@@ -273,9 +374,54 @@
         });
 
         // 自动加载默认文件
-        window.addEventListener('load', function () {
+        window.addEventListener('load', async function () { // Made async
+            await fetchShorthands(); // Pre-fetch shorthands
+            setupRealtimeSubscription(); // Setup Realtime
             loadDefaultFile();
         });
+
+        function setupRealtimeSubscription() {
+            supabaseClient
+                .channel('shorthand_db_changes')
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'jlhcdh_product_shorthands'
+                    },
+                    (payload) => {
+                        console.log('Realtime Change received:', payload);
+                        const { eventType, new: newRec, old: oldRec } = payload;
+
+                        if (eventType === 'INSERT' || eventType === 'UPDATE') {
+                            if (newRec && newRec.original_name) {
+                                window.globalShorthandMap[newRec.original_name] = newRec.shorthand;
+                            }
+                        } else if (eventType === 'DELETE') {
+                            if (oldRec && oldRec.original_name) {
+                                delete window.globalShorthandMap[oldRec.original_name];
+                            }
+                        }
+
+                        // Re-analyze immediately
+                        if (window.currentData) {
+                            // Debounce slightly if many updates come in? No, for now direct update is fine.
+                            // Maybe add a visual indicator?
+                            const title = document.querySelector('.section-title');
+                            if (title) {
+                                const originalColor = title.style.color;
+                                title.style.color = 'green';
+                                setTimeout(() => title.style.color = originalColor || '#000', 500);
+                            }
+                            analyzeData(window.currentData);
+                        }
+                    }
+                )
+                .subscribe((status) => {
+                    console.log('Realtime Subscription status:', status);
+                });
+        }
 
         async function loadDefaultFile() {
             try {
@@ -315,6 +461,7 @@
                     const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
                     // 分析数据
+                    window.currentData = jsonData; // 保存当前数据以便重新分析
                     analyzeData(jsonData);
 
                     // 显示内容
@@ -340,16 +487,49 @@
             const productPriceSum = {};  // 商品价格总和
             const productQuantitySum = {};  // 商品数量总和
             const productBrand = {};  // 商品品牌
+            const productSpecs = {}; // 商品规格
             const categoryCount = {};
             const brandCount = {};
             let totalAmount = 0;
             let totalQuantity = 0;
             const dateCount = {};
 
+            const dateQuantitySum = {}; // 每日采购总量
+            const productSpecAnalysis = {}; // 用于每日预测详细分析 Key: "Product||Spec"
+            const shorthandStats = {}; // 简称统计
+
+            // 使用全局加载的简称映射
+            const shorthandMap = window.globalShorthandMap || {};
+
             data.forEach(row => {
                 // 商品统计
                 const product = row['商品名称'];
                 const brand = row['品牌'];
+
+                // 简称处理 Logic
+                if (product) {
+                    const shorthand = shorthandMap[product] || product; // 如果有映射则用简称，否则用原名
+                    if (!shorthandStats[shorthand]) {
+                        shorthandStats[shorthand] = {
+                            name: shorthand,
+                            originalNames: new Set(),
+                            totalQty: 0,
+                            minQty: Infinity,
+                            maxQty: -Infinity,
+                            count: 0
+                        };
+                    }
+                    // 此处为了严谨，我们基于单行数量进行统计
+                    const qty = parseFloat(row['数量']) || 0;
+                    const stat = shorthandStats[shorthand];
+                    stat.originalNames.add(product);
+                    stat.totalQty += qty;
+                    stat.count += 1;
+                    if (qty > 0) { // 仅统计正向采购
+                        stat.minQty = Math.min(stat.minQty, qty);
+                        stat.maxQty = Math.max(stat.maxQty, qty);
+                    }
+                }
 
                 if (product) {
                     productCount[product] = (productCount[product] || 0) + 1;
@@ -365,6 +545,31 @@
                     if (!productBrand[product] && brand) {
                         productBrand[product] = brand;
                     }
+
+                    // 记录规格
+                    const spec = row['规格型号'];
+                    if (spec) {
+                        if (!productSpecs[product]) productSpecs[product] = new Set();
+                        productSpecs[product].add(spec);
+                    }
+
+                    // 每日预测分析数据收集
+                    const specKey = product + '||' + (spec || '统一规格');
+                    if (!productSpecAnalysis[specKey]) {
+                        productSpecAnalysis[specKey] = {
+                            product: product,
+                            spec: spec || '统一规格',
+                            brand: brand || '-',
+                            totalQty: 0,
+                            count: 0,
+                            minQty: Infinity,
+                            maxQty: -Infinity
+                        };
+                    }
+                    productSpecAnalysis[specKey].totalQty += quantity;
+                    productSpecAnalysis[specKey].count += 1;
+                    productSpecAnalysis[specKey].minQty = Math.min(productSpecAnalysis[specKey].minQty, quantity);
+                    productSpecAnalysis[specKey].maxQty = Math.max(productSpecAnalysis[specKey].maxQty, quantity);
                 }
 
                 // 分类统计
@@ -390,6 +595,8 @@
                 const date = row['下单日期'];
                 if (date) {
                     dateCount[date] = (dateCount[date] || 0) + 1;
+                    const quantity = parseFloat(row['数量']) || 0;
+                    dateQuantitySum[date] = (dateQuantitySum[date] || 0) + quantity;
                 }
             });
 
@@ -445,6 +652,8 @@
                             <th>排名</th>
                             <th>商品名称</th>
                             <th>品牌</th>
+                            <th>规格型号</th>
+                            <th>采购总量</th>
                             <th>订购次数</th>
                             <th>占比</th>
                             <th>均价参考</th>
@@ -452,15 +661,57 @@
                         ${generateExpandableTable('products', sortedProducts, totalRecords, ([product, count], index) => {
                 const avgPrice = productPriceSum[product] / productCount[product];
                 const brand = productBrand[product] || '-';
+                const specs = productSpecs[product] ? Array.from(productSpecs[product]).join(', ') : '-';
+                const totalQty = productQuantitySum[product] || 0;
                 return `
                             <td><strong>${index + 1}</strong></td>
                             <td>${product}</td>
                             <td>${brand}</td>
-                            <td class="highlight">${count} 次</td>
+                            <td>${specs}</td>
+                            <td class="highlight">${totalQty.toFixed(1)}</td>
+                            <td>${count} 次</td>
                             <td>${(count / totalRecords * 100).toFixed(1)}%</td>
                             <td>¥${avgPrice.toFixed(2)}</td>
                         `;
             })}
+                    </table>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">📊 菜品平均每天销售预测 (基于${Object.keys(dateCount).length || 1}天数据)</div>
+                    <div class="info-badge">
+                        <strong>按日均销量排序，用于辅助采购决策</strong>
+                    </div>
+                    <table>
+                        <tr>
+                            <th>排名</th>
+                            <th>商品名称</th>
+                            <th>规格型号</th>
+                            <th>品牌</th>
+                            <th>单次最少</th>
+                            <th>单次最多</th>
+                            <th>历史采购总量</th>
+                        </tr>
+                        ${generateExpandableTable('forecast',
+                Object.values(productSpecAnalysis).sort((a, b) => {
+                    const days = Object.keys(dateCount).length || 1;
+                    return (b.totalQty / days) - (a.totalQty / days);
+                }),
+                totalRecords,
+                (item, index) => {
+                    const days = Object.keys(dateCount).length || 1;
+                    const avgDaily = item.totalQty / days;
+                    return `
+                                    <td><strong>${index + 1}</strong></td>
+                                    <td>${item.product}</td>
+                                    <td>${item.spec}</td>
+                                    <td>${item.brand}</td>
+                                    <td>${item.minQty}</td>
+                                    <td>${item.maxQty}</td>
+                                    <td>${item.totalQty.toFixed(1)}</td>
+                                `;
+                }
+            )}
                     </table>
                 </div>
 
@@ -505,6 +756,7 @@
                     <table>
                         <tr>
                             <th>日期</th>
+                            <th>采购总量</th>
                             <th>订单数</th>
                             <th>占比</th>
                         </tr>
@@ -513,10 +765,42 @@
                     .map(([date, count]) => `
                             <tr>
                                 <td>${date}</td>
-                                <td class="highlight">${count}</td>
+                                <td class="highlight">${(dateQuantitySum[date] || 0).toFixed(1)}</td>
+                                <td>${count}</td>
                                 <td>${(count / totalRecords * 100).toFixed(1)}%</td>
                             </tr>
                         `).join('')}
+                    </table>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">🔗 基于简称合并统计 (自定义规则)</div>
+                    <div class="info-badge">
+                        <strong>将不同名称但同类的商品合并查看，便于总量把控</strong>
+                    </div>
+                    <table>
+                        <tr>
+                            <th>排名</th>
+                            <th>商品简称</th>
+                            <th>包含原商品名称</th>
+                            <th>合并采购总量</th>
+                            <th>单次最少</th>
+                            <th>单次最多</th>
+                            <th>订单笔数</th>
+                        </tr>
+                        ${generateExpandableTable('shorthand',
+                        Object.values(shorthandStats).sort((a, b) => b.totalQty - a.totalQty),
+                        totalRecords,
+                        (item, index) => `
+                                <td><strong>${index + 1}</strong></td>
+                                <td class="highlight">${item.name}</td>
+                                <td style="font-size: 12px; color: #666;">${Array.from(item.originalNames).slice(0, 10).join(', ')}${item.originalNames.size > 10 ? '...' : ''}</td>
+                                <td class="highlight">${item.totalQty.toFixed(1)}</td>
+                                <td>${item.minQty === Infinity ? 0 : item.minQty}</td>
+                                <td>${item.maxQty === -Infinity ? 0 : item.maxQty}</td>
+                                <td>${item.count}</td>
+                            `
+                    )}
                     </table>
                 </div>
 
@@ -610,6 +894,131 @@
                     }
                 });
             });
+        }
+
+        // Modal Functions
+        function openShorthandModal() {
+            const modal = document.getElementById('shorthandModal');
+            const listContainer = document.getElementById('shorthandList');
+            const savedMap = window.globalShorthandMap || {};
+
+            // 获取所有商品名称（从当前数据）
+            const products = new Set();
+            if (window.currentData) {
+                window.currentData.forEach(row => {
+                    if (row['商品名称']) products.add(row['商品名称']);
+                });
+            }
+
+            const sortedProducts = Array.from(products).sort();
+
+            let html = '';
+            sortedProducts.forEach(p => {
+                const val = savedMap[p] || '';
+                html += `
+                    <div class="shorthand-row">
+                        <label>${p}</label>
+                        <input type="text" 
+                               placeholder="输入简称 (留空保持原名)" 
+                               value="${val}" 
+                               data-original="${p}"
+                               oninput="handleShorthandChange(this)">
+                    </div>
+                `;
+            });
+
+            listContainer.innerHTML = html || '<p>请先加载数据文件</p>';
+            modal.style.display = 'block';
+        }
+
+        function closeShorthandModal() {
+            document.getElementById('shorthandModal').style.display = 'none';
+        }
+
+        // Debounce utility
+        function debounce(func, wait) {
+            let timeout;
+            return function (...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+
+        // Real-time Save handler (Debounced)
+        const processShorthandChange = debounce(async (original, shorthand) => {
+            const statusIndicator = document.querySelector(`input[data-original="${original}"]`);
+            if (statusIndicator) statusIndicator.style.borderColor = '#ffd700'; // saving yellow
+
+            try {
+                if (shorthand && shorthand !== original) {
+                    // Update/Insert
+                    const { error } = await supabaseClient
+                        .from('jlhcdh_product_shorthands')
+                        .upsert({ original_name: original, shorthand: shorthand });
+                    if (error) throw error;
+                    window.globalShorthandMap[original] = shorthand;
+                } else {
+                    // Delete if empty or same as original
+                    const { error } = await supabaseClient
+                        .from('jlhcdh_product_shorthands')
+                        .delete()
+                        .eq('original_name', original);
+                    if (error) throw error;
+                    delete window.globalShorthandMap[original];
+                }
+
+                if (statusIndicator) statusIndicator.style.borderColor = '#4caf50'; // success green
+                setTimeout(() => { if (statusIndicator) statusIndicator.style.borderColor = '#ddd'; }, 1000);
+
+                // Refresh Analysis Locally immediately after save confirmed
+                if (window.currentData) {
+                    analyzeData(window.currentData);
+                }
+
+            } catch (err) {
+                console.error('Save failed', err);
+                if (statusIndicator) statusIndicator.style.borderColor = '#f44336'; // error red
+                alert('保存失败: ' + err.message);
+            }
+        }, 800);
+
+        function handleShorthandChange(input) {
+            const original = input.getAttribute('data-original');
+            const shorthand = input.value.trim();
+            // Optimistic update local map for immediate feel? 
+            // Better wait for debounce to save bandwidth, but let's update local map immediately might cause jitter if realtime comes back.
+            // Let's just trigger the save.
+            processShorthandChange(original, shorthand);
+        }
+
+        async function fetchShorthands() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('jlhcdh_product_shorthands')
+                    .select('original_name, shorthand');
+
+                if (error) throw error;
+
+                // Conversion to map
+                const map = {};
+                if (data) {
+                    data.forEach(item => {
+                        map[item.original_name] = item.shorthand;
+                    });
+                }
+                window.globalShorthandMap = map;
+                console.log('Shorthands loaded:', Object.keys(map).length);
+            } catch (err) {
+                console.error('Error fetching shorthands:', err);
+            }
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function (event) {
+            const modal = document.getElementById('shorthandModal');
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
         }
     </script>
 </body>

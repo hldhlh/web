@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>订货管理后台 - 今岭后厨</title>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Main CSS -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Supabase SDK -->
+    <script src="lib/supabase.js"></script>
+</head>
+
+<body>
+
+    <header class="app-header">
+        <div class="header-content">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <a href="index.html" class="icon-btn"><i class="fas fa-arrow-left"></i></a>
+                <h1>订货管理后台</h1>
+            </div>
+            <div class="header-actions">
+                <span id="saveStatus" style="font-size:12px;color:#888;margin-right:10px;"></span>
+                <button id="refreshBtn" class="icon-btn" title="刷新"><i class="fas fa-sync-alt"></i></button>
+            </div>
+        </div>
+    </header>
+
+    <div class="admin-container">
+        <!-- 工具栏 -->
+        <div class="search-bar-container" style="background:transparent;padding:0 0 20px 0;">
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="searchInput" placeholder="搜索商品名称...">
+                <button id="clearSearch" class="hidden"><i class="fas fa-times-circle"></i></button>
+            </div>
+            <select id="categoryFilter" class="edit-input"
+                style="width:120px;border:none;background:white;padding:10px;border-radius:10px;">
+                <option value="全部">全部品类</option>
+            </select>
+        </div>
+
+        <!-- 数据表格 -->
+        <div class="data-table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">ID</th>
+                        <th style="width: 120px;">分类</th>
+                        <th>商品名称</th>
+                        <th style="width: 100px;">单位</th>
+                        <th style="width: 80px;">排序</th>
+                        <th style="width: 100px;">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="productTableBody">
+                    <!-- 动态生成 -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 添加按钮 -->
+    <div class="fab-add" id="addBtn" title="添加新商品">
+        <i class="fas fa-plus"></i>
+    </div>
+
+    <!-- 添加/编辑 模态框 -->
+    <div id="editModal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <h3 id="modalTitle">添加新商品</h3>
+            <form id="productForm">
+                <input type="hidden" id="editId">
+
+                <div style="margin-bottom:15px;">
+                    <label for="editCategory">商品分类</label>
+                    <input type="text" id="editCategory" class="edit-input" list="categoryOptions" required
+                        placeholder="如：生鲜蔬菜">
+                    <datalist id="categoryOptions">
+                        <!-- JS 填充 -->
+                    </datalist>
+                </div>
+
+                <div style="margin-bottom:15px;">
+                    <label for="editName">商品名称</label>
+                    <input type="text" id="editName" class="edit-input" required placeholder="如：土豆">
+                </div>
+
+                <div style="margin-bottom:20px;">
+                    <label for="editUnit">计量单位</label>
+                    <input type="text" id="editUnit" class="edit-input" list="unitOptions" required placeholder="如：斤">
+                    <datalist id="unitOptions">
+                        <option value="斤">
+                        <option value="公斤">
+                        <option value="份">
+                        <option value="包">
+                        <option value="箱">
+                        <option value="瓶">
+                        <option value="桶">
+                        <option value="个">
+                        <option value="只">
+                        <option value="把">
+                        <option value="袋">
+                        <option value="米">
+                        <option value="捆">
+                    </datalist>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" id="cancelEdit" class="btn-secondary">取消</button>
+                    <button type="submit" class="btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast">操作成功</div>
+
+    <script src="admin.js"></script>
+</body>
+
+</html>
