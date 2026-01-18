@@ -324,7 +324,90 @@
             color: var(--text-main);
         }
 
-        /* 管理页卡片流 - 核心视觉变更 */
+        /* 标签 (Tags) 样式 */
+        .tag-row {
+            display: flex;
+            gap: 8px;
+            padding: 8px 16px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+
+        .tag-row::-webkit-scrollbar {
+            display: none;
+        }
+
+        .tag-badge {
+            background: rgba(0, 113, 227, 0.1);
+            color: var(--primary);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .tag-chip {
+            padding: 6px 14px;
+            border-radius: 12px;
+            background: white;
+            border: 1px solid var(--glass-border);
+            color: var(--text-sub);
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tag-chip.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            box-shadow: 0 4px 10px rgba(0, 113, 227, 0.2);
+        }
+
+        .filter-section-title {
+            font-size: 11px;
+            font-weight: 800;
+            color: var(--text-sub);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 16px 16px 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .filter-section-title i {
+            font-size: 10px;
+            opacity: 0.8;
+        }
+
+        /* 管理页标签输入 */
+        .admin-tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            min-height: 24px;
+        }
+
+        .admin-tag-input {
+            border: none;
+            background: rgba(0, 0, 0, 0.04);
+            border-radius: 4px;
+            font-size: 12px;
+            padding: 2px 6px;
+            width: 80px;
+            outline: none;
+        }
+
+        .admin-tag-input:focus {
+            background: white;
+            box-shadow: 0 0 0 1px var(--primary);
+        }
+
+        /* 管理页高密度布局重塑 */
         .admin-main {
             max-width: 1000px;
             margin: 0 auto;
@@ -333,46 +416,76 @@
         }
 
         .admin-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
 
-        .admin-card {
+        .admin-row {
             background: var(--glass-bg);
             backdrop-filter: blur(var(--blur));
             border: 1px solid var(--glass-border);
-            border-radius: var(--radius-lg);
-            padding: 20px;
+            border-radius: var(--radius-md);
+            padding: 10px 16px;
+            display: grid;
+            grid-template-columns: 1.5fr 1fr 80px auto;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+            transition: all 0.2s;
+        }
+
+        .admin-row:hover {
+            background: white;
             box-shadow: var(--shadow);
-            transition: transform 0.3s cubic-bezier(0.2, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
+            transform: translateY(-2px);
         }
 
-        .admin-card:hover {
-            transform: translateY(-5px);
-        }
-
-        .admin-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, var(--primary), var(--primary-light));
-        }
-
-        .card-header {
+        .admin-cell {
             display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 20px;
+            flex-direction: column;
+            gap: 2px;
         }
 
-        .card-title-group {
-            flex: 1;
+        .admin-cell .card-label {
+            font-size: 10px;
+            margin-bottom: 0;
+            opacity: 0.6;
+        }
+
+        .admin-input-flat {
+            border: none;
+            background: transparent;
+            font-size: 15px;
+            font-weight: 600;
+            padding: 4px 0;
+            width: 100%;
+            border-bottom: 2px solid transparent;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .admin-input-flat:focus {
+            border-bottom-color: var(--primary);
+        }
+
+        .btn-delete-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: rgba(255, 59, 48, 0.08);
+            color: var(--accent);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .btn-delete-icon:hover {
+            background: var(--accent);
+            color: white;
         }
 
         .card-label {
@@ -858,6 +971,34 @@
                 width: 56px;
                 height: 56px;
             }
+
+            /* 移动端列表行适配 */
+            .admin-row {
+                grid-template-columns: 1fr 1fr auto;
+                gap: 8px;
+                padding: 12px;
+            }
+
+            .admin-cell:first-child {
+                grid-column: span 2;
+                border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+                padding-bottom: 4px;
+                margin-bottom: 4px;
+            }
+
+            /* 移动端标签自动换行展现 */
+            #categoryList {
+                flex-wrap: wrap;
+                gap: 8px;
+                padding: 0 16px 12px;
+            }
+
+            .cat-btn {
+                padding: 6px 12px;
+                font-size: 13px;
+                border-radius: 10px;
+                /* 移动端采用更节省空间的略方圆角 */
+            }
         }
     </style>
 </head>
@@ -887,8 +1028,14 @@
                 <i class="fas fa-search"></i>
                 <input type="text" id="searchInput" placeholder="搜索食材...">
             </div>
-            <button id="filterFavBtn" class="icon-btn"><i class="far fa-star"></i></button>
+            <div style="display:flex; gap:8px;">
+                <button id="sortBtn" class="icon-btn" title="排序方式"><i class="fas fa-sort-amount-down"></i></button>
+                <button id="filterFavBtn" class="icon-btn"><i class="far fa-star"></i></button>
+            </div>
         </div>
+        <div class="filter-section-title"><i class="fas fa-tags"></i> 常用标签</div>
+        <div id="tagFilterList" class="tag-row"></div>
+        <div class="filter-section-title"><i class="fas fa-th-large"></i> 商品分类</div>
         <div id="categoryList"></div>
         <main class="product-grid" id="productList"></main>
     </div>
@@ -999,7 +1146,9 @@
             currentDate: getLocalBusinessDate(),
             cartItems: [],
             activeSyncs: 0,
-            hasDataDates: new Set()
+            hasDataDates: new Set(),
+            activeTags: new Set(),
+            sortBy: 'category' // 'category', 'custom_tags'
         };
 
         function setGlobalSyncStatus(s) {
@@ -1030,6 +1179,7 @@
             await fetchProducts();
             await fetchCart();
             renderCategories();
+            renderTags();
             renderProducts();
             setupRealtime();
 
@@ -1099,6 +1249,11 @@
             document.getElementById('adminSearchInput').oninput = e => { state.adminSearch = e.target.value.trim(); renderAdminTable(); };
             document.getElementById('adminCatFilter').onchange = e => { state.adminCat = e.target.value; renderAdminTable(); };
             document.getElementById('filterFavBtn').onclick = () => { state.onlyFavorites = !state.onlyFavorites; document.getElementById('filterFavBtn').classList.toggle('active', state.onlyFavorites); renderProducts(); };
+            document.getElementById('sortBtn').onclick = () => {
+                state.sortBy = state.sortBy === 'category' ? 'tags' : 'category';
+                showToast(`已按${state.sortBy === 'category' ? '分类' : '标签'}排序`);
+                renderProducts();
+            };
 
             document.getElementById('openAddModal').onclick = () => { document.getElementById('editModal').classList.add('visible'); };
             document.getElementById('productForm').onsubmit = handleAdd;
@@ -1297,29 +1452,49 @@
             if (state.adminCat !== '全部') filtered = filtered.filter(p => p.category === state.adminCat);
             if (state.adminSearch) { const q = state.adminSearch.toLowerCase(); filtered = filtered.filter(p => p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)); }
 
-            document.getElementById('adminTableBody').innerHTML = filtered.map(p => `
-                <div class="admin-card">
-                    <div class="card-header">
-                        <div class="card-title-group">
-                            <div class="card-label">商品名称</div>
-                            <input type="text" class="card-input-main" value="${p.name}" onchange="updateField(${p.id}, 'name', this.value)">
-                        </div>
+            document.getElementById('adminTableBody').innerHTML = filtered.map(p => {
+                const tags = Array.isArray(p.tags) ? p.tags : [];
+                return `
+                <div class="admin-row" style="grid-template-columns: 1.2fr 0.8fr 70px 1.5fr auto;">
+                    <div class="admin-cell">
+                        <span class="card-label">商品名称</span>
+                        <input type="text" class="admin-input-flat" value="${p.name}" onchange="updateField(${p.id}, 'name', this.value)">
                     </div>
-                    <div class="card-body">
-                        <div class="card-field">
-                            <div class="card-label">分类</div>
-                            <input type="text" class="card-input-small" value="${p.category}" onchange="updateField(${p.id}, 'category', this.value)">
-                        </div>
-                        <div class="card-field">
-                            <div class="card-label">单位</div>
-                            <input type="text" class="card-input-small" value="${p.unit || '斤'}" onchange="updateField(${p.id}, 'unit', this.value)">
-                        </div>
+                    <div class="admin-cell">
+                        <span class="card-label">分类</span>
+                        <input type="text" class="admin-input-flat" value="${p.category}" onchange="updateField(${p.id}, 'category', this.value)">
                     </div>
-                    <button class="btn-delete" onclick="deleteProduct(${p.id})">
-                        <i class="fas fa-trash-alt"></i> 删除商品
+                    <div class="admin-cell">
+                        <span class="card-label">单位</span>
+                        <input type="text" class="admin-input-flat" value="${p.unit || '斤'}" onchange="updateField(${p.id}, 'unit', this.value)">
+                    </div>
+                    <div class="admin-cell">
+                        <span class="card-label">自定义标签 (逗号分隔)</span>
+                        <input type="text" class="admin-input-flat" style="font-size:12px;font-weight:400;" 
+                            placeholder="标签1, 标签2..." 
+                            value="${tags.join(', ')}" 
+                            onchange="updateTags(${p.id}, this.value)">
+                    </div>
+                    <button class="btn-delete-icon" onclick="deleteProduct(${p.id})" title="删除">
+                        <i class="fas fa-trash-alt"></i>
                     </button>
-                </div>`).join('');
+                </div>`;
+            }).join('');
         }
+
+        window.updateTags = async (id, val) => {
+            const tags = val.split(/[，,]/).map(t => t.trim()).filter(t => t);
+            startSync();
+            try {
+                const { error } = await sb.from('jlhcdh_products').update({ tags }).eq('id', id);
+                if (!error) {
+                    await fetchProducts();
+                    renderAdminTable();
+                    renderTags();
+                }
+                endSync(!!error);
+            } catch (e) { endSync(true); }
+        };
 
         window.updateField = async (id, field, value) => {
             document.getElementById('saveStatus').innerText = '正在保存...';
@@ -1446,28 +1621,74 @@
             renderProducts();
         };
 
+        function renderTags() {
+            const allTags = [...new Set(state.products.flatMap(p => p.tags || []))];
+            const container = document.getElementById('tagFilterList');
+            const titles = document.querySelectorAll('.filter-section-title');
+
+            if (allTags.length === 0) {
+                container.style.display = 'none';
+                if (titles[0]) titles[0].style.display = 'none';
+                return;
+            }
+            container.style.display = 'flex';
+            if (titles[0]) titles[0].style.display = 'flex';
+            container.innerHTML = allTags.map(tag => `
+                <div class="tag-chip ${state.activeTags.has(tag) ? 'active' : ''}" onclick="toggleTagFilter('${tag}')">
+                    ${tag}
+                </div>
+            `).join('');
+        }
+
+        window.toggleTagFilter = (tag) => {
+            if (state.activeTags.has(tag)) state.activeTags.delete(tag);
+            else state.activeTags.add(tag);
+            renderTags();
+            renderProducts();
+        };
+
         function renderProducts() {
-            let f = state.products;
+            let f = [...state.products];
+
+            // 排序逻辑
+            if (state.sortBy === 'category') {
+                f.sort((a, b) => a.category.localeCompare(b.category, 'zh'));
+            } else if (state.sortBy === 'tags') {
+                f.sort((a, b) => {
+                    const tagA = (a.tags && a.tags[0]) || 'zzzz';
+                    const tagB = (b.tags && b.tags[0]) || 'zzzz';
+                    return tagA.localeCompare(tagB, 'zh');
+                });
+            }
+
             if (state.currentCategory !== '全部') f = f.filter(p => p.category === state.currentCategory);
             if (state.onlyFavorites) f = f.filter(p => p.is_favorite);
+            if (state.activeTags.size > 0) {
+                f = f.filter(p => p.tags && Array.from(state.activeTags).every(t => p.tags.includes(t)));
+            }
             if (state.searchQuery) {
                 const q = state.searchQuery.toLowerCase();
                 f = f.filter(p => {
                     const nameMatch = p.name.toLowerCase().includes(q);
                     const pinyinMatch = p.pinyin && p.pinyin.toLowerCase().includes(q);
-                    return nameMatch || pinyinMatch;
+                    const tagMatch = p.tags && p.tags.some(t => t.toLowerCase().includes(q));
+                    return nameMatch || pinyinMatch || tagMatch;
                 });
             }
 
             document.getElementById('productList').innerHTML = f.map(p => {
                 const qty = state.orders[p.id]?.qty || '';
+                const tagsHtml = (p.tags || []).map(t => `<span class="tag-badge">${t}</span>`).join('');
                 return `
                 <div class="product-card" data-id="${p.id}">
                     <div class="fav-icon ${p.is_favorite ? 'active' : ''}" onclick="toggleFav(${p.id})">
                         <i class="fas fa-star"></i>
                     </div>
                     <div style="flex:1;">
-                        <div style="font-weight:700;font-size:17px;">${p.name}</div>
+                        <div style="font-weight:700;font-size:17px;display:flex;align-items:baseline;gap:8px;">
+                            ${p.name}
+                            <div style="display:flex;gap:4px;">${tagsHtml}</div>
+                        </div>
                         <div style="font-size:12px;color:var(--text-sub);margin-top:2px;">${p.category}</div>
                     </div>
                     <div id="wrapper-${p.id}" class="qty-control">
