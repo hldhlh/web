@@ -7,83 +7,1524 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>今岭后厨订货</title>
     <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Main CSS -->
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+        crossorigin="anonymous" referrerpolicy="no-referrer">
     <!-- Supabase SDK -->
     <script src="lib/supabase.js"></script>
     <!-- Pinyin Pro -->
     <script src="lib/pinyin-pro.js"></script>
+    <!-- Flatpickr -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh.js"></script>
+    <style>
+        /* 全局变量与 Apple 风格重塑 */
+        :root {
+            --primary: #0071e3;
+            --primary-light: #409eff;
+            --accent: #ff3b30;
+            --bg-gradient: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            --glass-bg: rgba(255, 255, 255, 0.75);
+            --glass-border: rgba(255, 255, 255, 0.4);
+            --text-main: #1d1d1f;
+            --text-sub: #86868b;
+            --radius-lg: 20px;
+            --radius-md: 14px;
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            --blur: 15px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html {
+            scrollbar-gutter: stable;
+            /* 预留滚动条空间，防止布局抖动 */
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg-gradient);
+            background-attachment: fixed;
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            overflow-y: scroll;
+            /* 强制显示滚动条轨道，保持视觉一致性 */
+        }
+
+        /* 统一 Header 系统 */
+        .app-header {
+            position: sticky;
+            top: 0;
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--blur));
+            -webkit-backdrop-filter: blur(var(--blur));
+            border-bottom: 1px solid var(--glass-border);
+            z-index: 1000;
+            padding: 0 16px;
+        }
+
+        .header-content {
+            max-width: 1000px;
+            margin: 0 auto;
+            height: 64px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-title-group h1 {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        /* 按钮重塑 */
+        .icon-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.05);
+            color: var(--text-main);
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .icon-btn:hover {
+            background: rgba(0, 0, 0, 0.1);
+            transform: scale(1.05);
+        }
+
+        .icon-btn.primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* 激活状态开关 */
+        .icon-btn.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 113, 227, 0.3);
+        }
+
+        .icon-btn.active i {
+            font-weight: 900;
+            /* 切换为实心图标 */
+        }
+
+        /* 搜索与筛选栏 - PC & Mobile 适配 */
+        .toolbar {
+            max-width: 1000px;
+            margin: 16px auto;
+            padding: 0 16px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 12px;
+        }
+
+        .search-box {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: var(--shadow);
+        }
+
+        .search-box input {
+            border: none;
+            background: transparent;
+            font-size: 16px;
+            width: 100%;
+            outline: none;
+            color: var(--text-main);
+        }
+
+        .select-custom {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            padding: 8px 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .select-custom:hover {
+            border-color: var(--primary-light);
+        }
+
+        /* 日期选择器容器 */
+        .date-picker-container {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--blur));
+            border: 1px solid var(--glass-border);
+            border-radius: 19px;
+            /* 38/2 */
+            height: 38px;
+            padding: 0 14px;
+            gap: 8px;
+            transition: all 0.3s;
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+
+        .date-picker-container:hover {
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .date-picker-container i {
+            color: var(--primary);
+            font-size: 14px;
+        }
+
+        /* 隐藏原生图标并覆盖点击区域 */
+        .date-picker-container input {
+            border: none;
+            background: transparent;
+            font-size: 15px;
+            font-weight: 700;
+            font-family: inherit;
+            color: var(--text-main);
+            outline: none;
+            width: 96px;
+            cursor: pointer;
+        }
+
+        /* Flatpickr 统一风格重塑 */
+        .flatpickr-calendar {
+            background: var(--glass-bg) !important;
+            backdrop-filter: blur(var(--blur)) !important;
+            -webkit-backdrop-filter: blur(var(--blur)) !important;
+            border: 1px solid var(--glass-border) !important;
+            border-radius: var(--radius-lg) !important;
+            box-shadow: var(--shadow) !important;
+            font-family: inherit !important;
+        }
+
+        .flatpickr-day.selected,
+        .flatpickr-day.startRange,
+        .flatpickr-day.endRange,
+        .flatpickr-day.selected.inRange,
+        .flatpickr-day.startRange.inRange,
+        .flatpickr-day.endRange.inRange,
+        .flatpickr-day.selected:focus,
+        .flatpickr-day.startRange:focus,
+        .flatpickr-day.endRange:focus,
+        .flatpickr-day.selected:hover,
+        .flatpickr-day.startRange:hover,
+        .flatpickr-day.endRange:hover,
+        .flatpickr-day.prevMonthDay.selected,
+        .flatpickr-day.nextMonthDay.selected {
+            background: var(--primary) !important;
+            border-color: var(--primary) !important;
+        }
+
+        .flatpickr-months .flatpickr-month {
+            color: var(--text-main) !important;
+            fill: var(--text-main) !important;
+        }
+
+        .flatpickr-current-month .flatpickr-monthDropdown-months {
+            font-weight: 700 !important;
+        }
+
+        .flatpickr-weekdays {
+            background: transparent !important;
+        }
+
+        span.flatpickr-weekday {
+            color: var(--text-sub) !important;
+            font-weight: 600 !important;
+        }
+
+        .flatpickr-day {
+            color: var(--text-main) !important;
+            border-radius: 8px !important;
+        }
+
+        .flatpickr-day.today {
+            border-color: var(--primary) !important;
+        }
+
+        .flatpickr-day.flatpickr-disabled,
+        .flatpickr-day.flatpickr-disabled:hover {
+            color: var(--text-sub) !important;
+            opacity: 0.3;
+        }
+
+        /* 有数据的日期标记 */
+        .has-data-dot {
+            position: relative;
+        }
+
+        .has-data-dot::after {
+            content: '';
+            position: absolute;
+            bottom: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        /* 内置按钮样式调整 */
+        .flatpickr-footer {
+            padding: 10px;
+            border-top: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .flatpickr-btn {
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .flatpickr-btn-today {
+            background: var(--primary);
+            color: white;
+        }
+
+        .flatpickr-btn-clear {
+            background: rgba(0, 0, 0, 0.05);
+            color: var(--text-main);
+        }
+
+        /* 管理页卡片流 - 核心视觉变更 */
+        .admin-main {
+            max-width: 1000px;
+            margin: 0 auto;
+            width: 100%;
+            padding: 0 16px 100px;
+        }
+
+        .admin-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .admin-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--blur));
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            transition: transform 0.3s cubic-bezier(0.2, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .admin-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .admin-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--primary-light));
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .card-title-group {
+            flex: 1;
+        }
+
+        .card-label {
+            font-size: 12px;
+            color: var(--text-sub);
+            text-transform: uppercase;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .card-input-main {
+            font-size: 18px;
+            font-weight: 700;
+            border: none;
+            background: transparent;
+            width: 100%;
+            padding: 4px 0;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .card-input-main:focus {
+            border-bottom-color: var(--primary);
+            outline: none;
+        }
+
+        .card-body {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .card-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .card-input-small {
+            background: rgba(0, 0, 0, 0.04);
+            border: 1px solid transparent;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 14px;
+            font-weight: 600;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .card-input-small:focus {
+            background: white;
+            border-color: var(--primary);
+        }
+
+        .btn-delete {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255, 59, 48, 0.1);
+            color: var(--accent);
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-delete:hover {
+            background: var(--accent);
+            color: white;
+        }
+
+        /* 悬浮添加按钮 */
+        .fab-add {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 10px 25px rgba(0, 113, 227, 0.4);
+            cursor: pointer;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .fab-add:hover {
+            transform: scale(1.1) rotate(90deg);
+            box-shadow: 0 15px 35px rgba(0, 113, 227, 0.5);
+        }
+
+        /* 状态标记 */
+        .sync-status {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+
+        .sync-status.online {
+            background: #34c759;
+            box-shadow: 0 0 10px #34c759;
+        }
+
+        .sync-status.syncing {
+            background: #ff9500;
+            animation: pulse 1s infinite alternate;
+        }
+
+        .sync-status.error {
+            background: #ff3b30;
+            box-shadow: 0 0 10px #ff3b30;
+        }
+
+        @keyframes pulse {
+            from {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            to {
+                transform: scale(1.5);
+                opacity: 0.5;
+            }
+        }
+
+        /* 下单页 & 核对页 适配 */
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        /* 产品列表 - 对齐管理页视觉 */
+        .product-grid {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+
+        .product-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--blur));
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s;
+        }
+
+        .fav-icon {
+            color: #ccc;
+            cursor: pointer;
+            padding: 10px;
+            transition: color 0.2s;
+        }
+
+        .fav-icon.active {
+            color: #ff9500;
+        }
+
+        .qty-control {
+            display: flex;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 12px;
+            padding: 4px;
+            margin-left: auto;
+        }
+
+        /* Toast & Modal */
+        .toast {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 20px;
+            z-index: 5000;
+            opacity: 0;
+            transition: 0.3s;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+            bottom: 60px;
+        }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(5px);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal.visible {
+            display: flex;
+        }
+
+        .modal-card {
+            background: white;
+            width: 100%;
+            max-width: 400px;
+            border-radius: 24px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        }
+
+        /* 分类导航 - 药丸风格 */
+        #categoryList {
+            display: flex;
+            gap: 10px;
+            padding: 0 16px 16px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            /* Firefox */
+        }
+
+        #categoryList::-webkit-scrollbar {
+            display: none;
+            /* Chrome/Safari */
+        }
+
+        .cat-btn {
+            padding: 10px 20px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(5px);
+            border: 1px solid var(--glass-border);
+            color: var(--text-sub);
+            font-size: 14px;
+            font-weight: 600;
+            white-space: nowrap;
+            flex-shrink: 0;
+            /* 极其重要：防止按钮被挤压 */
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .cat-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            box-shadow: 0 6px 16px rgba(0, 113, 227, 0.3);
+            transform: translateY(-1px);
+        }
+
+        /* 列表区域内边距，防止被底部栏遮挡 */
+        .product-grid,
+        .admin-main {
+            padding-bottom: 120px !important;
+        }
+
+        /* 状态条 - 高端质感 */
+        .status-bar {
+            padding: 12px 16px;
+            border-radius: var(--radius-md);
+            font-weight: 700;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .status-bar.waiting {
+            background: #fff3e0;
+            color: #ef6c00;
+            border: 1px solid rgba(239, 108, 0, 0.2);
+        }
+
+        .status-bar.locked {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid rgba(46, 125, 50, 0.2);
+        }
+
+        /* 汇总列表项 */
+        .agg-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .agg-item:last-child {
+            border-bottom: none;
+        }
+
+        .agg-name {
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .agg-qty-group {
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+        }
+
+        .agg-qty {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .agg-unit {
+            font-size: 12px;
+            color: var(--text-sub);
+            font-weight: 600;
+        }
+
+        /* 锁定按钮升级 */
+        .btn-lock {
+            background: var(--primary);
+            color: white;
+            padding: 16px;
+            border-radius: var(--radius-lg);
+            border: none;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(0, 113, 227, 0.3);
+            transition: all 0.3s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-lock:active {
+            transform: scale(0.98);
+        }
+
+        .btn-lock:disabled {
+            background: #a0a0a0;
+            box-shadow: none;
+            opacity: 0.7;
+        }
+
+        /* 同步状态反馈样式 */
+        .status-syncing {
+            box-shadow: 0 0 0 2px var(--primary-light) !important;
+        }
+
+        .status-saved {
+            background: #e8f5e9 !important;
+            border-color: #34c759 !important;
+        }
+
+        .status-error {
+            background: #ffebee !important;
+            border-color: var(--accent) !important;
+        }
+
+        /* 汇总金额统计条 */
+        .total-bar {
+            background: var(--primary);
+            color: white;
+            padding: 20px;
+            border-radius: var(--radius-lg);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 10px 25px rgba(0, 113, 227, 0.3);
+        }
+
+        .total-label {
+            font-size: 14px;
+            opacity: 0.9;
+            font-weight: 600;
+        }
+
+        .total-amount {
+            font-size: 28px;
+            font-weight: 800;
+        }
+
+        .item-price-info {
+            font-size: 12px;
+            color: var(--text-sub);
+            margin-top: 2px;
+        }
+
+        /* 复选框美化 */
+        .check-wrapper {
+            display: flex;
+            align-items: center;
+            margin-right: 12px;
+        }
+
+        .custom-checkbox {
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .custom-checkbox:checked {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .custom-checkbox:checked::after {
+            content: '\f00c';
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            color: white;
+            font-size: 14px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .agg-item.checked .agg-name {
+            text-decoration: line-through;
+            color: var(--text-sub);
+            opacity: 0.6;
+        }
+
+        /* 复选框状态反馈 */
+        .custom-checkbox.status-syncing {
+            border-color: var(--primary-light) !important;
+            box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.2);
+        }
+
+        .custom-checkbox.status-saved {
+            border-color: #34c759 !important;
+            background: rgba(52, 199, 89, 0.1);
+        }
+
+        .custom-checkbox.status-error {
+            border-color: var(--accent) !important;
+            background: rgba(255, 59, 48, 0.1);
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 600px) {
+            .admin-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header-title-group h1 {
+                font-size: 18px;
+            }
+
+            .fab-add {
+                bottom: 20px;
+                right: 20px;
+                width: 56px;
+                height: 56px;
+            }
+        }
+    </style>
 </head>
 
 <body>
-
-    <!-- 顶部导航 -->
-    <header class="app-header">
-        <div class="header-content">
-            <div style="display:flex;align-items:center;">
-                <div id="syncStatus" class="sync-status online" title="实时同步中"></div>
-                <h1>今岭后厨订货</h1>
+    <!-- 1. 下单页 -->
+    <div id="indexPage" class="page active">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="header-title-group">
+                    <div id="syncStatus" class="sync-status online" title="实时同步中"></div>
+                    <h1>今岭后厨订货</h1>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <div class="date-picker-container" id="datePickerIndex">
+                        <i class="far fa-calendar-alt"></i>
+                        <input type="text" id="dateInputIndex" readonly>
+                    </div>
+                    <button onclick="location.reload()" class="icon-btn"><i class="fas fa-sync-alt"></i></button>
+                    <button onclick="goToPage('orders')" class="icon-btn"><i class="fas fa-clipboard-list"></i></button>
+                    <button onclick="goToPage('admin')" class="icon-btn"><i class="fas fa-cog"></i></button>
+                </div>
             </div>
-            <div class="header-actions">
-                <button id="refreshBtn" class="icon-btn" title="刷新"><i class="fas fa-sync-alt"></i></button>
-                <a href="orders.html" class="icon-btn" title="订货清单" style="position: relative;">
-                    <i class="fas fa-clipboard-list"></i>
-                </a>
-                <a href="admin.html" class="icon-btn" title="管理后台"><i class="fas fa-cog"></i></a>
+        </header>
+        <div class="toolbar">
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="searchInput" placeholder="搜索食材...">
             </div>
+            <button id="filterFavBtn" class="icon-btn"><i class="far fa-star"></i></button>
         </div>
-
-        <!-- 分类滚动条 -->
-        <nav class="category-nav">
-            <div class="category-scroll" id="categoryList">
-                <!-- 由 JS 生成: <button class="cat-btn active">全部</button> -->
-            </div>
-        </nav>
-    </header>
-
-    <!-- 搜索栏 -->
-    <div class="search-bar-container">
-        <div class="search-box">
-            <i class="fas fa-search"></i>
-            <input type="text" id="searchInput" placeholder="搜索食材...">
-            <button id="clearSearch" class="hidden"><i class="fas fa-times-circle"></i></button>
-        </div>
-        <button id="filterFavBtn" class="filter-btn" title="只看收藏">
-            <i class="far fa-star"></i>
-            <span>收藏</span>
-        </button>
+        <div id="categoryList"></div>
+        <main class="product-grid" id="productList"></main>
     </div>
 
-    <!-- 主内容列表 -->
-    <main class="product-list-container" id="productList">
-        <!-- 骨架屏加载动画 -->
-        <div class="skeleton-loader">
-            <div class="skeleton-item"></div>
-            <div class="skeleton-item"></div>
-            <div class="skeleton-item"></div>
-            <div class="skeleton-item"></div>
+    <!-- 2. 核对页 -->
+    <div id="ordersPage" class="page">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="header-title-group">
+                    <button onclick="goToPage('index')" class="icon-btn"><i class="fas fa-chevron-left"></i></button>
+                    <div class="sync-status online" title="实时同步中"></div>
+                    <h1>订货核对</h1>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <button id="editModeBtn" class="icon-btn" onclick="toggleEditMode()" title="修订模式"><i
+                            class="fas fa-edit"></i></button>
+                    <div class="date-picker-container" id="datePickerOrders">
+                        <i class="far fa-calendar-alt"></i>
+                        <input type="text" id="dateInput" readonly>
+                    </div>
+                </div>
+            </div>
+        </header>
+        <main class="admin-main">
+            <div id="summaryTotalBar" class="total-bar"
+                style="display:none; margin-top: 20px; justify-content: center;">
+                <div id="orderCountTop" class="total-amount" style="font-size: 24px;">0 项品种</div>
+            </div>
+            <div class="admin-card">
+                <div class="card-label">订货品种汇总</div>
+                <div id="summaryList" style="margin-top:15px;"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 3. 管理页 -->
+    <div id="adminPage" class="page">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="header-title-group">
+                    <button onclick="goToPage('index')" class="icon-btn"><i class="fas fa-chevron-left"></i></button>
+                    <div class="sync-status online" title="实时同步中"></div>
+                    <h1>管理后台</h1>
+                </div>
+                <div id="saveStatus" style="font-size:12px;color:var(--text-sub);font-weight:600;"></div>
+            </div>
+        </header>
+
+        <div class="toolbar">
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="adminSearchInput" placeholder="搜索名称或分类...">
+            </div>
+            <select id="adminCatFilter" class="select-custom"></select>
         </div>
-    </main>
 
-    <!-- 底部操作栏 -->
-    <footer class="app-footer">
-        <div class="footer-info">
-            <span class="total-label">已选种类:</span>
-            <span class="total-count" id="selectedCount">0</span>
+        <main class="admin-main">
+            <div id="adminTableBody" class="admin-grid"></div>
+        </main>
+
+        <div class="fab-add" id="openAddModal"><i class="fas fa-plus"></i></div>
+    </div>
+
+    <!-- Modals -->
+    <div id="editModal" class="modal">
+        <div class="modal-card">
+            <h3 style="margin-bottom:24px;text-align:center;">添加新商品</h3>
+            <form id="productForm">
+                <div class="card-field" style="margin-bottom:16px;">
+                    <label class="card-label">商品分类</label>
+                    <input type="text" id="editCategory" class="card-input-small" list="catList" required
+                        placeholder="如：生鲜蔬菜">
+                    <datalist id="catList"></datalist>
+                </div>
+                <div class="card-field" style="margin-bottom:16px;">
+                    <label class="card-label">名称</label>
+                    <input type="text" id="editName" class="card-input-small" required placeholder="如：土豆">
+                </div>
+                <div class="card-field" style="margin-bottom:24px;">
+                    <label class="card-label">单位</label>
+                    <input type="text" id="editUnit" class="card-input-small" required value="斤">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <button type="button" class="btn-delete" style="background:#f2f2f7;color:#1d1d1f;"
+                        onclick="closeModal()">取消</button>
+                    <button type="submit" class="btn-delete" style="background:var(--primary);color:white;">保存</button>
+                </div>
+            </form>
         </div>
-        <button id="reviewBtn" class="submit-btn">
-            去核对
-        </button>
-    </footer>
+    </div>
+    <div id="toast" class="toast"></div>
 
-    <!-- 提交成功/失败 提示 Toast -->
-    <div id="toast" class="toast">提示信息</div>
+    <script>
+        const SB_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
+        const sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: false } });
 
-    <!-- 提交确认弹窗 -->
+        const state = {
+            products: [],
+            orders: {},
+            currentCategory: '全部',
+            onlyFavorites: false,
+            searchQuery: '',
+            adminSearch: '',
+            adminCat: '全部',
+            isLocked: false,
+            editMode: false,
+            currentDate: getLocalBusinessDate(),
+            cartItems: [],
+            activeSyncs: 0,
+            hasDataDates: new Set()
+        };
 
+        function setGlobalSyncStatus(s) {
+            const els = document.querySelectorAll('.sync-status');
+            els.forEach(el => {
+                el.classList.remove('online', 'syncing', 'error');
+                el.classList.add(s);
+                el.title = s === 'syncing' ? '同步中...' : (s === 'error' ? '同步失败' : '实时同步中');
+            });
+        }
 
-    <script src="app.js"></script>
+        function startSync() {
+            state.activeSyncs++;
+            setGlobalSyncStatus('syncing');
+        }
+
+        function endSync(err = false) {
+            state.activeSyncs = Math.max(0, state.activeSyncs - 1);
+            if (err) {
+                setGlobalSyncStatus('error');
+                setTimeout(() => { if (state.activeSyncs === 0) setGlobalSyncStatus('online'); }, 3000);
+            } else if (state.activeSyncs === 0) {
+                setGlobalSyncStatus('online');
+            }
+        }
+
+        async function init() {
+            await fetchProducts();
+            await fetchCart();
+            renderCategories();
+            renderProducts();
+            setupRealtime();
+
+            const onDateChange = async (selectedDates, dateStr) => {
+                state.currentDate = dateStr;
+                // 更新所有日期输入框的值
+                fpIndex.setDate(dateStr, false);
+                fpOrders.setDate(dateStr, false);
+
+                await fetchCart();
+                renderProducts();
+                if (document.getElementById('ordersPage').classList.contains('active')) {
+                    fetchDayData();
+                }
+            };
+
+            const updateHasDataMarkers = async (instance) => {
+                await fetchHistoryDates();
+                instance.redraw();
+            };
+
+            const fpConfig = {
+                locale: 'zh',
+                dateFormat: 'Y-m-d',
+                defaultDate: state.currentDate,
+                disableMobile: "true", // 强制在移动端使用自定义 UI 而非原生
+                onChange: onDateChange,
+                onMonthChange: (selectedDates, dateStr, instance) => {
+                    updateHasDataMarkers(instance);
+                },
+                // 标记有数据的日期
+                onDayCreate: function (dObj, dStr, fp, dayElem) {
+                    const dateStr = fp.formatDate(dayElem.dateObj, "Y-m-d");
+                    if (state.hasDataDates.has(dateStr)) {
+                        dayElem.classList.add("has-data-dot");
+                    }
+                },
+                // 添加底部操作按钮
+                onReady: function (selectedDates, dateStr, instance) {
+                    const footer = document.createElement('div');
+                    footer.className = 'flatpickr-footer';
+
+                    const clearBtn = document.createElement('button');
+                    clearBtn.className = 'flatpickr-btn flatpickr-btn-clear';
+                    clearBtn.innerHTML = '清除';
+                    clearBtn.onclick = () => { instance.clear(); };
+
+                    const todayBtn = document.createElement('button');
+                    todayBtn.className = 'flatpickr-btn flatpickr-btn-today';
+                    todayBtn.innerHTML = '今天';
+                    todayBtn.onclick = () => { instance.setDate(new Date()); onDateChange([new Date()], instance.formatDate(new Date(), 'Y-m-d')); instance.close(); };
+
+                    footer.appendChild(clearBtn);
+                    footer.appendChild(todayBtn);
+                    instance.calendarContainer.appendChild(footer);
+                }
+            };
+
+            const fpIndex = flatpickr("#dateInputIndex", fpConfig);
+            const fpOrders = flatpickr("#dateInput", fpConfig);
+
+            // 初始获取有数据的日期并标记
+            updateHasDataMarkers(fpIndex);
+            updateHasDataMarkers(fpOrders);
+
+            document.getElementById('searchInput').oninput = e => { state.searchQuery = e.target.value.trim(); renderProducts(); };
+            document.getElementById('adminSearchInput').oninput = e => { state.adminSearch = e.target.value.trim(); renderAdminTable(); };
+            document.getElementById('adminCatFilter').onchange = e => { state.adminCat = e.target.value; renderAdminTable(); };
+            document.getElementById('filterFavBtn').onclick = () => { state.onlyFavorites = !state.onlyFavorites; document.getElementById('filterFavBtn').classList.toggle('active', state.onlyFavorites); renderProducts(); };
+
+            document.getElementById('openAddModal').onclick = () => { document.getElementById('editModal').classList.add('visible'); };
+            document.getElementById('productForm').onsubmit = handleAdd;
+        }
+
+        function goToPage(id) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(id + 'Page').classList.add('active');
+            if (id === 'orders') fetchDayData();
+            if (id === 'admin') renderAdminTable();
+        }
+
+        async function fetchProducts() {
+            startSync();
+            try {
+                const { data, error } = await sb.from('jlhcdh_products').select('*').order('category');
+                if (data) {
+                    state.products = data.map(p => ({
+                        ...p,
+                        pinyin: p.pinyin || (window.pinyinPro ? window.pinyinPro.pinyin(p.name, { pattern: 'first', toneType: 'none' }).replace(/\s/g, '') : '')
+                    }));
+                }
+                endSync(!!error);
+            } catch (e) { endSync(true); }
+        }
+        async function fetchCart() {
+            startSync();
+            try {
+                state.orders = {};
+                const isToday = (state.currentDate === getLocalBusinessDate());
+                let errorOccurred = false;
+                if (isToday) {
+                    const { data, error } = await sb.from('jlhcdh_cart').select('*');
+                    if (data) data.forEach(i => state.orders[i.product_id] = { qty: parseFloat(i.quantity), purchased: i.is_purchased });
+                    errorOccurred = !!error;
+                } else {
+                    const start = `${state.currentDate}T00:00:00+08:00`;
+                    const end = `${state.currentDate}T23:59:59+08:00`;
+                    const { data, error } = await sb.from('jlhcdh_orders')
+                        .select('*')
+                        .gte('created_at', start)
+                        .lte('created_at', end)
+                        .order('created_at', { ascending: false });
+
+                    const rec = data?.find(r => r.order_data);
+                    if (rec) {
+                        const raw = rec.order_data;
+                        const items = Array.isArray(raw) ? raw : (raw.order_data || []);
+                        items.forEach(i => {
+                            const pid = i.id || i.product_id;
+                            if (pid) state.orders[pid] = { qty: parseFloat(i.qty || i.quantity || 0), purchased: !!i.is_purchased };
+                        });
+                    }
+                    errorOccurred = !!error;
+                }
+                updateFooter();
+                endSync(errorOccurred);
+            } catch (e) { endSync(true); }
+        }
+
+        async function fetchHistoryDates() {
+            try {
+                // 获取近 30 天的有数据的记录
+                const { data } = await sb.from('jlhcdh_orders')
+                    .select('created_at')
+                    .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+
+                if (data) {
+                    data.forEach(item => {
+                        const date = item.created_at.split('T')[0];
+                        state.hasDataDates.add(date);
+                    });
+                }
+                // 今天的数据从 cart 表获取
+                const { count } = await sb.from('jlhcdh_cart').select('*', { count: 'exact', head: true });
+                if (count > 0) state.hasDataDates.add(getLocalBusinessDate());
+            } catch (e) { console.error('Failed to fetch history dates', e); }
+        }
+
+        async function checkTodayLock() { }
+
+        window.updateQty = async (id, change) => {
+            const current = state.orders[id] || { qty: 0, purchased: false };
+            const newQty = Math.max(0, current.qty + change);
+            updateLocalQty(id, newQty);
+            syncToSupabase(id, newQty);
+        };
+        window.onQtyChange = (id, val) => {
+            const newQty = Math.max(0, parseFloat(val) || 0);
+            updateLocalQty(id, newQty);
+            syncToSupabase(id, newQty);
+        };
+        function updateLocalQty(id, qty) {
+            if (qty > 0) {
+                if (!state.orders[id]) state.orders[id] = { qty: 0, purchased: false };
+                state.orders[id].qty = qty;
+            } else {
+                delete state.orders[id];
+            }
+            updateFooter();
+            const input = document.querySelector(`.product-card[data-id="${id}"] input`);
+            if (input && document.activeElement !== input) input.value = qty || '';
+        }
+        const syncTimeouts = {};
+        function syncToSupabase(productId, quantity) {
+            clearTimeout(syncTimeouts[productId]);
+            const targetDate = state.currentDate;
+            const isPurchased = state.orders[productId]?.purchased || false;
+            updateSyncUI(productId, 'syncing');
+            syncTimeouts[productId] = setTimeout(async () => {
+                startSync();
+                try {
+                    if (targetDate === getLocalBusinessDate()) {
+                        await sb.from('jlhcdh_cart').delete().eq('product_id', productId);
+                        if (quantity > 0) await sb.from('jlhcdh_cart').insert({ product_id: productId, quantity, is_purchased: isPurchased });
+                    } else {
+                        const start = `${targetDate}T00:00:00+08:00`;
+                        const end = `${targetDate}T23:59:59+08:00`;
+                        const { data } = await sb.from('jlhcdh_orders').select('*').gte('created_at', start).lte('created_at', end).order('created_at', { ascending: false });
+                        const rec = data?.[0];
+                        if (rec) {
+                            let items = rec.order_data.order_data || [];
+                            const idx = items.findIndex(i => i.id === productId);
+                            if (idx > -1) {
+                                if (quantity > 0) {
+                                    items[idx].qty = quantity;
+                                    items[idx].is_purchased = isPurchased;
+                                } else items.splice(idx, 1);
+                            } else if (quantity > 0) {
+                                const p = state.products.find(x => x.id === productId);
+                                items.push({ ...p, qty: quantity, is_purchased: isPurchased });
+                            }
+                            await sb.from('jlhcdh_orders').update({ order_data: { ...rec.order_data, order_data: items } }).eq('id', rec.id);
+                        }
+                    }
+                    updateSyncUI(productId, 'saved');
+                    setTimeout(() => updateSyncUI(productId, null), 1000);
+                    endSync();
+                } catch (e) {
+                    updateSyncUI(productId, 'error');
+                    endSync(true);
+                }
+            }, 300);
+        }
+
+        window.togglePurchased = async (id, checked) => {
+            if (state.orders[id]) {
+                state.orders[id].purchased = checked;
+                updateSyncUI(id, 'syncing', true);
+                startSync();
+                try {
+                    if (state.currentDate === getLocalBusinessDate()) {
+                        await sb.from('jlhcdh_cart').update({ is_purchased: checked }).eq('product_id', id);
+                    } else {
+                        await syncToSupabaseAsync(id, state.orders[id].qty, checked);
+                    }
+                    updateSyncUI(id, 'saved', true);
+                    setTimeout(() => updateSyncUI(id, null, true), 1000);
+                    endSync();
+                } catch (e) {
+                    updateSyncUI(id, 'error', true);
+                    endSync(true);
+                }
+                setTimeout(() => fetchDayData(), 300);
+            }
+        };
+
+        // 辅助历史同步函数，避免与 debounce 的 syncToSupabase 冲突
+        async function syncToSupabaseAsync(productId, quantity, isPurchased) {
+            startSync();
+            try {
+                const targetDate = state.currentDate;
+                const start = `${targetDate}T00:00:00+08:00`;
+                const end = `${targetDate}T23:59:59+08:00`;
+                const { data } = await sb.from('jlhcdh_orders').select('*').gte('created_at', start).lte('created_at', end).order('created_at', { ascending: false });
+                const rec = data?.[0];
+                if (rec) {
+                    let items = rec.order_data.order_data || [];
+                    const idx = items.findIndex(i => i.id === productId);
+                    if (idx > -1) {
+                        items[idx].qty = quantity;
+                        items[idx].is_purchased = isPurchased;
+                    }
+                    await sb.from('jlhcdh_orders').update({ order_data: { ...rec.order_data, order_data: items } }).eq('id', rec.id);
+                }
+                endSync();
+            } catch (e) { endSync(true); }
+        }
+
+        function renderAdminTable() {
+            const cats = [...new Set(state.products.map(p => p.category))];
+            document.getElementById('adminCatFilter').innerHTML = '<option value="全部">全部品类</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+            document.getElementById('catList').innerHTML = cats.map(c => `<option value="${c}">`).join('');
+
+            let filtered = state.products;
+            if (state.adminCat !== '全部') filtered = filtered.filter(p => p.category === state.adminCat);
+            if (state.adminSearch) { const q = state.adminSearch.toLowerCase(); filtered = filtered.filter(p => p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)); }
+
+            document.getElementById('adminTableBody').innerHTML = filtered.map(p => `
+                <div class="admin-card">
+                    <div class="card-header">
+                        <div class="card-title-group">
+                            <div class="card-label">商品名称</div>
+                            <input type="text" class="card-input-main" value="${p.name}" onchange="updateField(${p.id}, 'name', this.value)">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="card-field">
+                            <div class="card-label">分类</div>
+                            <input type="text" class="card-input-small" value="${p.category}" onchange="updateField(${p.id}, 'category', this.value)">
+                        </div>
+                        <div class="card-field">
+                            <div class="card-label">单位</div>
+                            <input type="text" class="card-input-small" value="${p.unit || '斤'}" onchange="updateField(${p.id}, 'unit', this.value)">
+                        </div>
+                    </div>
+                    <button class="btn-delete" onclick="deleteProduct(${p.id})">
+                        <i class="fas fa-trash-alt"></i> 删除商品
+                    </button>
+                </div>`).join('');
+        }
+
+        window.updateField = async (id, field, value) => {
+            document.getElementById('saveStatus').innerText = '正在保存...';
+            startSync();
+            const updates = { [field]: value };
+
+            if (field === 'name' && window.pinyinPro) {
+                updates.pinyin = window.pinyinPro.pinyin(value, { pattern: 'first', toneType: 'none' }).replace(/\s/g, '');
+            }
+
+            try {
+                const { error } = await sb.from('jlhcdh_products').update(updates).eq('id', id);
+                if (!error) {
+                    document.getElementById('saveStatus').innerText = '已保存';
+                    await fetchProducts();
+                    if (field === 'category' || field === 'name') renderAdminTable();
+                }
+                endSync(!!error);
+            } catch (e) { endSync(true); }
+        };
+
+        window.deleteProduct = async id => {
+            if (confirm('删除后不可恢复，确定？')) {
+                startSync();
+                try {
+                    const { error } = await sb.from('jlhcdh_products').delete().eq('id', id);
+                    await fetchProducts();
+                    renderAdminTable();
+                    endSync(!!error);
+                } catch (e) { endSync(true); }
+            }
+        };
+
+        async function handleAdd(e) {
+            e.preventDefault();
+            const name = document.getElementById('editName').value;
+            const category = document.getElementById('editCategory').value;
+            const unit = document.getElementById('editUnit').value;
+            const pinyin = window.pinyinPro ? window.pinyinPro.pinyin(name, { pattern: 'first', toneType: 'none' }).replace(/\s/g, '') : '';
+
+            startSync();
+            try {
+                const { error } = await sb.from('jlhcdh_products').insert([{ name, category, unit, pinyin, is_favorite: false }]);
+                if (!error) {
+                    showToast('已添加');
+                    closeModal();
+                    await fetchProducts();
+                    renderAdminTable();
+                    renderProducts();
+                }
+                endSync(!!error);
+            } catch (e) { endSync(true); }
+        }
+        function closeModal() { document.getElementById('editModal').classList.remove('visible'); }
+
+        async function fetchDayData() {
+            state.cartItems = Object.entries(state.orders).map(([id, info]) => {
+                const p = state.products.find(x => x.id === parseInt(id));
+                return p ? { ...p, qty: info.qty, is_purchased: info.purchased } : null;
+            }).filter(x => x);
+            renderSummary();
+        }
+
+        function renderStatus() { }
+
+        function renderSummary() {
+            const list = document.getElementById('summaryList');
+            const totalBar = document.getElementById('summaryTotalBar');
+            const countDisplayTop = document.getElementById('orderCountTop');
+
+            if (state.cartItems.length === 0) {
+                totalBar.style.display = 'none';
+                return list.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text-sub);font-weight:600;">⚠️ 暂无报货记录</div>`;
+            }
+
+            totalBar.style.display = 'flex';
+            countDisplayTop.innerText = `${state.cartItems.length} 项品种`;
+
+            list.innerHTML = state.cartItems.map(item => {
+                return `
+                <div class="agg-item ${item.is_purchased ? 'checked' : ''}">
+                    <div class="check-wrapper">
+                        <input type="checkbox" id="check-${item.id}" class="custom-checkbox" 
+                            ${item.is_purchased ? 'checked' : ''} 
+                            onclick="togglePurchased(${item.id}, this.checked)">
+                    </div>
+                    <div style="flex:1;">
+                        <span class="agg-name">${item.name}</span>
+                    </div>
+                    <div class="agg-qty-group">
+                        ${state.editMode && state.currentDate === getLocalBusinessDate() ? `
+                            <div class="qty-control" style="margin-right:10px; scale:0.9;">
+                                <button class="icon-btn" style="width:28px;height:28px;background:none;" onclick="updateQty(${item.id}, -1); fetchDayData();">－</button>
+                                <input type="number" class="card-input-small" style="width:45px;text-align:center;background:none;padding:0;" value="${item.qty}" onchange="onQtyChange(${item.id}, this.value); fetchDayData();">
+                                <button class="icon-btn" style="width:28px;height:28px;background:none;" onclick="updateQty(${item.id}, 1); fetchDayData();">+</button>
+                            </div>
+                        ` : `
+                            <span class="agg-qty">${item.qty}</span>
+                        `}
+                        <span class="agg-unit">${item.unit || '斤'}</span>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        window.toggleEditMode = () => {
+            state.editMode = !state.editMode;
+            document.getElementById('editModeBtn').classList.toggle('active', state.editMode);
+            renderSummary();
+        };
+
+        async function toggleLock() { }
+
+        function renderCategories() {
+            const cats = ['全部', ...new Set(state.products.map(p => p.category))];
+            document.getElementById('categoryList').innerHTML = cats.map(c =>
+                `<button class="cat-btn ${c === state.currentCategory ? 'active' : ''}" onclick="filterCat('${c}')">${c}</button>`
+            ).join('');
+        }
+
+        window.filterCat = cat => {
+            state.currentCategory = cat;
+            renderCategories();
+            renderProducts();
+        };
+
+        function renderProducts() {
+            let f = state.products;
+            if (state.currentCategory !== '全部') f = f.filter(p => p.category === state.currentCategory);
+            if (state.onlyFavorites) f = f.filter(p => p.is_favorite);
+            if (state.searchQuery) {
+                const q = state.searchQuery.toLowerCase();
+                f = f.filter(p => {
+                    const nameMatch = p.name.toLowerCase().includes(q);
+                    const pinyinMatch = p.pinyin && p.pinyin.toLowerCase().includes(q);
+                    return nameMatch || pinyinMatch;
+                });
+            }
+
+            document.getElementById('productList').innerHTML = f.map(p => {
+                const qty = state.orders[p.id]?.qty || '';
+                return `
+                <div class="product-card" data-id="${p.id}">
+                    <div class="fav-icon ${p.is_favorite ? 'active' : ''}" onclick="toggleFav(${p.id})">
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <div style="flex:1;">
+                        <div style="font-weight:700;font-size:17px;">${p.name}</div>
+                        <div style="font-size:12px;color:var(--text-sub);margin-top:2px;">${p.category}</div>
+                    </div>
+                    <div id="wrapper-${p.id}" class="qty-control">
+                        <button class="icon-btn" style="width:32px;height:32px;background:none;" onclick="updateQty(${p.id}, -1)">−</button>
+                        <input type="number" class="card-input-small" style="width:50px;text-align:center;background:none;padding:0;" value="${qty}" placeholder="0" onchange="onQtyChange(${p.id}, this.value)">
+                        <button class="icon-btn" style="width:32px;height:32px;background:none;" onclick="updateQty(${p.id}, 1)">+</button>
+                    </div>
+                    <span style="margin-left:8px;font-size:14px;color:var(--text-sub);min-width:20px;">${p.unit || '斤'}</span>
+                </div>`;
+            }).join('');
+        }
+
+        window.toggleFav = async id => {
+            const p = state.products.find(x => x.id === id);
+            p.is_favorite = !p.is_favorite;
+            renderProducts();
+            startSync();
+            try {
+                const { error } = await sb.from('jlhcdh_products').update({ is_favorite: p.is_favorite }).eq('id', id);
+                endSync(!!error);
+            } catch (e) { endSync(true); }
+        };
+
+        function setupRealtime() {
+            sb.channel('cart_sync').on('postgres_changes', { event: '*', schema: 'public', table: 'jlhcdh_cart' }, () => fetchCart()).subscribe();
+        }
+
+        function getLocalBusinessDate() {
+            const n = new Date();
+            const y = n.getFullYear();
+            const m = String(n.getMonth() + 1).padStart(2, '0');
+            const d = String(n.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2000);
+        }
+
+        function updateSyncUI(id, s, isCheckbox = false) {
+            const selector = isCheckbox ? `check-${id}` : `wrapper-${id}`;
+            const el = document.getElementById(selector);
+            if (!el) return;
+            el.classList.remove('status-syncing', 'status-saved', 'status-error');
+            if (s) el.classList.add(`status-${s}`);
+        }
+
+        function updateFooter() {
+            const el = document.getElementById('selectedCount');
+            if (el) el.innerText = Object.keys(state.orders).length;
+        }
+
+        init();
+    </script>
 </body>
 
 </html>
