@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>思维导图 | 灵感矩阵</title>
+    <script src="https://cdn.staticfile.org/tailwindcss/2.2.19/tailwind.min.js"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;400&family=Noto+Sans+SC:wght@200;400&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4C6EF5;
+            --bg-deep: #F8F9FA;
+            --text-color: #2D3436;
+            --grid-line: rgba(0, 0, 0, 0.02);
+            --grid-dot: rgba(0, 0, 0, 0.05);
+            --branch-blue: #0984E3;
+            --branch-yellow: #F1C40F;
+            --branch-purple: #8E44AD;
+            --branch-red: #E17055;
+            --branch-green: #00B894;
+        }
+
+        body {
+            font-family: 'Outfit', 'Noto Sans SC', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            background: var(--bg-deep);
+            color: var(--text-color);
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        #viewport {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            overflow: hidden;
+            background: #F1F3F5;
+            cursor: crosshair;
+        }
+
+        .infinite-grid {
+            position: absolute;
+            inset: 0;
+            background-image:
+                radial-gradient(var(--grid-dot) 1px, transparent 1px),
+                linear-gradient(var(--grid-line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+            background-size: 40px 40px, 200px 200px, 200px 200px;
+            background-position: center center;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .content-layer {
+            position: absolute;
+            width: 0;
+            height: 0;
+            left: 50%;
+            top: 50%;
+            transform-origin: 0 0;
+            z-index: 1;
+        }
+
+        .tag {
+            position: absolute;
+            background: transparent;
+            border: none;
+            padding: 6px 12px;
+            transition: opacity 0.4s;
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            border-bottom: 2px solid transparent;
+            /* Placeholder for underline */
+        }
+
+        /* Root node style */
+        .tag.root {
+            background: white;
+            border: 1px solid #E9ECEF;
+            border-radius: 8px;
+            padding: 12px 24px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            border-bottom: 1px solid #E9ECEF;
+        }
+
+        .tag span {
+            font-weight: 500;
+            letter-spacing: 0.01em;
+            color: var(--text-color);
+            white-space: nowrap;
+            font-size: 0.95rem;
+        }
+
+        .tag.dragging {
+            cursor: grabbing;
+            opacity: 0.6;
+            z-index: 10000 !important;
+        }
+
+        .tag.selected {
+            color: var(--primary);
+        }
+
+        .tag.selected span {
+            color: var(--primary);
+        }
+
+        .tag.root {
+            border-bottom: none;
+            padding: 10px 20px;
+            background: white;
+            border: 1.5px solid #E9ECEF;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+        }
+
+        .selection-box {
+            position: absolute;
+            border: 1px dashed rgba(76, 110, 245, 0.3);
+            background: rgba(76, 110, 245, 0.03);
+            pointer-events: none;
+            z-index: 5000;
+        }
+
+        #floatingInput {
+            position: fixed;
+            z-index: 9999;
+            background: white;
+            border: 1px solid var(--primary);
+            border-radius: 4px;
+            outline: none;
+            color: var(--text-color);
+            padding: 4px 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            font-family: inherit;
+            font-size: 0.95rem;
+            display: none;
+            text-align: left;
+        }
+
+        .minimal-menu {
+            position: fixed;
+            z-index: 10000;
+            background: white;
+            border: 1px solid #E9ECEF;
+            border-radius: 12px;
+            padding: 4px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            opacity: 0;
+            transform: scale(0.95);
+            pointer-events: none;
+            transition: all 0.2s cubic-bezier(0.2, 1, 0.3, 1);
+        }
+
+        .minimal-menu.show {
+            opacity: 1;
+            transform: scale(1);
+            pointer-events: auto;
+        }
+
+        .menu-item {
+            padding: 10px 16px;
+            border-radius: 8px;
+            color: #495057;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .menu-item:hover {
+            background: #F8F9FA;
+            color: var(--primary);
+        }
+
+        .menu-item.danger {
+            color: #FA5252;
+        }
+
+        .connection-line {
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            opacity: 0.9;
+            transition: stroke 0.3s, stroke-width 0.3s;
+            filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+        }
+
+        .line-preview {
+            stroke: #ADB5BD;
+            stroke-dasharray: 6;
+            animation: dashScroll 1s linear infinite;
+        }
+
+        @keyframes dashScroll {
+            from {
+                stroke-dashoffset: 12;
+            }
+
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        .underline-line {
+            stroke-width: 2.5;
+            stroke-linecap: round;
+        }
+
+        ::-webkit-scrollbar {
+            display: none;
+        }
+
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .sync-indicator {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: #51CF66;
+            z-index: 10100;
+            opacity: 0.6;
+        }
+
+        .sync-indicator.syncing {
+            background-color: #fbbf24;
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.5);
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        .sync-indicator.error {
+            background-color: #f87171;
+            box-shadow: 0 0 15px rgba(248, 113, 113, 0.5);
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body class="antialiased select-none">
+    <div id="viewport">
+        <div id="grid" class="infinite-grid"></div>
+        <svg id="globalSvg"
+            style="position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:2; overflow:visible;">
+            <g id="lineGroups"></g>
+        </svg>
+        <div id="content" class="content-layer"></div>
+    </div>
+
+    <input type="text" id="floatingInput" spellcheck="false" autocomplete="off">
+
+    <div id="syncStatus" class="sync-indicator"></div>
+
+    <div id="minimalMenu" class="minimal-menu">
+        <div class="menu-item" id="menuReset">重置星空 (Reset)</div>
+        <div class="menu-item danger" id="menuDelete">抹除此灵感 (Delete)</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        const SUPABASE_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
+        const _client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const State = {
+            transform: { x: 0, y: 0, scale: 1 },
+            mouse: { lastX: 0, lastY: 0, startX: 0, startY: 0, startTime: 0 },
+            interaction: {
+                isPanning: false, isDragging: false, isSelecting: false, isLinking: false,
+                linkingFrom: null, currentTag: null, selectedTags: [], dragOffset: { x: 0, y: 0 },
+                contextEntity: null, contextType: null, lastTap: 0, lastBlurTime: 0
+            },
+            connections: [],
+            saveViewTimer: null
+        };
+
+        const DOM = {
+            viewport: document.getElementById('viewport'),
+            grid: document.getElementById('grid'),
+            content: document.getElementById('content'),
+            input: document.getElementById('floatingInput'),
+            menu: document.getElementById('minimalMenu'),
+            svgGroup: document.getElementById('lineGroups'),
+            selection: document.createElement('div'),
+            syncStatus: document.getElementById('syncStatus')
+        };
+
+        const SyncManager = {
+            set(status) {
+                DOM.syncStatus.style.backgroundColor =
+                    status === 'syncing' ? '#FCC419' :
+                        status === 'error' ? '#FF6B6B' : '#51CF66';
+            },
+            async wrap(promise) {
+                this.set('syncing');
+                try {
+                    const res = await promise;
+                    setTimeout(() => this.set('idle'), 200);
+                    return res;
+                } catch (e) {
+                    console.error(e);
+                    this.set('error');
+                    throw e;
+                }
+            }
+        };
+
+        const ColorPalette = [
+            '#0984E3', // Blue
+            '#F1C40F', // Yellow
+            '#8E44AD', // Purple
+            '#E17055', // Red
+            '#00B894', // Green
+            '#FD79A8'  // Pink
+        ];
+
+        function getBranchColor(nodeId, fromId) {
+            // Find root’s children to assign base colors
+            const root = findRoot();
+            if (!root) return '#ADB5BD';
+
+            // If the connection is from root, assign a new color
+            if (fromId === root.id) {
+                const idx = Array.from(DOM.content.children).indexOf(document.getElementById(nodeId)) % ColorPalette.length;
+                return ColorPalette[idx];
+            }
+
+            return findBaseBranchColor(fromId) || '#ADB5BD';
+        }
+
+        function findRoot() {
+            const nodes = Array.from(DOM.content.children);
+            if (nodes.length === 0) return null;
+
+            const destIds = new Set(State.connections.map(c => c.to_id || c.toId));
+            const root = nodes.find(n => !destIds.has(n.id));
+            return root || nodes[0];
+        }
+
+        const _colorCache = new Map();
+        function findBaseBranchColor(nodeId) {
+            if (_colorCache.has(nodeId)) return _colorCache.get(nodeId);
+
+            const root = findRoot();
+            if (!root || nodeId === root.id) return null;
+
+            const conn = State.connections.find(c => (c.to_id === nodeId || c.toId === nodeId));
+            if (!conn) return null;
+
+            const parentId = conn.from_id || conn.fromId;
+            if (parentId === root.id) {
+                const rootChildren = State.connections.filter(c => (c.from_id === root.id || c.fromId === root.id));
+                const idx = rootChildren.findIndex(c => (c.to_id === nodeId || c.toId === nodeId));
+                const color = ColorPalette[idx % ColorPalette.length];
+                _colorCache.set(nodeId, color);
+                return color;
+            }
+
+            const color = findBaseBranchColor(parentId);
+            _colorCache.set(nodeId, color);
+            return color;
+        }
+
+        function updateMatrix() {
+            const { x, y, scale } = State.transform;
+            DOM.content.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+
+            const ox = window.innerWidth / 2 + x;
+            const oy = window.innerHeight / 2 + y;
+            const s1 = 40 * scale;
+            const s2 = 200 * scale;
+
+            DOM.grid.style.backgroundSize = `${s1}px ${s1}px, ${s2}px ${s2}px, ${s2}px ${s2}px`;
+            DOM.grid.style.backgroundPosition = `${ox}px ${oy}px, ${ox}px ${oy}px, ${ox}px ${oy}px`;
+
+            _colorCache.clear();
+            LineManager.render();
+            saveViewState();
+        }
+
+        function saveViewState() {
+            if (State.saveViewTimer) clearTimeout(State.saveViewTimer);
+            State.saveViewTimer = setTimeout(async () => {
+                const { x, y, scale } = State.transform;
+                SyncManager.wrap(_client.from('canvas_state').upsert({ id: 1, x, y, scale }));
+            }, 300);
+        }
+
+        function screenToSpace(sx, sy) {
+            const rect = DOM.viewport.getBoundingClientRect();
+            const vx = sx - rect.left - rect.width / 2;
+            const vy = sy - rect.top - rect.height / 2;
+            return {
+                x: (vx - State.transform.x) / State.transform.scale,
+                y: (vy - State.transform.y) / State.transform.scale
+            };
+        }
+
+        function getTextWidth(text, font) {
+            // Re-use canvas object for better performance
+            const canvas = getTextWidth.canvas || (getTextWidth.canvas = document.createElement("canvas"));
+            const context = canvas.getContext("2d");
+            context.font = font;
+            const metrics = context.measureText(text);
+            return metrics.width;
+        }
+
+        function spaceToScreen(x, y) {
+            const rect = DOM.viewport.getBoundingClientRect();
+            return {
+                x: rect.width / 2 + State.transform.x + x * State.transform.scale,
+                y: rect.height / 2 + State.transform.y + y * State.transform.scale
+            };
+        }
+
+        const Tag = {
+            async create(text, x, y, id = null) {
+                const node = document.createElement('div');
+                node.id = id || `tag-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+                node.className = 'tag';
+                node.innerHTML = `<span>${text}</span>`;
+                node.style.left = `${x}px`;
+                node.style.top = `${y}px`;
+                node.dataset.x = x; node.dataset.y = y;
+                this.bind(node);
+                DOM.content.appendChild(node);
+
+                setTimeout(() => {
+                    const root = findRoot();
+                    if (root) {
+                        Array.from(DOM.content.children).forEach(n => {
+                            n.classList.toggle('root', n === root);
+                        });
+                    }
+                }, 100);
+
+                if (!id) {
+                    const { data, error } = await SyncManager.wrap(_client.from('canvas_nodes').insert({ text, x, y }).select().single());
+                    if (!error && data) node.id = data.id;
+                }
+                return node;
+            },
+            bind(node) {
+                node.addEventListener('mousedown', e => {
+                    e.stopPropagation(); e.preventDefault();
+                    if (e.button === 0) {
+                        State.interaction.isDragging = true;
+                        State.interaction.currentTag = node;
+                        node.classList.add('dragging');
+                        const spacePos = screenToSpace(e.clientX, e.clientY);
+                        State.interaction.dragOffset = { x: spacePos.x - parseFloat(node.dataset.x), y: spacePos.y - parseFloat(node.dataset.y) };
+                        if (!e.shiftKey && !State.interaction.selectedTags.includes(node)) this.deselect();
+                        this.select(node);
+                        DOM.viewport.style.cursor = 'grabbing';
+                    } else if (e.button === 2) {
+                        State.interaction.isLinking = true;
+                        State.interaction.linkingFrom = node;
+                    }
+                });
+                node.addEventListener('dblclick', e => {
+                    e.stopPropagation();
+                    const rect = node.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    Input.show(centerX, centerY, node.querySelector('span').textContent, node);
+                });
+                node.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); });
+
+                let timer;
+                node.addEventListener('touchstart', e => {
+                    // If already pinching/panning with two fingers, ignore
+                    if (e.touches.length > 1) return;
+
+                    const t = e.touches[0];
+                    State.interaction.isDragging = true;
+                    State.interaction.currentTag = node;
+                    node.classList.add('dragging');
+                    const spacePos = screenToSpace(t.clientX, t.clientY);
+                    State.interaction.dragOffset = { x: spacePos.x - parseFloat(node.dataset.x), y: spacePos.y - parseFloat(node.dataset.y) };
+
+                    // Select this tag
+                    if (!State.interaction.selectedTags.includes(node)) {
+                        Tag.deselect();
+                        Tag.select(node);
+                    }
+
+                    // Long press for context menu
+                    timer = setTimeout(() => {
+                        if (State.interaction.isDragging && State.interaction.currentTag === node) {
+                            Menu.show(t.clientX, t.clientY, node);
+                            // Vibrate on supported devices
+                            if (navigator.vibrate) navigator.vibrate(50);
+                        }
+                    }, 600);
+                }, { passive: false });
+
+                node.addEventListener('touchmove', e => {
+                    // Cancel long press if moving
+                    if (timer) clearTimeout(timer);
+                }, { passive: true });
+
+                node.addEventListener('touchend', e => {
+                    clearTimeout(timer);
+                    node.classList.remove('dragging');
+                    if (State.interaction.isDragging && State.interaction.currentTag === node) {
+                        State.interaction.isDragging = false;
+                        State.interaction.selectedTags.forEach(t => Tag.updatePos(t));
+                    }
+                });
+
+                node.addEventListener('touchcancel', e => {
+                    clearTimeout(timer);
+                    node.classList.remove('dragging');
+                    State.interaction.isDragging = false;
+                });
+            },
+            select(node) { node.classList.add('selected'); if (!State.interaction.selectedTags.includes(node)) State.interaction.selectedTags.push(node); },
+            deselect() { State.interaction.selectedTags.forEach(t => t.classList.remove('selected')); State.interaction.selectedTags = []; },
+            async updatePos(node) {
+                const id = node.id;
+                await SyncManager.wrap(_client.from('canvas_nodes').update({ x: parseFloat(node.dataset.x), y: parseFloat(node.dataset.y) }).eq('id', id));
+            }
+        };
+
+        const LineManager = {
+            render() {
+                DOM.svgGroup.innerHTML = '';
+                State.connections.forEach(conn => {
+                    const from = document.getElementById(conn.from_id || conn.fromId);
+                    const to = document.getElementById(conn.to_id || conn.toId);
+                    if (from && to) this.drawLine(from, to, false, conn);
+                });
+            },
+            drawLine(fromNode, toNodeOrPos, isPreview = false, connData = null) {
+                const fromRect = fromNode.getBoundingClientRect();
+                const fromCenter = { x: fromRect.left + fromRect.width / 2, y: fromRect.top + fromRect.height / 2 };
+
+                let toCenter, toRect;
+                if (isPreview) {
+                    toCenter = spaceToScreen(toNodeOrPos.x, toNodeOrPos.y);
+                } else {
+                    toRect = toNodeOrPos.getBoundingClientRect();
+                    toCenter = { x: toRect.left + toRect.width / 2, y: toRect.top + toRect.height / 2 };
+                }
+
+                const isRight = (toCenter.x > fromCenter.x);
+                const branchColor = isPreview ? '#ADB5BD' : (connData ? getBranchColor(toRect ? toNodeOrPos.id : null, fromNode.id) : '#ADB5BD');
+
+                // Start from the vertical center of the parent's side
+                const startX = isRight ? fromRect.right : fromRect.left;
+                const startY = fromCenter.y;
+
+                let endX, endY;
+                if (isPreview) {
+                    endX = toCenter.x;
+                    endY = toCenter.y;
+                } else {
+                    // End at the vertical center of the child's side
+                    endX = isRight ? toRect.left : toRect.right;
+                    endY = toCenter.y;
+                }
+
+                // Bezier curve calculation
+                const dx = Math.abs(endX - startX);
+
+                // Control points for a smooth S-curve
+                // We use 50% of the distance as the control point offset for a balanced curve
+                const tension = 0.5;
+                const cp1x = startX + (isRight ? 1 : -1) * (dx * tension);
+                const cp1y = startY;
+                const cp2x = endX - (isRight ? 1 : -1) * (dx * tension);
+                const cp2y = endY;
+
+                const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                const d = `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}`;
+                path.setAttribute("d", d);
+                path.setAttribute("class", isPreview ? "connection-line line-preview" : "connection-line");
+                path.setAttribute("fill", "none");
+                path.setAttribute("stroke", branchColor);
+                path.setAttribute("stroke-width", "2");
+                group.appendChild(path);
+
+                // Invisible hit path for easier clicking
+                if (!isPreview && connData) {
+                    const hitPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    hitPath.setAttribute("d", d);
+                    hitPath.setAttribute("stroke", "transparent");
+                    hitPath.setAttribute("stroke-width", "20");
+                    hitPath.style.cursor = "pointer";
+                    hitPath.style.pointerEvents = "stroke";
+
+                    hitPath.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        // Calculate middle point of the bezier curve for the input box
+                        // Bezier mid point formula for t=0.5
+                        const t = 0.5;
+                        const mx = (1 - t) * (1 - t) * (1 - t) * startX + 3 * (1 - t) * (1 - t) * t * cp1x + 3 * (1 - t) * t * t * cp2x + t * t * t * endX;
+                        const my = (1 - t) * (1 - t) * (1 - t) * startY + 3 * (1 - t) * (1 - t) * t * cp1y + 3 * (1 - t) * t * t * cp2y + t * t * t * endY;
+
+                        Input.show(mx, my, connData.label || '', connData, 'connection');
+                    });
+                    group.appendChild(hitPath);
+
+                    if (connData.label) {
+                        // Calculate approx middle point
+                        const t = 0.5;
+                        const mx = (1 - t) * (1 - t) * (1 - t) * startX + 3 * (1 - t) * (1 - t) * t * cp1x + 3 * (1 - t) * t * t * cp2x + t * t * t * endX;
+                        const my = (1 - t) * (1 - t) * (1 - t) * startY + 3 * (1 - t) * (1 - t) * t * cp1y + 3 * (1 - t) * t * t * cp2y + t * t * t * endY;
+
+                        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                        text.setAttribute("x", mx);
+                        text.setAttribute("y", my - 8);
+                        text.setAttribute("text-anchor", "middle");
+                        text.setAttribute("fill", "#636E72");
+                        text.setAttribute("font-size", "11");
+                        text.setAttribute("font-weight", "500");
+                        text.style.textShadow = "0 1px 2px rgba(255,255,255,0.8)";
+                        text.textContent = connData.label;
+                        text.style.pointerEvents = "none";
+                        group.appendChild(text);
+                    }
+                }
+
+                DOM.svgGroup.appendChild(group);
+            }
+        };
+
+        const Input = {
+            show(x, y, text = '', entity = null, type = 'node', angle = 0) {
+                State.interaction.contextEntity = entity;
+                State.interaction.contextType = type;
+                if (!entity) State.interaction.targetSpacePos = screenToSpace(x, y);
+
+                DOM.input.style.display = 'block';
+                DOM.input.value = text;
+
+                if (type === 'connection') {
+                    DOM.input.style.left = `${x}px`;
+                    DOM.input.style.top = `${y}px`;
+                    DOM.input.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+                    DOM.input.style.textAlign = 'center';
+                    DOM.input.style.width = '200px';
+                } else if (type === 'node' && entity) {
+                    // Match exact position of the span within the tag
+                    const span = entity.querySelector('span');
+                    const rect = span.getBoundingClientRect();
+
+                    DOM.input.style.left = `${rect.left}px`;
+                    DOM.input.style.top = `${rect.top}px`;
+
+                    // Initial width based on text or min 20px
+                    const updateWidth = () => {
+                        const style = window.getComputedStyle(DOM.input);
+                        const font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+                        const textWidth = getTextWidth(DOM.input.value, font);
+                        DOM.input.style.width = `${Math.max(textWidth + 10, rect.width, 20)}px`;
+                    };
+
+                    DOM.input.oninput = updateWidth;
+
+                    DOM.input.style.height = `${rect.height}px`;
+                    DOM.input.style.transform = 'none';
+                    DOM.input.style.textAlign = 'left';
+
+                    // Initialize width
+                    updateWidth();
+
+                    // Hide just the text, keep the box/bg
+                    span.style.visibility = 'hidden';
+                    entity.classList.add('editing');
+                } else {
+                    // New node creation
+                    DOM.input.style.left = `${x}px`;
+                    DOM.input.style.top = `${y}px`;
+                    DOM.input.style.transform = "translate(-50%, -50%)";
+                    DOM.input.style.textAlign = 'center';
+                    DOM.input.style.width = '150px';
+                    DOM.input.oninput = null; // Reset for new nodes
+                }
+
+                setTimeout(() => {
+                    DOM.input.focus();
+                }, 10);
+            },
+            hide() {
+                if (State.interaction.contextEntity && State.interaction.contextType === 'node') {
+                    const span = State.interaction.contextEntity.querySelector('span');
+                    if (span) span.style.visibility = 'visible';
+                    State.interaction.contextEntity.classList.remove('editing');
+                }
+                DOM.input.style.display = 'none';
+                DOM.input.style.transform = "none";
+                State.interaction.contextEntity = null;
+                State.interaction.contextType = null;
+            },
+            async save() {
+                const val = DOM.input.value.trim();
+                const entity = State.interaction.contextEntity;
+                const type = State.interaction.contextType;
+
+                if (val || val === '') { // Allow clearing logic if needed, simplify to val exists
+                    if (type === 'connection' && entity) {
+                        // Optimistic update
+                        entity.label = val;
+                        await SyncManager.wrap(_client.from('canvas_connections').update({ label: val }).eq('id', entity.id));
+                    } else if (type === 'node' && entity) {
+                        entity.querySelector('span').textContent = val;
+                        await SyncManager.wrap(_client.from('canvas_nodes').update({ text: val }).eq('id', entity.id));
+                    } else if (!entity && val) {
+                        Tag.create(val, State.interaction.targetSpacePos.x, State.interaction.targetSpacePos.y);
+                    }
+                }
+                this.hide(); LineManager.render();
+            }
+        };
+
+        const Menu = {
+            show(x, y, node) {
+                State.interaction.contextEntity = node;
+                State.interaction.contextType = 'node';
+                DOM.menu.style.left = `${Math.min(x, window.innerWidth - 200)}px`;
+                DOM.menu.style.top = `${Math.min(y, window.innerHeight - 150)}px`;
+                DOM.menu.classList.add('show');
+            },
+            hide() { DOM.menu.classList.remove('show'); State.interaction.contextEntity = null; }
+        };
+
+        const Selection = {
+            init() { DOM.selection.className = 'selection-box'; DOM.viewport.appendChild(DOM.selection); },
+            update(x, y) {
+                const l = Math.min(x, State.mouse.startX), t = Math.min(y, State.mouse.startY);
+                const w = Math.abs(x - State.mouse.startX), h = Math.abs(y - State.mouse.startY);
+                if (w > 5 || h > 5) {
+                    State.interaction.isSelecting = true; DOM.selection.style.display = 'block';
+                    Object.assign(DOM.selection.style, { left: `${l}px`, top: `${t}px`, width: `${w}px`, height: `${h}px` });
+                }
+            },
+            commit() {
+                if (!State.interaction.isSelecting) return;
+                const r = DOM.selection.getBoundingClientRect();
+                DOM.content.querySelectorAll('.tag').forEach(t => {
+                    const tr = t.getBoundingClientRect();
+                    if (tr.left >= r.left && tr.right <= r.right && tr.top >= r.top && tr.bottom <= r.bottom) Tag.select(t);
+                });
+                State.interaction.isSelecting = false; DOM.selection.style.display = 'none';
+            }
+        };
+
+        async function bootstrap() {
+            Selection.init();
+
+            // Load initial data
+            const { data: nodes } = await _client.from('canvas_nodes').select('*');
+            const { data: conns } = await _client.from('canvas_connections').select('*');
+            const { data: viewState } = await _client.from('canvas_state').select('*').eq('id', 1).single();
+
+            if (nodes) for (const n of nodes) await Tag.create(n.text, n.x, n.y, n.id);
+            if (conns) { State.connections = conns; LineManager.render(); }
+            if (viewState) {
+                State.transform = { x: viewState.x, y: viewState.y, scale: viewState.scale };
+            }
+
+            updateMatrix();
+
+            // Realtime setup
+            _client.channel('canvas_changes')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'canvas_nodes' }, payload => {
+                    const { eventType, new: newTag, old: oldTag } = payload;
+                    if (eventType === 'INSERT') {
+                        if (!document.getElementById(newTag.id)) Tag.create(newTag.text, newTag.x, newTag.y, newTag.id);
+                    } else if (eventType === 'UPDATE') {
+                        const node = document.getElementById(newTag.id);
+                        if (node) {
+                            node.querySelector('span').textContent = newTag.text;
+                            node.style.left = `${newTag.x}px`;
+                            node.style.top = `${newTag.y}px`;
+                            node.dataset.x = newTag.x; node.dataset.y = newTag.y;
+                            LineManager.render();
+                        }
+                    } else if (eventType === 'DELETE') {
+                        const node = document.getElementById(oldTag.id);
+                        if (node) node.remove();
+                        // Remove related connections locally to prevent ghost lines before next refresh
+                        State.connections = State.connections.filter(c => c.from_id !== oldTag.id && c.to_id !== oldTag.id);
+                        LineManager.render();
+                    }
+                })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'canvas_connections' }, payload => {
+                    const { eventType, new: newConn, old: oldConn } = payload;
+                    if (eventType === 'INSERT') {
+                        if (!State.connections.find(c => c.id === newConn.id)) {
+                            State.connections.push(newConn);
+                            LineManager.render();
+                        }
+                    } else if (eventType === 'DELETE') {
+                        State.connections = State.connections.filter(c => c.id !== oldConn.id);
+                        LineManager.render();
+                    } else if (eventType === 'UPDATE') {
+                        const idx = State.connections.findIndex(c => c.id === newConn.id);
+                        if (idx !== -1) {
+                            State.connections[idx] = newConn;
+                            LineManager.render();
+                        }
+                    }
+                })
+                .subscribe();
+
+            window.addEventListener('mousedown', e => {
+                if (e.target.closest('.tag')) return;
+                State.mouse.startTime = Date.now();
+                State.mouse.startX = e.clientX; State.mouse.startY = e.clientY;
+                State.mouse.lastX = e.clientX; State.mouse.lastY = e.clientY;
+                if (e.button === 1 || (e.button === 0 && (e.altKey || e.ctrlKey))) {
+                    State.interaction.isPanning = true; DOM.viewport.style.cursor = 'grabbing';
+                }
+            });
+
+            window.addEventListener('mousemove', e => {
+                const dx = e.clientX - State.mouse.lastX, dy = e.clientY - State.mouse.lastY;
+                if (State.interaction.isPanning) {
+                    State.transform.x += dx; State.transform.y += dy; updateMatrix();
+                } else if (State.interaction.isDragging && State.interaction.currentTag) {
+                    const spacePos = screenToSpace(e.clientX, e.clientY);
+                    const tagX = spacePos.x - State.interaction.dragOffset.x, tagY = spacePos.y - State.interaction.dragOffset.y;
+                    const moveDx = tagX - parseFloat(State.interaction.currentTag.dataset.x), moveDy = tagY - parseFloat(State.interaction.currentTag.dataset.y);
+
+                    State.interaction.selectedTags.forEach(t => {
+                        let nx = parseFloat(t.dataset.x) + moveDx;
+                        let ny = parseFloat(t.dataset.y) + moveDy;
+
+                        // Snap to grid if Ctrl is held (Grid size 40px)
+                        if (e.ctrlKey) {
+                            nx = Math.round(nx / 40) * 40;
+                            ny = Math.round(ny / 40) * 40;
+                        }
+
+                        t.style.left = `${nx}px`; t.style.top = `${ny}px`; t.dataset.x = nx; t.dataset.y = ny;
+                    });
+                    LineManager.render();
+                } else if (State.interaction.isLinking) {
+                    LineManager.render();
+                    LineManager.drawLine(State.interaction.linkingFrom, screenToSpace(e.clientX, e.clientY), true);
+                } else if (e.buttons === 1 && !State.interaction.isDragging && !State.interaction.isPanning) {
+                    Selection.update(e.clientX, e.clientY);
+                }
+                State.mouse.lastX = e.clientX; State.mouse.lastY = e.clientY;
+            });
+
+            window.addEventListener('mouseup', async e => {
+                const dur = Date.now() - State.mouse.startTime;
+                if (State.interaction.isPanning) {
+                    State.interaction.isPanning = false; DOM.viewport.style.cursor = 'crosshair';
+                } else if (State.interaction.isDragging) {
+                    State.interaction.isDragging = false;
+                    State.interaction.selectedTags.forEach(t => Tag.updatePos(t));
+                    State.interaction.currentTag.classList.remove('dragging');
+                    DOM.viewport.style.cursor = 'crosshair';
+                } else if (State.interaction.isLinking) {
+                    const tagUnderMouse = document.elementFromPoint(e.clientX, e.clientY)?.closest('.tag');
+                    if (tagUnderMouse && tagUnderMouse !== State.interaction.linkingFrom) {
+                        const fromId = State.interaction.linkingFrom.id;
+                        const toId = tagUnderMouse.id;
+                        const exists = State.connections.some(c => (c.from_id === fromId && c.to_id === toId) || (c.from_id === toId && c.to_id === fromId));
+                        if (!exists) {
+                            await SyncManager.wrap(_client.from('canvas_connections').insert({ from_id: fromId, to_id: toId }));
+                        }
+                    }
+                    State.interaction.isLinking = false; State.interaction.linkingFrom = null; LineManager.render();
+                } else if (State.interaction.isSelecting) {
+                    Selection.commit();
+                } else if (dur < 250 && e.target === DOM.viewport) {
+                    if (Date.now() - State.interaction.lastBlurTime > 200) {
+                        Tag.deselect();
+                        Input.show(e.clientX, e.clientY);
+                    }
+                } else if (dur < 250 && e.target.closest('.tag') && e.button === 2) {
+                    Menu.show(e.clientX, e.clientY, e.target.closest('.tag'));
+                }
+                Menu.hide();
+            });
+
+            DOM.viewport.addEventListener('wheel', e => {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                const newScale = Math.max(0.02, Math.min(State.transform.scale * delta, 8.0));
+                const rect = DOM.viewport.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left - rect.width / 2, mouseY = e.clientY - rect.top - rect.height / 2;
+                State.transform.x -= mouseX * (newScale / State.transform.scale - 1);
+                State.transform.y -= mouseY * (newScale / State.transform.scale - 1);
+                State.transform.scale = newScale; updateMatrix();
+            }, { passive: false });
+
+            DOM.input.addEventListener('keydown', e => {
+                if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+                if (e.key === 'Escape') { e.preventDefault(); Input.hide(); }
+            });
+            DOM.input.addEventListener('blur', () => {
+                State.interaction.lastBlurTime = Date.now();
+                if (DOM.input.style.display !== 'none') Input.save();
+            });
+
+            window.addEventListener('keydown', e => {
+                if ((e.key === 'Delete' || e.key === 'Backspace') && State.interaction.selectedTags.length > 0 && document.activeElement !== DOM.input) {
+                    State.interaction.selectedTags.forEach(async t => {
+                        await SyncManager.wrap(_client.from('canvas_nodes').delete().eq('id', t.id));
+                        t.remove();
+                    });
+                    State.interaction.selectedTags = []; LineManager.render();
+                }
+            });
+
+            document.getElementById('menuReset').addEventListener('click', () => {
+                State.transform = { x: 0, y: 0, scale: 1 }; updateMatrix(); Menu.hide();
+            });
+            document.getElementById('menuDelete').addEventListener('click', async () => {
+                const node = State.interaction.contextEntity;
+                if (node && State.interaction.contextType === 'node') {
+                    await SyncManager.wrap(_client.from('canvas_nodes').delete().eq('id', node.id));
+                    node.remove(); Tag.deselect(); LineManager.render();
+                }
+                Menu.hide();
+            });
+            document.addEventListener('contextmenu', e => e.preventDefault());
+            window.addEventListener('resize', updateMatrix);
+
+            // ========== Mobile Touch Support ==========
+            const TouchState = {
+                initialDistance: 0,
+                initialScale: 1,
+                initialCenter: { x: 0, y: 0 },
+                lastCenter: { x: 0, y: 0 },
+                isPinching: false,
+                isTwoFingerPanning: false,
+                startTime: 0,
+                lastTapTime: 0,
+                lastTapPos: { x: 0, y: 0 }
+            };
+
+            function getTouchDistance(touches) {
+                const dx = touches[0].clientX - touches[1].clientX;
+                const dy = touches[0].clientY - touches[1].clientY;
+                return Math.sqrt(dx * dx + dy * dy);
+            }
+
+            function getTouchCenter(touches) {
+                return {
+                    x: (touches[0].clientX + touches[1].clientX) / 2,
+                    y: (touches[0].clientY + touches[1].clientY) / 2
+                };
+            }
+
+            // Global touch handlers for viewport
+            DOM.viewport.addEventListener('touchstart', e => {
+                // Ignore if touching a tag (handled by tag's own listener)
+                if (e.target.closest('.tag')) return;
+
+                TouchState.startTime = Date.now();
+
+                if (e.touches.length === 1) {
+                    // Single finger - prepare for potential selection or tap
+                    const touch = e.touches[0];
+                    State.mouse.startX = touch.clientX;
+                    State.mouse.startY = touch.clientY;
+                    State.mouse.lastX = touch.clientX;
+                    State.mouse.lastY = touch.clientY;
+                    State.mouse.startTime = Date.now();
+                } else if (e.touches.length === 2) {
+                    e.preventDefault();
+                    // Two fingers - pinch/pan mode
+                    TouchState.isPinching = true;
+                    TouchState.isTwoFingerPanning = true;
+                    TouchState.initialDistance = getTouchDistance(e.touches);
+                    TouchState.initialScale = State.transform.scale;
+                    TouchState.initialCenter = getTouchCenter(e.touches);
+                    TouchState.lastCenter = TouchState.initialCenter;
+
+                    // Cancel any ongoing single-finger operations
+                    State.interaction.isDragging = false;
+                    State.interaction.isSelecting = false;
+                    DOM.selection.style.display = 'none';
+                }
+            }, { passive: false });
+
+            DOM.viewport.addEventListener('touchmove', e => {
+                if (e.touches.length === 2 && (TouchState.isPinching || TouchState.isTwoFingerPanning)) {
+                    e.preventDefault();
+
+                    const currentCenter = getTouchCenter(e.touches);
+                    const currentDistance = getTouchDistance(e.touches);
+
+                    // Pinch to zoom
+                    if (TouchState.isPinching) {
+                        const scaleRatio = currentDistance / TouchState.initialDistance;
+                        const newScale = Math.max(0.02, Math.min(TouchState.initialScale * scaleRatio, 8.0));
+
+                        // Zoom towards pinch center
+                        const rect = DOM.viewport.getBoundingClientRect();
+                        const centerX = TouchState.initialCenter.x - rect.left - rect.width / 2;
+                        const centerY = TouchState.initialCenter.y - rect.top - rect.height / 2;
+
+                        // Calculate new transform based on scale change from current scale
+                        const scaleDiff = newScale / State.transform.scale;
+                        State.transform.x -= centerX * (scaleDiff - 1);
+                        State.transform.y -= centerY * (scaleDiff - 1);
+                        State.transform.scale = newScale;
+                    }
+
+                    // Two-finger pan
+                    if (TouchState.isTwoFingerPanning) {
+                        const dx = currentCenter.x - TouchState.lastCenter.x;
+                        const dy = currentCenter.y - TouchState.lastCenter.y;
+                        State.transform.x += dx;
+                        State.transform.y += dy;
+                        TouchState.lastCenter = currentCenter;
+                    }
+
+                    updateMatrix();
+                } else if (e.touches.length === 1 && !e.target.closest('.tag')) {
+                    // Single finger pan (when not on a tag)
+                    const touch = e.touches[0];
+                    const dx = touch.clientX - State.mouse.lastX;
+                    const dy = touch.clientY - State.mouse.lastY;
+
+                    // Check if we moved enough to consider it a pan
+                    const totalDx = touch.clientX - State.mouse.startX;
+                    const totalDy = touch.clientY - State.mouse.startY;
+                    const totalDist = Math.sqrt(totalDx * totalDx + totalDy * totalDy);
+
+                    if (totalDist > 10) {
+                        State.interaction.isPanning = true;
+                        State.transform.x += dx;
+                        State.transform.y += dy;
+                        updateMatrix();
+                    }
+
+                    State.mouse.lastX = touch.clientX;
+                    State.mouse.lastY = touch.clientY;
+                } else if (e.touches.length === 1 && State.interaction.isDragging && State.interaction.currentTag) {
+                    // Single finger dragging a tag
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const spacePos = screenToSpace(touch.clientX, touch.clientY);
+                    const tagX = spacePos.x - State.interaction.dragOffset.x;
+                    const tagY = spacePos.y - State.interaction.dragOffset.y;
+                    const moveDx = tagX - parseFloat(State.interaction.currentTag.dataset.x);
+                    const moveDy = tagY - parseFloat(State.interaction.currentTag.dataset.y);
+
+                    State.interaction.selectedTags.forEach(t => {
+                        let nx = parseFloat(t.dataset.x) + moveDx;
+                        let ny = parseFloat(t.dataset.y) + moveDy;
+                        t.style.left = `${nx}px`;
+                        t.style.top = `${ny}px`;
+                        t.dataset.x = nx;
+                        t.dataset.y = ny;
+                    });
+                    LineManager.render();
+                }
+            }, { passive: false });
+
+            DOM.viewport.addEventListener('touchend', e => {
+                const duration = Date.now() - TouchState.startTime;
+
+                if (TouchState.isPinching || TouchState.isTwoFingerPanning) {
+                    // If still have one finger, don't immediately start new interaction
+                    if (e.touches.length < 2) {
+                        TouchState.isPinching = false;
+                        TouchState.isTwoFingerPanning = false;
+                        // Reset state for remaining touch if any
+                        if (e.touches.length === 1) {
+                            State.mouse.startX = e.touches[0].clientX;
+                            State.mouse.startY = e.touches[0].clientY;
+                            State.mouse.lastX = e.touches[0].clientX;
+                            State.mouse.lastY = e.touches[0].clientY;
+                            State.mouse.startTime = Date.now();
+                        }
+                    }
+                } else if (e.touches.length === 0) {
+                    // All fingers lifted
+                    if (State.interaction.isPanning) {
+                        State.interaction.isPanning = false;
+                    } else if (State.interaction.isDragging) {
+                        State.interaction.isDragging = false;
+                        State.interaction.selectedTags.forEach(t => Tag.updatePos(t));
+                        if (State.interaction.currentTag) {
+                            State.interaction.currentTag.classList.remove('dragging');
+                        }
+                    } else if (duration < 300 && !e.target.closest('.tag')) {
+                        // Quick tap - check for double tap
+                        const now = Date.now();
+                        const tapX = State.mouse.startX;
+                        const tapY = State.mouse.startY;
+                        const timeDiff = now - TouchState.lastTapTime;
+                        const posDiff = Math.sqrt(
+                            Math.pow(tapX - TouchState.lastTapPos.x, 2) +
+                            Math.pow(tapY - TouchState.lastTapPos.y, 2)
+                        );
+
+                        if (timeDiff < 400 && posDiff < 50) {
+                            // Double tap - create new node
+                            Tag.deselect();
+                            Input.show(tapX, tapY);
+                            TouchState.lastTapTime = 0; // Reset
+                        } else {
+                            // Single tap - record for potential double tap
+                            TouchState.lastTapTime = now;
+                            TouchState.lastTapPos = { x: tapX, y: tapY };
+                            // Also deselect on single tap on empty area
+                            Tag.deselect();
+                        }
+                    }
+                }
+            }, { passive: false });
+
+            // Prevent default touch behaviors
+            document.addEventListener('gesturestart', e => e.preventDefault(), { passive: false });
+            document.addEventListener('gesturechange', e => e.preventDefault(), { passive: false });
+            document.addEventListener('gestureend', e => e.preventDefault(), { passive: false });
+        }
+
+        bootstrap();
+    </script>
+</body>
+
+</html>

@@ -587,12 +587,13 @@
             box-shadow: 0 15px 35px rgba(0, 113, 227, 0.5);
         }
 
-        /* 状态标记 */
+        /* 状态标记 - 增强版 */
         .sync-status {
             width: 10px;
             height: 10px;
             border-radius: 50%;
             transition: all 0.3s;
+            cursor: pointer;
         }
 
         .sync-status.online {
@@ -605,9 +606,24 @@
             animation: pulse 1s infinite alternate;
         }
 
+        .sync-status.receiving {
+            background: #007aff;
+            animation: pulse-blue 0.5s infinite alternate;
+        }
+
         .sync-status.error {
             background: #ff3b30;
             box-shadow: 0 0 10px #ff3b30;
+        }
+
+        .sync-status.disconnected {
+            background: #8e8e93;
+            box-shadow: none;
+        }
+
+        .sync-status.connecting {
+            background: #ffcc00;
+            animation: pulse-yellow 1.5s infinite alternate;
         }
 
         @keyframes pulse {
@@ -619,6 +635,30 @@
             to {
                 transform: scale(1.5);
                 opacity: 0.5;
+            }
+        }
+
+        @keyframes pulse-blue {
+            from {
+                transform: scale(1);
+                box-shadow: 0 0 5px #007aff;
+            }
+
+            to {
+                transform: scale(1.3);
+                box-shadow: 0 0 15px #007aff;
+            }
+        }
+
+        @keyframes pulse-yellow {
+            from {
+                transform: scale(1);
+                opacity: 0.6;
+            }
+
+            to {
+                transform: scale(1.2);
+                opacity: 1;
             }
         }
 
@@ -1148,16 +1188,40 @@
             activeSyncs: 0,
             hasDataDates: new Set(),
             activeTags: new Set(),
-            sortBy: 'category' // 'category', 'custom_tags'
+            sortBy: 'category', // 'category', 'custom_tags'
+            fpIndex: null,  // flatpickr 实例引用
+            fpOrders: null,  // flatpickr 实例引用
+            realtimeConnected: false, // 实时连接状态
+            realtimeChannels: [], // 实时订阅通道
+            lastLocalUpdate: 0, // 最后本地更新时间戳，用于过滤自己的实时事件
+            skipRealtimeUntil: 0 // 跳过实时更新直到此时间戳
+        };
+
+        // 状态标题映射
+        const statusTitles = {
+            'online': '✓ 实时同步已连接',
+            'syncing': '↑ 正在上传数据...',
+            'receiving': '↓ 正在接收数据...',
+            'error': '✗ 同步失败，点击重试',
+            'disconnected': '○ 连接已断开，点击重连',
+            'connecting': '◐ 正在连接服务器...'
         };
 
         function setGlobalSyncStatus(s) {
             const els = document.querySelectorAll('.sync-status');
             els.forEach(el => {
-                el.classList.remove('online', 'syncing', 'error');
+                el.classList.remove('online', 'syncing', 'receiving', 'error', 'disconnected', 'connecting');
                 el.classList.add(s);
-                el.title = s === 'syncing' ? '同步中...' : (s === 'error' ? '同步失败' : '实时同步中');
+                el.title = statusTitles[s] || s;
             });
+        }
+
+        // 显示接收数据状态（短暂闪烁）
+        function showReceiving() {
+            setGlobalSyncStatus('receiving');
+            setTimeout(() => {
+                if (state.activeSyncs === 0) setGlobalSyncStatus('online');
+            }, 500);
         }
 
         function startSync() {
@@ -1169,25 +1233,28 @@
             state.activeSyncs = Math.max(0, state.activeSyncs - 1);
             if (err) {
                 setGlobalSyncStatus('error');
-                setTimeout(() => { if (state.activeSyncs === 0) setGlobalSyncStatus('online'); }, 3000);
+                setTimeout(() => { if (state.activeSyncs === 0 && state.realtimeConnected) setGlobalSyncStatus('online'); }, 3000);
             } else if (state.activeSyncs === 0) {
-                setGlobalSyncStatus('online');
+                setGlobalSyncStatus(state.realtimeConnected ? 'online' : 'disconnected');
             }
         }
 
         async function init() {
+            setGlobalSyncStatus('connecting'); // 初始状态：正在连接
+
             await fetchProducts();
             await fetchCart();
             renderCategories();
             renderTags();
             renderProducts();
             setupRealtime();
+            setupStatusIndicatorClick(); // 添加状态指示灯点击事件
 
             const onDateChange = async (selectedDates, dateStr) => {
                 state.currentDate = dateStr;
                 // 更新所有日期输入框的值
-                fpIndex.setDate(dateStr, false);
-                fpOrders.setDate(dateStr, false);
+                if (state.fpIndex) state.fpIndex.setDate(dateStr, false);
+                if (state.fpOrders) state.fpOrders.setDate(dateStr, false);
 
                 await fetchCart();
                 renderProducts();
@@ -1238,12 +1305,12 @@
                 }
             };
 
-            const fpIndex = flatpickr("#dateInputIndex", fpConfig);
-            const fpOrders = flatpickr("#dateInput", fpConfig);
+            state.fpIndex = flatpickr("#dateInputIndex", fpConfig);
+            state.fpOrders = flatpickr("#dateInput", fpConfig);
 
             // 初始获取有数据的日期并标记
-            updateHasDataMarkers(fpIndex);
-            updateHasDataMarkers(fpOrders);
+            updateHasDataMarkers(state.fpIndex);
+            updateHasDataMarkers(state.fpOrders);
 
             document.getElementById('searchInput').oninput = e => { state.searchQuery = e.target.value.trim(); renderProducts(); };
             document.getElementById('adminSearchInput').oninput = e => { state.adminSearch = e.target.value.trim(); renderAdminTable(); };
@@ -1283,13 +1350,18 @@
             startSync();
             try {
                 state.orders = {};
-                const isToday = (state.currentDate === getLocalBusinessDate());
                 let errorOccurred = false;
-                if (isToday) {
-                    const { data, error } = await sb.from('jlhcdh_cart').select('*');
-                    if (data) data.forEach(i => state.orders[i.product_id] = { qty: parseFloat(i.quantity), purchased: i.is_purchased });
-                    errorOccurred = !!error;
+
+                // 首先尝试从购物车表按日期加载
+                const { data: cartData, error: cartError } = await sb.from('jlhcdh_cart')
+                    .select('*')
+                    .eq('order_date', state.currentDate);
+
+                if (cartData && cartData.length > 0) {
+                    cartData.forEach(i => state.orders[i.product_id] = { qty: parseFloat(i.quantity), purchased: i.is_purchased });
+                    errorOccurred = !!cartError;
                 } else {
+                    // 购物车中无该日期数据，尝试从历史订单表加载
                     const start = `${state.currentDate}T00:00:00+08:00`;
                     const end = `${state.currentDate}T23:59:59+08:00`;
                     const { data, error } = await sb.from('jlhcdh_orders')
@@ -1316,20 +1388,33 @@
 
         async function fetchHistoryDates() {
             try {
-                // 获取近 30 天的有数据的记录
-                const { data } = await sb.from('jlhcdh_orders')
+                // 从历史订单表获取近 30 天有数据的日期
+                const { data: ordersData } = await sb.from('jlhcdh_orders')
                     .select('created_at')
                     .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
 
-                if (data) {
-                    data.forEach(item => {
-                        const date = item.created_at.split('T')[0];
+                if (ordersData) {
+                    ordersData.forEach(item => {
+                        // 将 UTC 时间转换为本地日期 (UTC+8)
+                        const utcDate = new Date(item.created_at);
+                        const localDate = new Date(utcDate.getTime() + 8 * 60 * 60 * 1000);
+                        const y = localDate.getUTCFullYear();
+                        const m = String(localDate.getUTCMonth() + 1).padStart(2, '0');
+                        const d = String(localDate.getUTCDate()).padStart(2, '0');
+                        const date = `${y}-${m}-${d}`;
                         state.hasDataDates.add(date);
                     });
                 }
-                // 今天的数据从 cart 表获取
-                const { count } = await sb.from('jlhcdh_cart').select('*', { count: 'exact', head: true });
-                if (count > 0) state.hasDataDates.add(getLocalBusinessDate());
+
+                // 从购物车表获取所有有数据的日期
+                const { data: cartDates } = await sb.from('jlhcdh_cart')
+                    .select('order_date');
+                if (cartDates) {
+                    const uniqueDates = [...new Set(cartDates.map(c => c.order_date))];
+                    uniqueDates.forEach(date => {
+                        if (date) state.hasDataDates.add(date);
+                    });
+                }
             } catch (e) { console.error('Failed to fetch history dates', e); }
         }
 
@@ -1364,85 +1449,114 @@
             const isPurchased = state.orders[productId]?.purchased || false;
             updateSyncUI(productId, 'syncing');
             syncTimeouts[productId] = setTimeout(async () => {
+                // 设置跳过实时事件的时间窗口（500ms内忽略自己的事件）
+                state.skipRealtimeUntil = Date.now() + 500;
+
                 startSync();
                 try {
-                    if (targetDate === getLocalBusinessDate()) {
-                        await sb.from('jlhcdh_cart').delete().eq('product_id', productId);
-                        if (quantity > 0) await sb.from('jlhcdh_cart').insert({ product_id: productId, quantity, is_purchased: isPurchased });
+                    if (quantity > 0) {
+                        // 使用 upsert：存在则更新，不存在则插入
+                        await sb.from('jlhcdh_cart').upsert({
+                            product_id: productId,
+                            quantity,
+                            is_purchased: isPurchased,
+                            order_date: targetDate,
+                            updated_at: new Date().toISOString()
+                        }, {
+                            onConflict: 'product_id,order_date' // 基于唯一约束
+                        });
                     } else {
-                        const start = `${targetDate}T00:00:00+08:00`;
-                        const end = `${targetDate}T23:59:59+08:00`;
-                        const { data } = await sb.from('jlhcdh_orders').select('*').gte('created_at', start).lte('created_at', end).order('created_at', { ascending: false });
-                        const rec = data?.[0];
-                        if (rec) {
-                            let items = rec.order_data.order_data || [];
-                            const idx = items.findIndex(i => i.id === productId);
-                            if (idx > -1) {
-                                if (quantity > 0) {
-                                    items[idx].qty = quantity;
-                                    items[idx].is_purchased = isPurchased;
-                                } else items.splice(idx, 1);
-                            } else if (quantity > 0) {
-                                const p = state.products.find(x => x.id === productId);
-                                items.push({ ...p, qty: quantity, is_purchased: isPurchased });
-                            }
-                            await sb.from('jlhcdh_orders').update({ order_data: { ...rec.order_data, order_data: items } }).eq('id', rec.id);
-                        }
+                        // 只有数量为0时才删除
+                        await sb.from('jlhcdh_cart')
+                            .delete()
+                            .eq('product_id', productId)
+                            .eq('order_date', targetDate);
                     }
                     updateSyncUI(productId, 'saved');
                     setTimeout(() => updateSyncUI(productId, null), 1000);
                     endSync();
                 } catch (e) {
+                    console.error('同步失败:', e);
                     updateSyncUI(productId, 'error');
                     endSync(true);
                 }
-            }, 300);
+            }, 100); // 减少 debounce 延迟提高实时性
         }
 
         window.togglePurchased = async (id, checked) => {
             if (state.orders[id]) {
+                // 设置跳过实时事件的时间窗口（500ms内忽略自己的事件）
+                state.skipRealtimeUntil = Date.now() + 500;
+
                 state.orders[id].purchased = checked;
+
+                // 增量更新 UI：只更新相关元素的样式，不刷新整个列表
+                const aggItem = document.querySelector(`#check-${id}`)?.closest('.agg-item');
+                if (aggItem) {
+                    aggItem.classList.toggle('checked', checked);
+                }
+                // 同时更新 cartItems 状态
+                const cartItem = state.cartItems.find(item => item.id === id);
+                if (cartItem) cartItem.is_purchased = checked;
+
                 updateSyncUI(id, 'syncing', true);
                 startSync();
                 try {
-                    if (state.currentDate === getLocalBusinessDate()) {
-                        await sb.from('jlhcdh_cart').update({ is_purchased: checked }).eq('product_id', id);
-                    } else {
-                        await syncToSupabaseAsync(id, state.orders[id].qty, checked);
-                    }
+                    // 使用 order_date 精确更新
+                    await sb.from('jlhcdh_cart')
+                        .update({
+                            is_purchased: checked,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('product_id', id)
+                        .eq('order_date', state.currentDate);
                     updateSyncUI(id, 'saved', true);
                     setTimeout(() => updateSyncUI(id, null, true), 1000);
                     endSync();
                 } catch (e) {
+                    // 同步失败时回滚 UI
+                    state.orders[id].purchased = !checked;
+                    if (cartItem) cartItem.is_purchased = !checked;
+                    if (aggItem) aggItem.classList.toggle('checked', !checked);
+                    const checkbox = document.getElementById(`check-${id}`);
+                    if (checkbox) checkbox.checked = !checked;
+
                     updateSyncUI(id, 'error', true);
                     endSync(true);
+                    showToast('同步失败，已回滚');
                 }
-                setTimeout(() => fetchDayData(), 300);
             }
         };
 
-        // 辅助历史同步函数，避免与 debounce 的 syncToSupabase 冲突
-        async function syncToSupabaseAsync(productId, quantity, isPurchased) {
+        // 删除购物车项目
+        window.deleteCartItem = async (id) => {
+            if (!confirm('确定要删除此项吗？')) return;
+
+            // 设置跳过实时事件的时间窗口（2秒内忽略自己的事件）
+            state.skipRealtimeUntil = Date.now() + 2000;
+
+            // 更新本地状态
+            delete state.orders[id];
+            updateFooter();
+
+            // 同步到数据库
             startSync();
             try {
-                const targetDate = state.currentDate;
-                const start = `${targetDate}T00:00:00+08:00`;
-                const end = `${targetDate}T23:59:59+08:00`;
-                const { data } = await sb.from('jlhcdh_orders').select('*').gte('created_at', start).lte('created_at', end).order('created_at', { ascending: false });
-                const rec = data?.[0];
-                if (rec) {
-                    let items = rec.order_data.order_data || [];
-                    const idx = items.findIndex(i => i.id === productId);
-                    if (idx > -1) {
-                        items[idx].qty = quantity;
-                        items[idx].is_purchased = isPurchased;
-                    }
-                    await sb.from('jlhcdh_orders').update({ order_data: { ...rec.order_data, order_data: items } }).eq('id', rec.id);
-                }
+                await sb.from('jlhcdh_cart')
+                    .delete()
+                    .eq('product_id', id)
+                    .eq('order_date', state.currentDate);
+                showToast('已删除');
                 endSync();
-            } catch (e) { endSync(true); }
-        }
+            } catch (e) {
+                showToast('删除失败');
+                endSync(true);
+            }
 
+            // 刷新显示
+            fetchDayData();
+            renderProducts();
+        };
         function renderAdminTable() {
             const cats = [...new Set(state.products.map(p => p.category))];
             document.getElementById('adminCatFilter').innerHTML = '<option value="全部">全部品类</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
@@ -1585,12 +1699,15 @@
                         <span class="agg-name">${item.name}</span>
                     </div>
                     <div class="agg-qty-group">
-                        ${state.editMode && state.currentDate === getLocalBusinessDate() ? `
+                        ${state.editMode ? `
                             <div class="qty-control" style="margin-right:10px; scale:0.9;">
                                 <button class="icon-btn" style="width:28px;height:28px;background:none;" onclick="updateQty(${item.id}, -1); fetchDayData();">－</button>
                                 <input type="number" class="card-input-small" style="width:45px;text-align:center;background:none;padding:0;" value="${item.qty}" onchange="onQtyChange(${item.id}, this.value); fetchDayData();">
                                 <button class="icon-btn" style="width:28px;height:28px;background:none;" onclick="updateQty(${item.id}, 1); fetchDayData();">+</button>
                             </div>
+                            <button class="btn-delete-icon" style="margin-right:8px;" onclick="deleteCartItem(${item.id})" title="删除">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
                         ` : `
                             <span class="agg-qty">${item.qty}</span>
                         `}
@@ -1702,18 +1819,268 @@
         }
 
         window.toggleFav = async id => {
+            // 设置跳过实时事件的时间窗口
+            state.skipRealtimeUntil = Date.now() + 2000;
+
             const p = state.products.find(x => x.id === id);
             p.is_favorite = !p.is_favorite;
-            renderProducts();
+
+            // 增量更新 UI：只更新收藏按钮状态
+            const favBtn = document.querySelector(`.product-card[data-id="${id}"] .fav-btn`);
+            if (favBtn) {
+                const icon = favBtn.querySelector('i');
+                if (icon) {
+                    icon.className = p.is_favorite ? 'fas fa-star' : 'far fa-star';
+                }
+            }
+
             startSync();
             try {
                 const { error } = await sb.from('jlhcdh_products').update({ is_favorite: p.is_favorite }).eq('id', id);
                 endSync(!!error);
-            } catch (e) { endSync(true); }
+            } catch (e) {
+                // 回滚
+                p.is_favorite = !p.is_favorite;
+                if (favBtn) {
+                    const icon = favBtn.querySelector('i');
+                    if (icon) icon.className = p.is_favorite ? 'fas fa-star' : 'far fa-star';
+                }
+                endSync(true);
+            }
         };
 
         function setupRealtime() {
-            sb.channel('cart_sync').on('postgres_changes', { event: '*', schema: 'public', table: 'jlhcdh_cart' }, () => fetchCart()).subscribe();
+            setGlobalSyncStatus('connecting');
+
+            // 创建统一的实时订阅通道
+            const channel = sb.channel('realtime_sync', {
+                config: {
+                    broadcast: { self: false } // 不接收自己发送的消息
+                }
+            });
+
+            // 监听购物车变化
+            channel.on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'jlhcdh_cart'
+            }, async (payload) => {
+                const now = Date.now();
+
+                // 如果在跳过时间窗口内，忽略此事件（自己的操作触发的）
+                if (now < state.skipRealtimeUntil) {
+                    console.log('📦 跳过自己的实时事件');
+                    return;
+                }
+
+                console.log('📦 收到远程购物车变化:', payload.eventType, payload.new || payload.old);
+                showReceiving();
+
+                // 获取变化数据的日期
+                const changedDate = payload.new?.order_date || payload.old?.order_date;
+                const changedProductId = payload.new?.product_id || payload.old?.product_id;
+
+                // 只有当变化的日期匹配当前选择的日期时，才处理
+                if (changedDate === state.currentDate) {
+                    // 增量更新：只更新变化的商品，不重新加载整个列表
+                    if (payload.eventType === 'UPDATE' && payload.new) {
+                        // 更新本地状态
+                        if (state.orders[changedProductId]) {
+                            state.orders[changedProductId].qty = parseFloat(payload.new.quantity);
+                            state.orders[changedProductId].purchased = payload.new.is_purchased;
+                        }
+
+                        // 更新 cartItems 状态
+                        const cartItem = state.cartItems.find(item => item.id === changedProductId);
+                        if (cartItem) {
+                            cartItem.qty = parseFloat(payload.new.quantity);
+                            cartItem.is_purchased = payload.new.is_purchased;
+                        }
+
+                        // 增量更新首页 UI（产品卡片）
+                        const qtyInput = document.querySelector(`.product-card[data-id="${changedProductId}"] input`);
+                        if (qtyInput && document.activeElement !== qtyInput) {
+                            qtyInput.value = payload.new.quantity;
+                        }
+
+                        // 增量更新核对页 UI（聚合列表）
+                        const checkbox = document.getElementById(`check-${changedProductId}`);
+                        if (checkbox) {
+                            checkbox.checked = payload.new.is_purchased;
+                            const aggItem = checkbox.closest('.agg-item');
+                            if (aggItem) {
+                                aggItem.classList.toggle('checked', payload.new.is_purchased);
+                                // 更新数量显示
+                                const qtySpan = aggItem.querySelector('.agg-qty');
+                                if (qtySpan) qtySpan.textContent = payload.new.quantity;
+                                const qtyInputAgg = aggItem.querySelector('.qty-control input');
+                                if (qtyInputAgg && document.activeElement !== qtyInputAgg) {
+                                    qtyInputAgg.value = payload.new.quantity;
+                                }
+                            }
+                        }
+
+                        // 更新底部计数
+                        updateFooter();
+                    } else {
+                        // INSERT 或 DELETE 需要重新加载
+                        await fetchCart();
+                        renderProducts();
+                        if (document.getElementById('ordersPage').classList.contains('active')) {
+                            fetchDayData();
+                        }
+                    }
+                }
+
+                // 日历标记始终更新
+                await refreshCalendarMarkers();
+            });
+
+            // 监听产品变化
+            channel.on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'jlhcdh_products'
+            }, async (payload) => {
+                const now = Date.now();
+
+                // 如果在跳过时间窗口内，忽略此事件
+                if (now < state.skipRealtimeUntil) {
+                    console.log('🏷️ 跳过自己的产品变更事件');
+                    return;
+                }
+
+                console.log('🏷️ 收到远程产品变化:', payload.eventType, payload.new || payload.old);
+                showReceiving();
+
+                const changedProductId = payload.new?.id || payload.old?.id;
+
+                if (payload.eventType === 'UPDATE' && payload.new) {
+                    // 增量更新：更新本地产品数据
+                    const productIndex = state.products.findIndex(p => p.id === changedProductId);
+                    if (productIndex > -1) {
+                        // 保留 pinyin 字段，更新其他字段
+                        const oldPinyin = state.products[productIndex].pinyin;
+                        state.products[productIndex] = {
+                            ...payload.new,
+                            pinyin: oldPinyin || (window.pinyinPro ? window.pinyinPro.pinyin(payload.new.name, { pattern: 'first', toneType: 'none' }).replace(/\s/g, '') : '')
+                        };
+
+                        // 更新 UI 中对应的产品卡片
+                        const card = document.querySelector(`.product-card[data-id="${changedProductId}"]`);
+                        if (card) {
+                            const nameEl = card.querySelector('.product-name');
+                            if (nameEl) nameEl.textContent = payload.new.name;
+                            const unitEl = card.querySelector('span[style*="margin-left:8px"]');
+                            if (unitEl) unitEl.textContent = payload.new.unit || '斤';
+                        }
+
+                        // 更新核对页中的名称
+                        const aggName = document.querySelector(`.agg-item #check-${changedProductId}`)?.closest('.agg-item')?.querySelector('.agg-name');
+                        if (aggName) aggName.textContent = payload.new.name;
+
+                        // 如果有分类或标签变化，需要刷新分类和标签列表
+                        renderCategories();
+                        renderTags();
+                    }
+
+                    // 管理后台如果打开则刷新
+                    if (document.getElementById('adminPage').classList.contains('active')) {
+                        renderAdminTable();
+                    }
+                } else {
+                    // INSERT 或 DELETE 需要完全重新加载
+                    await fetchProducts();
+                    renderProducts();
+                    renderCategories();
+                    renderTags();
+                    if (document.getElementById('adminPage').classList.contains('active')) {
+                        renderAdminTable();
+                    }
+                }
+            });
+
+            // 监听历史订单变化
+            channel.on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'jlhcdh_orders'
+            }, async (payload) => {
+                console.log('📋 订单数据变化:', payload.eventType);
+                showReceiving();
+                await refreshCalendarMarkers();
+                // 如果变化的日期是当前选择的日期，重新加载
+                if (document.getElementById('ordersPage').classList.contains('active')) {
+                    await fetchCart();
+                    fetchDayData();
+                }
+            });
+
+            // 订阅并监听连接状态
+            channel.subscribe((status) => {
+                console.log('🔌 实时连接状态:', status);
+                if (status === 'SUBSCRIBED') {
+                    state.realtimeConnected = true;
+                    setGlobalSyncStatus('online');
+                    console.log('✅ 实时订阅已建立');
+                } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+                    state.realtimeConnected = false;
+                    setGlobalSyncStatus('disconnected');
+                    console.log('❌ 实时连接已断开，尝试重连...');
+                    // 5秒后尝试重连
+                    setTimeout(() => {
+                        if (!state.realtimeConnected) {
+                            reconnectRealtime();
+                        }
+                    }, 5000);
+                }
+            });
+
+            state.realtimeChannels.push(channel);
+        }
+
+        // 重新连接实时订阅
+        async function reconnectRealtime() {
+            console.log('🔄 正在重新连接...');
+            setGlobalSyncStatus('connecting');
+
+            // 移除旧订阅
+            for (const ch of state.realtimeChannels) {
+                await sb.removeChannel(ch);
+            }
+            state.realtimeChannels = [];
+
+            // 重新建立订阅
+            setupRealtime();
+
+            // 同时刷新所有数据
+            await fetchProducts();
+            await fetchCart();
+            await refreshCalendarMarkers();
+            renderProducts();
+            renderCategories();
+            renderTags();
+        }
+
+        // 给状态指示灯添加点击事件（点击重连）
+        function setupStatusIndicatorClick() {
+            document.querySelectorAll('.sync-status').forEach(el => {
+                el.onclick = async () => {
+                    if (!state.realtimeConnected || el.classList.contains('error') || el.classList.contains('disconnected')) {
+                        showToast('正在重新连接...');
+                        await reconnectRealtime();
+                    } else {
+                        showToast(el.title);
+                    }
+                };
+            });
+        }
+
+        // 刷新日历标记的辅助函数
+        async function refreshCalendarMarkers() {
+            await fetchHistoryDates();
+            if (state.fpIndex) state.fpIndex.redraw();
+            if (state.fpOrders) state.fpOrders.redraw();
         }
 
         function getLocalBusinessDate() {
