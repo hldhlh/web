@@ -1825,27 +1825,30 @@
             const p = state.products.find(x => x.id === id);
             p.is_favorite = !p.is_favorite;
 
-            // 增量更新 UI：只更新收藏按钮状态
-            const favBtn = document.querySelector(`.product-card[data-id="${id}"] .fav-btn`);
-            if (favBtn) {
-                const icon = favBtn.querySelector('i');
+            // 增量更新 UI：更新收藏图标状态
+            const favIcon = document.querySelector(`.product-card[data-id="${id}"] .fav-icon`);
+            if (favIcon) {
+                favIcon.classList.toggle('active', p.is_favorite);
+                const icon = favIcon.querySelector('i');
                 if (icon) {
-                    icon.className = p.is_favorite ? 'fas fa-star' : 'far fa-star';
+                    icon.className = p.is_favorite ? 'fas fa-star' : 'fas fa-star'; // 保持实心，通过颜色区分
                 }
             }
 
             startSync();
             try {
                 const { error } = await sb.from('jlhcdh_products').update({ is_favorite: p.is_favorite }).eq('id', id);
-                endSync(!!error);
+                if (error) throw error;
+                endSync(false);
             } catch (e) {
-                // 回滚
+                console.error('收藏同步失败:', e);
+                // 失败时回滚
                 p.is_favorite = !p.is_favorite;
-                if (favBtn) {
-                    const icon = favBtn.querySelector('i');
-                    if (icon) icon.className = p.is_favorite ? 'fas fa-star' : 'far fa-star';
+                if (favIcon) {
+                    favIcon.classList.toggle('active', p.is_favorite);
                 }
                 endSync(true);
+                showToast('收藏失败');
             }
         };
 
@@ -1966,22 +1969,36 @@
                             pinyin: oldPinyin || (window.pinyinPro ? window.pinyinPro.pinyin(payload.new.name, { pattern: 'first', toneType: 'none' }).replace(/\s/g, '') : '')
                         };
 
-                        // 更新 UI 中对应的产品卡片
+                        // 获取产品卡片
                         const card = document.querySelector(`.product-card[data-id="${changedProductId}"]`);
                         if (card) {
-                            const nameEl = card.querySelector('.product-name');
-                            if (nameEl) nameEl.textContent = payload.new.name;
+                            // 更新名称
+                            const nameEl = card.querySelector('.product-name') || card.querySelector('div[style*="font-weight:700"]');
+                            if (nameEl) nameEl.childNodes[0].textContent = payload.new.name + ' ';
+
+                            // 更新单位
                             const unitEl = card.querySelector('span[style*="margin-left:8px"]');
                             if (unitEl) unitEl.textContent = payload.new.unit || '斤';
+
+                            // 关键：实时同步收藏状态
+                            const favIcon = card.querySelector('.fav-icon');
+                            if (favIcon) {
+                                favIcon.classList.toggle('active', !!payload.new.is_favorite);
+                                const icon = favIcon.querySelector('i');
+                                if (icon) icon.className = payload.new.is_favorite ? 'fas fa-star' : 'fas fa-star';
+                            }
                         }
 
                         // 更新核对页中的名称
                         const aggName = document.querySelector(`.agg-item #check-${changedProductId}`)?.closest('.agg-item')?.querySelector('.agg-name');
                         if (aggName) aggName.textContent = payload.new.name;
 
-                        // 如果有分类或标签变化，需要刷新分类和标签列表
-                        renderCategories();
-                        renderTags();
+                        // 如果有分类、标签或收藏状态变化，可能需要重新过滤列表
+                        if (state.onlyFavorites || state.currentCategory !== '全部' || state.activeTags.size > 0) {
+                            // 延迟一小会儿刷新，避免频繁抖动
+                            clearTimeout(window.renderTimer);
+                            window.renderTimer = setTimeout(renderProducts, 300);
+                        }
                     }
 
                     // 管理后台如果打开则刷新
@@ -2081,6 +2098,12 @@
             await fetchHistoryDates();
             if (state.fpIndex) state.fpIndex.redraw();
             if (state.fpOrders) state.fpOrders.redraw();
+            // 在状态栏旁边显示一个小提示
+            const statusEl = document.getElementById('syncStatus');
+            if (statusEl) {
+                statusEl.classList.add('receiving');
+                setTimeout(() => statusEl.classList.remove('receiving'), 1000);
+            }
         }
 
         function getLocalBusinessDate() {
