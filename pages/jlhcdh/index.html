@@ -1857,6 +1857,10 @@
                     if (document.getElementById('adminPage').classList.contains('active')) {
                         renderAdminTable();
                     }
+                    // 如果订货核对页面打开，也刷新它
+                    if (document.getElementById('ordersPage').classList.contains('active')) {
+                        fetchDayData();
+                    }
                 }
                 endSync(!!error);
             } catch (e) {
@@ -1892,6 +1896,10 @@
                     renderTags();
                     if (document.getElementById('adminPage').classList.contains('active')) {
                         renderAdminTable();
+                    }
+                    // 如果订货核对页面打开，也刷新它
+                    if (document.getElementById('ordersPage').classList.contains('active')) {
+                        fetchDayData();
                     }
                 }
                 endSync(!!error);
@@ -1978,6 +1986,15 @@
 
         function renderTags() {
             const allTags = [...new Set(state.products.flatMap(p => p.tags || []))];
+
+            // 清理已不存在的activeTags，防止筛选结果为空
+            const tagsToRemove = [];
+            state.activeTags.forEach(tag => {
+                if (!allTags.includes(tag)) {
+                    tagsToRemove.push(tag);
+                }
+            });
+            tagsToRemove.forEach(tag => state.activeTags.delete(tag));
             const container = document.getElementById('tagFilterList');
             const titles = document.querySelectorAll('.filter-section-title');
 
