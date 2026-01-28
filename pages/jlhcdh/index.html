@@ -17,6 +17,8 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh.js"></script>
+    <!-- html2canvas for export -->
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <style>
         /* 全局变量与 Apple 风格重塑 */
         :root {
@@ -32,6 +34,53 @@
             --radius-md: 14px;
             --shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
             --blur: 15px;
+            --card-bg: white;
+            --input-bg: rgba(0, 0, 0, 0.04);
+        }
+
+        /* 深色模式 */
+        body.dark-mode {
+            --bg-gradient: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            --glass-bg: rgba(30, 30, 50, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-main: #f5f5f7;
+            --text-sub: #a1a1a6;
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            --card-bg: rgba(40, 40, 60, 0.9);
+            --input-bg: rgba(255, 255, 255, 0.08);
+        }
+
+        body.dark-mode .modal-card {
+            background: var(--card-bg);
+        }
+
+        body.dark-mode .cat-btn {
+            background: var(--glass-bg);
+            color: var(--text-sub);
+        }
+
+        body.dark-mode .tag-chip {
+            background: var(--glass-bg);
+            color: var(--text-sub);
+        }
+
+        body.dark-mode .search-box input,
+        body.dark-mode .admin-input-flat,
+        body.dark-mode .card-input-small,
+        body.dark-mode .card-input-main {
+            color: var(--text-main);
+        }
+
+        body.dark-mode .card-input-small {
+            background: var(--input-bg);
+        }
+
+        body.dark-mode .flatpickr-calendar {
+            background: var(--glass-bg) !important;
+        }
+
+        body.dark-mode .flatpickr-day {
+            color: var(--text-main) !important;
         }
 
         * {
@@ -1040,6 +1089,122 @@
                 /* 移动端采用更节省空间的略方圆角 */
             }
         }
+
+        /* 快捷操作栏 */
+        .quick-actions {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+
+        .quick-actions::-webkit-scrollbar {
+            display: none;
+        }
+
+        .quick-action-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border-radius: 20px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--blur));
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-action-btn:hover {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .quick-action-btn i {
+            font-size: 12px;
+        }
+
+        .quick-action-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* 批量操作进度条 */
+        .batch-progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            background: var(--primary);
+            z-index: 9999;
+            transition: width 0.3s;
+        }
+
+        /* 导出预览容器 */
+        .export-preview {
+            position: fixed;
+            left: -9999px;
+            top: 0;
+            background: white;
+            padding: 24px;
+            width: 400px;
+        }
+
+        .export-preview .export-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #0071e3;
+        }
+
+        .export-preview .export-title {
+            font-size: 22px;
+            font-weight: 800;
+            color: #1d1d1f;
+            margin-bottom: 4px;
+        }
+
+        .export-preview .export-date {
+            font-size: 14px;
+            color: #86868b;
+        }
+
+        .export-preview .export-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .export-preview .export-item:last-child {
+            border-bottom: none;
+        }
+
+        .export-preview .export-name {
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .export-preview .export-qty {
+            font-weight: 700;
+            color: #0071e3;
+        }
+
+        .export-preview .export-footer {
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid #eee;
+            text-align: center;
+            font-size: 12px;
+            color: #86868b;
+        }
     </style>
 </head>
 
@@ -1053,6 +1218,8 @@
                     <h1>今岭每日订货表</h1>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
+                    <button id="darkModeBtn" onclick="toggleDarkMode()" class="icon-btn" title="切换深色模式"><i
+                            class="fas fa-moon"></i></button>
                     <div class="date-picker-container" id="datePickerIndex">
                         <i class="far fa-calendar-alt"></i>
                         <input type="text" id="dateInputIndex" readonly>
@@ -1072,6 +1239,15 @@
                 <button id="sortBtn" class="icon-btn" title="排序方式"><i class="fas fa-sort-amount-down"></i></button>
                 <button id="filterFavBtn" class="icon-btn"><i class="far fa-star"></i></button>
             </div>
+        </div>
+        <!-- 快捷操作栏 -->
+        <div class="quick-actions">
+            <button class="quick-action-btn" onclick="copyYesterdayOrder()">
+                <i class="fas fa-copy"></i> 复制昨日订单
+            </button>
+            <button class="quick-action-btn" onclick="clearTodayOrder()">
+                <i class="fas fa-eraser"></i> 清空今日
+            </button>
         </div>
         <div class="filter-section-title"><i class="fas fa-tags"></i> 常用标签</div>
         <div id="tagFilterList" class="tag-row"></div>
@@ -1099,6 +1275,18 @@
                 </div>
             </div>
         </header>
+        <!-- 快捷操作栏 -->
+        <div class="quick-actions">
+            <button class="quick-action-btn" onclick="batchSelectAll()">
+                <i class="fas fa-check-double"></i> 全部勾选
+            </button>
+            <button class="quick-action-btn" onclick="batchDeselectAll()">
+                <i class="fas fa-times"></i> 全部取消
+            </button>
+            <button class="quick-action-btn" onclick="exportOrderImage()">
+                <i class="fas fa-image"></i> 导出图片
+            </button>
+        </div>
         <main class="admin-main">
             <div id="summaryTotalBar" class="total-bar"
                 style="display:none; margin-top: 20px; justify-content: center;">
@@ -1202,6 +1390,21 @@
         </div>
     </div>
     <div id="toast" class="toast"></div>
+
+    <!-- 批量操作进度条 -->
+    <div id="batchProgress" class="batch-progress" style="width: 0%;"></div>
+
+    <!-- 导出预览容器 -->
+    <div id="exportPreview" class="export-preview">
+        <div class="export-header">
+            <div class="export-title">今岭订货单</div>
+            <div class="export-date" id="exportDate"></div>
+        </div>
+        <div id="exportItems"></div>
+        <div class="export-footer">
+            生成时间: <span id="exportTime"></span>
+        </div>
+    </div>
 
     <script>
         const SB_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
@@ -2414,6 +2617,298 @@
             const el = document.getElementById('selectedCount');
             if (el) el.innerText = Object.keys(state.orders).length;
         }
+
+        // ========== 深色模式功能 ==========
+        function toggleDarkMode() {
+            const isDark = document.body.classList.toggle('dark-mode');
+            localStorage.setItem('darkMode', isDark ? 'true' : 'false');
+            updateDarkModeIcon();
+            showToast(isDark ? '已切换到深色模式' : '已切换到浅色模式');
+        }
+
+        function updateDarkModeIcon() {
+            const btn = document.getElementById('darkModeBtn');
+            if (btn) {
+                const icon = btn.querySelector('i');
+                if (document.body.classList.contains('dark-mode')) {
+                    icon.className = 'fas fa-sun';
+                } else {
+                    icon.className = 'fas fa-moon';
+                }
+            }
+        }
+
+        function initDarkMode() {
+            if (localStorage.getItem('darkMode') === 'true') {
+                document.body.classList.add('dark-mode');
+            }
+            updateDarkModeIcon();
+        }
+
+        // ========== 复制昨日订单 ==========
+        async function copyYesterdayOrder() {
+            // 计算昨天的日期
+            const today = new Date(state.currentDate);
+            today.setDate(today.getDate() - 1);
+            const yesterdayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+            showToast('正在获取昨日订单...');
+            startSync();
+
+            try {
+                // 从购物车表获取昨日数据
+                const { data: cartData, error: cartError } = await sb.from('jlhcdh_cart')
+                    .select('*')
+                    .eq('order_date', yesterdayStr);
+
+                if (cartError) throw cartError;
+
+                if (!cartData || cartData.length === 0) {
+                    showToast('昨日没有订货记录');
+                    endSync();
+                    return;
+                }
+
+                // 确认是否覆盖
+                if (Object.keys(state.orders).length > 0) {
+                    if (!confirm(`今日已有 ${Object.keys(state.orders).length} 项订货，是否覆盖？`)) {
+                        endSync();
+                        return;
+                    }
+                }
+
+                // 设置跳过实时事件
+                state.skipRealtimeUntil = Date.now() + 5000;
+
+                // 复制每一项到今日
+                const progress = document.getElementById('batchProgress');
+                let completed = 0;
+
+                for (const item of cartData) {
+                    await sb.from('jlhcdh_cart').upsert({
+                        product_id: item.product_id,
+                        quantity: item.quantity,
+                        is_purchased: false, // 重置采购状态
+                        order_date: state.currentDate,
+                        updated_at: new Date().toISOString()
+                    }, {
+                        onConflict: 'product_id,order_date'
+                    });
+
+                    completed++;
+                    progress.style.width = `${(completed / cartData.length) * 100}%`;
+                }
+
+                // 重新加载数据
+                await fetchCart();
+                renderProducts();
+                fetchDayData();
+
+                progress.style.width = '0%';
+                showToast(`已复制 ${cartData.length} 项昨日订单`);
+                endSync();
+            } catch (e) {
+                console.error('复制订单失败:', e);
+                showToast('复制失败: ' + e.message);
+                endSync(true);
+            }
+        }
+
+        // ========== 清空今日订单 ==========
+        async function clearTodayOrder() {
+            if (Object.keys(state.orders).length === 0) {
+                showToast('今日无订货记录');
+                return;
+            }
+
+            if (!confirm(`确定要清空今日的 ${Object.keys(state.orders).length} 项订货吗？`)) {
+                return;
+            }
+
+            state.skipRealtimeUntil = Date.now() + 5000;
+            startSync();
+
+            try {
+                await sb.from('jlhcdh_cart')
+                    .delete()
+                    .eq('order_date', state.currentDate);
+
+                state.orders = {};
+                updateFooter();
+                renderProducts();
+                fetchDayData();
+                showToast('已清空今日订单');
+                endSync();
+            } catch (e) {
+                console.error('清空失败:', e);
+                showToast('清空失败');
+                endSync(true);
+            }
+        }
+
+        // ========== 批量全选/取消 ==========
+        async function batchSelectAll() {
+            if (state.cartItems.length === 0) {
+                showToast('无订货项目');
+                return;
+            }
+
+            const uncheckedItems = state.cartItems.filter(item => !item.is_purchased);
+            if (uncheckedItems.length === 0) {
+                showToast('所有项目已勾选');
+                return;
+            }
+
+            state.skipRealtimeUntil = Date.now() + 10000;
+            startSync();
+
+            const progress = document.getElementById('batchProgress');
+            let completed = 0;
+
+            try {
+                for (const item of uncheckedItems) {
+                    await sb.from('jlhcdh_cart')
+                        .update({
+                            is_purchased: true,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('product_id', item.id)
+                        .eq('order_date', state.currentDate);
+
+                    // 更新本地状态
+                    if (state.orders[item.id]) {
+                        state.orders[item.id].purchased = true;
+                    }
+                    item.is_purchased = true;
+
+                    completed++;
+                    progress.style.width = `${(completed / uncheckedItems.length) * 100}%`;
+                }
+
+                renderSummary();
+                progress.style.width = '0%';
+                showToast(`已勾选 ${uncheckedItems.length} 项`);
+                endSync();
+            } catch (e) {
+                console.error('批量勾选失败:', e);
+                showToast('操作失败');
+                progress.style.width = '0%';
+                endSync(true);
+            }
+        }
+
+        async function batchDeselectAll() {
+            if (state.cartItems.length === 0) {
+                showToast('无订货项目');
+                return;
+            }
+
+            const checkedItems = state.cartItems.filter(item => item.is_purchased);
+            if (checkedItems.length === 0) {
+                showToast('所有项目已取消勾选');
+                return;
+            }
+
+            state.skipRealtimeUntil = Date.now() + 10000;
+            startSync();
+
+            const progress = document.getElementById('batchProgress');
+            let completed = 0;
+
+            try {
+                for (const item of checkedItems) {
+                    await sb.from('jlhcdh_cart')
+                        .update({
+                            is_purchased: false,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('product_id', item.id)
+                        .eq('order_date', state.currentDate);
+
+                    // 更新本地状态
+                    if (state.orders[item.id]) {
+                        state.orders[item.id].purchased = false;
+                    }
+                    item.is_purchased = false;
+
+                    completed++;
+                    progress.style.width = `${(completed / checkedItems.length) * 100}%`;
+                }
+
+                renderSummary();
+                progress.style.width = '0%';
+                showToast(`已取消 ${checkedItems.length} 项`);
+                endSync();
+            } catch (e) {
+                console.error('批量取消失败:', e);
+                showToast('操作失败');
+                progress.style.width = '0%';
+                endSync(true);
+            }
+        }
+
+        // ========== 导出订货单为图片 ==========
+        async function exportOrderImage() {
+            if (state.cartItems.length === 0) {
+                showToast('无订货记录可导出');
+                return;
+            }
+
+            showToast('正在生成图片...');
+
+            // 准备导出内容
+            const exportPreview = document.getElementById('exportPreview');
+            const exportDate = document.getElementById('exportDate');
+            const exportItems = document.getElementById('exportItems');
+            const exportTime = document.getElementById('exportTime');
+
+            // 格式化日期
+            const dateObj = new Date(state.currentDate);
+            const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+            exportDate.textContent = `${state.currentDate} ${weekDays[dateObj.getDay()]}`;
+
+            // 生成条目
+            exportItems.innerHTML = state.cartItems.map(item => `
+                <div class="export-item">
+                    <span class="export-name">${item.name}</span>
+                    <span class="export-qty">${item.qty} ${item.unit || '斤'}</span>
+                </div>
+            `).join('');
+
+            // 生成时间
+            const now = new Date();
+            exportTime.textContent = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+            // 将容器移到可见位置
+            exportPreview.style.left = '0';
+
+            try {
+                // 使用 html2canvas 生成图片
+                const canvas = await html2canvas(exportPreview, {
+                    backgroundColor: '#ffffff',
+                    scale: 2,
+                    logging: false
+                });
+
+                // 隐藏导出容器
+                exportPreview.style.left = '-9999px';
+
+                // 转换为图片并下载
+                const link = document.createElement('a');
+                link.download = `订货单_${state.currentDate}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+
+                showToast('图片已保存');
+            } catch (e) {
+                console.error('导出失败:', e);
+                exportPreview.style.left = '-9999px';
+                showToast('导出失败');
+            }
+        }
+
+        // 初始化时加载深色模式设置
+        initDarkMode();
 
         init();
     </script>
