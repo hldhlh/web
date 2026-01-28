@@ -127,7 +127,6 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            gap: 10px;
         }
 
         .header-title-group {
@@ -135,7 +134,7 @@
             align-items: center;
             gap: 12px;
             flex-shrink: 0;
-            /* 防止标题组被挤压 */
+            min-width: 0;
         }
 
         .header-title-group h1 {
@@ -143,7 +142,9 @@
             font-weight: 700;
             letter-spacing: -0.5px;
             white-space: nowrap;
-            /* 防止标题换行或竖向显示 */
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex-shrink: 1;
         }
 
         /* 按钮重塑 */
@@ -648,6 +649,7 @@
             border-radius: 50%;
             transition: all 0.3s;
             cursor: pointer;
+            flex-shrink: 0;
         }
 
         .sync-status.online {
@@ -1055,8 +1057,38 @@
                 grid-template-columns: 1fr;
             }
 
+            .header-content {
+                height: 56px;
+                gap: 8px;
+            }
+
+            .header-title-group {
+                gap: 6px;
+                flex: 1;
+                min-width: 0;
+            }
+
             .header-title-group h1 {
-                font-size: 18px;
+                font-size: 17px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .date-picker-container {
+                padding: 0 8px;
+                height: 34px;
+                gap: 4px;
+            }
+
+            .date-picker-container input {
+                width: 75px;
+                font-size: 13px;
+            }
+
+            .icon-btn {
+                width: 34px;
+                height: 34px;
             }
 
             .fab-add {
