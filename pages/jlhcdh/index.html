@@ -127,18 +127,23 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 10px;
         }
 
         .header-title-group {
             display: flex;
             align-items: center;
             gap: 12px;
+            flex-shrink: 0;
+            /* 防止标题组被挤压 */
         }
 
         .header-title-group h1 {
             font-size: 20px;
             font-weight: 700;
             letter-spacing: -0.5px;
+            white-space: nowrap;
+            /* 防止标题换行或竖向显示 */
         }
 
         /* 按钮重塑 */
