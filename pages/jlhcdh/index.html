@@ -1240,15 +1240,6 @@
                 <button id="filterFavBtn" class="icon-btn"><i class="far fa-star"></i></button>
             </div>
         </div>
-        <!-- 快捷操作栏 -->
-        <div class="quick-actions">
-            <button class="quick-action-btn" onclick="copyYesterdayOrder()">
-                <i class="fas fa-copy"></i> 复制昨日订单
-            </button>
-            <button class="quick-action-btn" onclick="clearTodayOrder()">
-                <i class="fas fa-eraser"></i> 清空今日
-            </button>
-        </div>
         <div class="filter-section-title"><i class="fas fa-tags"></i> 常用标签</div>
         <div id="tagFilterList" class="tag-row"></div>
         <div class="filter-section-title"><i class="fas fa-th-large"></i> 商品分类</div>
@@ -2643,107 +2634,6 @@
                 document.body.classList.add('dark-mode');
             }
             updateDarkModeIcon();
-        }
-
-        // ========== 复制昨日订单 ==========
-        async function copyYesterdayOrder() {
-            // 计算昨天的日期
-            const today = new Date(state.currentDate);
-            today.setDate(today.getDate() - 1);
-            const yesterdayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-
-            showToast('正在获取昨日订单...');
-            startSync();
-
-            try {
-                // 从购物车表获取昨日数据
-                const { data: cartData, error: cartError } = await sb.from('jlhcdh_cart')
-                    .select('*')
-                    .eq('order_date', yesterdayStr);
-
-                if (cartError) throw cartError;
-
-                if (!cartData || cartData.length === 0) {
-                    showToast('昨日没有订货记录');
-                    endSync();
-                    return;
-                }
-
-                // 确认是否覆盖
-                if (Object.keys(state.orders).length > 0) {
-                    if (!confirm(`今日已有 ${Object.keys(state.orders).length} 项订货，是否覆盖？`)) {
-                        endSync();
-                        return;
-                    }
-                }
-
-                // 设置跳过实时事件
-                state.skipRealtimeUntil = Date.now() + 5000;
-
-                // 复制每一项到今日
-                const progress = document.getElementById('batchProgress');
-                let completed = 0;
-
-                for (const item of cartData) {
-                    await sb.from('jlhcdh_cart').upsert({
-                        product_id: item.product_id,
-                        quantity: item.quantity,
-                        is_purchased: false, // 重置采购状态
-                        order_date: state.currentDate,
-                        updated_at: new Date().toISOString()
-                    }, {
-                        onConflict: 'product_id,order_date'
-                    });
-
-                    completed++;
-                    progress.style.width = `${(completed / cartData.length) * 100}%`;
-                }
-
-                // 重新加载数据
-                await fetchCart();
-                renderProducts();
-                fetchDayData();
-
-                progress.style.width = '0%';
-                showToast(`已复制 ${cartData.length} 项昨日订单`);
-                endSync();
-            } catch (e) {
-                console.error('复制订单失败:', e);
-                showToast('复制失败: ' + e.message);
-                endSync(true);
-            }
-        }
-
-        // ========== 清空今日订单 ==========
-        async function clearTodayOrder() {
-            if (Object.keys(state.orders).length === 0) {
-                showToast('今日无订货记录');
-                return;
-            }
-
-            if (!confirm(`确定要清空今日的 ${Object.keys(state.orders).length} 项订货吗？`)) {
-                return;
-            }
-
-            state.skipRealtimeUntil = Date.now() + 5000;
-            startSync();
-
-            try {
-                await sb.from('jlhcdh_cart')
-                    .delete()
-                    .eq('order_date', state.currentDate);
-
-                state.orders = {};
-                updateFooter();
-                renderProducts();
-                fetchDayData();
-                showToast('已清空今日订单');
-                endSync();
-            } catch (e) {
-                console.error('清空失败:', e);
-                showToast('清空失败');
-                endSync(true);
-            }
         }
 
         // ========== 批量全选/取消 ==========
