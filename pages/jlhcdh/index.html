@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>今岭后厨订货</title>
+    <title>今岭每日订货表</title>
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
         crossorigin="anonymous" referrerpolicy="no-referrer">
@@ -1050,7 +1050,7 @@
             <div class="header-content">
                 <div class="header-title-group">
                     <div id="syncStatus" class="sync-status online" title="实时同步中"></div>
-                    <h1>今岭后厨订货</h1>
+                    <h1>今岭每日订货表</h1>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <div class="date-picker-container" id="datePickerIndex">
@@ -1166,6 +1166,41 @@
             </form>
         </div>
     </div>
+
+    <!-- 编辑商品模态框 -->
+    <div id="editProductModal" class="modal">
+        <div class="modal-card">
+            <h3 style="margin-bottom:24px;text-align:center;">编辑商品</h3>
+            <form id="editProductForm">
+                <input type="hidden" id="editProductId">
+                <div class="card-field" style="margin-bottom:16px;">
+                    <label class="card-label">商品名称</label>
+                    <input type="text" id="editProductName" class="card-input-small" required>
+                </div>
+                <div class="card-field" style="margin-bottom:16px;">
+                    <label class="card-label">分类</label>
+                    <input type="text" id="editProductCategory" class="card-input-small" list="catListEdit" required>
+                    <datalist id="catListEdit"></datalist>
+                </div>
+                <div class="card-field" style="margin-bottom:16px;">
+                    <label class="card-label">单位</label>
+                    <input type="text" id="editProductUnit" class="card-input-small" required>
+                </div>
+                <div class="card-field" style="margin-bottom:24px;">
+                    <label class="card-label">标签 (逗号分隔)</label>
+                    <input type="text" id="editProductTags" class="card-input-small" placeholder="如：后厨, 常用">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                    <button type="button" class="btn-delete" onclick="deleteFromEditModal()">
+                        <i class="fas fa-trash-alt"></i> 删除
+                    </button>
+                    <button type="button" class="btn-delete" style="background:#f2f2f7;color:#1d1d1f;"
+                        onclick="closeEditProductModal()">取消</button>
+                    <button type="submit" class="btn-delete" style="background:var(--primary);color:white;">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
     <div id="toast" class="toast"></div>
 
     <script>
@@ -1194,7 +1229,9 @@
             realtimeConnected: false, // 实时连接状态
             realtimeChannels: [], // 实时订阅通道
             lastLocalUpdate: 0, // 最后本地更新时间戳，用于过滤自己的实时事件
-            skipRealtimeUntil: 0 // 跳过实时更新直到此时间戳
+            skipRealtimeUntil: 0, // 跳过实时更新直到此时间戳
+            realtimeRetryCount: 0, // 实时连接重试次数
+            maxRealtimeRetries: 3 // 最大重试次数
         };
 
         // 状态标题映射
@@ -1564,7 +1601,16 @@
 
             let filtered = state.products;
             if (state.adminCat !== '全部') filtered = filtered.filter(p => p.category === state.adminCat);
-            if (state.adminSearch) { const q = state.adminSearch.toLowerCase(); filtered = filtered.filter(p => p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)); }
+            if (state.adminSearch) {
+                const q = state.adminSearch.toLowerCase();
+                filtered = filtered.filter(p => {
+                    const nameMatch = p.name.toLowerCase().includes(q);
+                    const categoryMatch = p.category.toLowerCase().includes(q);
+                    const pinyinMatch = p.pinyin && p.pinyin.toLowerCase().includes(q);
+                    const tagMatch = p.tags && p.tags.some(t => t.toLowerCase().includes(q));
+                    return nameMatch || categoryMatch || pinyinMatch || tagMatch;
+                });
+            }
 
             document.getElementById('adminTableBody').innerHTML = filtered.map(p => {
                 const tags = Array.isArray(p.tags) ? p.tags : [];
@@ -1598,71 +1644,263 @@
 
         window.updateTags = async (id, val) => {
             const tags = val.split(/[，,]/).map(t => t.trim()).filter(t => t);
+            // 设置跳过实时事件的时间窗口
+            state.skipRealtimeUntil = Date.now() + 2000;
             startSync();
             try {
-                const { error } = await sb.from('jlhcdh_products').update({ tags }).eq('id', id);
-                if (!error) {
+                const { data, error } = await sb.from('jlhcdh_products').update({ tags }).eq('id', id).select();
+                if (error) {
+                    console.error('更新标签失败:', error);
+                    showToast('更新标签失败');
+                } else {
                     await fetchProducts();
                     renderAdminTable();
                     renderTags();
+                    showToast('标签已更新');
                 }
                 endSync(!!error);
-            } catch (e) { endSync(true); }
+            } catch (e) {
+                console.error('更新标签异常:', e);
+                showToast('更新标签失败');
+                endSync(true);
+            }
         };
 
         window.updateField = async (id, field, value) => {
             document.getElementById('saveStatus').innerText = '正在保存...';
+            // 设置跳过实时事件的时间窗口
+            state.skipRealtimeUntil = Date.now() + 2000;
             startSync();
             const updates = { [field]: value };
-
-            if (field === 'name' && window.pinyinPro) {
-                updates.pinyin = window.pinyinPro.pinyin(value, { pattern: 'first', toneType: 'none' }).replace(/\s/g, '');
-            }
+            // 注意：pinyin 字段是本地计算的，不存储在数据库中
 
             try {
-                const { error } = await sb.from('jlhcdh_products').update(updates).eq('id', id);
-                if (!error) {
+                const { data, error } = await sb.from('jlhcdh_products').update(updates).eq('id', id).select();
+                if (error) {
+                    console.error('更新字段失败:', error);
+                    document.getElementById('saveStatus').innerText = '保存失败';
+                    showToast('保存失败: ' + error.message);
+                } else {
                     document.getElementById('saveStatus').innerText = '已保存';
                     await fetchProducts();
-                    if (field === 'category' || field === 'name') renderAdminTable();
+                    if (field === 'category' || field === 'name') {
+                        renderAdminTable();
+                        renderCategories();
+                    }
                 }
                 endSync(!!error);
-            } catch (e) { endSync(true); }
+            } catch (e) {
+                console.error('更新字段异常:', e);
+                document.getElementById('saveStatus').innerText = '保存失败';
+                showToast('保存失败');
+                endSync(true);
+            }
         };
 
         window.deleteProduct = async id => {
             if (confirm('删除后不可恢复，确定？')) {
+                // 设置跳过实时事件的时间窗口
+                state.skipRealtimeUntil = Date.now() + 2000;
                 startSync();
                 try {
                     const { error } = await sb.from('jlhcdh_products').delete().eq('id', id);
-                    await fetchProducts();
-                    renderAdminTable();
+                    if (error) {
+                        console.error('删除商品失败:', error);
+                        showToast('删除失败: ' + error.message);
+                    } else {
+                        showToast('已删除');
+                        await fetchProducts();
+                        renderAdminTable();
+                        renderCategories();
+                        renderTags();
+                        renderProducts();
+                    }
                     endSync(!!error);
-                } catch (e) { endSync(true); }
+                } catch (e) {
+                    console.error('删除商品异常:', e);
+                    showToast('删除失败');
+                    endSync(true);
+                }
             }
         };
 
         async function handleAdd(e) {
             e.preventDefault();
-            const name = document.getElementById('editName').value;
-            const category = document.getElementById('editCategory').value;
-            const unit = document.getElementById('editUnit').value;
-            const pinyin = window.pinyinPro ? window.pinyinPro.pinyin(name, { pattern: 'first', toneType: 'none' }).replace(/\s/g, '') : '';
+            const nameInput = document.getElementById('editName');
+            const categoryInput = document.getElementById('editCategory');
+            const unitInput = document.getElementById('editUnit');
 
+            const name = nameInput.value.trim();
+            const category = categoryInput.value.trim();
+            const unit = unitInput.value.trim() || '斤';
+
+            // 验证必填字段
+            if (!name || !category) {
+                showToast('请填写商品名称和分类');
+                return;
+            }
+
+            // 设置跳过实时事件的时间窗口
+            state.skipRealtimeUntil = Date.now() + 2000;
             startSync();
             try {
-                const { error } = await sb.from('jlhcdh_products').insert([{ name, category, unit, pinyin, is_favorite: false }]);
-                if (!error) {
-                    showToast('已添加');
+                // 注意：pinyin 字段是本地计算的，不存储在数据库中
+                const { data, error } = await sb.from('jlhcdh_products')
+                    .insert([{ name, category, unit, is_favorite: false, tags: [] }])
+                    .select();
+
+                if (error) {
+                    console.error('添加商品失败:', error);
+                    showToast('添加失败: ' + error.message);
+                } else {
+                    console.log('商品添加成功:', data);
+                    showToast('已添加: ' + name);
+                    // 重置表单
+                    nameInput.value = '';
+                    categoryInput.value = '';
+                    unitInput.value = '斤';
                     closeModal();
                     await fetchProducts();
                     renderAdminTable();
+                    renderCategories();
+                    renderTags();
                     renderProducts();
                 }
                 endSync(!!error);
-            } catch (e) { endSync(true); }
+            } catch (e) {
+                console.error('添加商品异常:', e);
+                showToast('添加失败');
+                endSync(true);
+            }
         }
         function closeModal() { document.getElementById('editModal').classList.remove('visible'); }
+
+        // ========== 长按编辑功能 ==========
+        let longPressTimer = null;
+        const LONG_PRESS_DURATION = 500; // 500ms 触发长按
+
+        window.startLongPress = (productId) => {
+            longPressTimer = setTimeout(() => {
+                openEditProductModal(productId);
+                // 触发震动反馈（如果支持）
+                if (navigator.vibrate) navigator.vibrate(50);
+            }, LONG_PRESS_DURATION);
+        };
+
+        window.cancelLongPress = () => {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+        };
+
+        function openEditProductModal(productId) {
+            const product = state.products.find(p => p.id === productId);
+            if (!product) {
+                showToast('商品不存在');
+                return;
+            }
+
+            // 填充分类列表
+            const cats = [...new Set(state.products.map(p => p.category))];
+            document.getElementById('catListEdit').innerHTML = cats.map(c => `<option value="${c}">`).join('');
+
+            // 填充表单
+            document.getElementById('editProductId').value = product.id;
+            document.getElementById('editProductName').value = product.name;
+            document.getElementById('editProductCategory').value = product.category;
+            document.getElementById('editProductUnit').value = product.unit || '斤';
+            document.getElementById('editProductTags').value = (product.tags || []).join(', ');
+
+            // 显示模态框
+            document.getElementById('editProductModal').classList.add('visible');
+        }
+
+        window.closeEditProductModal = () => {
+            document.getElementById('editProductModal').classList.remove('visible');
+        };
+
+        // 编辑表单提交
+        document.getElementById('editProductForm').onsubmit = async (e) => {
+            e.preventDefault();
+
+            const id = parseInt(document.getElementById('editProductId').value);
+            const name = document.getElementById('editProductName').value.trim();
+            const category = document.getElementById('editProductCategory').value.trim();
+            const unit = document.getElementById('editProductUnit').value.trim() || '斤';
+            const tagsStr = document.getElementById('editProductTags').value;
+            const tags = tagsStr.split(/[，,]/).map(t => t.trim()).filter(t => t);
+
+            if (!name || !category) {
+                showToast('请填写商品名称和分类');
+                return;
+            }
+
+            state.skipRealtimeUntil = Date.now() + 2000;
+            startSync();
+
+            try {
+                const { error } = await sb.from('jlhcdh_products')
+                    .update({ name, category, unit, tags })
+                    .eq('id', id);
+
+                if (error) {
+                    console.error('更新商品失败:', error);
+                    showToast('保存失败: ' + error.message);
+                } else {
+                    showToast('已保存: ' + name);
+                    closeEditProductModal();
+                    await fetchProducts();
+                    renderProducts();
+                    renderCategories();
+                    renderTags();
+                    if (document.getElementById('adminPage').classList.contains('active')) {
+                        renderAdminTable();
+                    }
+                }
+                endSync(!!error);
+            } catch (e) {
+                console.error('更新商品异常:', e);
+                showToast('保存失败');
+                endSync(true);
+            }
+        };
+
+        // 从编辑模态框删除商品
+        window.deleteFromEditModal = async () => {
+            const id = parseInt(document.getElementById('editProductId').value);
+            const name = document.getElementById('editProductName').value;
+
+            if (!confirm(`确定要删除 "${name}" 吗？此操作不可恢复。`)) {
+                return;
+            }
+
+            state.skipRealtimeUntil = Date.now() + 2000;
+            startSync();
+
+            try {
+                const { error } = await sb.from('jlhcdh_products').delete().eq('id', id);
+                if (error) {
+                    console.error('删除商品失败:', error);
+                    showToast('删除失败: ' + error.message);
+                } else {
+                    showToast('已删除: ' + name);
+                    closeEditProductModal();
+                    await fetchProducts();
+                    renderProducts();
+                    renderCategories();
+                    renderTags();
+                    if (document.getElementById('adminPage').classList.contains('active')) {
+                        renderAdminTable();
+                    }
+                }
+                endSync(!!error);
+            } catch (e) {
+                console.error('删除商品异常:', e);
+                showToast('删除失败');
+                endSync(true);
+            }
+        };
 
         async function fetchDayData() {
             state.cartItems = Object.entries(state.orders).map(([id, info]) => {
@@ -1797,7 +2035,13 @@
                 const qty = state.orders[p.id]?.qty || '';
                 const tagsHtml = (p.tags || []).map(t => `<span class="tag-badge">${t}</span>`).join('');
                 return `
-                <div class="product-card" data-id="${p.id}">
+                <div class="product-card" data-id="${p.id}" 
+                    onmousedown="startLongPress(${p.id})" 
+                    onmouseup="cancelLongPress()" 
+                    onmouseleave="cancelLongPress()"
+                    ontouchstart="startLongPress(${p.id})" 
+                    ontouchend="cancelLongPress()" 
+                    ontouchcancel="cancelLongPress()">
                     <div class="fav-icon ${p.is_favorite ? 'active' : ''}" onclick="toggleFav(${p.id})">
                         <i class="fas fa-star"></i>
                     </div>
@@ -2038,18 +2282,29 @@
                 console.log('🔌 实时连接状态:', status);
                 if (status === 'SUBSCRIBED') {
                     state.realtimeConnected = true;
+                    state.realtimeRetryCount = 0; // 连接成功，重置重试计数
                     setGlobalSyncStatus('online');
                     console.log('✅ 实时订阅已建立');
                 } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
                     state.realtimeConnected = false;
                     setGlobalSyncStatus('disconnected');
-                    console.log('❌ 实时连接已断开，尝试重连...');
-                    // 5秒后尝试重连
+
+                    // 检查是否超过最大重试次数
+                    if (state.realtimeRetryCount >= state.maxRealtimeRetries) {
+                        console.log('⚠️ 已达到最大重试次数，停止自动重连。可手动点击状态指示灯重试。');
+                        return;
+                    }
+
+                    state.realtimeRetryCount++;
+                    console.log(`❌ 实时连接已断开，${state.realtimeRetryCount}/${state.maxRealtimeRetries} 次重试...`);
+
+                    // 递增延迟重连 (5s, 10s, 15s...)
+                    const retryDelay = 5000 * state.realtimeRetryCount;
                     setTimeout(() => {
                         if (!state.realtimeConnected) {
                             reconnectRealtime();
                         }
-                    }, 5000);
+                    }, retryDelay);
                 }
             });
 
@@ -2057,13 +2312,22 @@
         }
 
         // 重新连接实时订阅
-        async function reconnectRealtime() {
+        async function reconnectRealtime(forceRetry = false) {
+            // 如果是手动重试，重置计数器
+            if (forceRetry) {
+                state.realtimeRetryCount = 0;
+            }
+
             console.log('🔄 正在重新连接...');
             setGlobalSyncStatus('connecting');
 
-            // 移除旧订阅
-            for (const ch of state.realtimeChannels) {
-                await sb.removeChannel(ch);
+            // 移除旧订阅（静默处理错误）
+            try {
+                for (const ch of state.realtimeChannels) {
+                    await sb.removeChannel(ch).catch(() => { });
+                }
+            } catch (e) {
+                console.log('清理旧连接时出错（可忽略）:', e);
             }
             state.realtimeChannels = [];
 
@@ -2085,7 +2349,7 @@
                 el.onclick = async () => {
                     if (!state.realtimeConnected || el.classList.contains('error') || el.classList.contains('disconnected')) {
                         showToast('正在重新连接...');
-                        await reconnectRealtime();
+                        await reconnectRealtime(true); // 手动重试，重置计数器
                     } else {
                         showToast(el.title);
                     }

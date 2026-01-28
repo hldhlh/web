@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>批量更新标签</title>
+    <script src="lib/supabase.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #1d1d1f;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background: #0071e3;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        .btn:hover {
+            background: #0077ed;
+        }
+
+        .btn:disabled {
+            background: #999;
+            cursor: not-allowed;
+        }
+
+        #log {
+            background: #f5f5f7;
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: 13px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        .success {
+            color: #34c759;
+        }
+
+        .error {
+            color: #ff3b30;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h1>🏷️ 批量添加标签</h1>
+        <p>此操作将为数据库中<strong>所有商品</strong>的 tags 字段添加 <strong>"后厨"</strong> 标签。</p>
+        <p style="color:#86868b;font-size:14px;">已有 "后厨" 标签的商品将被跳过。</p>
+        <button id="startBtn" class="btn" onclick="startUpdate()">开始更新</button>
+        <div id="log"></div>
+    </div>
+
+    <script>
+        const SB_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
+        const sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: false } });
+
+        const logEl = document.getElementById('log');
+        const btn = document.getElementById('startBtn');
+
+        function log(msg, type = '') {
+            const span = document.createElement('div');
+            span.className = type;
+            span.textContent = msg;
+            logEl.appendChild(span);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        async function startUpdate() {
+            btn.disabled = true;
+            btn.textContent = '正在更新...';
+            logEl.innerHTML = '';
+
+            const TAG_TO_ADD = '后厨';
+
+            try {
+                log('📦 正在获取所有商品...');
+                const { data: products, error: fetchError } = await sb
+                    .from('jlhcdh_products')
+                    .select('id, name, tags');
+
+                if (fetchError) {
+                    log('❌ 获取商品失败: ' + fetchError.message, 'error');
+                    return;
+                }
+
+                log(`✅ 获取到 ${products.length} 个商品`);
+
+                let updated = 0;
+                let skipped = 0;
+
+                for (const product of products) {
+                    const currentTags = Array.isArray(product.tags) ? product.tags : [];
+
+                    // 检查是否已有该标签
+                    if (currentTags.includes(TAG_TO_ADD)) {
+                        log(`⏭️ 跳过: ${product.name} (已有标签)`);
+                        skipped++;
+                        continue;
+                    }
+
+                    // 添加新标签
+                    const newTags = [...currentTags, TAG_TO_ADD];
+
+                    const { error: updateError } = await sb
+                        .from('jlhcdh_products')
+                        .update({ tags: newTags })
+                        .eq('id', product.id);
+
+                    if (updateError) {
+                        log(`❌ 更新失败: ${product.name} - ${updateError.message}`, 'error');
+                    } else {
+                        log(`✅ 已更新: ${product.name}`, 'success');
+                        updated++;
+                    }
+                }
+
+                log('');
+                log(`🎉 完成！已更新 ${updated} 个商品，跳过 ${skipped} 个商品`, 'success');
+                btn.textContent = '更新完成！';
+
+            } catch (e) {
+                log('❌ 发生错误: ' + e.message, 'error');
+                btn.disabled = false;
+                btn.textContent = '重试';
+            }
+        }
+    </script>
+</body>
+
+</html>

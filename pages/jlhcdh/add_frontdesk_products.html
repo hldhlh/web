@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>批量添加前厅商品</title>
+    <script src="lib/supabase.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            color: #1d1d1f;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background: #5856d6;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        .btn:hover {
+            background: #4a49c9;
+        }
+
+        .btn:disabled {
+            background: #999;
+            cursor: not-allowed;
+        }
+
+        #log {
+            background: #f5f5f7;
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: 13px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        .success {
+            color: #34c759;
+        }
+
+        .error {
+            color: #ff3b30;
+        }
+
+        .info {
+            color: #5856d6;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+
+        th,
+        td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f5f5f7;
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h1>🏪 批量添加前厅商品</h1>
+        <p>将以下 <strong>28 个商品</strong> 写入数据库，并标记为 <strong>"前厅"</strong> 标签：</p>
+
+        <table>
+            <tr>
+                <th>分类</th>
+                <th>商品名称</th>
+                <th>单位</th>
+            </tr>
+            <tr>
+                <td>调料</td>
+                <td>老干妈</td>
+                <td>瓶</td>
+            </tr>
+            <tr>
+                <td>调料</td>
+                <td>蚝油</td>
+                <td>瓶</td>
+            </tr>
+            <tr>
+                <td>调料</td>
+                <td>花椒油</td>
+                <td>瓶</td>
+            </tr>
+            <tr>
+                <td>调料</td>
+                <td>芝麻油</td>
+                <td>瓶</td>
+            </tr>
+            <tr>
+                <td>调料</td>
+                <td>米醋</td>
+                <td>瓶</td>
+            </tr>
+            <tr>
+                <td>调料</td>
+                <td>酱油</td>
+                <td>瓶</td>
+            </tr>
+            <tr>
+                <td>调料</td>
+                <td>生抽</td>
+                <td>瓶</td>
+            </tr>
+            <tr>
+                <td>调料</td>
+                <td>藤椒粉(翠宏)</td>
+                <td>包</td>
+            </tr>
+            <tr>
+                <td>调料</td>
+                <td>辣椒油包</td>
+                <td>包</td>
+            </tr>
+            <tr>
+                <td>粮油</td>
+                <td>五常大米</td>
+                <td>袋</td>
+            </tr>
+            <tr>
+                <td>饮品</td>
+                <td>王老吉(310ml)</td>
+                <td>罐</td>
+            </tr>
+            <tr>
+                <td>饮品</td>
+                <td>果粒橙(450ml)</td>
+                <td>瓶</td>
+            </tr>
+            <tr>
+                <td>饮品</td>
+                <td>马蹄爽(300ml)</td>
+                <td>瓶</td>
+            </tr>
+            <tr>
+                <td>饮品</td>
+                <td>冬瓜茶(596ml)</td>
+                <td>瓶</td>
+            </tr>
+            <tr>
+                <td>耗材</td>
+                <td>卫生纸</td>
+                <td>卷</td>
+            </tr>
+            <tr>
+                <td>包装</td>
+                <td>半封包袋(26×42cm)</td>
+                <td>扎</td>
+            </tr>
+            <tr>
+                <td>包装</td>
+                <td>大封包袋(30×50cm)</td>
+                <td>扎</td>
+            </tr>
+            <tr>
+                <td>包装</td>
+                <td>500刮泡盒(米饭盒)</td>
+                <td>扎</td>
+            </tr>
+            <tr>
+                <td>耗材</td>
+                <td>一次性手套</td>
+                <td>盒</td>
+            </tr>
+            <tr>
+                <td>耗材</td>
+                <td>一次性围裙</td>
+                <td>包</td>
+            </tr>
+            <tr>
+                <td>包装</td>
+                <td>保温棉</td>
+                <td>卷</td>
+            </tr>
+            <tr>
+                <td>包装</td>
+                <td>外卖封口贴</td>
+                <td>卷</td>
+            </tr>
+            <tr>
+                <td>包装</td>
+                <td>白色细吸管</td>
+                <td>包</td>
+            </tr>
+            <tr>
+                <td>包装</td>
+                <td>透明粗吸管</td>
+                <td>包</td>
+            </tr>
+            <tr>
+                <td>包装</td>
+                <td>一次性筷子套(160mm)</td>
+                <td>扎</td>
+            </tr>
+            <tr>
+                <td>食材</td>
+                <td>紫菜</td>
+                <td>包</td>
+            </tr>
+            <tr>
+                <td>耗材</td>
+                <td>牙线</td>
+                <td>盒</td>
+            </tr>
+            <tr>
+                <td>耗材</td>
+                <td>皮筋</td>
+                <td>包</td>
+            </tr>
+        </table>
+
+        <button id="startBtn" class="btn" onclick="startInsert()">🚀 开始写入数据库</button>
+        <div id="log"></div>
+    </div>
+
+    <script>
+        const SB_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
+        const sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: false } });
+
+        const logEl = document.getElementById('log');
+        const btn = document.getElementById('startBtn');
+
+        // 要添加的商品列表
+        const products = [
+            // 调料类
+            { name: '老干妈', category: '调料', unit: '瓶' },
+            { name: '蚝油', category: '调料', unit: '瓶' },
+            { name: '花椒油', category: '调料', unit: '瓶' },
+            { name: '芝麻油', category: '调料', unit: '瓶' },
+            { name: '米醋', category: '调料', unit: '瓶' },
+            { name: '酱油', category: '调料', unit: '瓶' },
+            { name: '生抽', category: '调料', unit: '瓶' },
+            { name: '藤椒粉(翠宏)', category: '调料', unit: '包' },
+            { name: '辣椒油包', category: '调料', unit: '包' },
+            // 粮油类
+            { name: '五常大米', category: '粮油', unit: '袋' },
+            // 饮品类
+            { name: '王老吉(310ml)', category: '饮品', unit: '罐' },
+            { name: '果粒橙(450ml)', category: '饮品', unit: '瓶' },
+            { name: '马蹄爽(300ml)', category: '饮品', unit: '瓶' },
+            { name: '冬瓜茶(596ml)', category: '饮品', unit: '瓶' },
+            // 耗材类
+            { name: '卫生纸', category: '耗材', unit: '卷' },
+            { name: '一次性手套', category: '耗材', unit: '盒' },
+            { name: '一次性围裙', category: '耗材', unit: '包' },
+            { name: '牙线', category: '耗材', unit: '盒' },
+            { name: '皮筋', category: '耗材', unit: '包' },
+            // 包装类
+            { name: '半封包袋(26×42cm)', category: '包装', unit: '扎' },
+            { name: '大封包袋(30×50cm)', category: '包装', unit: '扎' },
+            { name: '500刮泡盒(米饭盒)', category: '包装', unit: '扎' },
+            { name: '保温棉', category: '包装', unit: '卷' },
+            { name: '外卖封口贴', category: '包装', unit: '卷' },
+            { name: '白色细吸管', category: '包装', unit: '包' },
+            { name: '透明粗吸管', category: '包装', unit: '包' },
+            { name: '一次性筷子套(160mm)', category: '包装', unit: '扎' },
+            // 食材类
+            { name: '紫菜', category: '食材', unit: '包' }
+        ];
+
+        function log(msg, type = '') {
+            const span = document.createElement('div');
+            span.className = type;
+            span.textContent = msg;
+            logEl.appendChild(span);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        async function startInsert() {
+            btn.disabled = true;
+            btn.textContent = '正在写入...';
+            logEl.innerHTML = '';
+
+            const TAG = '前厅';
+            let success = 0;
+            let failed = 0;
+
+            log(`📦 准备写入 ${products.length} 个商品...`, 'info');
+            log('');
+
+            for (const product of products) {
+                try {
+                    const { data, error } = await sb
+                        .from('jlhcdh_products')
+                        .insert([{
+                            name: product.name,
+                            category: product.category,
+                            unit: product.unit,
+                            is_favorite: false,
+                            tags: [TAG]
+                        }])
+                        .select();
+
+                    if (error) {
+                        log(`❌ 失败: ${product.name} - ${error.message}`, 'error');
+                        failed++;
+                    } else {
+                        log(`✅ 成功: ${product.name} [${product.category}]`, 'success');
+                        success++;
+                    }
+                } catch (e) {
+                    log(`❌ 异常: ${product.name} - ${e.message}`, 'error');
+                    failed++;
+                }
+            }
+
+            log('');
+            log('═══════════════════════════════════════', 'info');
+            log(`🎉 完成！成功: ${success} 个，失败: ${failed} 个`, success === products.length ? 'success' : 'info');
+            log('═══════════════════════════════════════', 'info');
+
+            btn.textContent = '✅ 写入完成！';
+        }
+    </script>
+</body>
+
+</html>
