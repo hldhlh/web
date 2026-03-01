@@ -14,6 +14,7 @@
     { name: "PPT", path: "ppt/index.html" },
     { name: "阅图", path: "vista/index.html" },
     { name: "SVG", path: "svg/index.html" },
-    { name: "日志", path: "log/index.html" }
+    { name: "日志", path: "log/index.html" },
+    { name: "蔬菜盘点程序", path: "vegcheck/index.html" }
   ];
 }
