@@ -581,5 +581,3 @@
   }
   // Read-only timeline: no interactions bound
 })();
-teractions bound
-})();
