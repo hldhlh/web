@@ -547,6 +547,104 @@
             border: none;
         }
 
+        /* 圈子交互区 (Minimal Style) */
+        .community-container {
+            padding: 24px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .post-box {
+            background: #fff;
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.03);
+            border: 1px solid rgba(0,0,0,0.04);
+        }
+
+        .post-input {
+            width: 100%;
+            border: none;
+            outline: none;
+            resize: none;
+            min-height: 50px;
+            font-size: 14px;
+            color: var(--text-main);
+            font-family: inherit;
+            background: transparent;
+        }
+
+        .post-input::placeholder { color: #A4B0BE; }
+
+        .post-footer {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed #F1F2F6;
+        }
+
+        /* 动态列表 */
+        .post-card {
+            background: #fff;
+            padding: 20px;
+            border-radius: 20px;
+            border: 1px solid rgba(0,0,0,0.03);
+            position: relative;
+            animation: slideUp 0.4s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .post-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .post-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 8px;
+            background: var(--primary-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 800;
+            flex-shrink: 0;
+        }
+
+        .post-meta {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .post-user {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .post-time {
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        .post-content {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #4B5563;
+            padding-left: 34px; /* 对齐文字，不被头像挡住 */
+        }
+
         /* 滚动条 */
         ::-webkit-scrollbar { width: 0; height: 0; }
     </style>
@@ -602,10 +700,22 @@
                 </ul>
             </div>
 
-            <!-- 圈子面板 -->
-            <div class="tab-pane" id="community" style="text-align: center; padding: 60px 20px;">
-                <div style="font-size: 40px; margin-bottom: 12px; opacity: 0.5;">💬</div>
-                <p style="color: var(--text-muted); font-size: 14px;">圈子功能即将上线</p>
+            <!-- 圈子面板 (极简动态流) -->
+            <div class="tab-pane" id="community">
+                <div class="community-container">
+                    <!-- 发表卡片 -->
+                    <div class="post-box">
+                        <textarea id="postInput" class="post-input" placeholder="这一刻的想法..."></textarea>
+                        <div class="post-footer">
+                            <button class="btn-main" id="sendBtn" style="padding: 10px 24px; font-size: 13px; border-radius: 14px;">分享动态</button>
+                        </div>
+                    </div>
+
+                    <!-- 动态列表项载体 -->
+                    <div id="postsList">
+                        <div style="text-align: center; padding: 60px; color: var(--text-muted); font-size: 13px;">正在加载动态...</div>
+                    </div>
+                </div>
             </div>
         </main>
 
@@ -631,18 +741,6 @@
 
     <script>
         // ========== 数据加载逻辑 ==========
-        const defaults = {
-            platformName: '情景故事学习小组制作',
-            platformMeta: '16,059 关注者 · 785 单课',
-            lessons: [
-                { id: 1, name: '中秋节', duration: '25:10', views: 715, src: 'media/1.mp4' },
-                { id: 2, name: '植树节', duration: '20:10', views: 652, src: 'media/2.mp4' },
-                { id: 3, name: '生日会', duration: '25:30', views: 856, src: 'media/3.mp4' },
-                { id: 4, name: '六一儿童节', duration: '23:30', views: 934, src: 'media/4.mp4' },
-                { id: 5, name: '春天', duration: '22:45', views: 521, src: 'media/5.mp4' }
-            ]
-        };
-
         let currentData = CourseStore.cloneDefaults();
         let lessons = currentData.lessons;
 
@@ -656,7 +754,12 @@
         function render() {
             // 更新平台名称
             document.querySelector('.platform-name').textContent = currentData.platformName;
-            document.querySelector('.platform-meta').textContent = currentData.platformMeta;
+            
+            // 自动统计：全课总播放量 + 总课时数
+            const totalViews = lessons.reduce((s, l) => s + (parseInt(l.views) || 0), 0);
+            const totalLessons = lessons.length;
+            document.querySelector('.platform-meta').textContent = `${totalViews.toLocaleString()}次学习 · ${totalLessons}单课`;
+            
             const coverImg = document.querySelector('.cover-img');
             const platformLogo = document.querySelector('.platform-logo');
             if (coverImg) coverImg.src = currentData.coverUrl || 'cover.png';
@@ -696,8 +799,67 @@
                 
                 btn.classList.add('active');
                 document.getElementById(btn.dataset.target).classList.add('active');
+
+                // 切换到圈子时，自动刷新数据
+                if (btn.dataset.target === 'community') {
+                    renderPosts();
+                }
             };
         });
+
+        // ========== 极简圈子交互渲染 ==========
+        async function renderPosts() {
+            const container = document.getElementById('postsList');
+            const posts = await CourseStore.getPosts();
+            
+            if (posts.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 80px; color: var(--text-muted); font-size: 13px;">空空如也，发布你的第一条学习心得吧</div>';
+                return;
+            }
+
+            container.innerHTML = `
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    ${posts.map(p => `
+                        <div class="post-card" style="padding: 16px;">
+                            <div class="post-header">
+                                <div class="post-avatar">学</div>
+                                <div class="post-meta">
+                                    <span class="post-user">${p.user_nickname || '学习伙伴'}</span>
+                                    <span class="post-time">${new Date(p.created_at).toLocaleString('zh-CN', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}</span>
+                                </div>
+                            </div>
+                            <div class="post-content">${p.content}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function getDeviceName() {
+            const ua = navigator.userAgent;
+            if (/Android/i.test(ua)) return "Android 用户";
+            if (/iPhone|iPad|iPod/i.test(ua)) return "iOS 用户";
+            if (/Windows/i.test(ua)) return "Windows 用户";
+            if (/Macintosh/i.test(ua)) return "Mac 用户";
+            return "神秘系统用户";
+        }
+
+        document.getElementById('sendBtn').onclick = async () => {
+            const input = document.getElementById('postInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const btn = document.getElementById('sendBtn');
+            btn.textContent = '...';
+            btn.disabled = true;
+
+            const nick = getDeviceName(); // 动态获取设备名
+            await CourseStore.addPost(nick, text);
+            input.value = '';
+            btn.textContent = '分享动态';
+            btn.disabled = false;
+            renderPosts();
+        };
 
         document.getElementById('followBtn').onclick = function() {
             state.isFollowed = !state.isFollowed;

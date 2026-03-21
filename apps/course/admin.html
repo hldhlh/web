@@ -186,9 +186,10 @@
 
     /* ========== 表单系统 ========== */
     .form-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      max-width: 600px; /* 控制宽度，不要铺得太满 */
     }
 
     .field {
@@ -201,7 +202,7 @@
       font-size: 13px;
       font-weight: 700;
       color: var(--text-muted);
-      margin-left: 4px;
+      margin-bottom: 4px;
     }
 
     input[type="text"] {
@@ -226,11 +227,16 @@
       background: var(--bg);
       border: 2px dashed #D1D5DB;
       border-radius: 16px;
-      padding: 20px;
+      padding: 16px;
       text-align: center;
       cursor: pointer;
       transition: all 0.3s;
       position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100px;
     }
 
     .upload-box:hover {
@@ -414,14 +420,24 @@
       z-index: 2000;
     }
 
-    @media (max-width: 600px) {
-      .form-grid { grid-template-columns: 1fr; }
-      .lesson-item {
-        grid-template-columns: 40px 1fr 60px;
-        gap: 12px;
-      }
+    @media (max-width: 768px) {
       .l-stats { display: none; }
     }
+
+    /* 圈子管理样式 */
+    .post-admin-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 16px;
+      background: var(--bg);
+      border-radius: 12px;
+      margin-bottom: 12px;
+    }
+    .post-admin-info { flex: 1; }
+    .post-admin-user { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+    .post-admin-content { font-size: 13px; color: var(--text-main); line-height: 1.5; }
+    .post-admin-time { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -455,19 +471,6 @@
             <input type="text" id="platformName" oninput="autoSave()" placeholder="例如：情景故事学习小组">
           </div>
           <div class="field">
-            <label>平台简介</label>
-            <input type="text" id="platformMeta" oninput="autoSave()" placeholder="例如：1.6万 关注者">
-          </div>
-          <div class="field">
-            <label>封面媒体 (Poster)</label>
-            <div class="upload-box">
-              <i data-lucide="image" size="28"></i><br>
-              <span id="coverHint">点击上传封面图</span>
-              <input type="file" id="coverFile" accept="image/*" onchange="uploadAndSave(this)">
-            </div>
-            <input type="text" id="coverUrl" readonly placeholder="自动回填 URL" style="font-size: 11px; margin-top: 8px; opacity: 0.7;">
-          </div>
-          <div class="field">
             <label>品牌 Logo</label>
             <div class="upload-box">
               <i data-lucide="award" size="28"></i><br>
@@ -488,6 +491,19 @@
         
         <div id="lessonTableBody">
           <!-- 动态渲染 -->
+        </div>
+      </section>
+
+      <!-- 圈子管理 -->
+      <section class="section-card">
+        <div class="section-header">
+          <h2 class="section-title"><i data-lucide="message-square" size="20"></i> 圈子评价</h2>
+          <button class="btn-outline" onclick="loadPosts()">刷新动态</button>
+        </div>
+        
+        <div id="postsList">
+          <!-- 动态渲染 -->
+          <div style="text-align: center; padding: 40px; color: var(--text-muted); font-size: 13px;">正在加载圈子动态...</div>
         </div>
       </section>
     </div>
@@ -538,8 +554,6 @@
 
     function render() {
       document.getElementById('platformName').value = currentData.platformName || '';
-      document.getElementById('platformMeta').value = currentData.platformMeta || '';
-      document.getElementById('coverUrl').value = currentData.coverUrl || '';
       document.getElementById('logoUrl').value = currentData.logoUrl || '';
 
       const container = document.getElementById('lessonTableBody');
@@ -634,8 +648,6 @@
 
     async function performSave() {
       currentData.platformName = document.getElementById('platformName').value.trim();
-      currentData.platformMeta = document.getElementById('platformMeta').value.trim();
-      currentData.coverUrl = document.getElementById('coverUrl').value.trim();
       currentData.logoUrl = document.getElementById('logoUrl').value.trim();
 
       currentData.lessons.forEach((lesson, i) => {
@@ -672,16 +684,54 @@
       }, 1000);
     }
 
-    CourseStore.load().then((data) => {
-      currentData = data || CourseStore.cloneDefaults();
-      render();
-      setStatus('云端连接已就绪');
-    }).catch((e) => {
-      console.error(e);
-      currentData = CourseStore.cloneDefaults();
-      render();
-      setStatus('云端连接超时 (离线)');
-    });
+    async function loadInfo() {
+      setStatus('正在同步中...', 'syncing');
+      try {
+        currentData = await CourseStore.load();
+        render(); // Use render() instead of renderUI()
+        await loadPosts(); // 同时加载动态
+        setStatus('云端同步就绪 (Cloud Connected)');
+      } catch (e) {
+        console.error(e);
+        currentData = CourseStore.cloneDefaults();
+        render();
+        setStatus('云端连接超时 (离线)');
+      }
+    }
+
+    async function loadPosts() {
+      const posts = await CourseStore.getPosts();
+      const container = document.getElementById('postsList');
+      if (posts.length === 0) {
+        container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted); font-size: 13px;">暂无评价动态</div>';
+        return;
+      }
+      container.innerHTML = posts.map(p => `
+        <div class="post-admin-item">
+          <div class="post-admin-info">
+            <div class="post-admin-user">${p.user_nickname || '学习伙伴'}</div>
+            <div class="post-admin-content">${p.content}</div>
+            <div class="post-admin-time">${new Date(p.created_at).toLocaleString()}</div>
+          </div>
+          <button class="btn-danger" onclick="deletePost('${p.id}')">
+            <i data-lucide="trash-2" size="16"></i>
+          </button>
+        </div>
+      `).join('');
+      lucide.createIcons();
+    }
+
+    async function deletePost(id) {
+      if (!confirm('确定要删除这条评价吗？此操作不可撤销。')) return;
+      setStatus('正在删除...', 'syncing');
+      await CourseStore.deletePost(id);
+      await loadPosts(); // Re-render posts after deletion
+      setStatus('删除成功');
+      showToast('评价已移除');
+    }
+
+    // Initial load
+    loadInfo();
   </script>
 </body>
 </html>

@@ -6,16 +6,16 @@
   const CACHE_KEY = 'courseAdminData';
 
   const DEFAULTS = {
-    platformName: '情景故事学习小组制作',
-    platformMeta: '16,059 关注者 · 785 单课',
+    platformName: '正在载入...',
+    platformMeta: '--- 关注者 · --- 单课',
     coverUrl: 'cover.png',
     logoUrl: 'logo.png',
     lessons: [
-      { id: 1, name: '中秋节', duration: '25:10', views: 715, src: 'media/1.mp4' },
-      { id: 2, name: '植树节', duration: '20:10', views: 652, src: 'media/2.mp4' },
-      { id: 3, name: '生日会', duration: '25:30', views: 856, src: 'media/3.mp4' },
-      { id: 4, name: '六一儿童节', duration: '23:30', views: 934, src: 'media/4.mp4' },
-      { id: 5, name: '春天', duration: '22:45', views: 521, src: 'media/5.mp4' }
+      { id: 1, name: '中秋节', duration: '25:10', views: 0, src: 'media/1.mp4' },
+      { id: 2, name: '植树节', duration: '20:10', views: 0, src: 'media/2.mp4' },
+      { id: 3, name: '生日会', duration: '25:30', views: 0, src: 'media/3.mp4' },
+      { id: 4, name: '六一儿童节', duration: '23:30', views: 0, src: 'media/4.mp4' },
+      { id: 5, name: '春天', duration: '22:45', views: 0, src: 'media/5.mp4' }
     ]
   };
 
@@ -85,7 +85,35 @@
       for (const r of rows) await client.from('course_lessons').upsert(r);
       localStorage.setItem(CACHE_KEY, JSON.stringify(data));
     },
+    incrementViews: async (id) => {
+      const client = getClient();
+      if (!client) return;
+      // 简单实现：先查后增并更新 (由于是单ID单行，并发竞态对统计精度影响极小)
+      const { data } = await client.from('course_lessons').select('views').eq('id', id).maybeSingle();
+      if (data) {
+        await client.from('course_lessons').update({ views: (data.views || 0) + 1 }).eq('id', id);
+      }
+    },
+    getPosts: async () => {
+      const client = getClient();
+      if (!client) return [];
+      const { data } = await client.from('course_posts').select('*').eq('platform_id', PLATFORM_ID).order('created_at', { ascending: false });
+      return data || [];
+    },
+    addPost: async (nickname, content) => {
+      const client = getClient();
+      if (!client) return;
+      await client.from('course_posts').insert({ user_nickname: nickname, content, platform_id: PLATFORM_ID });
+    },
+    deletePost: async (id) => {
+      const client = getClient();
+      if (!client) return;
+      await client.from('course_posts').delete().eq('id', id);
+    },
     uploadToStorage,
+
+
+
     get client() { return getClient(); }
   };
 })();

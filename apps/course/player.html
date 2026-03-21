@@ -380,6 +380,38 @@
             filter: blur(80px) brightness(0.9);
             opacity: 0.3;
         }
+
+        /* 极简加载动画 (Minimal Loading) */
+        .video-loader {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.8);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
+            transition: opacity 0.3s ease;
+        }
+        
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid rgba(0,0,0,0.05);
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .video-loader.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
     </style>
 </head>
 
@@ -402,6 +434,9 @@
         <!-- Player Visual -->
         <main class="player-visual">
             <div class="video-container">
+                <div class="video-loader" id="videoLoader">
+                    <div class="spinner"></div>
+                </div>
                 <video id="mainVideo" playsinline></video>
             </div>
             
@@ -418,7 +453,9 @@
                 <div style="flex:1"></div>
                 <span id="totalTime" style="margin-right: 12px;">02:30</span>
                 <!-- 放在播放条尾巴：小巧的倍速选择 -->
-                <span id="speedBtn" style="cursor: pointer; background: rgba(0,0,0,0.05); padding: 2px 8px; border-radius: 6px; font-weight: 800; color: var(--primary);">1.0X</span>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span id="speedBtn" style="cursor: pointer; background: rgba(0,0,0,0.05); padding: 2px 8px; border-radius: 6px; font-weight: 800; color: var(--primary);">1.0X</span>
+                </div>
             </div>
             <div class="progress-bar-container" id="progressArea">
                 <div class="progress-fill" id="progressFill"></div>
@@ -523,17 +560,6 @@
 
     <script>
         // ========== 数据加载逻辑 ==========
-        const defaults = {
-            platformName: '情景故事学习小组制作',
-            lessons: [
-                { id: 1, name: '中秋节', duration: '25:10', views: 715, src: 'media/1.mp4' },
-                { id: 2, name: '植树节', duration: '20:10', views: 652, src: 'media/2.mp4' },
-                { id: 3, name: '生日會', duration: '25:30', views: 856, src: 'media/3.mp4' },
-                { id: 4, name: '六一儿童节', duration: '23:30', views: 934, src: 'media/4.mp4' },
-                { id: 5, name: '春天', duration: '22:45', views: 521, src: 'media/5.mp4' }
-            ]
-        };
-
         let currentData = CourseStore.cloneDefaults();
         let lessons = currentData.lessons;
 
@@ -542,7 +568,8 @@
             currentIdx: 1, 
             speed: 1.0,
             progress: 0,
-            duration: 0
+            duration: 0,
+            lastIncrementedId: null // 增加：记录上次增加阅读量的ID，防止单次会话重复计入
         };
 
         // UI 变量抢先定义
@@ -557,6 +584,31 @@
         const curTimeText = document.getElementById('currentTime');
         const totalTimeText = document.getElementById('totalTime');
         const mainContainer = document.getElementById('mainContainer');
+        const videoLoader = document.getElementById('videoLoader');
+
+        // ========== 全屏控制 ==========
+        function toggleFullscreen() {
+            const container = document.querySelector('.video-container');
+            if (!document.fullscreenElement) {
+                if (container.requestFullscreen) container.requestFullscreen();
+                else if (container.webkitRequestFullscreen) container.webkitRequestFullscreen();
+                else if (container.msRequestFullscreen) container.msRequestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+                else if (document.msExitFullscreen) document.msExitFullscreen();
+            }
+        }
+
+        document.querySelector('.video-container').ondblclick = toggleFullscreen;
+
+        // ========== 加载动画控制 ==========
+        video.onwaiting = () => videoLoader.classList.remove('hidden');
+        video.onplaying = () => videoLoader.classList.add('hidden');
+        video.oncanplay = () => videoLoader.classList.add('hidden');
+        video.onloadstart = () => videoLoader.classList.remove('hidden');
+        video.onloadeddata = () => videoLoader.classList.add('hidden');
+        video.onerror = () => videoLoader.classList.add('hidden');
 
         // 从 URL 获取参数
         const params = new URLSearchParams(window.location.search);
@@ -601,6 +653,14 @@
             const bgBlur = document.querySelector('.bg-blur');
             const videoContainer = document.querySelector('.video-container');
             const coverSrc = currentData.coverUrl || 'cover.png';
+
+            // 云端统计递增：仅当课时真正切换且有有效ID时触发
+            if (state.currentIdx && state.currentIdx !== state.lastIncrementedId) {
+                CourseStore.incrementViews(state.currentIdx);
+                state.lastIncrementedId = state.currentIdx;
+                console.log('云端学习建议已统计:', state.currentIdx);
+            }
+
             if (bgBlur) {
                 bgBlur.style.backgroundImage = `url('${coverSrc}')`;
             }
