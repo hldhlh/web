@@ -337,7 +337,7 @@
       const noIconDirs = ['jlbj', 'ppt'];
       if (noIconDirs.includes(dir)) return null;
 
-      const candidates = [`./pages/${dir}/icon.svg`, `./pages/${dir}/icon`, `./pages/${dir}/icon.png`, `./pages/${dir}/icon.jpg`];
+      const candidates = [`./apps/${dir}/icon.svg`, `./apps/${dir}/icon`, `./apps/${dir}/icon.png`, `./apps/${dir}/icon.jpg`];
 
       for (const url of candidates) {
         const data = await fetchIconData(dir, url);
@@ -417,7 +417,7 @@
         }
 
         const el = document.createElement('a');
-        el.href = `./pages/${app.path}`;
+        el.href = `./apps/${app.path}`;
         el.className = 'app-icon';
         el.title = app.name;
         el.setAttribute('data-dir', dir); // 标记以便更新

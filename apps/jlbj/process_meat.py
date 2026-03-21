@@ -71,7 +71,7 @@ def process_directory(directory, limit=5):
     return results
 
 if __name__ == "__main__":
-    photo_dir = r"c:\Users\Aries\OneDrive\代码\HTML\web\pages\jlbj\iCloud 照片"
+    photo_dir = r"c:\Users\Aries\OneDrive\代码\HTML\web\apps\jlbj\iCloud 照片"
     data = process_directory(photo_dir, limit=10)
     with open("processed_photos.json", "w") as f:
         json.dump(data, f)
