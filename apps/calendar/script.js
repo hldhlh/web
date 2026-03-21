@@ -46,40 +46,112 @@
   function pad2(n) { return String(n).padStart(2, '0'); }
   function isoDate(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
 
-  // Holiday store (remote API)
+  // Holiday store (remote API, aggregated)
   const holidayCache = new Map();
+  const holidayInfoCache = new Map();
+
+  async function fetchTimorYear(year) {
+    const r = await fetch(`https://timor.tech/api/holiday/year/${year}`);
+    if (!r.ok) throw new Error(`timor year ${r.status}`);
+    const data = await r.json();
+    const raw = data && data.holiday ? data.holiday : {};
+    const map = new Map();
+    Object.keys(raw).forEach(key => {
+      const item = raw[key];
+      if (!item || !item.date) return;
+      map.set(item.date, {
+        date: item.date,
+        localName: item.name || '特殊日',
+        name: item.name || 'Special Day',
+        isHoliday: !!item.holiday,
+        isWorkday: item.holiday === false && !!(item.after !== undefined || item.target),
+        source: 'timor',
+        note: item.target ? `${item.after ? '补班' : '调休'} · ${item.target}` : '',
+      });
+    });
+    return map;
+  }
+
+  async function fetchNagerYear(year) {
+    const r = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/CN`);
+    if (!r.ok) throw new Error(`nager ${r.status}`);
+    const list = await r.json();
+    const map = new Map();
+    (Array.isArray(list) ? list : []).forEach(item => {
+      if (!item || !item.date) return;
+      map.set(item.date, {
+        date: item.date,
+        localName: item.localName || item.name || '节假日',
+        name: item.name || item.localName || 'Holiday',
+        isHoliday: true,
+        isWorkday: false,
+        source: 'nager',
+        note: '',
+      });
+    });
+    return map;
+  }
+
   async function ensureHolidayYear(year) {
     if (holidayCache.has(year)) return holidayCache.get(year);
-    const promise = fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/CN`)
-      .then(r => {
-        if (!r.ok) throw new Error(`holiday api ${r.status}`);
-        return r.json();
-      })
-      .then(list => {
-        const map = new Map();
-        (Array.isArray(list) ? list : []).forEach(item => {
-          if (!item || !item.date) return;
-          map.set(item.date, {
-            localName: item.localName || item.name || '节假日',
-            name: item.name || item.localName || 'Holiday'
-          });
+    const promise = (async () => {
+      const merged = new Map();
+      try {
+        const timorMap = await fetchTimorYear(year);
+        timorMap.forEach((value, key) => merged.set(key, value));
+      } catch (err) {
+        console.warn('Timor year fetch failed:', err);
+      }
+      try {
+        const nagerMap = await fetchNagerYear(year);
+        nagerMap.forEach((value, key) => {
+          if (!merged.has(key)) merged.set(key, value);
         });
-        holidayCache.set(year, map);
-        return map;
-      })
-      .catch(err => {
-        console.warn('Holiday fetch failed:', err);
-        const empty = new Map();
-        holidayCache.set(year, empty);
-        return empty;
-      });
+      } catch (err) {
+        console.warn('Nager year fetch failed:', err);
+      }
+      holidayCache.set(year, merged);
+      return merged;
+    })().catch(err => {
+      console.warn('Holiday aggregate failed:', err);
+      const empty = new Map();
+      holidayCache.set(year, empty);
+      return empty;
+    });
     holidayCache.set(year, promise);
     return promise;
   }
+
+  async function ensureHolidayInfo(dateStr) {
+    if (holidayInfoCache.has(dateStr)) return holidayInfoCache.get(dateStr);
+    const promise = fetch(`https://timor.tech/api/holiday/info/${dateStr}`)
+      .then(r => {
+        if (!r.ok) throw new Error(`timor info ${r.status}`);
+        return r.json();
+      })
+      .then(data => {
+        holidayInfoCache.set(dateStr, data || null);
+        return data || null;
+      })
+      .catch(err => {
+        console.warn('Holiday info fetch failed:', err);
+        holidayInfoCache.set(dateStr, null);
+        return null;
+      });
+    holidayInfoCache.set(dateStr, promise);
+    return promise;
+  }
+
   function getHolidayForDate(d) {
     const maybe = holidayCache.get(d.getFullYear());
     if (!maybe || typeof maybe.then === 'function') return null;
     return maybe.get(isoDate(d)) || null;
+  }
+
+  function getHolidayInfoForDateStr(dateStr) {
+    const maybe = holidayInfoCache.get(dateStr);
+    if (!maybe || typeof maybe.then === 'function') return null;
+    return maybe;
   }
 
   // Todo store (Using Supabase)
@@ -208,7 +280,9 @@
 
   function holidayLabelText(date) {
     const holiday = getHolidayForDate(date);
-    return holiday ? (holiday.localName || holiday.name || '节假日') : '';
+    if (!holiday) return '';
+    if (holiday.isWorkday) return holiday.localName || '补班';
+    return holiday.localName || holiday.name || '节假日';
   }
 
   function buildGrid(y, m) {
@@ -387,7 +461,20 @@
     todoTitle.textContent = isToday ? '今日提示' : '日期提示';
     todoDate.textContent = `${selected.getFullYear()}年${selected.getMonth() + 1}月${selected.getDate()}日 ${weekdayName(selected)}`;
     const holiday = getHolidayForDate(selected);
-    if (holidayInfo) holidayInfo.textContent = holiday ? `节假日：${holiday.localName || holiday.name || '节假日'}` : ' '; 
+    const info = getHolidayInfoForDateStr(key);
+    if (holidayInfo) {
+      const parts = [];
+      if (holiday) {
+        parts.push(holiday.isWorkday
+          ? `特殊日：${holiday.localName || '补班'}`
+          : `特殊日：${holiday.localName || holiday.name || '节假日'}`);
+      }
+      if (holiday && holiday.note) parts.push(holiday.note);
+      if (info && info.type && info.type.name && !/^周[一二三四五六日天]$/.test(info.type.name)) {
+        parts.push(info.type.name);
+      }
+      holidayInfo.textContent = parts.join(' · ') || ' ';
+    }
     const arr = listTodos(selected);
     const total = arr.length;
     const done = arr.filter(x => x.done).length;
@@ -493,4 +580,6 @@
     }
   }
   // Read-only timeline: no interactions bound
+})();
+teractions bound
 })();

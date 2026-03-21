@@ -149,6 +149,13 @@ body {
   border-color: color-mix(in lab, var(--accent) 45%, var(--border));
   background: color-mix(in lab, var(--accent) 10%, var(--surface));
 }
+.day.workday {
+  border-color: color-mix(in lab, var(--today) 45%, var(--border));
+  background: color-mix(in lab, var(--today) 10%, var(--surface));
+}
+.day.workday .holiday-label {
+  color: color-mix(in lab, var(--today) 75%, var(--text));
+}
 .holiday-info {
   margin-top: 4px;
   min-height: 18px;
