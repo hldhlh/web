@@ -2,7 +2,7 @@
   return [
     { name: "日历", path: "calendar/index.html" },
     { name: "待办事项", path: "todo/index.html" },
-    { name: "测试", path: "test/index.html" },
+    { name: "图片转换", path: "image-converter/index.html" },
     { name: "思维导图", path: "mindmap/index.html" },
     { name: "云盘", path: "cloud/index.html" },
     { name: "吃什么", path: "eatwhat/index.html" },
