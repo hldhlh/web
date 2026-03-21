@@ -23,6 +23,8 @@
   const todoTitle = $('#todoTitle');
   const todoDate = $('#todoDate');
   const holidayInfo = $('#holidayInfo');
+  const beijingTime = $('#beijingTime');
+  const urumqiTime = $('#urumqiTime');
   const todoStatus = $('#todoStatus');
   const todoInput = $('#todoInput');
   const todoAdd = $('#todoAdd');
@@ -446,6 +448,8 @@
 
   // Init
   initTheme();
+  updateDualTime();
+  setInterval(updateDualTime, 30000);
   fetchTodos();
   migrateLocalData();
 

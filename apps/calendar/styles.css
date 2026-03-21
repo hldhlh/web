@@ -163,6 +163,24 @@ body {
   color: var(--accent-ink);
   font-weight: 600;
 }
+.dual-time {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.time-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: color-mix(in lab, var(--surface) 96%, white 4%);
+  font-size: 12px;
+}
+.time-city { color: var(--muted); }
+.time-value { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
 
 .day .todo-dot {
   position: absolute; top: 8px; right: 10px; width: 6px; height: 6px;
