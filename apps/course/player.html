@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>春节 - 情景故事</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', 'Microsoft YaHei', sans-serif;
+            background: #fff;
+            color: #333;
+            -webkit-font-smoothing: antialiased;
+            max-width: 480px;
+            margin: 0 auto;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* ========== 顶部状态栏模拟 ========== */
+        .status-indicator {
+            background: #e63946;
+            color: #fff;
+            text-align: center;
+            padding: 4px 0;
+            font-size: 11px;
+            display: none;
+        }
+
+        .status-indicator.active {
+            display: block;
+        }
+
+        /* ========== 顶部标题栏 ========== */
+        .header-bar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .header-bar .close-btn {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: none;
+            border: none;
+            font-size: 20px;
+            color: #333;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .header-bar .title-area {
+            flex: 1;
+            text-align: center;
+            padding: 0 8px;
+        }
+
+        .header-bar .title-text {
+            font-size: 15px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .header-bar .subtitle {
+            font-size: 11px;
+            color: #999;
+            margin-top: 1px;
+        }
+
+        .header-bar .more-btn {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: none;
+            border: none;
+            font-size: 20px;
+            color: #333;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        /* ========== 加载进度条 ========== */
+        .loading-bar {
+            height: 2px;
+            background: #4CAF50;
+            width: 100%;
+            transition: opacity 0.3s;
+        }
+
+        /* ========== 课程封面 ========== */
+        .cover-area {
+            width: 100%;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .cover-image {
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 4 / 3;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+            position: relative;
+        }
+
+        .cover-image canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* 提示气泡 */
+        .tip-bubble {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 12px 14px;
+            border-radius: 10px;
+            font-size: 12px;
+            line-height: 1.6;
+            z-index: 5;
+            display: none;
+        }
+
+        .tip-bubble.show {
+            display: block;
+            animation: fadeInTip 0.3s ease;
+        }
+
+        @keyframes fadeInTip {
+            from {
+                opacity: 0;
+                transform: translateY(-5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .tip-close {
+            position: absolute;
+            top: 6px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        /* ========== 课程标题 ========== */
+        .lesson-title {
+            text-align: center;
+            font-size: 22px;
+            font-weight: 700;
+            padding: 16px 16px 10px;
+            color: #222;
+        }
+
+        /* ========== 进入课程链接 ========== */
+        .course-link {
+            margin: 6px 16px 12px;
+            padding: 12px 16px;
+            background: #fff0f3;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+
+        .course-link:active {
+            background: #ffe0e6;
+        }
+
+        .course-link span {
+            color: #e63946;
+            font-size: 14px;
+        }
+
+        .course-link .arrow {
+            color: #e63946;
+            font-size: 16px;
+        }
+
+        /* ========== 弹幕 & 笔记行 ========== */
+        .danmaku-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 20px;
+        }
+
+        .danmaku-btn {
+            width: 36px;
+            height: 36px;
+            border: 2px solid #e63946;
+            border-radius: 6px;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #e63946;
+            font-size: 13px;
+            font-weight: 700;
+            transition: all 0.2s;
+        }
+
+        .danmaku-btn.active {
+            background: #e63946;
+            color: #fff;
+        }
+
+        .note-btn {
+            width: 36px;
+            height: 36px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* ========== 进度条 ========== */
+        .progress-area {
+            padding: 4px 20px 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .time-label {
+            font-size: 12px;
+            color: #999;
+            flex-shrink: 0;
+            min-width: 36px;
+        }
+
+        .progress-bar-wrapper {
+            flex: 1;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 3px;
+            background: #eee;
+            border-radius: 2px;
+            position: relative;
+            overflow: visible;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #e63946, #ff6b6b);
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        .progress-thumb {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 12px;
+            height: 12px;
+            background: #e63946;
+            border-radius: 50%;
+            box-shadow: 0 1px 4px rgba(230, 57, 70, 0.4);
+            left: 0%;
+        }
+
+        /* ========== 播放控制 ========== */
+        .controls-area {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            padding: 16px 20px 24px;
+        }
+
+        .control-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: #666;
+            transition: all 0.2s;
+        }
+
+        .control-btn:active {
+            transform: scale(0.92);
+        }
+
+        .control-btn .icon {
+            font-size: 22px;
+        }
+
+        .control-btn .label {
+            font-size: 10px;
+            color: #999;
+        }
+
+        .prev-btn,
+        .next-btn {
+            color: #333;
+        }
+
+        .prev-btn .icon,
+        .next-btn .icon {
+            font-size: 28px;
+        }
+
+        .play-pause-btn {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #e63946, #ff4757);
+            border: none;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 6px 20px rgba(230, 57, 70, 0.35);
+            transition: all 0.2s;
+            color: #fff;
+        }
+
+        .play-pause-btn:active {
+            transform: scale(0.93);
+        }
+
+        .play-pause-btn .play-icon {
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 12px 0 12px 22px;
+            border-color: transparent transparent transparent #fff;
+            margin-left: 3px;
+        }
+
+        .play-pause-btn .pause-icon {
+            display: flex;
+            gap: 5px;
+        }
+
+        .play-pause-btn .pause-icon span {
+            width: 4px;
+            height: 22px;
+            background: #fff;
+            border-radius: 2px;
+        }
+
+        .speed-btn .speed-val {
+            font-size: 15px;
+            font-weight: 700;
+            color: #333;
+            border: 1.5px solid #ddd;
+            border-radius: 4px;
+            padding: 3px 6px;
+        }
+
+        /* ========== 课程介绍入口 ========== */
+        .intro-entry {
+            margin: 0 16px;
+            padding: 16px;
+            border-top: 1px solid #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+        }
+
+        .intro-entry:active {
+            background: #fafafa;
+        }
+
+        .intro-entry h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .intro-entry .arrow {
+            color: #ccc;
+            font-size: 18px;
+        }
+
+        /* ========== 底部 Tab 栏 ========== */
+        .bottom-tabs {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 480px;
+            background: #fff;
+            border-top: 1px solid #f0f0f0;
+            z-index: 90;
+        }
+
+        .tab-row {
+            display: flex;
+            padding: 8px 0 2px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #999;
+            padding: 4px 0;
+            transition: color 0.2s;
+        }
+
+        .tab-btn:active {
+            color: #e63946;
+        }
+
+        .tab-btn .tab-icon {
+            font-size: 20px;
+        }
+
+        .tab-btn .tab-label {
+            font-size: 11px;
+        }
+
+        .nav-arrows {
+            display: flex;
+            justify-content: center;
+            gap: 80px;
+            padding: 4px 0 6px;
+            padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+            border-top: 1px solid #f5f5f5;
+        }
+
+        .arrow-btn {
+            background: none;
+            border: none;
+            font-size: 22px;
+            color: #ccc;
+            cursor: pointer;
+            padding: 4px 12px;
+        }
+
+        .arrow-btn:active {
+            color: #999;
+        }
+
+        /* 内容区底部留白 */
+        .content-spacer {
+            height: 100px;
+        }
+
+        /* ========== 底部弹出面板（通用） ========== */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 200;
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+
+        .modal-overlay.active {
+            display: block;
+            opacity: 1;
+        }
+
+        .modal-sheet {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%) translateY(100%);
+            width: 100%;
+            max-width: 480px;
+            background: #fff;
+            border-radius: 16px 16px 0 0;
+            z-index: 201;
+            transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .modal-sheet.active {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 18px 16px 14px;
+            position: relative;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .modal-header h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .modal-close {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            font-size: 20px;
+            color: #999;
+            cursor: pointer;
+        }
+
+        /* ========== 更多操作面板 ========== */
+        .more-list {
+            list-style: none;
+        }
+
+        .more-list li {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid #f5f5f5;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .more-list li:active {
+            background: #fafafa;
+        }
+
+        .more-list li:last-child {
+            border-bottom: none;
+        }
+
+        .more-list .item-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 15px;
+            color: #333;
+        }
+
+        .more-list .item-left .item-icon {
+            font-size: 18px;
+            color: #999;
+            width: 24px;
+            text-align: center;
+        }
+
+        .more-list .item-arrow {
+            color: #ccc;
+            font-size: 16px;
+        }
+
+        /* ========== 课程列表面板 ========== */
+        .playlist-item {
+            display: flex;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid #f5f5f5;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .playlist-item:active {
+            background: #fafafa;
+        }
+
+        .playlist-item .pl-index {
+            width: 28px;
+            font-size: 14px;
+            color: #bbb;
+            flex-shrink: 0;
+        }
+
+        .playlist-item .pl-name {
+            font-size: 15px;
+            color: #333;
+            flex: 1;
+        }
+
+        .playlist-item.current .pl-index,
+        .playlist-item.current .pl-name {
+            color: #e63946;
+            font-weight: 600;
+        }
+
+        .playlist-item.current .pl-playing {
+            color: #e63946;
+            font-size: 16px;
+            margin-left: 8px;
+        }
+
+        /* ========== 倍速面板 ========== */
+        .speed-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 20px;
+            justify-content: center;
+        }
+
+        .speed-option {
+            padding: 10px 20px;
+            border: 1px solid #eee;
+            border-radius: 20px;
+            background: #fff;
+            font-size: 14px;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .speed-option.active {
+            background: #e63946;
+            color: #fff;
+            border-color: #e63946;
+        }
+
+        .speed-option:active {
+            transform: scale(0.95);
+        }
+
+        /* ========== 动画 ========== */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .cover-spinning .cover-image {
+            animation: spin 15s linear infinite;
+            border-radius: 50%;
+        }
+
+        /* 滚动条 */
+        ::-webkit-scrollbar {
+            width: 0;
+            background: transparent;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 播放状态指示条 -->
+    <div class="status-indicator" id="statusIndicator">
+        <span>● 正在播放</span>
+    </div>
+
+    <!-- 顶部标题栏 -->
+    <header class="header-bar">
+        <button class="close-btn" id="closeBtn" title="返回">✕</button>
+        <div class="title-area">
+            <div class="title-text" id="headerTitle">春节</div>
+            <div class="subtitle">h5.qlchat.com</div>
+        </div>
+        <button class="more-btn" id="moreMenuBtn" title="更多">•••</button>
+    </header>
+
+    <!-- 加载进度条 -->
+    <div class="loading-bar" id="loadingBar"></div>
+
+    <!-- 课程封面 -->
+    <div class="cover-area" id="coverArea">
+        <div class="cover-image">
+            <canvas id="coverCanvas"></canvas>
+            <!-- 提示气泡 -->
+            <div class="tip-bubble show" id="tipBubble">
+                ① 点击 ••• 菜单内的 ◎ 浮窗按钮，即可边听课边聊微信<br>
+                ② 还可点击 📦 收藏按钮，即可收藏到微信「我」中的收藏夹，便于下次打开
+                <button class="tip-close" id="tipClose">✕</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 课程标题 -->
+    <h1 class="lesson-title" id="lessonTitle">春节</h1>
+
+    <!-- 进入课程链接 -->
+    <a class="course-link" id="courseLink" href="./index.html">
+        <span>点击进入课程：情景故事</span>
+        <span class="arrow">›</span>
+    </a>
+
+    <!-- 弹幕 & 笔记 -->
+    <div class="danmaku-row">
+        <button class="danmaku-btn" id="danmakuBtn">弹</button>
+        <button class="note-btn" id="noteBtn">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+        </button>
+    </div>
+
+    <!-- 进度条 -->
+    <div class="progress-area">
+        <span class="time-label" id="currentTime">00:00</span>
+        <div class="progress-bar-wrapper" id="progressWrapper">
+            <div class="progress-track">
+                <div class="progress-fill" id="progressFill"></div>
+                <div class="progress-thumb" id="progressThumb"></div>
+            </div>
+        </div>
+        <span class="time-label" id="totalTime">02:14</span>
+    </div>
+
+    <!-- 播放控制 -->
+    <div class="controls-area">
+        <button class="control-btn" id="playlistBtn">
+            <span class="icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <line x1="8" y1="6" x2="21" y2="6" />
+                    <line x1="8" y1="12" x2="21" y2="12" />
+                    <line x1="8" y1="18" x2="21" y2="18" />
+                    <line x1="3" y1="6" x2="3.01" y2="6" />
+                    <line x1="3" y1="12" x2="3.01" y2="12" />
+                    <line x1="3" y1="18" x2="3.01" y2="18" />
+                </svg>
+            </span>
+            <span class="label">课程列表</span>
+        </button>
+
+        <button class="control-btn prev-btn" id="prevBtn">
+            <span class="icon">⏮</span>
+        </button>
+
+        <button class="play-pause-btn" id="playPauseBtn">
+            <div class="play-icon" id="playIcon"></div>
+            <div class="pause-icon" id="pauseIcon" style="display:none">
+                <span></span>
+                <span></span>
+            </div>
+        </button>
+
+        <button class="control-btn next-btn" id="nextBtn">
+            <span class="icon">⏭</span>
+        </button>
+
+        <button class="control-btn speed-btn" id="speedBtn">
+            <span class="speed-val" id="speedVal">1.0</span>
+            <span class="label">倍速</span>
+        </button>
+    </div>
+
+    <!-- 查看课程介绍 -->
+    <div class="intro-entry" id="introEntry">
+        <h3>查看课程介绍</h3>
+        <span class="arrow">›</span>
+    </div>
+
+    <div class="content-spacer"></div>
+
+    <!-- ========== 底部 Tab 栏 ========== -->
+    <div class="bottom-tabs">
+        <div class="tab-row">
+            <button class="tab-btn" id="shareTabBtn">
+                <span class="tab-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="1.5">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                        <polyline points="15 3 21 3 21 9" />
+                        <line x1="10" y1="14" x2="21" y2="3" />
+                    </svg>
+                </span>
+                <span class="tab-label">分享</span>
+            </button>
+            <button class="tab-btn" id="commentTabBtn">
+                <span class="tab-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="1.5">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
+                </span>
+                <span class="tab-label">评论</span>
+            </button>
+            <button class="tab-btn" id="moreTabBtn">
+                <span class="tab-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="1.5">
+                        <line x1="3" y1="6" x2="21" y2="6" />
+                        <line x1="3" y1="12" x2="21" y2="12" />
+                        <line x1="3" y1="18" x2="21" y2="18" />
+                    </svg>
+                </span>
+                <span class="tab-label">更多</span>
+            </button>
+        </div>
+        <div class="nav-arrows">
+            <button class="arrow-btn" id="navPrev">‹</button>
+            <button class="arrow-btn" id="navNext">›</button>
+        </div>
+    </div>
+
+    <!-- ========== 更多操作 弹出面板 ========== -->
+    <div class="modal-overlay" id="moreOverlay"></div>
+    <div class="modal-sheet" id="moreSheet">
+        <div class="modal-header">
+            <h3>更多操作</h3>
+            <button class="modal-close" id="moreClose">✕</button>
+        </div>
+        <ul class="more-list">
+            <li data-action="intro">
+                <div class="item-left"><span class="item-icon">📄</span> 课程简介</div>
+                <span class="item-arrow">›</span>
+            </li>
+            <li data-action="review">
+                <div class="item-left"><span class="item-icon">✏️</span> 评价课程</div>
+                <span class="item-arrow">›</span>
+            </li>
+            <li data-action="favorite">
+                <div class="item-left"><span class="item-icon">☆</span> 收藏</div>
+                <span class="item-arrow">›</span>
+            </li>
+            <li data-action="support">
+                <div class="item-left"><span class="item-icon">🔄</span> 售后处理</div>
+                <span class="item-arrow">›</span>
+            </li>
+            <li data-action="report">
+                <div class="item-left"><span class="item-icon">⚠️</span> 违规举报</div>
+                <span class="item-arrow">›</span>
+            </li>
+        </ul>
+    </div>
+
+    <!-- ========== 课程列表 弹出面板 ========== -->
+    <div class="modal-overlay" id="playlistOverlay"></div>
+    <div class="modal-sheet" id="playlistSheet">
+        <div class="modal-header">
+            <h3>课程列表</h3>
+            <button class="modal-close" id="playlistClose">✕</button>
+        </div>
+        <div id="playlistContent"></div>
+    </div>
+
+    <!-- ========== 倍速 弹出面板 ========== -->
+    <div class="modal-overlay" id="speedOverlay"></div>
+    <div class="modal-sheet" id="speedSheet">
+        <div class="modal-header">
+            <h3>播放倍速</h3>
+            <button class="modal-close" id="speedClose">✕</button>
+        </div>
+        <div class="speed-options" id="speedOptions">
+            <button class="speed-option" data-speed="0.5">0.5x</button>
+            <button class="speed-option" data-speed="0.75">0.75x</button>
+            <button class="speed-option active" data-speed="1.0">1.0x</button>
+            <button class="speed-option" data-speed="1.25">1.25x</button>
+            <button class="speed-option" data-speed="1.5">1.5x</button>
+            <button class="speed-option" data-speed="2.0">2.0x</button>
+        </div>
+    </div>
+
+    <script>
+        // ========== 课程数据 ==========
+        const lessons = [
+            { id: 1, name: '春节', duration: '02:14' },
+            { id: 2, name: '春天', duration: '02:10' },
+            { id: 3, name: '冬天', duration: '02:08' },
+            { id: 4, name: '端午节', duration: '02:15' },
+            { id: 5, name: '儿童节', duration: '02:12' },
+            { id: 6, name: '国庆节', duration: '02:20' },
+            { id: 7, name: '教师节', duration: '02:05' },
+            { id: 8, name: '清明节', duration: '02:18' },
+            { id: 9, name: '生日会', duration: '02:30' },
+            { id: 10, name: '万圣节', duration: '02:22' },
+            { id: 11, name: '中秋节', duration: '02:16' },
+            { id: 12, name: '重阳节', duration: '02:11' },
+            { id: 13, name: '元宵节', duration: '02:25' },
+            { id: 14, name: '植树节', duration: '02:09' },
+            { id: 15, name: '劳动节', duration: '02:14' }
+        ];
+
+        // 获取 URL 参数
+        const urlParams = new URLSearchParams(window.location.search);
+        let currentLessonId = parseInt(urlParams.get('lesson')) || 1;
+
+        let isPlaying = false;
+        let currentSpeed = 1.0;
+        let currentTime = 0;
+        let totalTime = 134; // 默认 02:14
+        let progressInterval = null;
+        let danmakuOn = false;
+
+        // ========== 封面绘制 ==========
+        const coverThemes = {
+            '春节': { bg1: '#f9dcc4', bg2: '#fcd5ce', emoji: '🧧', textColor: '#b71c1c', decoColor: 'rgba(183,28,28,0.1)' },
+            '春天': { bg1: '#d4edda', bg2: '#c8e6c9', emoji: '🌸', textColor: '#2e7d32', decoColor: 'rgba(46,125,50,0.1)' },
+            '冬天': { bg1: '#e3f2fd', bg2: '#bbdefb', emoji: '❄️', textColor: '#1565c0', decoColor: 'rgba(21,101,192,0.1)' },
+            '端午节': { bg1: '#e8f5e9', bg2: '#c8e6c9', emoji: '🐲', textColor: '#1b5e20', decoColor: 'rgba(27,94,32,0.1)' },
+            '儿童节': { bg1: '#fff9c4', bg2: '#fff59d', emoji: '🎈', textColor: '#f57f17', decoColor: 'rgba(245,127,23,0.1)' },
+            '国庆节': { bg1: '#ffcdd2', bg2: '#ef9a9a', emoji: '🇨🇳', textColor: '#c62828', decoColor: 'rgba(198,40,40,0.1)' },
+            '教师节': { bg1: '#e1bee7', bg2: '#ce93d8', emoji: '📚', textColor: '#6a1b9a', decoColor: 'rgba(106,27,154,0.1)' },
+            '清明节': { bg1: '#dcedc8', bg2: '#c5e1a5', emoji: '🌿', textColor: '#33691e', decoColor: 'rgba(51,105,30,0.1)' },
+            '生日会': { bg1: '#fce4ec', bg2: '#f8bbd0', emoji: '🎂', textColor: '#c2185b', decoColor: 'rgba(194,24,91,0.1)' },
+            '万圣节': { bg1: '#fff3e0', bg2: '#ffe0b2', emoji: '🎃', textColor: '#e65100', decoColor: 'rgba(230,81,0,0.1)' },
+            '中秋节': { bg1: '#fff8e1', bg2: '#ffecb3', emoji: '🥮', textColor: '#ff8f00', decoColor: 'rgba(255,143,0,0.1)' },
+            '重阳节': { bg1: '#fce4ec', bg2: '#f8bbd0', emoji: '🌺', textColor: '#ad1457', decoColor: 'rgba(173,20,87,0.1)' },
+            '元宵节': { bg1: '#fff3e0', bg2: '#ffe0b2', emoji: '🏮', textColor: '#e65100', decoColor: 'rgba(230,81,0,0.1)' },
+            '植树节': { bg1: '#e8f5e9', bg2: '#a5d6a7', emoji: '🌳', textColor: '#2e7d32', decoColor: 'rgba(46,125,50,0.1)' },
+            '劳动节': { bg1: '#e3f2fd', bg2: '#90caf9', emoji: '⚒️', textColor: '#1565c0', decoColor: 'rgba(21,101,192,0.1)' },
+        };
+
+        function drawCover(lessonName) {
+            const canvas = document.getElementById('coverCanvas');
+            const ctx = canvas.getContext('2d');
+            const container = canvas.parentElement;
+            const rect = container.getBoundingClientRect();
+            const dpr = 2;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
+            ctx.scale(dpr, dpr);
+
+            const w = rect.width;
+            const h = rect.height;
+            const theme = coverThemes[lessonName] || coverThemes['春节'];
+
+            // 背景
+            const grad = ctx.createLinearGradient(0, 0, w, h);
+            grad.addColorStop(0, theme.bg1);
+            grad.addColorStop(1, theme.bg2);
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+
+            // 装饰圆
+            for (let i = 0; i < 6; i++) {
+                ctx.beginPath();
+                ctx.arc(
+                    Math.random() * w,
+                    Math.random() * h,
+                    20 + Math.random() * 40,
+                    0, Math.PI * 2
+                );
+                ctx.fillStyle = theme.decoColor;
+                ctx.fill();
+            }
+
+            // 中式装饰线条
+            ctx.strokeStyle = theme.textColor + '20';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 3; i++) {
+                ctx.beginPath();
+                ctx.arc(w * 0.8 + i * 15, h * 0.2, 30 + i * 20, 0, Math.PI * 0.5);
+                ctx.stroke();
+            }
+
+            // 主标题文字
+            ctx.fillStyle = theme.textColor;
+            ctx.font = `bold ${w * 0.18}px "PingFang SC", sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(lessonName, w / 2, h * 0.45);
+
+            // 大 emoji
+            ctx.font = `${w * 0.15}px sans-serif`;
+            ctx.fillText(theme.emoji, w * 0.78, h * 0.75);
+
+            // 小装饰 emoji
+            ctx.font = `${w * 0.06}px sans-serif`;
+            ctx.fillText(theme.emoji, w * 0.12, h * 0.2);
+            ctx.fillText(theme.emoji, w * 0.88, h * 0.15);
+
+            // 底部金色波浪装饰
+            ctx.beginPath();
+            ctx.moveTo(0, h * 0.88);
+            for (let x = 0; x <= w; x += 1) {
+                ctx.lineTo(x, h * 0.88 + Math.sin(x * 0.03) * 8);
+            }
+            ctx.lineTo(w, h);
+            ctx.lineTo(0, h);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(255, 193, 7, 0.2)';
+            ctx.fill();
+        }
+
+        // ========== 切换课程 ==========
+        function switchLesson(lessonId) {
+            const lesson = lessons.find(l => l.id === lessonId);
+            if (!lesson) return;
+
+            currentLessonId = lessonId;
+            currentTime = 0;
+
+            // 解析总时间
+            const parts = lesson.duration.split(':');
+            totalTime = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+
+            // 更新 UI
+            document.getElementById('headerTitle').textContent = lesson.name;
+            document.getElementById('lessonTitle').textContent = lesson.name;
+            document.title = lesson.name + ' - 情景故事';
+            document.getElementById('totalTime').textContent = lesson.duration;
+            document.getElementById('currentTime').textContent = '00:00';
+            updateProgress(0);
+
+            // 重绘封面
+            drawCover(lesson.name);
+
+            // 更新 URL（不刷新页面）
+            const url = new URL(window.location);
+            url.searchParams.set('lesson', lessonId);
+            history.replaceState(null, '', url);
+
+            // 如果正在播放，继续播放
+            if (isPlaying) {
+                startProgress();
+            }
+        }
+
+        // ========== 播放/暂停 ==========
+        function togglePlay() {
+            isPlaying = !isPlaying;
+            const playIcon = document.getElementById('playIcon');
+            const pauseIcon = document.getElementById('pauseIcon');
+            const status = document.getElementById('statusIndicator');
+
+            if (isPlaying) {
+                playIcon.style.display = 'none';
+                pauseIcon.style.display = 'flex';
+                status.classList.add('active');
+                startProgress();
+            } else {
+                playIcon.style.display = '';
+                pauseIcon.style.display = 'none';
+                status.classList.remove('active');
+                stopProgress();
+            }
+        }
+
+        // ========== 进度模拟 ==========
+        function startProgress() {
+            stopProgress();
+            progressInterval = setInterval(() => {
+                currentTime += currentSpeed;
+                if (currentTime >= totalTime) {
+                    // 播放下一课
+                    const nextId = currentLessonId < lessons.length ? currentLessonId + 1 : 1;
+                    switchLesson(nextId);
+                    return;
+                }
+                updateProgress(currentTime / totalTime);
+                updateTimeDisplay();
+            }, 1000);
+        }
+
+        function stopProgress() {
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+        }
+
+        function updateProgress(ratio) {
+            ratio = Math.min(1, Math.max(0, ratio));
+            const pct = ratio * 100;
+            document.getElementById('progressFill').style.width = pct + '%';
+            document.getElementById('progressThumb').style.left = pct + '%';
+        }
+
+        function updateTimeDisplay() {
+            const min = Math.floor(currentTime / 60);
+            const sec = Math.floor(currentTime % 60);
+            document.getElementById('currentTime').textContent =
+                String(min).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+        }
+
+        // ========== 进度条拖拽 ==========
+        function initProgressDrag() {
+            const wrapper = document.getElementById('progressWrapper');
+            let dragging = false;
+
+            function seekTo(e) {
+                const rect = wrapper.getBoundingClientRect();
+                const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+                const ratio = Math.min(1, Math.max(0, x / rect.width));
+                currentTime = ratio * totalTime;
+                updateProgress(ratio);
+                updateTimeDisplay();
+            }
+
+            wrapper.addEventListener('mousedown', (e) => { dragging = true; seekTo(e); });
+            wrapper.addEventListener('touchstart', (e) => { dragging = true; seekTo(e); }, { passive: true });
+            document.addEventListener('mousemove', (e) => { if (dragging) seekTo(e); });
+            document.addEventListener('touchmove', (e) => { if (dragging) seekTo(e); }, { passive: true });
+            document.addEventListener('mouseup', () => { dragging = false; });
+            document.addEventListener('touchend', () => { dragging = false; });
+        }
+
+        // ========== 课程列表面板 ==========
+        function renderPlaylist() {
+            const container = document.getElementById('playlistContent');
+            container.innerHTML = lessons.map(l => `
+        <div class="playlist-item ${l.id === currentLessonId ? 'current' : ''}" data-id="${l.id}">
+          <span class="pl-index">${l.id === currentLessonId ? '▎' : String(l.id).padStart(2, '0')}</span>
+          <span class="pl-name">音频课 | ${l.name}</span>
+          ${l.id === currentLessonId ? '<span class="pl-playing">♪</span>' : ''}
+        </div>
+      `).join('');
+
+            container.querySelectorAll('.playlist-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const id = parseInt(item.dataset.id);
+                    switchLesson(id);
+                    closeModal('playlist');
+                    renderPlaylist();
+                });
+            });
+        }
+
+        // ========== 模态框管理 ==========
+        function openModal(name) {
+            const overlay = document.getElementById(name + 'Overlay');
+            const sheet = document.getElementById(name + 'Sheet');
+            overlay.classList.add('active');
+            requestAnimationFrame(() => {
+                sheet.classList.add('active');
+            });
+
+            overlay.onclick = () => closeModal(name);
+        }
+
+        function closeModal(name) {
+            const overlay = document.getElementById(name + 'Overlay');
+            const sheet = document.getElementById(name + 'Sheet');
+            sheet.classList.remove('active');
+            setTimeout(() => {
+                overlay.classList.remove('active');
+            }, 300);
+        }
+
+        // ========== 初始化所有事件 ==========
+        function init() {
+            const lesson = lessons.find(l => l.id === currentLessonId) || lessons[0];
+            currentLessonId = lesson.id;
+
+            // 解析总时间
+            const parts = lesson.duration.split(':');
+            totalTime = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+
+            // 初始化 UI
+            document.getElementById('headerTitle').textContent = lesson.name;
+            document.getElementById('lessonTitle').textContent = lesson.name;
+            document.title = lesson.name + ' - 情景故事';
+            document.getElementById('totalTime').textContent = lesson.duration;
+
+            // 绘制封面
+            drawCover(lesson.name);
+            window.addEventListener('resize', () => drawCover(lessons.find(l => l.id === currentLessonId).name));
+
+            // 播放/暂停
+            document.getElementById('playPauseBtn').addEventListener('click', togglePlay);
+
+            // 上一课/下一课
+            document.getElementById('prevBtn').addEventListener('click', () => {
+                if (currentLessonId > 1) switchLesson(currentLessonId - 1);
+            });
+            document.getElementById('nextBtn').addEventListener('click', () => {
+                if (currentLessonId < lessons.length) switchLesson(currentLessonId + 1);
+            });
+
+            // 进度条拖拽
+            initProgressDrag();
+
+            // 提示气泡
+            document.getElementById('tipClose').addEventListener('click', () => {
+                document.getElementById('tipBubble').classList.remove('show');
+            });
+            // 5秒后自动关闭提示
+            setTimeout(() => {
+                document.getElementById('tipBubble').classList.remove('show');
+            }, 5000);
+
+            // 弹幕按钮
+            document.getElementById('danmakuBtn').addEventListener('click', () => {
+                danmakuOn = !danmakuOn;
+                document.getElementById('danmakuBtn').classList.toggle('active', danmakuOn);
+            });
+
+            // 课程列表面板
+            document.getElementById('playlistBtn').addEventListener('click', () => {
+                renderPlaylist();
+                openModal('playlist');
+            });
+            document.getElementById('playlistClose').addEventListener('click', () => closeModal('playlist'));
+
+            // 更多操作面板
+            document.getElementById('moreTabBtn').addEventListener('click', () => openModal('more'));
+            document.getElementById('moreMenuBtn').addEventListener('click', () => openModal('more'));
+            document.getElementById('moreClose').addEventListener('click', () => closeModal('more'));
+
+            // 倍速面板
+            document.getElementById('speedBtn').addEventListener('click', () => openModal('speed'));
+            document.getElementById('speedClose').addEventListener('click', () => closeModal('speed'));
+            document.querySelectorAll('.speed-option').forEach(opt => {
+                opt.addEventListener('click', () => {
+                    currentSpeed = parseFloat(opt.dataset.speed);
+                    document.getElementById('speedVal').textContent = currentSpeed.toFixed(1);
+                    document.querySelectorAll('.speed-option').forEach(o => o.classList.remove('active'));
+                    opt.classList.add('active');
+                    closeModal('speed');
+                });
+            });
+
+            // 返回
+            document.getElementById('closeBtn').addEventListener('click', () => {
+                stopProgress();
+                if (window.history.length > 1) {
+                    window.history.back();
+                } else {
+                    window.location.href = './index.html';
+                }
+            });
+
+            // 底部导航箭头
+            document.getElementById('navPrev').addEventListener('click', () => {
+                if (currentLessonId > 1) switchLesson(currentLessonId - 1);
+            });
+            document.getElementById('navNext').addEventListener('click', () => {
+                if (currentLessonId < lessons.length) switchLesson(currentLessonId + 1);
+            });
+
+            // 查看课程介绍
+            document.getElementById('introEntry').addEventListener('click', () => {
+                window.location.href = './index.html';
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+
+</html>
