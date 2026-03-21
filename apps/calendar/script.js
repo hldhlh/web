@@ -22,6 +22,7 @@
   const todoCard = $('#todoCard');
   const todoTitle = $('#todoTitle');
   const todoDate = $('#todoDate');
+  const holidayInfo = $('#holidayInfo');
   const todoStatus = $('#todoStatus');
   const todoInput = $('#todoInput');
   const todoAdd = $('#todoAdd');
@@ -44,6 +45,42 @@
   }
   function pad2(n) { return String(n).padStart(2, '0'); }
   function isoDate(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+
+  // Holiday store (remote API)
+  const holidayCache = new Map();
+  async function ensureHolidayYear(year) {
+    if (holidayCache.has(year)) return holidayCache.get(year);
+    const promise = fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/CN`)
+      .then(r => {
+        if (!r.ok) throw new Error(`holiday api ${r.status}`);
+        return r.json();
+      })
+      .then(list => {
+        const map = new Map();
+        (Array.isArray(list) ? list : []).forEach(item => {
+          if (!item || !item.date) return;
+          map.set(item.date, {
+            localName: item.localName || item.name || '节假日',
+            name: item.name || item.localName || 'Holiday'
+          });
+        });
+        holidayCache.set(year, map);
+        return map;
+      })
+      .catch(err => {
+        console.warn('Holiday fetch failed:', err);
+        const empty = new Map();
+        holidayCache.set(year, empty);
+        return empty;
+      });
+    holidayCache.set(year, promise);
+    return promise;
+  }
+  function getHolidayForDate(d) {
+    const maybe = holidayCache.get(d.getFullYear());
+    if (!maybe || typeof maybe.then === 'function') return null;
+    return maybe.get(isoDate(d)) || null;
+  }
 
   // Todo store (Using Supabase)
   let todos = {};
@@ -169,6 +206,11 @@
     monthLabel.textContent = monthsCN[m];
   }
 
+  function holidayLabelText(date) {
+    const holiday = getHolidayForDate(date);
+    return holiday ? (holiday.localName || holiday.name || '节假日') : '';
+  }
+
   function buildGrid(y, m) {
     const { offset, daysInMonth, daysInPrev } = monthInfo(y, m);
     daysEl.innerHTML = '';
@@ -215,6 +257,15 @@
     num.textContent = String(date.getDate());
     btn.appendChild(num);
 
+    const holidayText = holidayLabelText(date);
+    if (holidayText) {
+      btn.classList.add('holiday');
+      const holiday = document.createElement('span');
+      holiday.className = 'holiday-label';
+      holiday.textContent = holidayText;
+      btn.appendChild(holiday);
+    }
+
     if (isSameDate(date, today)) btn.classList.add('today');
     if (isSameDate(date, selected)) btn.classList.add('selected');
 
@@ -256,6 +307,10 @@
     buildGrid(view.y, view.m);
     updateTodoCard();
     updateTimeline();
+    const currentYearState = holidayCache.get(view.y);
+    if (!currentYearState || typeof currentYearState.then === 'function') {
+      ensureHolidayYear(view.y).then(() => render());
+    }
   }
 
   // Navigation
@@ -331,6 +386,8 @@
     const key = isoDate(selected);
     todoTitle.textContent = isToday ? '今日提示' : '日期提示';
     todoDate.textContent = `${selected.getFullYear()}年${selected.getMonth() + 1}月${selected.getDate()}日 ${weekdayName(selected)}`;
+    const holiday = getHolidayForDate(selected);
+    if (holidayInfo) holidayInfo.textContent = holiday ? `节假日：${holiday.localName || holiday.name || '节假日'}` : ' '; 
     const arr = listTodos(selected);
     const total = arr.length;
     const done = arr.filter(x => x.done).length;
