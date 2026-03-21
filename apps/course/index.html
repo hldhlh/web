@@ -4,1119 +4,768 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>情景故事_远航教育直播平台</title>
+    <title>情景故事 - 情景故事学习小组制作</title>
+    <!-- 引入高质感字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./course-db.js"></script>
     <style>
+        :root {
+            /* 核心色盘 */
+            --primary: #FF4757;
+            --primary-gradient: linear-gradient(135deg, #FF4757, #FF6B81);
+            --secondary: #2F3542;
+            --accent: #70A1FF;
+            --success: #2ED573;
+            
+            /* 中性色 */
+            --bg: #F1F2F6;
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --text-main: #2F3542;
+            --text-muted: #747D8C;
+            --border: rgba(0, 0, 0, 0.05);
+            
+            /* 玻璃拟态 */
+            --glass: rgba(255, 255, 255, 0.75);
+            --glass-border: rgba(255, 255, 255, 0.4);
+            
+            /* 阴影 */
+            --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.12);
+            
+            /* 圆角 */
+            --radius-sm: 8px;
+            --radius-md: 16px;
+            --radius-lg: 24px;
+            --radius-full: 999px;
+            
+            /* 布局 */
+            --max-w: 480px;
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', 'Microsoft YaHei', sans-serif;
-            background: #f5f5f5;
-            color: #333;
-            -webkit-font-smoothing: antialiased;
-            max-width: 480px;
-            margin: 0 auto;
-            min-height: 100vh;
-            position: relative;
+            font-family: 'Outfit', 'Noto Sans SC', sans-serif;
+            background: #E4E7EB; /* 桌面端大背景 */
+            color: var(--text-main);
             overflow-x: hidden;
+            min-height: 100vh;
         }
 
-        /* ========== 顶部标题栏 ========== */
-        .header-bar {
+        /* 移动端容器居中 */
+        .app-container {
+            max-width: var(--max-w);
+            margin: 0 auto;
+            background: var(--bg);
+            min-height: 100vh;
+            position: relative;
+            box-shadow: 0 0 100px rgba(0,0,0,0.1);
+        }
+
+        /* ========== 头部导航 (Glassmorphism) ========== */
+        .header {
             position: sticky;
             top: 0;
-            z-index: 100;
-            background: #fff;
+            z-index: 1000;
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 10px 12px;
-            border-bottom: 1px solid #eee;
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--glass-border);
         }
 
-        .header-bar .close-btn {
-            width: 32px;
-            height: 32px;
+        .header .btn-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: none;
+            background: rgba(0,0,0,0.03);
             border: none;
-            font-size: 20px;
-            color: #333;
             cursor: pointer;
-            flex-shrink: 0;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .header-bar .title-area {
-            flex: 1;
+        .header .btn-icon:active {
+            transform: scale(0.9);
+            background: rgba(0,0,0,0.08);
+        }
+
+        .header .title-center {
             text-align: center;
-            padding: 0 8px;
+            flex: 1;
         }
 
-        .header-bar .title-area .title-text {
-            font-size: 15px;
-            font-weight: 600;
-            color: #333;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+        .header .title-main {
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
         }
 
-        .header-bar .title-area .subtitle {
-            font-size: 11px;
-            color: #999;
-            margin-top: 1px;
-        }
-
-        .header-bar .more-btn {
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: none;
-            border: none;
-            font-size: 20px;
-            color: #333;
-            cursor: pointer;
-            flex-shrink: 0;
+        .header .title-sub {
+            font-size: 10px;
+            text-transform: uppercase;
             letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-top: 2px;
         }
 
         /* ========== 视频/封面区域 ========== */
-        .video-area {
+        .hero-section {
+            position: relative;
+            padding: 20px;
+            background: white;
+        }
+
+        .cover-wrapper {
             position: relative;
             width: 100%;
             aspect-ratio: 16 / 10;
-            background: #1a1a2e;
+            border-radius: var(--radius-lg);
             overflow: hidden;
+            box-shadow: var(--shadow-md);
             cursor: pointer;
+            transform: translateZ(0); /* 开启硬件加速 */
         }
 
-        .video-area .course-banner {
+        .cover-wrapper .cover-img {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            display: block;
+            transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
 
-        .video-area .banner-top {
+        .cover-wrapper:hover .cover-img {
+            transform: scale(1.05);
+        }
+
+        .cover-overlay {
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: linear-gradient(135deg, #e63946, #ff6b6b);
-            color: #fff;
-            font-size: 11px;
-            padding: 6px 12px;
+            inset: 0;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.2), rgba(0,0,0,0.5));
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+        }
+
+        .tag-festive {
+            align-self: flex-start;
+            background: var(--primary-gradient);
+            color: white;
+            padding: 6px 14px;
+            border-radius: var(--radius-full);
+            font-size: 12px;
+            font-weight: 600;
             display: flex;
             align-items: center;
-            gap: 8px;
-            z-index: 2;
+            gap: 6px;
+            box-shadow: 0 4px 12px rgba(255, 71, 87, 0.3);
         }
 
-        .video-area .banner-top .banner-icon {
-            font-size: 13px;
-        }
-
-        .video-area .play-btn {
+        .play-master-btn {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 60px;
-            height: 60px;
-            background: rgba(0, 0, 0, 0.5);
+            width: 72px;
+            height: 72px;
+            background: var(--glass);
+            backdrop-filter: blur(8px);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            z-index: 3;
-            border: 2px solid rgba(255, 255, 255, 0.7);
-            transition: transform 0.2s ease;
+            border: 2px solid white;
+            transition: all 0.3s;
+            box-shadow: var(--shadow-lg);
         }
 
-        .video-area .play-btn:hover {
-            transform: translate(-50%, -50%) scale(1.1);
-        }
-
-        .video-area .play-btn::after {
-            content: '';
-            width: 0;
-            height: 0;
-            border-style: solid;
-            border-width: 12px 0 12px 22px;
-            border-color: transparent transparent transparent #fff;
+        .play-master-btn svg {
+            width: 32px;
+            height: 32px;
+            fill: var(--primary);
             margin-left: 4px;
         }
 
-        .video-area .share-btn {
-            position: absolute;
-            top: 40px;
-            right: 10px;
-            background: rgba(0, 0, 0, 0.45);
-            color: #fff;
-            font-size: 12px;
-            padding: 5px 10px;
-            border-radius: 4px;
+        .play-master-btn:hover {
+            transform: translate(-50%, -50%) scale(1.1);
+            background: white;
+        }
+
+        /* ========== 课程信息和数据 ========== */
+        .info-card {
+            padding: 24px 20px;
+            background: white;
+            border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+        }
+
+        .course-title {
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin-bottom: 12px;
+        }
+
+        .course-badges {
             display: flex;
-            align-items: center;
-            gap: 4px;
-            z-index: 3;
-            cursor: pointer;
-            border: none;
-        }
-
-        .video-area .volume-btn {
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            width: 30px;
-            height: 30px;
-            background: rgba(0, 0, 0, 0.45);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 3;
-            cursor: pointer;
-            border: none;
-            color: #fff;
-        }
-
-        /* ========== 课程信息区 ========== */
-        .course-info {
-            background: #fff;
-            padding: 16px;
-        }
-
-        .course-info .course-title {
-            font-size: 20px;
-            font-weight: 700;
-            color: #222;
-            margin-bottom: 10px;
-        }
-
-        .course-info .course-stats {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            font-size: 13px;
-            color: #888;
-        }
-
-        .course-info .course-stats .stat-item {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .course-info .course-stats .stat-icon {
-            font-size: 14px;
-            color: #aaa;
-        }
-
-        /* ========== 分割线 ========== */
-        .divider {
-            height: 8px;
-            background: #f5f5f5;
-        }
-
-        /* ========== 平台信息区 ========== */
-        .platform-info {
-            background: #fff;
-            padding: 16px;
-            display: flex;
-            align-items: center;
             gap: 12px;
         }
 
-        .platform-info .platform-avatar {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #3498db, #2ecc71);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            overflow: hidden;
-        }
-
-        .platform-info .platform-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .platform-info .platform-avatar .avatar-text {
-            color: #fff;
-            font-size: 11px;
-            font-weight: 700;
-            text-align: center;
-            line-height: 1.1;
-        }
-
-        .platform-info .platform-detail {
-            flex: 1;
-        }
-
-        .platform-info .platform-name {
-            font-size: 15px;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 4px;
-        }
-
-        .platform-info .platform-stats {
-            font-size: 12px;
-            color: #999;
-        }
-
-        .platform-info .platform-stats span {
-            color: #333;
-            font-weight: 600;
-            margin-right: 2px;
-        }
-
-        .platform-info .follow-btn {
-            padding: 6px 14px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background: #fff;
+        .badge {
+            background: var(--bg);
+            padding: 8px 14px;
+            border-radius: 12px;
             font-size: 13px;
-            color: #666;
-            cursor: pointer;
-            flex-shrink: 0;
-            transition: all 0.2s;
-        }
-
-        .platform-info .follow-btn:active {
-            background: #f5f5f5;
-        }
-
-        .platform-info .follow-btn.followed {
-            border-color: #e63946;
-            color: #e63946;
-        }
-
-        /* ========== Tab导航 ========== */
-        .tab-nav {
-            background: #fff;
+            color: var(--text-muted);
             display: flex;
-            border-bottom: 1px solid #eee;
-            position: sticky;
-            top: 53px;
-            z-index: 90;
+            align-items: center;
+            gap: 6px;
+            font-weight: 500;
         }
 
-        .tab-nav .tab-item {
-            flex: 1;
-            text-align: center;
-            padding: 14px 0;
-            font-size: 14px;
-            color: #666;
-            cursor: pointer;
-            position: relative;
-            transition: color 0.2s;
-            background: none;
-            border: none;
-            font-family: inherit;
+        .badge strong {
+            color: var(--text-main);
         }
 
-        .tab-nav .tab-item.active {
-            color: #333;
-            font-weight: 700;
+        /* ========== 平台信息 (精致卡片) ========== */
+        .platform-section {
+            padding: 20px;
         }
 
-        .tab-nav .tab-item.active::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 24px;
-            height: 3px;
-            background: #e63946;
-            border-radius: 2px;
-        }
-
-        /* ========== Tab内容区域 ========== */
-        .tab-content {
-            background: #fff;
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        /* 继续听课 */
-        .continue-listen {
-            padding: 12px 16px;
-            background: #fff9f5;
-            border-bottom: 1px solid #f0f0f0;
-        }
-
-        .continue-listen a {
-            color: #e63946;
-            font-size: 14px;
-            text-decoration: none;
-        }
-
-        .continue-listen a:active {
-            opacity: 0.7;
-        }
-
-        /* 学习列表头 */
-        .list-header {
+        .platform-card {
+            background: white;
             padding: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .list-header .list-title {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .list-header .list-title .title-bar {
-            width: 3px;
-            height: 18px;
-            background: #e63946;
-            border-radius: 2px;
-        }
-
-        .list-header .list-title h3 {
-            font-size: 16px;
-            font-weight: 700;
-            color: #333;
-        }
-
-        .list-header .list-actions {
+            border-radius: var(--radius-md);
             display: flex;
             align-items: center;
             gap: 16px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border);
         }
 
-        .list-header .list-actions .action-btn {
-            background: none;
-            border: none;
-            color: #666;
-            font-size: 13px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 4px;
+        .platform-logo {
+            width: 56px;
+            height: 56px;
+            border-radius: 14px;
+            object-fit: cover;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
         }
 
-        .list-header .list-actions .grid-icon {
-            font-size: 20px;
-            color: #999;
-        }
-
-        .lesson-count-row {
-            padding: 0 16px 12px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            font-size: 13px;
-            color: #999;
-        }
-
-        .lesson-count-row .sort-btn {
-            background: none;
-            border: none;
-            color: #999;
-            font-size: 13px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .lesson-count-row .sort-btn .sort-icon {
-            font-size: 14px;
-        }
-
-        /* ========== 课程列表 ========== */
-        .lesson-list {
-            list-style: none;
-            padding-bottom: 100px;
-        }
-
-        .lesson-item {
-            display: flex;
-            align-items: center;
-            padding: 14px 16px;
-            border-bottom: 1px solid #f5f5f5;
-            cursor: pointer;
-            transition: background 0.15s;
-        }
-
-        .lesson-item:active {
-            background: #f9f9f9;
-        }
-
-        .lesson-item .lesson-index {
-            width: 28px;
-            font-size: 14px;
-            color: #bbb;
-            flex-shrink: 0;
-        }
-
-        .lesson-item .lesson-info {
+        .platform-content {
             flex: 1;
         }
 
-        .lesson-item .lesson-name {
-            font-size: 15px;
-            color: #333;
+        .platform-name {
+            font-size: 16px;
+            font-weight: 700;
             margin-bottom: 4px;
         }
 
-        .lesson-item .lesson-meta {
+        .platform-meta {
             font-size: 12px;
-            color: #bbb;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            color: var(--text-muted);
         }
 
-        .lesson-item .lesson-play-icon {
-            width: 28px;
-            height: 28px;
+        .btn-follow {
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1.5px solid var(--primary);
+            background: transparent;
+            color: var(--primary);
+        }
+
+        .btn-follow.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* ========== Tabs 导航 ========== */
+        .tabs {
+            position: sticky;
+            top: 65px;
+            z-index: 900;
+            background: var(--glass);
+            backdrop-filter: blur(12px);
+            display: flex;
+            padding: 4px;
+            margin: 0 20px;
+            background: rgba(0,0,0,0.05);
+            border-radius: 14px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 10px 0;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            background: white;
+            color: var(--text-main);
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* ========== 列表内容 ========== */
+        .tab-pane {
+            display: none;
+            padding: 20px;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 课程列表项 */
+        .lesson-list {
+            list-style: none;
+            display: grid;
+            gap: 12px;
+            padding-bottom: 120px;
+        }
+
+        .lesson-item {
+            background: white;
+            padding: 16px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid transparent;
+        }
+
+        .l-number {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-muted);
+            width: 32px;
+        }
+
+        .lesson-item:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .lesson-item.playing {
+            border-color: var(--primary);
+            background: #FFF5F6;
+        }
+
+        .l-number {
+            font-size: 18px;
+            font-weight: 800;
+            color: #E2E8F0;
+            width: 32px;
+            transition: color 0.3s;
+        }
+
+        .playing .l-number {
+            color: var(--primary);
+        }
+
+        .l-content {
+            flex: 1;
+        }
+
+        .l-title {
+            font-size: 15px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .l-meta {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            gap: 12px;
+        }
+
+        .l-action {
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
-            background: #f0f0f0;
+            background: var(--bg);
             display: flex;
             align-items: center;
             justify-content: center;
-            flex-shrink: 0;
-            color: #999;
-            font-size: 12px;
-            transition: all 0.2s;
+            transition: all 0.3s;
         }
 
-        .lesson-item:hover .lesson-play-icon {
-            background: #e63946;
-            color: #fff;
+        .lesson-item:hover .l-action {
+            background: var(--primary);
+            color: white;
         }
 
-        .lesson-item.playing .lesson-name {
-            color: #e63946;
+        .playing .l-action {
+            background: var(--primary);
+            color: white;
+            animation: pulse 2s infinite;
         }
 
-        .lesson-item.playing .lesson-index {
-            color: #e63946;
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 71, 87, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0); }
         }
 
-        .lesson-item.playing .lesson-play-icon {
-            background: #e63946;
-            color: #fff;
-        }
-
-        /* ========== 课程介绍 Tab ========== */
-        .course-intro {
-            padding: 20px 16px;
-            line-height: 1.8;
-            font-size: 14px;
-            color: #555;
-        }
-
-        .course-intro h4 {
-            font-size: 16px;
-            color: #333;
-            margin-bottom: 12px;
-        }
-
-        .course-intro p {
-            margin-bottom: 12px;
-        }
-
-        .course-intro .highlight-box {
-            background: #fff9f5;
-            border-left: 3px solid #e63946;
-            padding: 12px 16px;
-            border-radius: 0 6px 6px 0;
-            margin: 12px 0;
-        }
-
-        /* ========== 课程圈子 Tab ========== */
-        .course-community {
-            padding: 40px 16px;
-            text-align: center;
-        }
-
-        .course-community .empty-state {
-            color: #ccc;
-            font-size: 14px;
-        }
-
-        .course-community .empty-icon {
-            font-size: 48px;
-            margin-bottom: 12px;
-            opacity: 0.4;
-        }
-
-        /* ========== 底部固定按钮 ========== */
-        .bottom-bar {
+        /* ========== 底部固定栏 ========== */
+        .tabbar {
             position: fixed;
-            bottom: 0;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            width: 100%;
-            max-width: 480px;
-            z-index: 100;
-            background: #fff;
-            padding: 10px 16px;
-            padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.06);
+            width: calc(min(var(--max-w), 100vw) - 40px);
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            padding: 12px;
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--glass-border);
+            z-index: 2000;
         }
 
-        .bottom-bar .enter-course-btn {
-            width: 100%;
-            padding: 14px 0;
-            background: linear-gradient(135deg, #e63946, #ff6b6b);
-            color: #fff;
+        .btn-main {
+            flex: 1;
+            height: 52px;
+            background: var(--primary-gradient);
+            color: white;
+            border: none;
+            border-radius: 16px;
             font-size: 16px;
             font-weight: 700;
-            border: none;
-            border-radius: 25px;
+            letter-spacing: 1px;
+            box-shadow: 0 8px 20px rgba(255, 71, 87, 0.3);
             cursor: pointer;
-            letter-spacing: 2px;
-            transition: all 0.2s;
+            transition: all 0.3s;
         }
 
-        .bottom-bar .enter-course-btn:active {
-            transform: scale(0.98);
-            opacity: 0.9;
+        .btn-main:active {
+            transform: scale(0.96);
+            box-shadow: 0 4px 10px rgba(255, 71, 87, 0.2);
         }
 
-        /* 底部翻页箭头 */
-        .bottom-nav-arrows {
+        .btn-nav-circle {
+            width: 52px;
+            height: 52px;
+            border-radius: 16px;
+            background: white;
+            border: none;
             display: flex;
-            justify-content: center;
-            gap: 80px;
-            padding: 8px 0 4px;
-        }
-
-        .bottom-nav-arrows .arrow-btn {
-            background: none;
-            border: none;
-            font-size: 22px;
-            color: #ccc;
-            cursor: pointer;
-            padding: 4px 12px;
-        }
-
-        .bottom-nav-arrows .arrow-btn:active {
-            color: #999;
-        }
-
-        /* ========== 视频播放器覆盖层 ========== */
-        .video-player-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: #000;
-            z-index: 999;
             align-items: center;
             justify-content: center;
+            color: var(--text-main);
+            box-shadow: var(--shadow-sm);
+            cursor: pointer;
         }
 
-        .video-player-overlay.active {
-            display: flex;
+        /* ========== 视频全屏载入 ========== */
+        .video-overlay {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: 3000;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.4s;
+            justify-content: center;
+            align-items: center;
         }
 
-        .video-player-overlay video {
+        /* 视频全屏背景模糊 */
+        .video-overlay::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: var(--curr-cover, url('cover.png')) center;
+            background-size: cover;
+            filter: blur(40px) brightness(0.4);
+            opacity: 0.9;
+            z-index: 0;
+        }
+
+        .video-overlay video {
             width: 100%;
-            max-height: 100%;
+            height: auto;
+            max-height: 100vh;
+            object-fit: contain;
+            position: relative;
+            z-index: 1;
         }
 
-        .video-player-overlay .close-video-btn {
+        .video-overlay.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .close-video {
             position: absolute;
             top: 40px;
-            left: 16px;
-            width: 36px;
-            height: 36px;
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
+            left: 20px;
+            width: 44px;
+            height: 44px;
+            background: rgba(255,255,255,0.2);
             border-radius: 50%;
-            color: #fff;
-            font-size: 20px;
-            cursor: pointer;
+            color: white;
             display: flex;
             align-items: center;
             justify-content: center;
+            cursor: pointer;
+            border: none;
         }
 
-        /* ========== 动画 ========== */
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(12px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .animate-in {
-            animation: fadeInUp 0.4s ease forwards;
-        }
-
-        /* 滚动条美化 */
-        ::-webkit-scrollbar {
-            width: 0;
-            background: transparent;
-        }
+        /* 滚动条 */
+        ::-webkit-scrollbar { width: 0; height: 0; }
     </style>
 </head>
 
 <body>
-    <!-- 顶部标题栏 -->
-    <header class="header-bar">
-        <button class="close-btn" id="closeBtn" title="返回">✕</button>
-        <div class="title-area">
-            <div class="title-text">情景故事_远航教育直播平台</div>
-            <div class="subtitle">h5.qlchat.com</div>
-        </div>
-        <button class="more-btn" title="更多">•••</button>
-    </header>
-
-    <!-- 视频/封面区域 -->
-    <div class="video-area" id="videoArea">
-        <!-- 顶部横幅 -->
-        <div class="banner-top">
-            <span class="banner-icon">🎄</span>
-            <span>文化藏在节日中</span>
-            <span>带领宝宝探索节日</span>
-        </div>
-
-        <!-- 封面用canvas绘制 -->
-        <canvas id="courseBanner" class="course-banner"></canvas>
-
-        <!-- 播放按钮 -->
-        <div class="play-btn" id="playBtn"></div>
-
-        <!-- 分享按钮 -->
-        <button class="share-btn">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                <polyline points="15 3 21 3 21 9" />
-                <line x1="10" y1="14" x2="21" y2="3" />
-            </svg>
-            分享
-        </button>
-
-        <!-- 音量按钮 -->
-        <button class="volume-btn" id="volumeBtn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                <line x1="23" y1="9" x2="17" y2="15"></line>
-                <line x1="17" y1="9" x2="23" y2="15"></line>
-            </svg>
-        </button>
-    </div>
-
-    <!-- 课程信息区 -->
-    <section class="course-info animate-in">
-        <h1 class="course-title">情景故事</h1>
-        <div class="course-stats">
-            <div class="stat-item">
-                <span class="stat-icon">📄</span>
-                <span>已开15课 | 共15课</span>
+    <div class="app-container">
+        <!-- 顶部 -->
+        <header class="header">
+            <button class="btn-icon" id="backBtn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <div class="title-center">
+                <div class="title-main">情景故事</div>
+                <div class="title-sub">PREMIUM COURSE</div>
             </div>
-            <div class="stat-item">
-                <span class="stat-icon">▶</span>
-                <span>6284次学习</span>
+            <button class="btn-icon" id="adminBtn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+            </button>
+        </header>
+
+        <!-- 平台名片 -->
+
+        <!-- 平台名片 -->
+        <section class="platform-section">
+            <div class="platform-card">
+                <img src="logo.png" alt="Platform Logo" class="platform-logo">
+                <div class="platform-content">
+                    <h3 class="platform-name">情景故事学习小组制作</h3>
+                    <p class="platform-meta">16,059 关注者 · 785 单课</p>
+                </div>
+                <button class="btn-follow active" id="followBtn">已关注</button>
             </div>
-        </div>
-    </section>
+        </section>
 
-    <div class="divider"></div>
+        <!-- 内容切换区 -->
+        <nav class="tabs">
+            <button class="tab-btn" data-target="intro">介绍</button>
+            <button class="tab-btn active" data-target="lessons">课程</button>
+            <button class="tab-btn" data-target="community">圈子</button>
+        </nav>
 
-    <!-- 平台信息区 -->
-    <section class="platform-info animate-in" style="animation-delay: 0.1s">
-        <div class="platform-avatar">
-            <div class="avatar-text">远航<br>教育</div>
-        </div>
-        <div class="platform-detail">
-            <div class="platform-name">远航教育直播平台</div>
-            <div class="platform-stats">
-                <span>785</span> 单课数&nbsp;&nbsp;&nbsp;<span>16059</span> 关注人数
-            </div>
-        </div>
-        <button class="follow-btn" id="followBtn">取消关注</button>
-    </section>
-
-    <!-- Tab 导航 -->
-    <nav class="tab-nav" id="tabNav">
-        <button class="tab-item" data-tab="intro">课程介绍</button>
-        <button class="tab-item active" data-tab="lessons">听课列表</button>
-        <button class="tab-item" data-tab="community">课程圈子</button>
-    </nav>
-
-    <!-- Tab内容：课程介绍 -->
-    <div class="tab-content" id="tab-intro">
-        <div class="course-intro">
-            <h4>📚 课程简介</h4>
-            <p>「情景故事」是远航教育精心策划的系列课程，围绕中国传统节日文化，通过生动有趣的情景对话和互动活动，引导宝宝深入了解中华文化的精髓。</p>
-
-            <div class="highlight-box">
-                <strong>🎯 适合人群：</strong>3-8岁儿童及家长<br>
-                <strong>🕐 课程时长：</strong>每节课约20-30分钟<br>
-                <strong>📖 课程模式：</strong>情景模拟 + 互动问答 + 手工制作
+        <main class="content-area">
+            <!-- 介绍面板 -->
+            <div class="tab-pane" id="intro">
+                <p style="line-height: 1.8; color: var(--text-muted); font-size: 14px;">「情景故事」是远航教育精心策划的精品系列课程。通过中国传统节日的生动视角，带领宝宝探索文化精髓。结合互动问答与情境模拟，培养孩子的文化认同感。适合 3-8 岁儿童家长共学。</p>
             </div>
 
-            <h4 style="margin-top: 20px">✨ 课程亮点</h4>
-            <p>• 主题交流对话卡 — 节日篇</p>
-            <p>• 覆盖春节、元宵、端午、中秋等传统节日</p>
-            <p>• 结合绘本阅读、角色扮演与文化体验</p>
-            <p>• 培养孩子的文化认同感和表达能力</p>
-        </div>
-    </div>
-
-    <!-- Tab内容：听课列表 -->
-    <div class="tab-content active" id="tab-lessons">
-        <!-- 继续听课 -->
-        <div class="continue-listen">
-            <a href="javascript:void(0)" id="continueListenLink">继续听课：生日会</a>
-        </div>
-
-        <!-- 学习列表头 -->
-        <div class="list-header">
-            <div class="list-title">
-                <div class="title-bar"></div>
-                <h3>学习列表</h3>
+            <!-- 课程面板 -->
+            <div class="tab-pane active" id="lessons">
+                <ul class="lesson-list" id="lessonList">
+                    <!-- 动态生成 -->
+                </ul>
             </div>
-            <div class="list-actions">
-                <button class="action-btn grid-icon" id="gridToggle" title="切换视图">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="1.5">
-                        <rect x="3" y="3" width="7" height="7" rx="1" />
-                        <rect x="14" y="3" width="7" height="7" rx="1" />
-                        <rect x="3" y="14" width="7" height="7" rx="1" />
-                        <rect x="14" y="14" width="7" height="7" rx="1" />
-                    </svg>
-                </button>
-            </div>
-        </div>
 
-        <!-- 课时数量 + 排序 -->
-        <div class="lesson-count-row">
-            <span id="lessonCount">15节课</span>
-            <button class="sort-btn" id="sortBtn">
-                <span class="sort-icon">↕</span>
-                <span id="sortLabel">正序</span>
+            <!-- 圈子面板 -->
+            <div class="tab-pane" id="community" style="text-align: center; padding: 60px 20px;">
+                <div style="font-size: 40px; margin-bottom: 12px; opacity: 0.5;">💬</div>
+                <p style="color: var(--text-muted); font-size: 14px;">圈子功能即将上线</p>
+            </div>
+        </main>
+
+        <!-- 底部工具栏 -->
+        <div class="tabbar">
+            <button class="btn-nav-circle" id="prevBtn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <button class="btn-main" id="startBtn">开始学习</button>
+            <button class="btn-nav-circle" id="nextBtn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
             </button>
         </div>
 
-        <!-- 课程列表 -->
-        <ul class="lesson-list" id="lessonList"></ul>
-    </div>
-
-    <!-- Tab内容：课程圈子 -->
-    <div class="tab-content" id="tab-community">
-        <div class="course-community">
-            <div class="empty-icon">💬</div>
-            <p class="empty-state">暂无课程圈子动态</p>
-            <p class="empty-state" style="margin-top: 8px; font-size: 12px">课程圈子即将开放，敬请期待</p>
+        <!-- 视频容器 -->
+        <div class="video-overlay" id="videoOverlay">
+            <button class="close-video">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+            <video id="player" style="width: 100%;" controls></video>
         </div>
-    </div>
-
-    <!-- 底部固定栏 -->
-    <div class="bottom-bar">
-        <button class="enter-course-btn" id="enterCourseBtn">进入课程</button>
-        <div class="bottom-nav-arrows">
-            <button class="arrow-btn" id="prevArrow">‹</button>
-            <button class="arrow-btn" id="nextArrow">›</button>
-        </div>
-    </div>
-
-    <!-- 视频播放器 -->
-    <div class="video-player-overlay" id="videoOverlay">
-        <button class="close-video-btn" id="closeVideoBtn">✕</button>
-        <video id="videoPlayer" controls controlslist="nodownload">
-            <source src="" type="video/mp4">
-        </video>
     </div>
 
     <script>
-        // ========== 课程数据 ==========
-        const lessons = [
-            { id: 1, name: '生日会', duration: '25:30', views: 856, date: '2025-01-15' },
-            { id: 2, name: '春节', duration: '28:15', views: 1023, date: '2025-01-22' },
-            { id: 3, name: '元宵节', duration: '22:40', views: 789, date: '2025-02-05' },
-            { id: 4, name: '植树节', duration: '20:10', views: 652, date: '2025-03-12' },
-            { id: 5, name: '清明节', duration: '24:55', views: 548, date: '2025-04-04' },
-            { id: 6, name: '劳动节', duration: '26:20', views: 472, date: '2025-05-01' },
-            { id: 7, name: '端午节', duration: '27:45', views: 601, date: '2025-06-02' },
-            { id: 8, name: '儿童节', duration: '23:30', views: 934, date: '2025-06-01' },
-            { id: 9, name: '中秋节', duration: '25:10', views: 715, date: '2025-09-17' },
-            { id: 10, name: '国庆节', duration: '26:50', views: 623, date: '2025-10-01' },
-            { id: 11, name: '重阳节', duration: '21:35', views: 387, date: '2025-10-21' },
-            { id: 12, name: '万圣节', duration: '24:20', views: 456, date: '2025-10-31' },
-            { id: 13, name: '感恩节', duration: '22:55', views: 398, date: '2025-11-27' },
-            { id: 14, name: '冬至', duration: '20:45', views: 342, date: '2025-12-22' },
-            { id: 15, name: '圣诞节', duration: '23:15', views: 521, date: '2025-12-25' }
-        ];
+        // ========== 数据加载逻辑 ==========
+        const defaults = {
+            platformName: '情景故事学习小组制作',
+            platformMeta: '16,059 关注者 · 785 单课',
+            lessons: [
+                { id: 1, name: '中秋节', duration: '25:10', views: 715, src: 'media/1.mp4' },
+                { id: 2, name: '植树节', duration: '20:10', views: 652, src: 'media/2.mp4' },
+                { id: 3, name: '生日会', duration: '25:30', views: 856, src: 'media/3.mp4' },
+                { id: 4, name: '六一儿童节', duration: '23:30', views: 934, src: 'media/4.mp4' },
+                { id: 5, name: '春天', duration: '22:45', views: 521, src: 'media/5.mp4' }
+            ]
+        };
 
-        let currentSort = 'asc';
-        let currentPlaying = 1; // 默认播放第一课
-        let isFollowed = true;
+        let currentData = CourseStore.cloneDefaults();
+        let lessons = currentData.lessons;
 
-        // ========== 绘制封面 ==========
-        function drawBanner() {
-            const canvas = document.getElementById('courseBanner');
-            const ctx = canvas.getContext('2d');
-            const rect = canvas.parentElement.getBoundingClientRect();
-            canvas.width = rect.width * 2; // 高清
-            canvas.height = rect.height * 2;
-            canvas.style.width = rect.width + 'px';
-            canvas.style.height = rect.height + 'px';
-            ctx.scale(2, 2);
+        let state = {
+            activeTab: 'lessons',
+            currentIdx: 0,
+            isFollowed: true
+        };
 
-            const w = rect.width;
-            const h = rect.height;
+        // ========== 渲染控制 ==========
+        function render() {
+            // 更新平台名称
+            document.querySelector('.platform-name').textContent = currentData.platformName;
+            document.querySelector('.platform-meta').textContent = currentData.platformMeta;
+            const coverImg = document.querySelector('.cover-img');
+            const platformLogo = document.querySelector('.platform-logo');
+            if (coverImg) coverImg.src = currentData.coverUrl || 'cover.png';
+            if (platformLogo) platformLogo.src = currentData.logoUrl || 'logo.png';
 
-            // 背景渐变
-            const grad = ctx.createLinearGradient(0, 0, w, h);
-            grad.addColorStop(0, '#ffecd2');
-            grad.addColorStop(0.5, '#fcb69f');
-            grad.addColorStop(1, '#ff9a76');
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, w, h);
-
-            // 装饰圆圈
-            const circles = [
-                { x: w * 0.15, y: h * 0.3, r: 30, color: 'rgba(230, 57, 70, 0.2)' },
-                { x: w * 0.85, y: h * 0.7, r: 45, color: 'rgba(255, 183, 77, 0.3)' },
-                { x: w * 0.7, y: h * 0.2, r: 20, color: 'rgba(255, 255, 255, 0.3)' },
-                { x: w * 0.3, y: h * 0.8, r: 35, color: 'rgba(233, 30, 99, 0.15)' },
-            ];
-            circles.forEach(c => {
-                ctx.beginPath();
-                ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
-                ctx.fillStyle = c.color;
-                ctx.fill();
+            const list = document.getElementById('lessonList');
+            list.innerHTML = lessons.map((l, i) => `
+                <li class="lesson-item ${i === state.currentIdx ? 'playing' : ''}" data-idx="${i}">
+                    <span class="l-number">${String(l.id).padStart(2, '0')}</span>
+                    <div class="l-content">
+                        <div class="l-title">${l.name}</div>
+                        <div class="l-meta">
+                            <span>${l.duration}</span>
+                            <span>${l.views} 学习</span>
+                        </div>
+                    </div>
+                    <div class="l-action" onclick="event.stopPropagation(); playLesson(${i}, true)">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    </div>
+                </li>
+            `).join('');
+            
+            // 绑定列表点击
+            document.querySelectorAll('.lesson-item').forEach(el => {
+                el.onclick = () => {
+                    state.currentIdx = parseInt(el.dataset.idx);
+                    render();
+                };
             });
-
-            // 标题文字
-            ctx.fillStyle = '#b71c1c';
-            ctx.font = 'bold ' + (w * 0.08) + 'px "PingFang SC", sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('主题交流对话卡', w / 2, h * 0.42);
-
-            // 副标题
-            ctx.fillStyle = '#c62828';
-            ctx.font = 'bold ' + (w * 0.1) + 'px "PingFang SC", sans-serif';
-            ctx.fillText('节 日 篇', w / 2, h * 0.62);
-
-            // 底部装饰龙
-            ctx.font = (w * 0.12) + 'px sans-serif';
-            ctx.fillText('🐉', w * 0.5, h * 0.85);
-
-            // 左边小图标
-            ctx.font = (w * 0.06) + 'px sans-serif';
-            ctx.fillText('🎎', w * 0.1, h * 0.5);
-            ctx.fillText('🧧', w * 0.9, h * 0.45);
-            ctx.fillText('🏮', w * 0.15, h * 0.75);
-            ctx.fillText('🎋', w * 0.85, h * 0.8);
         }
 
-        // ========== 渲染课程列表 ==========
-        function renderLessons() {
-            const list = document.getElementById('lessonList');
-            const sorted = [...lessons];
-            if (currentSort === 'desc') {
-                sorted.reverse();
+        // ========== 交互逻辑 ==========
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+                
+                btn.classList.add('active');
+                document.getElementById(btn.dataset.target).classList.add('active');
+            };
+        });
+
+        document.getElementById('followBtn').onclick = function() {
+            state.isFollowed = !state.isFollowed;
+            this.textContent = state.isFollowed ? '已关注' : '+ 关注';
+            this.classList.toggle('active', state.isFollowed);
+        };
+
+        window.playLesson = (index, autoplay = false) => {
+             const l = lessons[index];
+             const url = `./player.html?lesson=${l.id}&name=${encodeURIComponent(l.name)}${autoplay ? '&autoplay=true' : ''}`;
+             window.location.href = url;
+        };
+
+        document.getElementById('startBtn').onclick = () => {
+             playLesson(state.currentIdx, false);
+        };
+
+
+
+        document.querySelector('.close-video').onclick = () => {
+            const overlay = document.getElementById('videoOverlay');
+            overlay.classList.remove('active');
+        };
+
+        document.getElementById('backBtn').onclick = () => window.history.back();
+        document.getElementById('adminBtn').onclick = () => window.location.href = './admin.html';
+
+        // 左右导航
+        document.getElementById('prevBtn').onclick = () => {
+            if(state.currentIdx > 0) {
+                state.currentIdx--;
+                render();
+            }
+        };
+        document.getElementById('nextBtn').onclick = () => {
+            if(state.currentIdx < lessons.length - 1) {
+                state.currentIdx++;
+                render();
+            }
+        };
+
+        // ========== 无阻塞极速渲染策略 ==========
+        function initApp() {
+            // 1. 彻底移除“等待”，秒级显示默认内容
+            render();
+
+            // 2. 局部瞬间覆盖缓存 (离线也秒登)
+            const CACHE_KEY = 'courseAdminData';
+            const cached = localStorage.getItem(CACHE_KEY);
+            if (cached) {
+                try {
+                    currentData = JSON.parse(cached);
+                    lessons = currentData.lessons;
+                    render();
+                } catch(e) {}
             }
 
-            list.innerHTML = sorted.map(lesson => `
-        <li class="lesson-item ${lesson.id === currentPlaying ? 'playing' : ''}" data-id="${lesson.id}">
-          <div class="lesson-index">${lesson.id}</div>
-          <div class="lesson-info">
-            <div class="lesson-name">${lesson.name}</div>
-            <div class="lesson-meta">
-              <span>⏱ ${lesson.duration}</span>
-              <span>👁 ${lesson.views}次</span>
-            </div>
-          </div>
-          <div class="lesson-play-icon" data-play="${lesson.id}">
-            ${lesson.id === currentPlaying ? '⏸' : '▶'}
-          </div>
-        </li>
-      `).join('');
-        }
-
-        // 使用事件委托，只绑定一次
-        function initLessonListClick() {
-            document.getElementById('lessonList').addEventListener('click', (e) => {
-                // 判断是否点击了播放图标（或其内部元素）
-                const playIcon = e.target.closest('.lesson-play-icon');
-                if (playIcon) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const id = parseInt(playIcon.dataset.play);
-                    currentPlaying = id;
-                    const lessonName = lessons.find(l => l.id === id).name;
-                    document.getElementById('continueListenLink').textContent = `继续听课：${lessonName}`;
-                    renderLessons();
-                    return; // 不跳转
-                }
-
-                // 点击其他区域 → 仅高亮选中
-                const item = e.target.closest('.lesson-item');
-                if (item) {
-                    const id = parseInt(item.dataset.id);
-                    currentPlaying = id;
-                    const lessonName = lessons.find(l => l.id === id).name;
-                    document.getElementById('continueListenLink').textContent = `继续听课：${lessonName}`;
-                    renderLessons();
+            // 3. 静默进行云端增量同步
+            CourseStore.load().then((data) => {
+                if (data) {
+                    currentData = data;
+                    lessons = currentData.lessons;
+                    render();
                 }
             });
         }
 
-        // ========== Tab切换 ==========
-        function initTabs() {
-            const tabs = document.querySelectorAll('.tab-item');
-            tabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    // 移除所有active
-                    tabs.forEach(t => t.classList.remove('active'));
-                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-
-                    // 设置active
-                    tab.classList.add('active');
-                    const tabId = tab.dataset.tab;
-                    document.getElementById('tab-' + tabId).classList.add('active');
-                });
-            });
-        }
-
-        // ========== 排序切换 ==========
-        function initSort() {
-            document.getElementById('sortBtn').addEventListener('click', () => {
-                currentSort = currentSort === 'asc' ? 'desc' : 'asc';
-                document.getElementById('sortLabel').textContent = currentSort === 'asc' ? '正序' : '倒序';
-                renderLessons();
-            });
-        }
-
-        // ========== 关注/取消关注 ==========
-        function initFollow() {
-            const btn = document.getElementById('followBtn');
-            btn.addEventListener('click', () => {
-                isFollowed = !isFollowed;
-                btn.textContent = isFollowed ? '取消关注' : '+ 关注';
-                btn.classList.toggle('followed', !isFollowed);
-            });
-        }
-
-        // ========== 视频播放 ==========
-        function initVideo() {
-            const overlay = document.getElementById('videoOverlay');
-            const video = document.getElementById('videoPlayer');
-
-            document.getElementById('playBtn').addEventListener('click', () => {
-                overlay.classList.add('active');
-                // 这里可以设置视频源
-                // video.play();
-            });
-
-            document.getElementById('closeVideoBtn').addEventListener('click', () => {
-                overlay.classList.remove('active');
-                video.pause();
-            });
-        }
-
-        // ========== 音量按钮 ==========
-        function initVolume() {
-            const btn = document.getElementById('volumeBtn');
-            let muted = true;
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                muted = !muted;
-                btn.innerHTML = muted
-                    ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>'
-                    : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>';
-            });
-        }
-
-        // ========== 关闭按钮 ==========
-        function initClose() {
-            document.getElementById('closeBtn').addEventListener('click', () => {
-                if (window.history.length > 1) {
-                    window.history.back();
-                } else {
-                    window.location.href = '../../index.html';
-                }
-            });
-        }
-
-        // ========== 进入课程按钮 ==========
-        function initEnterCourse() {
-            document.getElementById('enterCourseBtn').addEventListener('click', () => {
-                window.location.href = `./player.html?lesson=${currentPlaying}`;
-            });
-
-            // 继续听课链接
-            document.getElementById('continueListenLink').addEventListener('click', (e) => {
-                e.preventDefault();
-                window.location.href = `./player.html?lesson=${currentPlaying}`;
-            });
-        }
-
-        // ========== 翻页箭头 ==========
-        function initArrows() {
-            document.getElementById('prevArrow').addEventListener('click', () => {
-                if (currentPlaying > 1) {
-                    currentPlaying--;
-                    const lessonName = lessons.find(l => l.id === currentPlaying).name;
-                    document.getElementById('continueListenLink').textContent = `继续听课：${lessonName}`;
-                    renderLessons();
-                }
-            });
-            document.getElementById('nextArrow').addEventListener('click', () => {
-                if (currentPlaying < lessons.length) {
-                    currentPlaying++;
-                    const lessonName = lessons.find(l => l.id === currentPlaying).name;
-                    document.getElementById('continueListenLink').textContent = `继续听课：${lessonName}`;
-                    renderLessons();
-                }
-            });
-        }
-
-        // ========== 初始化 ==========
-        document.addEventListener('DOMContentLoaded', () => {
-            drawBanner();
-            renderLessons();
-            initLessonListClick();
-            initTabs();
-            initSort();
-            initFollow();
-            initVideo();
-            initVolume();
-            initClose();
-            initEnterCourse();
-            initArrows();
-
-            // 监听resize重绘封面
-            window.addEventListener('resize', drawBanner);
-        });
+        initApp();
     </script>
 </body>
-
 </html>
