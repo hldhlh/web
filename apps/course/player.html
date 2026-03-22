@@ -5,9 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>正在播放 - 情景故事</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap"
+        rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./course-db.js"></script>
+    <script src="./cdn-selector.js"></script>
     <style>
         :root {
             --primary: #FF4757;
@@ -45,7 +48,7 @@
             position: relative;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 0 100px rgba(0,0,0,0.1);
+            box-shadow: 0 0 100px rgba(0, 0, 0, 0.1);
         }
 
         /* ========== Header ========== */
@@ -69,7 +72,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: rgba(0,0,0,0.03);
+            background: rgba(0, 0, 0, 0.03);
             border: none;
             cursor: pointer;
         }
@@ -106,23 +109,27 @@
         .video-container {
             width: 100%;
             position: relative;
-            background: transparent; /* 容器背景透明 */
+            background: transparent;
+            /* 容器背景透明 */
             border-radius: 20px;
-            overflow: visible; 
+            overflow: visible;
             display: flex;
             align-items: center;
             justify-content: center;
-            height: 38vh; /* 高度在画面中比例固定：占屏幕高度的 38% */
+            height: 38vh;
+            /* 高度在画面中比例固定：占屏幕高度的 38% */
         }
 
         #mainVideo {
             width: 100%;
             height: 100%;
-            object-fit: contain; /* 保持比例 */
-            background: transparent; /* 关键：视频标签本身也设为透明，消除内置黑边 */
+            object-fit: contain;
+            /* 保持比例 */
+            background: transparent;
+            /* 关键：视频标签本身也设为透明，消除内置黑边 */
             border-radius: 20px;
             /* 柔和投影让视频主体更突出 */
-            filter: drop-shadow(0 20px 40px rgba(0,0,0,0.1)); 
+            filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.1));
             z-index: 1;
             display: block;
         }
@@ -152,7 +159,8 @@
         .progress-labels {
             display: flex;
             justify-content: space-between;
-            align-items: center; /* 保持倍速按钮和时间戳垂直对齐 */
+            align-items: center;
+            /* 保持倍速按钮和时间戳垂直对齐 */
             margin-bottom: 8px;
             font-size: 12px;
             color: var(--text-muted);
@@ -187,7 +195,7 @@
             background: white;
             border: 3px solid var(--primary);
             border-radius: 50%;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
 
         /* ========== 控制栏 ========== */
@@ -211,8 +219,10 @@
             height: 44px;
             transition: all 0.2s;
         }
+
         .btn-control svg {
-            display: block; /* Clear baseline issues */
+            display: block;
+            /* Clear baseline issues */
         }
 
         .btn-control.secondary {
@@ -240,8 +250,11 @@
             transition: all 0.3s;
             position: relative;
         }
+
         /* 播放图标由于三角形几何中心偏左，需要轻微视觉修正 */
-        #playIcon { transform: translateX(2px); }
+        #playIcon {
+            transform: translateX(2px);
+        }
 
         .btn-play-pause:active {
             transform: scale(0.9);
@@ -258,14 +271,15 @@
             padding: 24px 30px;
             display: flex;
             justify-content: space-between;
-            border-top: 1px solid rgba(0,0,0,0.05);
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
         }
 
         .btn-action-small {
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center; /* 确保垂直水平全中心对齐 */
+            justify-content: center;
+            /* 确保垂直水平全中心对齐 */
             gap: 8px;
             background: none;
             border: none;
@@ -277,7 +291,11 @@
             cursor: pointer;
             width: 70px;
         }
-        .btn-action-small svg { display: block; min-height: 20px; }
+
+        .btn-action-small svg {
+            display: block;
+            min-height: 20px;
+        }
 
         .btn-action-small.active {
             color: var(--primary);
@@ -287,7 +305,7 @@
         .modal-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.4);
+            background: rgba(0, 0, 0, 0.4);
             z-index: 2000;
             display: none;
             opacity: 0;
@@ -356,7 +374,7 @@
 
         .list-item {
             padding: 16px;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
             display: flex;
             align-items: center;
             gap: 16px;
@@ -384,8 +402,11 @@
         /* 极简加载动画 (Minimal Loading) */
         .video-loader {
             position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255,255,255,0.8);
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
             backdrop-filter: blur(4px);
             display: flex;
             align-items: center;
@@ -393,19 +414,24 @@
             z-index: 5;
             transition: opacity 0.3s ease;
         }
-        
+
         .spinner {
             width: 32px;
             height: 32px;
-            border: 3px solid rgba(0,0,0,0.05);
+            border: 3px solid rgba(0, 0, 0, 0.05);
             border-top: 3px solid var(--primary);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
 
         .video-loader.hidden {
@@ -418,11 +444,13 @@
 <body>
     <div class="app-container" id="mainContainer">
         <div class="bg-blur"></div>
-        
+
         <!-- Header -->
         <header class="header">
             <button class="btn-icon" onclick="window.location.href='./index.html'">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M15 18l-6-6 6-6" />
+                </svg>
             </button>
             <div class="title-area">
                 <div class="title-main" id="curTitle">正在进入学习...</div>
@@ -439,7 +467,7 @@
                 </div>
                 <video id="mainVideo" playsinline></video>
             </div>
-            
+
             <div class="lesson-info">
                 <h1 id="lessonLabel">---</h1>
                 <p>正在同步课程数据</p>
@@ -454,7 +482,8 @@
                 <span id="totalTime" style="margin-right: 12px;">02:30</span>
                 <!-- 放在播放条尾巴：小巧的倍速选择 -->
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <span id="speedBtn" style="cursor: pointer; background: rgba(0,0,0,0.05); padding: 2px 8px; border-radius: 6px; font-weight: 800; color: var(--primary);">1.0X</span>
+                    <span id="speedBtn"
+                        style="cursor: pointer; background: rgba(0,0,0,0.05); padding: 2px 8px; border-radius: 6px; font-weight: 800; color: var(--primary);">1.0X</span>
                 </div>
             </div>
             <div class="progress-bar-container" id="progressArea">
@@ -466,21 +495,30 @@
         <!-- Controls -->
         <div class="controls">
             <button class="btn-control secondary" id="prevBtn">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+                </svg>
             </button>
             <button class="btn-play-pause" id="playPauseBtn">
-                <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                <svg id="pauseIcon" style="display:none" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                <svg id="playIcon" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                </svg>
+                <svg id="pauseIcon" style="display:none" viewBox="0 0 24 24">
+                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                </svg>
             </button>
             <button class="btn-control secondary" id="nextBtn">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+                </svg>
             </button>
         </div>
 
         <!-- Actions -->
         <div class="action-bar">
             <button class="btn-action-small" id="shareBtn">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                    stroke-linecap="round" stroke-linejoin="round">
                     <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
                     <polyline points="16 6 12 2 8 6"></polyline>
                     <line x1="12" y1="2" x2="12" y2="15"></line>
@@ -488,7 +526,8 @@
                 <span>分享</span>
             </button>
             <button class="btn-action-small" id="listBtn">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                    stroke-linecap="round" stroke-linejoin="round">
                     <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
                     <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
                     <path d="M12 7v10"></path>
@@ -508,13 +547,17 @@
 
         <!-- Playlist Modal -->
         <div class="modal-overlay" id="overlay"></div>
-        
+
         <!-- 播放列表面板 -->
         <div class="modal-sheet" id="playlistModal">
             <div class="modal-header">
                 <h3>课程目录</h3>
                 <button class="modal-close" onclick="closeModal()">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.5">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
                 </button>
             </div>
             <ul class="list-items" id="playlistItems"></ul>
@@ -525,34 +568,69 @@
             <div class="modal-header">
                 <h3>更多操作</h3>
                 <button class="modal-close" onclick="closeModal()">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.5">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
                 </button>
             </div>
             <ul class="list-items">
                 <li class="list-item" onclick="closeModal()">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
                     <span style="flex:1; margin-left:12px;">课程简介</span>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
                 </li>
                 <li class="list-item" onclick="closeModal()">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
                     <span style="flex:1; margin-left:12px;">评价课程</span>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
                 </li>
                 <li class="list-item" onclick="closeModal()">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon
+                            points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
+                        </polygon>
+                    </svg>
                     <span style="flex:1; margin-left:12px;">收藏</span>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
                 </li>
                 <li class="list-item" onclick="closeModal()">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"></path><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path></svg>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+                        <path
+                            d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z">
+                        </path>
+                    </svg>
                     <span style="flex:1; margin-left:12px;">售后处理</span>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
                 </li>
                 <li class="list-item" onclick="closeModal()">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path
+                            d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z">
+                        </path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
                     <span style="flex:1; margin-left:12px;">违规举报</span>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
                 </li>
             </ul>
         </div>
@@ -565,8 +643,8 @@
 
         let state = {
             isPlaying: false,
-            currentIdx: 1, 
-            speed: 1.0,
+            currentIdx: 1,
+            speed: parseFloat(localStorage.getItem('course_speed')) || 1.0,
             progress: 0,
             duration: 0,
             lastIncrementedId: null // 增加：记录上次增加阅读量的ID，防止单次会话重复计入
@@ -585,6 +663,24 @@
         const totalTimeText = document.getElementById('totalTime');
         const mainContainer = document.getElementById('mainContainer');
         const videoLoader = document.getElementById('videoLoader');
+
+        // ========== 播放状态同步 (修复“点两下才播放”的 Bug) ==========
+        function syncPlayUI() {
+            if (!window.playIcon || !window.pauseIcon || !window.mainContainer) return;
+            if (state.isPlaying) {
+                playIcon.style.display = 'none';
+                pauseIcon.style.display = 'block';
+                mainContainer.classList.add('playing');
+            } else {
+                playIcon.style.display = 'block';
+                pauseIcon.style.display = 'none';
+                mainContainer.classList.remove('playing');
+            }
+        }
+
+        // 核心：监听底层事件，实现物理状态 -> 逻辑状态的一致性
+        video.onplay = () => { state.isPlaying = true; syncPlayUI(); };
+        video.onpause = () => { state.isPlaying = false; syncPlayUI(); };
 
         // ========== 全屏控制 ==========
         function toggleFullscreen() {
@@ -615,7 +711,7 @@
         const lId = parseInt(params.get('lesson')) || 1;
         const lName = params.get('name') || '';
         const isAuto = params.get('autoplay') === 'true';
-        
+
         state.currentIdx = lId;
         if (isAuto) state.isPlaying = true; // 如果带有 autoplay 标志，则默认开始播放
 
@@ -628,7 +724,7 @@
 
 
         function formatTime(sec) {
-            if(!sec || isNaN(sec)) return '00:00';
+            if (!sec || isNaN(sec)) return '00:00';
             const m = Math.floor(sec / 60);
             const s = Math.floor(sec % 60);
             return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
@@ -638,13 +734,25 @@
             const lesson = lessons.find(l => l.id === state.currentIdx) || lessons[0];
             lessonLabel.textContent = lesson.name;
             curTitle.textContent = `${lesson.name} - 情景故事`;
-            
-            // 切换视频源
-            const newSrc = lesson.src || '';
-            if (video.src.indexOf(newSrc) === -1) {
-                video.src = newSrc;
+
+            // 核心优化：使用最佳 CDN 转换地址
+            const rawSrc = lesson.src || '';
+            const fastSrc = window.CDNSelector ? window.CDNSelector.getFastestUrl(rawSrc) : rawSrc;
+
+            if (video.src.indexOf(fastSrc) === -1) {
+                video.src = fastSrc;
+                video.preload = "auto"; // 提升首屏加载
                 state.progress = 0;
                 video.load();
+            }
+
+            // 预热下一课时 (如果在列表中有后续项目)
+            const nextIdx = lessons.findIndex(l => l.id === state.currentIdx) + 1;
+            if (nextIdx < lessons.length && window.CDNSelector) {
+                const nextLesson = lessons[nextIdx];
+                if (nextLesson && nextLesson.src) {
+                    setTimeout(() => window.CDNSelector.warmUp(nextLesson.src), 2000); // 启动静默预热
+                }
             }
 
             // 动态更新平台制作名
@@ -670,18 +778,21 @@
 
             totalTimeText.textContent = formatTime(video.duration || 0);
 
+            // 同步播放配置
+            video.playbackRate = state.speed;
+
             if (state.isPlaying) {
-                video.playbackRate = state.speed; // 确保切换视频时倍速依然生效
-                video.play().catch(e => console.log("Play failed"));
-                playIcon.style.display = 'none';
-                pauseIcon.style.display = 'block';
-                mainContainer.classList.add('playing');
+                if (video.paused) {
+                    video.play().catch(e => {
+                        console.log("Play failed (likely blocked):", e);
+                        state.isPlaying = false;
+                        syncPlayUI();
+                    });
+                }
             } else {
-                video.pause();
-                playIcon.style.display = 'block';
-                pauseIcon.style.display = 'none';
-                mainContainer.classList.remove('playing');
+                if (!video.paused) video.pause();
             }
+            syncPlayUI();
 
             // 禁用状态管理
             const idx = lessons.findIndex(l => l.id === state.currentIdx);
@@ -694,7 +805,7 @@
             if (state.isPlaying && video.duration) {
                 state.progress = video.currentTime;
                 state.duration = video.duration;
-                
+
                 const pct = (state.progress / state.duration) * 100;
                 progressFill.style.width = pct + '%';
                 progressKnob.style.left = pct + '%';
@@ -705,8 +816,12 @@
 
         // 交互
         btnPlay.onclick = () => {
-            state.isPlaying = !state.isPlaying;
-            updateUI();
+            // 直接操作底层状态，规避逻辑状态不同步的问题
+            if (video.paused) {
+                video.play();
+            } else {
+                video.pause();
+            }
         };
 
         // 简单的进度条拖动点击
@@ -720,12 +835,13 @@
         };
 
         document.getElementById('speedBtn').onclick = () => {
-             const speeds = [1.0, 1.25, 1.5, 2.0];
-             let currentIdx = speeds.indexOf(state.speed);
-             let nextIdx = (currentIdx + 1) % speeds.length;
-             state.speed = speeds[nextIdx];
-             video.playbackRate = state.speed;
-             document.getElementById('speedBtn').textContent = state.speed.toFixed(2).replace(/\.00$/, '') + 'X';
+            const speeds = [1.0, 1.25, 1.5, 2.0];
+            let currentIdx = speeds.indexOf(state.speed);
+            let nextIdx = (currentIdx + 1) % speeds.length;
+            state.speed = speeds[nextIdx];
+            localStorage.setItem('course_speed', state.speed);
+            video.playbackRate = state.speed;
+            document.getElementById('speedBtn').textContent = state.speed.toFixed(2).replace(/\.00$/, '') + 'X';
         };
 
         document.getElementById('listBtn').onclick = () => {
@@ -740,14 +856,14 @@
         };
 
         document.getElementById('shareBtn').onclick = () => {
-             const title = curTitle.textContent;
-             const url = window.location.href;
-             if (navigator.share) {
-                 navigator.share({ title, url }).catch(console.error);
-             } else {
-                 navigator.clipboard.writeText(url);
-                 alert('链接已复制到剪贴板');
-             }
+            const title = curTitle.textContent;
+            const url = window.location.href;
+            if (navigator.share) {
+                navigator.share({ title, url }).catch(console.error);
+            } else {
+                navigator.clipboard.writeText(url);
+                alert('链接已复制到剪贴板');
+            }
         };
 
         window.closeModal = () => {
@@ -809,7 +925,7 @@
         // ========== 立即初次渲染 (消除所有显式等待) ==========
         function initQuickly() {
             // 1. 先用本地默认数据全量渲染
-            updateUI(); 
+            updateUI();
 
             // 2. 尝试覆盖缓存数据 (离线版瞬间就位)
             const CACHE_KEY = 'courseAdminData';
@@ -819,7 +935,7 @@
                     currentData = JSON.parse(cached);
                     lessons = currentData.lessons;
                     updateUI();
-                } catch(e) {}
+                } catch (e) { }
             }
 
             // 3. 静默从云端获取最新，拉取到后秒级刷新
