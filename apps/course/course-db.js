@@ -9,6 +9,7 @@
   const CHUNK_SIZE = 1 * 1024 * 1024;
   const UPLOAD_CONCURRENCY = 4;
   const SUPABASE_HOST = new URL(SUPABASE_URL).hostname.split('.')[0];
+  const VIDEO_LINE_PROMISES = new Map();
   const DEFAULT_VIDEO_LINES = [
     {
       id: 'supabase_primary',
@@ -139,24 +140,40 @@
       if (found) return found;
     }
 
-    const bucket = sample?.bucket || STORAGE_BUCKET;
-    const samplePath = sample?.objectPath || sample?.path || getObjectPathFromUrl(sample?.url || '') || '';
-    const probePath = samplePath || 'probe.txt';
+    const cacheKey = getNetworkKey();
+    if (VIDEO_LINE_PROMISES.has(cacheKey)) {
+      return VIDEO_LINE_PROMISES.get(cacheKey);
+    }
 
-    const results = await Promise.allSettled(lines.map(async (line) => {
-      const probe = buildVideoUrl(bucket, probePath, line);
-      const result = await probeUrl(probe);
-      return { line, ms: result.ms };
-    }));
+    const task = (async () => {
+      const bucket = sample?.bucket || STORAGE_BUCKET;
+      const samplePath = sample?.objectPath || sample?.path || getObjectPathFromUrl(sample?.url || '') || '';
+      const probePath = samplePath || 'probe.txt';
 
-    const successes = results
-      .filter((r) => r.status === 'fulfilled')
-      .map((r) => r.value)
-      .sort((a, b) => a.ms - b.ms);
+      const results = await Promise.allSettled(lines.map(async (line) => {
+        const probe = buildVideoUrl(bucket, probePath, line);
+        const result = await probeUrl(probe);
+        return { line, ms: result.ms };
+      }));
 
-    const best = successes[0]?.line || lines[0];
-    if (best) writeCachedLine(best.id);
-    return best;
+      const successes = results
+        .filter((r) => r.status === 'fulfilled')
+        .map((r) => r.value)
+        .sort((a, b) => a.ms - b.ms);
+
+      const best = successes[0]?.line || lines[0];
+      if (best) writeCachedLine(best.id);
+      return best;
+    })();
+
+    VIDEO_LINE_PROMISES.set(cacheKey, task);
+    try {
+      return await task;
+    } finally {
+      if (VIDEO_LINE_PROMISES.get(cacheKey) === task) {
+        VIDEO_LINE_PROMISES.delete(cacheKey);
+      }
+    }
   };
   const getClient = () => {
     if (window.CourseStore?._client) return window.CourseStore._client;
@@ -298,9 +315,13 @@
     buildVideoUrl: (bucket, objectPath, line) => buildVideoUrl(bucket, objectPath, line),
     getPreferredVideoLine: async (sample) => pickBestVideoLine(sample),
     warmupVideoLine: (sample) => {
-      pickBestVideoLine(sample).catch(() => {});
+      return pickBestVideoLine(sample).catch(() => null);
     },
     resolveStoragePublicUrl: async (src, sample = {}) => {
+      if (window.CDNSelector?.getFastestUrl) {
+        const rewritten = window.CDNSelector.getFastestUrl(src);
+        if (rewritten) return rewritten;
+      }
       const bucket = sample.bucket || STORAGE_BUCKET;
       const path = sample.objectPath || getObjectPathFromUrl(src);
       if (!path) return src;

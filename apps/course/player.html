@@ -590,6 +590,10 @@
         const prefetchInFlight = new Map();
         const chunkFetchCache = new Map(); // chunk cache key -> Promise<ArrayBuffer>
         const CHUNK_DOWNLOAD_CONCURRENCY = 4;
+        video.preload = 'metadata';
+        video.setAttribute('preload', 'metadata');
+        video.playsInline = true;
+        video.setAttribute('webkit-playsinline', '');
 
         function decodeLessonSrc(src) {
             const prefix = 'chunked:';
@@ -639,6 +643,14 @@
             return line?.id || line?.baseUrl || 'default';
         }
 
+        function resolveFastUrl(url) {
+            if (!url) return url;
+            if (window.CDNSelector?.getFastestUrl) {
+                return window.CDNSelector.getFastestUrl(url);
+            }
+            return url;
+        }
+
         function fetchChunkBuffer(bucket, chunkPath, line) {
             const cacheKey = `${bucket}:${chunkPath}:${getPreferredLineKey(line)}`;
             if (chunkFetchCache.has(cacheKey)) {
@@ -682,15 +694,25 @@
 
         async function resolveLessonVideoSrc(lesson) {
             const rawSrc = lesson?.src || '';
-            const manifest = decodeLessonSrc(rawSrc);
-            if (!manifest) {
-                const storage = extractStorageLocation(rawSrc);
-                if (!storage) return rawSrc;
-                return CourseStore.resolveStoragePublicUrl(rawSrc, storage);
-            }
+            if (!rawSrc) return '';
 
             if (chunkedCache.has(rawSrc)) {
                 return await chunkedCache.get(rawSrc);
+            }
+
+            const manifest = decodeLessonSrc(rawSrc);
+            if (!manifest) {
+                const storage = extractStorageLocation(rawSrc);
+                const task = storage
+                    ? CourseStore.resolveStoragePublicUrl(rawSrc, storage)
+                    : Promise.resolve(rawSrc);
+                chunkedCache.set(rawSrc, task);
+                try {
+                    return await task;
+                } catch (e) {
+                    chunkedCache.delete(rawSrc);
+                    throw e;
+                }
             }
 
             const loadPromise = (async () => {
@@ -719,20 +741,12 @@
             if (!lesson || !lesson.src) return;
             const rawSrc = lesson.src || '';
             if (chunkedCache.has(rawSrc) || prefetchInFlight.has(rawSrc)) return;
-            const manifest = decodeLessonSrc(rawSrc);
-            if (manifest?.chunks?.length) {
-                const bucket = manifest.bucket || 'course-media';
-                const chunks = [...manifest.chunks].sort((a, b) => (a.index || 0) - (b.index || 0));
-                const sample = getLessonSample(lesson) || { bucket, objectPath: chunks[0]?.path, url: rawSrc };
-                CourseStore.getPreferredVideoLine(sample).then((line) => {
-                    chunks.forEach((chunk) => {
-                        fetchChunkBuffer(bucket, chunk.path, line).catch(() => {});
-                    });
-                }).catch(() => {});
-            }
-            resolveLessonVideoSrc(lesson).catch((e) => {
+            const task = resolveLessonVideoSrc(lesson).catch((e) => {
                 console.error('Video prefetch failed:', e);
+            }).finally(() => {
+                prefetchInFlight.delete(rawSrc);
             });
+            prefetchInFlight.set(rawSrc, task);
         }
 
         function getLessonByIndex(index) {
@@ -744,17 +758,7 @@
             if (!lesson || !lesson.src || chunkedCache.has(lesson.src) || prefetchInFlight.has(lesson.src)) {
                 return;
             }
-
-            const task = Promise.resolve()
-                .then(() => prefetchLessonVideo(lesson))
-                .catch((e) => {
-                    console.error('Prefetch failed:', e);
-                })
-                .finally(() => {
-                    prefetchInFlight.delete(lesson.src);
-                });
-
-            prefetchInFlight.set(lesson.src, task);
+            prefetchLessonVideo(lesson);
         }
 
         function prefetchNearbyLessons() {
@@ -849,7 +853,7 @@
             if (platformText) platformText.textContent = currentData.platformName;
             const bgBlur = document.querySelector('.bg-blur');
             const videoContainer = document.querySelector('.video-container');
-            const coverSrc = currentData.coverUrl || 'cover.png';
+            const coverSrc = resolveFastUrl(currentData.coverUrl || 'cover.png');
 
             // 云端统计递增：仅当课时真正切换且有有效ID时触发
             if (state.currentIdx && state.currentIdx !== state.lastIncrementedId) {
