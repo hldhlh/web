@@ -1437,7 +1437,9 @@
     <script>
         const SB_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
         const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
-        const sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: false } });
+        const LINE_CACHE_KEY = 'jlhcdh_best_supabase_line_v1';
+        const LINE_CACHE_TTL = 6 * 60 * 60 * 1000; // 6h
+        let sb = null;
 
         const state = {
             products: [],
@@ -1463,8 +1465,141 @@
             skipRealtimeUntil: 0, // 跳过实时更新直到此时间戳
             realtimeRetryCount: 0, // 实时连接重试次数
             maxRealtimeRetries: 3, // 最大重试次数
-            isAuthorized: false // 管理操作授权状态
+            isAuthorized: false, // 管理操作授权状态
+            reconnectTimer: null, // 重连定时器
+            isReconnecting: false, // 是否正在重连
+            supabaseLineCandidates: [], // 可用线路
+            lineProbeResults: [], // 线路测速结果
+            currentLineIndex: 0, // 当前线路下标
+            currentSupabaseUrl: SB_URL // 当前使用的 Supabase URL
         };
+
+        function createSupabaseClient(baseUrl) {
+            return window.supabase.createClient(baseUrl, SB_KEY, { auth: { persistSession: false } });
+        }
+
+        function normalizeLineUrl(url) {
+            const value = String(url || '').trim().replace(/\/+$/, '');
+            if (!value || !/^https?:\/\//i.test(value)) return null;
+            return value;
+        }
+
+        function getNetworkKey() {
+            const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+            if (!conn) return 'unknown';
+            return [conn.effectiveType || 'unknown', conn.downlink || '', conn.rtt || '', conn.saveData ? 'save' : 'nosave'].join('|');
+        }
+
+        function getLineCandidates() {
+            const fromWindow = Array.isArray(window.JLHCDH_SUPABASE_LINES) ? window.JLHCDH_SUPABASE_LINES : [];
+            const fromStorage = (() => {
+                try {
+                    const raw = localStorage.getItem('jlhcdh_supabase_lines');
+                    const parsed = JSON.parse(raw || '[]');
+                    return Array.isArray(parsed) ? parsed : [];
+                } catch (e) {
+                    return [];
+                }
+            })();
+            return [...new Set([SB_URL, ...fromWindow, ...fromStorage].map(normalizeLineUrl).filter(Boolean))];
+        }
+
+        async function probeSupabaseLine(url, timeoutMs = 3000) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            const start = performance.now();
+            try {
+                // /rest/v1/ 是最轻量、最稳定的连通性探测目标
+                const res = await fetch(`${url}/rest/v1/`, {
+                    method: 'GET',
+                    headers: {
+                        apikey: SB_KEY
+                    },
+                    cache: 'no-store',
+                    signal: controller.signal
+                });
+                const latency = Math.round(performance.now() - start);
+                // 即使返回 401/404，通常也代表线路可达（网络层成功）
+                return { url, ok: !!res, latency };
+            } catch (e) {
+                return { url, ok: false, latency: Infinity, error: e?.name || e?.message || 'probe_failed' };
+            } finally {
+                clearTimeout(timer);
+            }
+        }
+
+        function readCachedBestLine(candidates) {
+            try {
+                const raw = localStorage.getItem(LINE_CACHE_KEY);
+                if (!raw) return null;
+                const cached = JSON.parse(raw);
+                if (!cached || !cached.url || !cached.savedAt) return null;
+                if (Date.now() - cached.savedAt > LINE_CACHE_TTL) return null;
+                if (cached.networkKey !== getNetworkKey()) return null;
+                if (!candidates.includes(cached.url)) return null;
+                return cached.url;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function writeCachedBestLine(url) {
+            try {
+                localStorage.setItem(LINE_CACHE_KEY, JSON.stringify({
+                    url,
+                    savedAt: Date.now(),
+                    networkKey: getNetworkKey()
+                }));
+            } catch (e) { }
+        }
+
+        async function selectBestSupabaseLine(forceProbe = false) {
+            const candidates = getLineCandidates();
+            state.supabaseLineCandidates = candidates;
+            if (!candidates.length) return SB_URL;
+
+            const cached = !forceProbe ? readCachedBestLine(candidates) : null;
+            if (cached) {
+                state.lineProbeResults = [{ url: cached, ok: true, latency: 0, source: 'cache' }];
+                state.currentLineIndex = Math.max(candidates.indexOf(cached), 0);
+                return cached;
+            }
+
+            const results = await Promise.all(candidates.map((url) => probeSupabaseLine(url)));
+            const sorted = results
+                .filter(r => r.ok)
+                .sort((a, b) => a.latency - b.latency);
+
+            state.lineProbeResults = [...sorted, ...results.filter(r => !r.ok)];
+
+            const best = sorted[0]?.url || candidates[0];
+            writeCachedBestLine(best);
+            state.currentLineIndex = Math.max(candidates.indexOf(best), 0);
+            return best;
+        }
+
+        async function initSupabaseWithBestLine(forceProbe = false) {
+            const bestLine = await selectBestSupabaseLine(forceProbe);
+            state.currentSupabaseUrl = bestLine || SB_URL;
+            sb = createSupabaseClient(state.currentSupabaseUrl);
+            console.log(`🌍 当前 Supabase 线路: ${state.currentSupabaseUrl}`);
+        }
+
+        async function switchToNextSupabaseLine() {
+            const list = state.supabaseLineCandidates;
+            if (!Array.isArray(list) || list.length <= 1) return false;
+            if (state.currentLineIndex >= list.length - 1) return false;
+
+            state.currentLineIndex += 1;
+            const nextUrl = list[state.currentLineIndex];
+            if (!nextUrl) return false;
+
+            state.currentSupabaseUrl = nextUrl;
+            sb = createSupabaseClient(nextUrl);
+            console.log(`🌐 已切换到备用线路: ${nextUrl}`);
+            showToast('已自动切换到备用线路');
+            return true;
+        }
 
         // 密码保护
         const ADMIN_PASSWORD = '123456';
@@ -1531,6 +1666,7 @@
         async function init() {
             setGlobalSyncStatus('connecting'); // 初始状态：正在连接
 
+            await initSupabaseWithBestLine(false);
             await fetchProducts();
             await fetchCart();
             renderCategories();
@@ -2369,6 +2505,7 @@
         };
 
         function setupRealtime() {
+            if (!sb) return;
             setGlobalSyncStatus('connecting');
 
             // 创建统一的实时订阅通道
@@ -2555,64 +2692,93 @@
                 if (status === 'SUBSCRIBED') {
                     state.realtimeConnected = true;
                     state.realtimeRetryCount = 0; // 连接成功，重置重试计数
+                    if (state.reconnectTimer) {
+                        clearTimeout(state.reconnectTimer);
+                        state.reconnectTimer = null;
+                    }
                     setGlobalSyncStatus('online');
                     console.log('✅ 实时订阅已建立');
-                } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+                } else if (status === 'TIMED_OUT' || status === 'CLOSED' || status === 'CHANNEL_ERROR') {
                     state.realtimeConnected = false;
                     setGlobalSyncStatus('disconnected');
-
-                    // 检查是否超过最大重试次数
-                    if (state.realtimeRetryCount >= state.maxRealtimeRetries) {
-                        console.log('⚠️ 已达到最大重试次数，停止自动重连。可手动点击状态指示灯重试。');
-                        return;
-                    }
-
-                    state.realtimeRetryCount++;
-                    console.log(`❌ 实时连接已断开，${state.realtimeRetryCount}/${state.maxRealtimeRetries} 次重试...`);
-
-                    // 递增延迟重连 (5s, 10s, 15s...)
-                    const retryDelay = 5000 * state.realtimeRetryCount;
-                    setTimeout(() => {
-                        if (!state.realtimeConnected) {
-                            reconnectRealtime();
-                        }
-                    }, retryDelay);
+                    scheduleRealtimeReconnect(status);
                 }
             });
 
             state.realtimeChannels.push(channel);
         }
 
+        // 统一调度重连，避免 TIMED_OUT + CLOSED 叠加触发重复重连
+        function scheduleRealtimeReconnect(reason = 'UNKNOWN') {
+            if (state.reconnectTimer) return;
+
+            if (state.realtimeRetryCount >= state.maxRealtimeRetries) {
+                console.log('⚠️ 已达到最大重试次数，停止自动重连。可手动点击状态指示灯重试。');
+                return;
+            }
+
+            state.realtimeRetryCount++;
+            const retryDelay = Math.min(3000 * Math.pow(2, state.realtimeRetryCount - 1), 30000); // 3s/6s/12s...
+            console.log(`❌ 实时连接异常(${reason})，${state.realtimeRetryCount}/${state.maxRealtimeRetries} 次重试，${retryDelay}ms 后重连...`);
+
+            state.reconnectTimer = setTimeout(async () => {
+                state.reconnectTimer = null;
+                if (!state.realtimeConnected) {
+                    await reconnectRealtime();
+                }
+            }, retryDelay);
+        }
+
         // 重新连接实时订阅
         async function reconnectRealtime(forceRetry = false) {
-            // 如果是手动重试，重置计数器
-            if (forceRetry) {
-                state.realtimeRetryCount = 0;
-            }
+            if (state.isReconnecting) return;
+            state.isReconnecting = true;
 
-            console.log('🔄 正在重新连接...');
-            setGlobalSyncStatus('connecting');
-
-            // 移除旧订阅（静默处理错误）
             try {
-                for (const ch of state.realtimeChannels) {
-                    await sb.removeChannel(ch).catch(() => { });
+                // 如果是手动重试，重置计数器
+                if (forceRetry) {
+                    state.realtimeRetryCount = 0;
                 }
-            } catch (e) {
-                console.log('清理旧连接时出错（可忽略）:', e);
+
+                // 连续失败时自动切换线路，再重连
+                if (!forceRetry && state.realtimeRetryCount >= 2) {
+                    await switchToNextSupabaseLine();
+                }
+
+                console.log('🔄 正在重新连接...');
+                setGlobalSyncStatus('connecting');
+
+                // 移除旧订阅（静默处理错误）
+                try {
+                    for (const ch of state.realtimeChannels) {
+                        await sb.removeChannel(ch).catch(() => { });
+                    }
+                } catch (e) {
+                    console.log('清理旧连接时出错（可忽略）:', e);
+                }
+                state.realtimeChannels = [];
+
+                // 重建 Realtime socket，避免 TIMED_OUT 后连接器卡死
+                try {
+                    sb.realtime.disconnect();
+                    sb.realtime.connect();
+                } catch (e) {
+                    console.log('重建 Realtime socket 失败（可忽略）:', e);
+                }
+
+                // 重新建立订阅
+                setupRealtime();
+
+                // 同时刷新所有数据
+                await fetchProducts();
+                await fetchCart();
+                await refreshCalendarMarkers();
+                renderProducts();
+                renderCategories();
+                renderTags();
+            } finally {
+                state.isReconnecting = false;
             }
-            state.realtimeChannels = [];
-
-            // 重新建立订阅
-            setupRealtime();
-
-            // 同时刷新所有数据
-            await fetchProducts();
-            await fetchCart();
-            await refreshCalendarMarkers();
-            renderProducts();
-            renderCategories();
-            renderTags();
         }
 
         // 给状态指示灯添加点击事件（点击重连）
