@@ -710,7 +710,18 @@
         <!-- 平台名片 -->
         <section class="platform-section">
             <div class="platform-card">
-                <img src="logo.png" alt="Platform Logo" class="platform-logo">
+                <svg class="platform-logo" viewBox="0 0 64 64" role="img" aria-label="Platform Logo" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="platformLogoBg" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#ffe08a" />
+                            <stop offset="100%" stop-color="#ff8f5a" />
+                        </linearGradient>
+                    </defs>
+                    <rect x="2" y="2" width="60" height="60" rx="18" fill="url(#platformLogoBg)" />
+                    <circle cx="24" cy="26" r="8" fill="#fff7e8" />
+                    <path d="M38 18l12 8-12 8z" fill="#ffffff" opacity="0.95" />
+                    <rect x="16" y="40" width="32" height="6" rx="3" fill="#ffffff" opacity="0.9" />
+                </svg>
                 <div class="platform-content">
                     <h3 class="platform-name">情景故事学习小组制作</h3>
                     <p class="platform-meta">16,059 关注者 · 785 单课</p>
@@ -811,7 +822,9 @@
             const coverImg = document.querySelector('.cover-img');
             const platformLogo = document.querySelector('.platform-logo');
             if (coverImg) coverImg.src = currentData.coverUrl || 'cover.png';
-            if (platformLogo) platformLogo.src = currentData.logoUrl || 'logo.png';
+            if (platformLogo && platformLogo.tagName === 'IMG') {
+                platformLogo.src = currentData.logoUrl || 'logo.png';
+            }
 
             const list = document.getElementById('lessonList');
             list.innerHTML = lessons.map((l, i) => `
