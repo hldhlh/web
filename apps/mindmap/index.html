@@ -193,6 +193,7 @@
             opacity: 0.9;
             transition: stroke 0.3s, stroke-width 0.3s;
             filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+            vector-effect: non-scaling-stroke;
         }
 
         .line-preview {
@@ -254,11 +255,16 @@
 <body class="antialiased select-none">
     <div id="viewport">
         <div id="grid" class="infinite-grid"></div>
-        <svg id="globalSvg"
+        <div id="content" class="content-layer">
+            <svg id="contentSvg"
+                style="position:absolute; top:0; left:0; width:1px; height:1px; pointer-events:none; z-index:0; overflow:visible;">
+                <g id="lineGroups"></g>
+            </svg>
+        </div>
+        <svg id="overlaySvg"
             style="position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:2; overflow:visible;">
-            <g id="lineGroups"></g>
+            <g id="overlayLines"></g>
         </svg>
-        <div id="content" class="content-layer"></div>
     </div>
 
     <input type="text" id="floatingInput" spellcheck="false" autocomplete="off">
@@ -284,6 +290,13 @@
                 linkingFrom: null, currentTag: null, selectedTags: [], dragOffset: { x: 0, y: 0 },
                 contextEntity: null, contextType: null, lastTap: 0, lastBlurTime: 0
             },
+            trackpad: {
+                lastWheelAt: 0,
+                gestureMode: null,
+                panSensitivity: 1.0,
+                zoomSensitivity: 0.0035,
+                momentumCutoff: 0.12
+            },
             connections: [],
             saveViewTimer: null
         };
@@ -295,6 +308,7 @@
             input: document.getElementById('floatingInput'),
             menu: document.getElementById('minimalMenu'),
             svgGroup: document.getElementById('lineGroups'),
+            overlayLines: document.getElementById('overlayLines'),
             selection: document.createElement('div'),
             syncStatus: document.getElementById('syncStatus')
         };
@@ -379,6 +393,11 @@
             const { x, y, scale } = State.transform;
             DOM.content.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
 
+            // Only redraw lines during zoom if they are in screen coordinates or if we need labels to maintain scale
+            // But since we moved it into content layer, we don't redraw unless nodes move.
+            // Exception: during active linking preview, we redraw overlay.
+            if (State.interaction.isLinking) LineManager.renderOverlay();
+
             const ox = window.innerWidth / 2 + x;
             const oy = window.innerHeight / 2 + y;
             const s1 = 40 * scale;
@@ -388,7 +407,6 @@
             DOM.grid.style.backgroundPosition = `${ox}px ${oy}px, ${ox}px ${oy}px, ${ox}px ${oy}px`;
 
             _colorCache.clear();
-            LineManager.render();
             saveViewState();
         }
 
@@ -425,6 +443,35 @@
                 x: rect.width / 2 + State.transform.x + x * State.transform.scale,
                 y: rect.height / 2 + State.transform.y + y * State.transform.scale
             };
+        }
+
+        function clampScale(nextScale) {
+            return Math.max(0.08, Math.min(nextScale, 4.5));
+        }
+
+        function zoomAt(clientX, clientY, nextScale) {
+            const rect = DOM.viewport.getBoundingClientRect();
+            const mouseX = clientX - rect.left - rect.width / 2;
+            const mouseY = clientY - rect.top - rect.height / 2;
+            const prevScale = State.transform.scale;
+            const clamped = clampScale(nextScale);
+            State.transform.x -= mouseX * (clamped / prevScale - 1);
+            State.transform.y -= mouseY * (clamped / prevScale - 1);
+            State.transform.scale = clamped;
+            updateMatrix();
+        }
+
+        function resetViewAnimated() {
+            State.transform = { x: 0, y: 0, scale: 1 };
+            updateMatrix();
+        }
+
+        function isLikelyTrackpadPinch(e) {
+            return e.ctrlKey;
+        }
+
+        function isLikelyTrackpadPan(e) {
+            return !e.ctrlKey;
         }
 
         const Tag = {
@@ -542,50 +589,48 @@
                 State.connections.forEach(conn => {
                     const from = document.getElementById(conn.from_id || conn.fromId);
                     const to = document.getElementById(conn.to_id || conn.toId);
-                    if (from && to) this.drawLine(from, to, false, conn);
+                    if (from && to) {
+                        const g = this.drawLine(from, to, false, conn);
+                        if (g) DOM.svgGroup.appendChild(g);
+                    }
                 });
             },
             drawLine(fromNode, toNodeOrPos, isPreview = false, connData = null) {
+                const isRight = isPreview ? (spaceToScreen(toNodeOrPos.x, toNodeOrPos.y).x > fromNode.getBoundingClientRect().left + fromNode.getBoundingClientRect().width / 2) : 
+                               (parseFloat(toNodeOrPos.dataset.x) > parseFloat(fromNode.dataset.x));
+
+                const fromX = parseFloat(fromNode.dataset.x);
+                const fromY = parseFloat(fromNode.dataset.y);
                 const fromRect = fromNode.getBoundingClientRect();
-                const fromCenter = { x: fromRect.left + fromRect.width / 2, y: fromRect.top + fromRect.height / 2 };
+                const nodeW = fromRect.width / State.transform.scale;
+                const nodeH = fromRect.height / State.transform.scale;
 
-                let toCenter, toRect;
+                // local coordinates
+                const startX = isRight ? (fromX + nodeW / 2) : (fromX - nodeW / 2);
+                const startY = fromY;
+
+                let endX, endY, toNodeId = null;
                 if (isPreview) {
-                    toCenter = spaceToScreen(toNodeOrPos.x, toNodeOrPos.y);
+                    endX = toNodeOrPos.x;
+                    endY = toNodeOrPos.y;
                 } else {
-                    toRect = toNodeOrPos.getBoundingClientRect();
-                    toCenter = { x: toRect.left + toRect.width / 2, y: toRect.top + toRect.height / 2 };
+                    const toX = parseFloat(toNodeOrPos.dataset.x);
+                    const toY = parseFloat(toNodeOrPos.dataset.y);
+                    const toRect = toNodeOrPos.getBoundingClientRect();
+                    const toW = toRect.width / State.transform.scale;
+                    toNodeId = toNodeOrPos.id;
+                    endX = isRight ? (toX - toW / 2) : (toX + toW / 2);
+                    endY = toY;
                 }
 
-                const isRight = (toCenter.x > fromCenter.x);
-                const branchColor = isPreview ? '#ADB5BD' : (connData ? getBranchColor(toRect ? toNodeOrPos.id : null, fromNode.id) : '#ADB5BD');
-
-                // Start from the vertical center of the parent's side
-                const startX = isRight ? fromRect.right : fromRect.left;
-                const startY = fromCenter.y;
-
-                let endX, endY;
-                if (isPreview) {
-                    endX = toCenter.x;
-                    endY = toCenter.y;
-                } else {
-                    // End at the vertical center of the child's side
-                    endX = isRight ? toRect.left : toRect.right;
-                    endY = toCenter.y;
-                }
-
-                // Bezier curve calculation
                 const dx = Math.abs(endX - startX);
-
-                // Control points for a smooth S-curve
-                // We use 50% of the distance as the control point offset for a balanced curve
                 const tension = 0.5;
                 const cp1x = startX + (isRight ? 1 : -1) * (dx * tension);
                 const cp1y = startY;
                 const cp2x = endX - (isRight ? 1 : -1) * (dx * tension);
                 const cp2y = endY;
 
-                const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                const branchColor = isPreview ? '#ADB5BD' : (connData ? getBranchColor(toNodeId, fromNode.id) : '#ADB5BD');
 
                 const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
                 const d = `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}`;
@@ -594,9 +639,10 @@
                 path.setAttribute("fill", "none");
                 path.setAttribute("stroke", branchColor);
                 path.setAttribute("stroke-width", "2");
+
+                const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
                 group.appendChild(path);
 
-                // Invisible hit path for easier clicking
                 if (!isPreview && connData) {
                     const hitPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
                     hitPath.setAttribute("d", d);
@@ -604,40 +650,64 @@
                     hitPath.setAttribute("stroke-width", "20");
                     hitPath.style.cursor = "pointer";
                     hitPath.style.pointerEvents = "stroke";
-
                     hitPath.addEventListener('click', (e) => {
                         e.stopPropagation();
-                        // Calculate middle point of the bezier curve for the input box
-                        // Bezier mid point formula for t=0.5
-                        const t = 0.5;
-                        const mx = (1 - t) * (1 - t) * (1 - t) * startX + 3 * (1 - t) * (1 - t) * t * cp1x + 3 * (1 - t) * t * t * cp2x + t * t * t * endX;
-                        const my = (1 - t) * (1 - t) * (1 - t) * startY + 3 * (1 - t) * (1 - t) * t * cp1y + 3 * (1 - t) * t * t * cp2y + t * t * t * endY;
-
-                        Input.show(mx, my, connData.label || '', connData, 'connection');
+                        // input for labels still needs screen coords
+                        const screenStart = spaceToScreen(startX, startY);
+                        const screenEnd = spaceToScreen(endX, endY);
+                        const midX = (screenStart.x + screenEnd.x) / 2;
+                        const midY = (screenStart.y + screenEnd.y) / 2;
+                        Input.show(midX, midY, connData.label || '', connData, 'connection');
                     });
                     group.appendChild(hitPath);
 
                     if (connData.label) {
-                        // Calculate approx middle point
-                        const t = 0.5;
-                        const mx = (1 - t) * (1 - t) * (1 - t) * startX + 3 * (1 - t) * (1 - t) * t * cp1x + 3 * (1 - t) * t * t * cp2x + t * t * t * endX;
-                        const my = (1 - t) * (1 - t) * (1 - t) * startY + 3 * (1 - t) * (1 - t) * t * cp1y + 3 * (1 - t) * t * t * cp2y + t * t * t * endY;
-
+                        const midX = (startX + endX) / 2;
+                        const midY = (startY + endY) / 2;
                         const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                        text.setAttribute("x", mx);
-                        text.setAttribute("y", my - 8);
+                        text.setAttribute("x", midX);
+                        text.setAttribute("y", midY - 6);
                         text.setAttribute("text-anchor", "middle");
                         text.setAttribute("fill", "#636E72");
                         text.setAttribute("font-size", "11");
                         text.setAttribute("font-weight", "500");
-                        text.style.textShadow = "0 1px 2px rgba(255,255,255,0.8)";
                         text.textContent = connData.label;
-                        text.style.pointerEvents = "none";
+                        text.setAttribute("transform", `scale(${1/State.transform.scale})`); // Text needs to counter scale if we want it constant
+                        // Actually, easier to keep text outside or just let it scale. Let's let it scale for now.
                         group.appendChild(text);
                     }
                 }
+                return group;
+            },
+            renderOverlay() {
+                DOM.overlayLines.innerHTML = '';
+                if (State.interaction.isLinking && State.interaction.linkingFrom) {
+                    const from = State.interaction.linkingFrom;
+                    const mousePos = { x: State.mouse.lastX, y: State.mouse.lastY };
+                    
+                    const fromRect = from.getBoundingClientRect();
+                    const fromCenter = { x: fromRect.left + fromRect.width / 2, y: fromRect.top + fromRect.height / 2 };
+                    const isRight = mousePos.x > fromCenter.x;
+                    const startX = isRight ? fromRect.right : fromRect.left;
+                    const startY = fromCenter.y;
 
-                DOM.svgGroup.appendChild(group);
+                    const dx = Math.abs(mousePos.x - startX);
+                    const tension = 0.5;
+                    const cp1x = startX + (isRight ? 1 : -1) * (dx * tension);
+                    const cp1y = startY;
+                    const cp2x = mousePos.x - (isRight ? 1 : -1) * (dx * tension);
+                    const cp2y = mousePos.y;
+
+                    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    const d = `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${mousePos.x} ${mousePos.y}`;
+                    path.setAttribute("d", d);
+                    path.setAttribute("class", "connection-line line-preview");
+                    path.setAttribute("fill", "none");
+                    path.setAttribute("stroke", "#ADB5BD");
+                    path.setAttribute("stroke-width", "2");
+
+                    DOM.overlayLines.appendChild(path);
+                }
             }
         };
 
@@ -854,8 +924,7 @@
                     });
                     LineManager.render();
                 } else if (State.interaction.isLinking) {
-                    LineManager.render();
-                    LineManager.drawLine(State.interaction.linkingFrom, screenToSpace(e.clientX, e.clientY), true);
+                    LineManager.renderOverlay();
                 } else if (e.buttons === 1 && !State.interaction.isDragging && !State.interaction.isPanning) {
                     Selection.update(e.clientX, e.clientY);
                 }
@@ -869,7 +938,7 @@
                 } else if (State.interaction.isDragging) {
                     State.interaction.isDragging = false;
                     State.interaction.selectedTags.forEach(t => Tag.updatePos(t));
-                    State.interaction.currentTag.classList.remove('dragging');
+                    if (State.interaction.currentTag) State.interaction.currentTag.classList.remove('dragging');
                     DOM.viewport.style.cursor = 'crosshair';
                 } else if (State.interaction.isLinking) {
                     const tagUnderMouse = document.elementFromPoint(e.clientX, e.clientY)?.closest('.tag');
@@ -885,7 +954,8 @@
                 } else if (State.interaction.isSelecting) {
                     Selection.commit();
                 } else if (dur < 250 && e.target === DOM.viewport) {
-                    if (Date.now() - State.interaction.lastBlurTime > 200) {
+                    const justTrackpadGesture = Date.now() - State.trackpad.lastWheelAt < 220;
+                    if (!justTrackpadGesture && Date.now() - State.interaction.lastBlurTime > 200) {
                         Tag.deselect();
                         Input.show(e.clientX, e.clientY);
                     }
@@ -897,14 +967,35 @@
 
             DOM.viewport.addEventListener('wheel', e => {
                 e.preventDefault();
-                const delta = e.deltaY > 0 ? 0.9 : 1.1;
-                const newScale = Math.max(0.02, Math.min(State.transform.scale * delta, 8.0));
-                const rect = DOM.viewport.getBoundingClientRect();
-                const mouseX = e.clientX - rect.left - rect.width / 2, mouseY = e.clientY - rect.top - rect.height / 2;
-                State.transform.x -= mouseX * (newScale / State.transform.scale - 1);
-                State.transform.y -= mouseY * (newScale / State.transform.scale - 1);
-                State.transform.scale = newScale; updateMatrix();
+                State.trackpad.lastWheelAt = Date.now();
+
+                // Advanced Trackpad Pinch (Chrome/Edge/iOS/Mac)
+                if (e.ctrlKey) {
+                    const factor = Math.exp(-e.deltaY * State.trackpad.zoomSensitivity);
+                    zoomAt(e.clientX, e.clientY, State.transform.scale * factor);
+                } else {
+                    // Two-finger pan or Mouse scroll
+                    const dx = e.deltaX;
+                    const dy = e.deltaY;
+                    State.transform.x -= dx * State.trackpad.panSensitivity;
+                    State.transform.y -= dy * State.trackpad.panSensitivity;
+                    updateMatrix();
+                }
             }, { passive: false });
+
+            // Safari Native Pinch Support
+            let startScale = 1;
+            DOM.viewport.addEventListener('gesturestart', e => {
+                e.preventDefault();
+                startScale = State.transform.scale;
+            });
+            DOM.viewport.addEventListener('gesturechange', e => {
+                e.preventDefault();
+                zoomAt(e.clientX, e.clientY, startScale * e.scale);
+            });
+            DOM.viewport.addEventListener('gestureend', e => {
+                e.preventDefault();
+            });
 
             DOM.input.addEventListener('keydown', e => {
                 if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
@@ -922,11 +1013,29 @@
                         t.remove();
                     });
                     State.interaction.selectedTags = []; LineManager.render();
+                    return;
+                }
+
+                if ((e.metaKey || e.ctrlKey) && e.key === '0') {
+                    e.preventDefault();
+                    resetViewAnimated();
+                    return;
+                }
+
+                if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) {
+                    e.preventDefault();
+                    zoomAt(window.innerWidth / 2, window.innerHeight / 2, State.transform.scale * 1.12);
+                    return;
+                }
+
+                if ((e.metaKey || e.ctrlKey) && e.key === '-') {
+                    e.preventDefault();
+                    zoomAt(window.innerWidth / 2, window.innerHeight / 2, State.transform.scale / 1.12);
                 }
             });
 
             document.getElementById('menuReset').addEventListener('click', () => {
-                State.transform = { x: 0, y: 0, scale: 1 }; updateMatrix(); Menu.hide();
+                resetViewAnimated(); Menu.hide();
             });
             document.getElementById('menuDelete').addEventListener('click', async () => {
                 const node = State.interaction.contextEntity;
@@ -938,6 +1047,12 @@
             });
             document.addEventListener('contextmenu', e => e.preventDefault());
             window.addEventListener('resize', updateMatrix);
+
+            DOM.viewport.addEventListener('dblclick', e => {
+                if (e.target.closest('.tag')) return;
+                e.preventDefault();
+                resetViewAnimated();
+            });
 
             // ========== Mobile Touch Support ==========
             const TouchState = {

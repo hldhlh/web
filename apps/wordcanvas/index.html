@@ -175,6 +175,7 @@
             stroke-width: 2;
             stroke-linecap: round;
             opacity: 0.8;
+            vector-effect: non-scaling-stroke;
         }
 
         .line-preview {
@@ -234,16 +235,16 @@
 <body class="antialiased select-none">
     <div id="viewport">
         <div id="grid" class="infinite-grid"></div>
-        <svg id="globalSvg"
+        <div id="content" class="content-layer">
+            <svg id="contentSvg"
+                style="position:absolute; top:0; left:0; width:1px; height:1px; pointer-events:none; z-index:0; overflow:visible;">
+                <g id="lineGroups"></g>
+            </svg>
+        </div>
+        <svg id="overlaySvg"
             style="position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:2; overflow:visible;">
-            <defs>
-                <marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto">
-                    <path d="M0,0 L10,5 L0,10 Z" fill="#818cf8" />
-                </marker>
-            </defs>
-            <g id="lineGroups"></g>
+            <g id="overlayLines"></g>
         </svg>
-        <div id="content" class="content-layer"></div>
     </div>
 
     <input type="text" id="floatingInput" spellcheck="false" autocomplete="off">
@@ -268,6 +269,10 @@
                 isPanning: false, isDragging: false, isSelecting: false, isLinking: false,
                 linkingFrom: null, currentTag: null, selectedTags: [], dragOffset: { x: 0, y: 0 },
                 contextEntity: null, contextType: null, lastTap: 0, lastBlurTime: 0
+            },
+            trackpad: {
+                zoomSensitivity: 0.0035,
+                panSensitivity: 1.0
             },
             connections: [],
             saveViewTimer: null
@@ -309,21 +314,18 @@
             const { x, y, scale } = State.transform;
             DOM.content.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
 
-            // Grid optimization: Update background instead of transforming container
-            // This ensures 1px lines remain 1px visually, implementing "High Definition" look
+            // Only redraw overlay lines during zoom if needed
+            if (State.interaction.isLinking) LineManager.renderOverlay();
+
+            // Grid optimization
             const ox = window.innerWidth / 2 + x;
             const oy = window.innerHeight / 2 + y;
             const s1 = 40 * scale;
             const s2 = 200 * scale;
 
             DOM.grid.style.backgroundSize = `${s1}px ${s1}px, ${s2}px ${s2}px, ${s2}px ${s2}px`;
-            DOM.grid.style.backgroundPosition = `
-                ${ox}px ${oy}px,
-                ${ox}px ${oy}px,
-                ${ox}px ${oy}px
-            `;
+            DOM.grid.style.backgroundPosition = `${ox}px ${oy}px, ${ox}px ${oy}px, ${ox}px ${oy}px`;
 
-            LineManager.render();
             saveViewState();
         }
 
@@ -360,6 +362,18 @@
                 x: rect.width / 2 + State.transform.x + x * State.transform.scale,
                 y: rect.height / 2 + State.transform.y + y * State.transform.scale
             };
+        }
+
+        function zoomAt(clientX, clientY, nextScale) {
+            const rect = DOM.viewport.getBoundingClientRect();
+            const mouseX = clientX - rect.left - rect.width / 2;
+            const mouseY = clientY - rect.top - rect.height / 2;
+            const prevScale = State.transform.scale;
+            const clamped = Math.max(0.02, Math.min(nextScale, 8.0));
+            State.transform.x -= mouseX * (clamped / prevScale - 1);
+            State.transform.y -= mouseY * (clamped / prevScale - 1);
+            State.transform.scale = clamped;
+            updateMatrix();
         }
 
         const Tag = {
@@ -468,51 +482,57 @@
                 State.connections.forEach(conn => {
                     const from = document.getElementById(conn.from_id || conn.fromId);
                     const to = document.getElementById(conn.to_id || conn.toId);
-                    if (from && to) this.drawLine(from, to, false, conn);
+                    if (from && to) {
+                        const g = this.drawLine(from, to, false, conn);
+                        if (g) DOM.svgGroup.appendChild(g);
+                    }
                 });
             },
             drawLine(fromNode, toNodeOrPos, isPreview = false, connData = null) {
-                const fromRect = fromNode.getBoundingClientRect();
-                const fromCenter = { x: fromRect.left + fromRect.width / 2, y: fromRect.top + fromRect.height / 2 };
+                const isRight = isPreview ? (spaceToScreen(toNodeOrPos.x, toNodeOrPos.y).x > fromNode.getBoundingClientRect().left + fromNode.getBoundingClientRect().width / 2) : 
+                               (parseFloat(toNodeOrPos.dataset.x) > parseFloat(fromNode.dataset.x));
 
-                let toCenter, toRect;
+                const fromX = parseFloat(fromNode.dataset.x);
+                const fromY = parseFloat(fromNode.dataset.y);
+                const fromRect = fromNode.getBoundingClientRect();
+                const nodeW = fromRect.width / State.transform.scale;
+
+                const startX = isRight ? (fromX + nodeW / 2) : (fromX - nodeW / 2);
+                const startY = fromY;
+
+                let endX, endY;
                 if (isPreview) {
-                    toCenter = spaceToScreen(toNodeOrPos.x, toNodeOrPos.y);
+                    endX = toNodeOrPos.x;
+                    endY = toNodeOrPos.y;
                 } else {
-                    toRect = toNodeOrPos.getBoundingClientRect();
-                    toCenter = { x: toRect.left + toRect.width / 2, y: toRect.top + toRect.height / 2 };
+                    const toX = parseFloat(toNodeOrPos.dataset.x);
+                    const toY = parseFloat(toNodeOrPos.dataset.y);
+                    const toRect = toNodeOrPos.getBoundingClientRect();
+                    const toW = toRect.width / State.transform.scale;
+                    endX = isRight ? (toX - toW / 2) : (toX + toW / 2);
+                    endY = toY;
                 }
 
-                const start = this.getEdgePoint(fromRect, toCenter);
-                const end = isPreview ? toCenter : this.getEdgePoint(toRect, fromCenter);
-
                 const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-
                 const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-                line.setAttribute("x1", start.x);
-                line.setAttribute("y1", start.y);
-                line.setAttribute("x2", end.x);
-                line.setAttribute("y2", end.y);
+                line.setAttribute("x1", startX);
+                line.setAttribute("y1", startY);
+                line.setAttribute("x2", endX);
+                line.setAttribute("y2", endY);
                 line.setAttribute("class", isPreview ? "connection-line line-preview" : "connection-line");
-                if (!isPreview) line.setAttribute("marker-end", "url(#arrow)");
                 group.appendChild(line);
 
                 if (!isPreview && connData) {
-                    const dx = end.x - start.x;
-                    const dy = end.y - start.y;
+                    const dx = endX - startX;
+                    const dy = endY - startY;
                     let angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                    if (angle > 90 || angle < -90) angle += 180;
 
-                    // Keep text readable (not upside down)
-                    if (angle > 90 || angle < -90) {
-                        angle += 180;
-                    }
-
-                    // Hidden hit area
                     const hitLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
-                    hitLine.setAttribute("x1", start.x);
-                    hitLine.setAttribute("y1", start.y);
-                    hitLine.setAttribute("x2", end.x);
-                    hitLine.setAttribute("y2", end.y);
+                    hitLine.setAttribute("x1", startX);
+                    hitLine.setAttribute("y1", startY);
+                    hitLine.setAttribute("x2", endX);
+                    hitLine.setAttribute("y2", endY);
                     hitLine.setAttribute("stroke", "transparent");
                     hitLine.setAttribute("stroke-width", "20");
                     hitLine.style.cursor = "pointer";
@@ -520,19 +540,17 @@
 
                     hitLine.addEventListener('click', (e) => {
                         e.stopPropagation();
-                        // Calculate screen center for input
-                        const midX = (start.x + end.x) / 2;
-                        const midY = (start.y + end.y) / 2;
+                        const screenStart = spaceToScreen(startX, startY);
+                        const screenEnd = spaceToScreen(endX, endY);
+                        const midX = (screenStart.x + screenEnd.x) / 2;
+                        const midY = (screenStart.y + screenEnd.y) / 2;
                         Input.show(midX, midY, connData.label || '', connData, 'connection', angle);
                     });
-
                     group.appendChild(hitLine);
 
-                    // Label
                     if (connData.label) {
-                        const midX = (start.x + end.x) / 2;
-                        const midY = (start.y + end.y) / 2;
-
+                        const midX = (startX + endX) / 2;
+                        const midY = (startY + endY) / 2;
                         const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
                         text.setAttribute("x", midX);
                         text.setAttribute("y", midY);
@@ -540,28 +558,18 @@
                         text.setAttribute("dominant-baseline", "middle");
                         text.setAttribute("fill", "#e2e8f0");
                         text.setAttribute("font-size", "12");
-                        text.setAttribute("dy", "-3"); // visual adjustment
+                        text.setAttribute("dy", "-3");
                         text.setAttribute("transform", `rotate(${angle}, ${midX}, ${midY})`);
                         text.textContent = connData.label;
                         text.style.pointerEvents = "none";
-                        text.style.textShadow = "0 0 4px #000, 0 0 8px #000"; // Stronger shadow
                         group.appendChild(text);
                     }
                 }
-
-                DOM.svgGroup.appendChild(group);
+                return group;
             },
-            getEdgePoint(rect, target) {
-                const centerX = rect.left + rect.width / 2;
-                const centerY = rect.top + rect.height / 2;
-                const dx = target.x - centerX;
-                const dy = target.y - centerY;
-                if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return { x: centerX, y: centerY };
-                const angle = Math.atan2(dy, dx);
-                const absCos = Math.abs(Math.cos(angle)), absSin = Math.abs(Math.sin(angle));
-                const halfW = rect.width / 2, halfH = rect.height / 2;
-                let scale = (halfW * absSin <= halfH * absCos) ? halfW / absCos : halfH / absSin;
-                return { x: centerX + Math.cos(angle) * scale, y: centerY + Math.sin(angle) * scale };
+            renderOverlay() {
+                DOM.overlayLines.innerHTML = '';
+                // Linking preview implementation simplified
             }
         };
 
@@ -821,14 +829,23 @@
 
             DOM.viewport.addEventListener('wheel', e => {
                 e.preventDefault();
-                const delta = e.deltaY > 0 ? 0.9 : 1.1;
-                const newScale = Math.max(0.02, Math.min(State.transform.scale * delta, 8.0));
-                const rect = DOM.viewport.getBoundingClientRect();
-                const mouseX = e.clientX - rect.left - rect.width / 2, mouseY = e.clientY - rect.top - rect.height / 2;
-                State.transform.x -= mouseX * (newScale / State.transform.scale - 1);
-                State.transform.y -= mouseY * (newScale / State.transform.scale - 1);
-                State.transform.scale = newScale; updateMatrix();
+                if (e.ctrlKey) {
+                    const factor = Math.exp(-e.deltaY * State.trackpad.zoomSensitivity);
+                    zoomAt(e.clientX, e.clientY, State.transform.scale * factor);
+                } else {
+                    State.transform.x -= e.deltaX * State.trackpad.panSensitivity;
+                    State.transform.y -= e.deltaY * State.trackpad.panSensitivity;
+                    updateMatrix();
+                }
             }, { passive: false });
+
+            // Safari Native Pinch Support
+            let startScale = 1;
+            DOM.viewport.addEventListener('gesturestart', e => { e.preventDefault(); startScale = State.transform.scale; });
+            DOM.viewport.addEventListener('gesturechange', e => {
+                e.preventDefault();
+                zoomAt(e.clientX, e.clientY, startScale * e.scale);
+            });
 
             DOM.input.addEventListener('keydown', e => {
                 if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }

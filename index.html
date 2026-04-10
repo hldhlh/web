@@ -334,6 +334,32 @@
 
     // 尝试获取新图标（用于初始化和更新）
     const fetchAndCacheIcon = async (dir) => {
+      // 针对 'calendar' 应用，生动态图标
+      if (dir === 'calendar') {
+        const now = new Date();
+        const day = now.getDate();
+        const month = now.getMonth() + 1;
+        const weekdayCN = ['日', '一', '二', '三', '四', '五', '六'];
+        const week = weekdayCN[now.getDay()];
+
+        const svg = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="cal-grad-dynamic" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" style="stop-color:#f9f9f9" />
+              <stop offset="100%" style="stop-color:#e0e0e0" />
+            </linearGradient>
+          </defs>
+          <rect x="5" y="5" width="90" height="90" rx="18" fill="url(#cal-grad-dynamic)" stroke="#ccc" stroke-width="1" />
+          <rect x="5" y="5" width="90" height="28" rx="18" fill="#FF3B30" />
+          <rect x="5" y="20" width="90" height="13" fill="#FF3B30" />
+          <text x="50" y="26" font-family="system-ui, sans-serif" font-size="14" font-weight="900" fill="white" text-anchor="middle">周${week}</text>
+          <text x="50" y="78" font-family="system-ui, sans-serif" font-size="44" font-weight="900" fill="#333" text-anchor="middle">${day}</text>
+        </svg>`;
+        const data = { type: 'svg', content: svg, hash: 'dynamic-' + day + '-' + month, url: 'dynamic' };
+        iconCache.set(dir, data);
+        return data;
+      }
+
       const noIconDirs = ['jlbj', 'ppt'];
       if (noIconDirs.includes(dir)) return null;
 
@@ -351,6 +377,7 @@
 
     // 检查更新
     const revalidateIcon = async (dir, currentHash, currentUrl) => {
+      if (dir === 'calendar') return; // 动态图标不进行静默更新检查
       try {
         // 先尝试 HEAD 请求比对 ETag
         const headRes = await fetch(currentUrl, { method: 'HEAD', cache: 'no-cache' });
@@ -423,14 +450,23 @@
         el.setAttribute('data-dir', dir); // 标记以便更新
 
         let inner = '';
+        let appDisplayName = app.name;
+
+        // 特殊处理 'calendar' 的显示名称，增加日期前缀
+        if (dir === 'calendar') {
+          const now = new Date();
+          const month = now.getMonth() + 1;
+          const day = now.getDate();
+          appDisplayName = `${month}月${day}日 · ${app.name}`;
+        }
+
         if (icon) {
-          // 使用 content (可能是 SVG 源码或 Base64)
           inner = icon.type === 'svg' ? icon.content : `<img src="${icon.content}" alt="${app.name}">`;
         } else {
           inner = `<div style="width:100%;height:100%;background:#0a84ff;border-radius:20px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:24px">${app.name.charAt(0)}</div>`;
         }
 
-        el.innerHTML = `<div class="app-icon-image">${inner}</div><div class="app-name">${app.name}</div>`;
+        el.innerHTML = `<div class="app-icon-image">${inner}</div><div class="app-name">${appDisplayName}</div>`;
 
         // 按原本顺序是不保证的，因为 Promise.all 是并行的。
         // 但为了保持 apps.js 的顺序，我们需要按 index 排序，或者简单的 for loop.

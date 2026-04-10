@@ -540,32 +540,6 @@
       return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     }
 
-    function decodeChunkedSrc(src) {
-      const prefix = 'chunked:';
-      if (!src || typeof src !== 'string' || !src.startsWith(prefix)) return null;
-      try {
-        return JSON.parse(decodeURIComponent(src.slice(prefix.length)));
-      } catch (e) {
-        return null;
-      }
-    }
-
-    function describeLessonSrc(src) {
-      const manifest = decodeChunkedSrc(src);
-      if (manifest) {
-        const count = Array.isArray(manifest.chunks) ? manifest.chunks.length : 0;
-        return `Chunked video · ${count} parts`;
-      }
-      if (!src) return '';
-      const text = String(src);
-      try {
-        const url = new URL(text, window.location.href);
-        return url.pathname.split('/').pop() || text;
-      } catch (e) {
-        return text.split('/').pop() || text;
-      }
-    }
-
     async function probeDurationFromFile(file) {
       const url = URL.createObjectURL(file);
       return new Promise((resolve) => {
@@ -600,7 +574,7 @@
              </div>
              <input type="hidden" id="src-${i}" value="${l.src || ''}">
              <div style="font-size: 9px; color: var(--text-muted); margin-top: 4px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                ${describeLessonSrc(l.src)}
+                ${l.src ? String(l.src).split('/').pop() : ''}
              </div>
           </div>
           <div class="l-actions">
@@ -656,15 +630,11 @@
           hint.textContent = 'Logo 上传成功';
         } else {
           const lesson = currentData.lessons[idx];
-          lesson.src = uploaded.src || uploaded.publicUrl;
+          lesson.src = uploaded.publicUrl;
           lesson.duration = await probeDurationFromFile(file);
-          document.getElementById(`src-${idx}`).value = lesson.src;
+          document.getElementById(`src-${idx}`).value = uploaded.publicUrl;
           document.getElementById(`dur-${idx}`).textContent = lesson.duration;
-          if (uploaded.manifest) {
-            hint.textContent = `Chunked upload complete ${uploaded.manifest.chunks.length} parts`;
-          } else {
-            hint.textContent = '视频更新成功';
-          }
+          hint.textContent = '视频更新成功';
         }
 
         setStatus('云端同步成功');
@@ -765,4 +735,3 @@
   </script>
 </body>
 </html>
-

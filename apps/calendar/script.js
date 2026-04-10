@@ -112,6 +112,62 @@
       } catch (err) {
         console.warn('Nager year fetch failed:', err);
       }
+
+      // 2026 Local Fallback for China (including adjusted working days - '补班')
+      if (year === 2026) {
+        const fallback2026 = {
+          '2026-01-01': { name: '元旦', isHoliday: true, isWorkday: false },
+          '2026-02-08': { name: '补班', isHoliday: false, isWorkday: true, note: '为春节调休' },
+          '2026-02-15': { name: '春节', isHoliday: true, isWorkday: false },
+          '2026-02-16': { name: '春节', isHoliday: true, isWorkday: false },
+          '2026-02-17': { name: '春节', isHoliday: true, isWorkday: false },
+          '2026-02-18': { name: '春节', isHoliday: true, isWorkday: false },
+          '2026-02-19': { name: '春节', isHoliday: true, isWorkday: false },
+          '2026-02-20': { name: '春节', isHoliday: true, isWorkday: false },
+          '2026-02-21': { name: '春节', isHoliday: true, isWorkday: false },
+          '2026-02-22': { name: '春节', isHoliday: true, isWorkday: false },
+          '2026-02-28': { name: '补班', isHoliday: false, isWorkday: true, note: '为春节调休' },
+          '2026-04-04': { name: '清明节', isHoliday: true, isWorkday: false },
+          '2026-04-05': { name: '清明节', isHoliday: true, isWorkday: false },
+          '2026-04-06': { name: '清明节', isHoliday: true, isWorkday: false },
+          '2026-04-26': { name: '补班', isHoliday: false, isWorkday: true, note: '为劳动节调休' },
+          '2026-05-01': { name: '劳动节', isHoliday: true, isWorkday: false },
+          '2026-05-02': { name: '劳动节', isHoliday: true, isWorkday: false },
+          '2026-05-03': { name: '劳动节', isHoliday: true, isWorkday: false },
+          '2026-05-04': { name: '劳动节', isHoliday: true, isWorkday: false },
+          '2026-05-05': { name: '劳动节', isHoliday: true, isWorkday: false },
+          '2026-05-10': { name: '补班', isHoliday: false, isWorkday: true, note: '为劳动节调休' },
+          '2026-06-19': { name: '端午节', isHoliday: true, isWorkday: false },
+          '2026-06-20': { name: '端午节', isHoliday: true, isWorkday: false },
+          '2026-06-21': { name: '端午节', isHoliday: true, isWorkday: false },
+          '2026-09-25': { name: '中秋节', isHoliday: true, isWorkday: false },
+          '2026-09-26': { name: '中秋节', isHoliday: true, isWorkday: false },
+          '2026-09-27': { name: '中秋节', isHoliday: true, isWorkday: false },
+          '2026-10-01': { name: '国庆节', isHoliday: true, isWorkday: false },
+          '2026-10-02': { name: '国庆节', isHoliday: true, isWorkday: false },
+          '2026-10-03': { name: '国庆节', isHoliday: true, isWorkday: false },
+          '2026-10-04': { name: '国庆节', isHoliday: true, isWorkday: false },
+          '2026-10-05': { name: '国庆节', isHoliday: true, isWorkday: false },
+          '2026-10-06': { name: '国庆节', isHoliday: true, isWorkday: false },
+          '2026-10-07': { name: '国庆节', isHoliday: true, isWorkday: false },
+          '2026-10-10': { name: '补班', isHoliday: false, isWorkday: true, note: '为国庆节调休' }
+        };
+        Object.keys(fallback2026).forEach(k => {
+          if (!merged.has(k) || merged.get(k).source === 'nager') {
+            const data = fallback2026[k];
+            merged.set(k, {
+              date: k,
+              localName: data.name,
+              name: data.name,
+              isHoliday: data.isHoliday,
+              isWorkday: data.isWorkday,
+              source: 'local',
+              note: data.note || ''
+            });
+          }
+        });
+      }
+
       holidayCache.set(year, merged);
       return merged;
     })().catch(err => {
@@ -335,11 +391,16 @@
 
     const holidayText = holidayLabelText(date);
     if (holidayText) {
-      btn.classList.add('holiday');
-      const holiday = document.createElement('span');
-      holiday.className = 'holiday-label';
-      holiday.textContent = holidayText;
-      btn.appendChild(holiday);
+      const holiday = getHolidayForDate(date);
+      if (holiday && holiday.isWorkday) {
+        btn.classList.add('workday');
+      } else {
+        btn.classList.add('holiday');
+      }
+      const label = document.createElement('span');
+      label.className = 'holiday-label';
+      label.textContent = holidayText;
+      btn.appendChild(label);
     }
 
     if (isSameDate(date, today)) btn.classList.add('today');
@@ -430,7 +491,6 @@
     } else if (theme === 'light') {
       root.removeAttribute('data-theme'); // rely on light vars
     } else {
-      // auto: follow system; remove explicit override
       root.removeAttribute('data-theme');
     }
   }
@@ -438,6 +498,27 @@
     const saved = localStorage.getItem(THEME_KEY);
     applyTheme(saved || 'auto');
   }
+
+  function updateDualTime() {
+    const now = new Date();
+    // Beijing time
+    const beijingStr = now.toLocaleTimeString('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    // Urumqi time (Beijing Time - 2 hours)
+    const urumqiDate = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+    const urumqiStr = urumqiDate.toLocaleTimeString('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+
+    if (beijingTime) beijingTime.textContent = beijingStr;
+    if (urumqiTime) urumqiTime.textContent = urumqiStr;
+  }
+
   themeToggle.addEventListener('click', () => {
     const root = document.documentElement;
     const hasDark = root.getAttribute('data-theme') === 'dark';
@@ -478,6 +559,20 @@
         parts.push(info.type.name);
       }
       holidayInfo.textContent = parts.join(' · ') || ' ';
+
+      // If detailed info not cached, fetch it once
+      if (!info) {
+        ensureHolidayInfo(key).then(() => {
+          // Re-update only the holiday info line to avoid re-rendering entire card
+          const freshInfo = getHolidayInfoForDateStr(key);
+          if (freshInfo && freshInfo.type && freshInfo.type.name && !/^周[一二三四五六日天]$/.test(freshInfo.type.name)) {
+             if (!parts.includes(freshInfo.type.name)) {
+               parts.push(freshInfo.type.name);
+               holidayInfo.textContent = parts.join(' · ');
+             }
+          }
+        });
+      }
     }
     const arr = listTodos(selected);
     const total = arr.length;

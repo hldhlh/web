@@ -317,7 +317,7 @@
 
         .lightbox img.loaded {
             opacity: 1;
-            transform: scale(1);
+            transform: translate(var(--tx, 0), var(--ty, 0)) scale(var(--ts, 1));
         }
 
         .progress-track {
@@ -414,7 +414,7 @@
         <div class="preview-loader" id="previewLoader">
             <div class="spinner"></div><span style="font-size: 13px; opacity: 0.8; letter-spacing: 1px;">LOADING</span>
         </div>
-        <img id="lightbox-img" src="" alt="">
+        <img id="lightbox-img" src="" alt="" style="--tx: 0px; --ty: 0px; --ts: 1;">
     </div>
 
     <script>
@@ -424,6 +424,23 @@
             lightboxImg = document.getElementById('lightbox-img'), progressBar = document.getElementById('progressBar'),
             progressTrack = document.getElementById('progressTrack'), previewLoader = document.getElementById('previewLoader'),
             statusDot = document.getElementById('statusDot'), statusText = document.getElementById('statusText');
+
+        const LightboxState = {
+            x: 0, y: 0, scale: 1,
+            isDragging: false,
+            lastX: 0, lastY: 0
+        };
+
+        function updateLightboxTransform() {
+            lightboxImg.style.setProperty('--tx', `${LightboxState.x}px`);
+            lightboxImg.style.setProperty('--ty', `${LightboxState.y}px`);
+            lightboxImg.style.setProperty('--ts', LightboxState.scale);
+        }
+
+        function resetLightbox() {
+            LightboxState.x = 0; LightboxState.y = 0; LightboxState.scale = 1;
+            updateLightboxTransform();
+        }
 
         const SUPABASE_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
@@ -535,7 +552,15 @@
                     lightboxImg.classList.remove('loaded'); progressTrack.style.display = 'block'; progressBar.style.width = '0%';
                     previewLoader.style.display = 'flex'; lightbox.style.display = 'flex';
                     let pct = 0; const itv = setInterval(() => { pct += Math.random() * 15; if (pct >= 90) { clearInterval(itv); pct = 90; } progressBar.style.width = pct + '%'; }, 200);
-                    lightboxImg.src = highRes; lightboxImg.onload = () => { clearInterval(itv); progressBar.style.width = '100%'; setTimeout(() => { progressTrack.style.display = 'none'; previewLoader.style.display = 'none'; lightboxImg.classList.add('loaded'); }, 300); };
+                    lightboxImg.src = highRes; lightboxImg.onload = () => { 
+                        clearInterval(itv); progressBar.style.width = '100%'; 
+                        setTimeout(() => { 
+                            progressTrack.style.display = 'none'; 
+                            previewLoader.style.display = 'none'; 
+                            lightboxImg.classList.add('loaded'); 
+                            resetLightbox();
+                        }, 300); 
+                    };
                 };
                 getShortestColumn().appendChild(item);
             });
@@ -549,7 +574,69 @@
             initColumns(); if (viewMode === 'all') fetchRandomPhotos(20); else renderPhotos(favorites);
         };
         window.onscroll = debounce(() => { if (viewMode === 'all' && (window.innerHeight + window.scrollY) >= document.body.offsetHeight - 800) fetchRandomPhotos(10); }, 200);
-        lightbox.onclick = () => { lightbox.style.display = 'none'; setTimeout(() => { lightboxImg.src = ''; lightboxImg.classList.remove('loaded'); }, 300); };
+        lightbox.onclick = (e) => { 
+            if (e.target === lightbox) {
+                lightbox.style.display = 'none'; 
+                setTimeout(() => { lightboxImg.src = ''; lightboxImg.classList.remove('loaded'); }, 300); 
+            }
+        };
+
+        lightbox.addEventListener('wheel', e => {
+            e.preventDefault();
+            if (e.ctrlKey) {
+                const s = Math.exp(-e.deltaY * 0.003);
+                const prev = LightboxState.scale;
+                LightboxState.scale = Math.max(0.5, Math.min(LightboxState.scale * s, 10));
+                
+                // Zoom towards mouse
+                const rect = lightboxImg.getBoundingClientRect();
+                const ox = e.clientX - (rect.left + rect.width / 2);
+                const oy = e.clientY - (rect.top + rect.height / 2);
+                LightboxState.x -= ox * (LightboxState.scale / prev - 1);
+                LightboxState.y -= oy * (LightboxState.scale / prev - 1);
+            } else {
+                LightboxState.x -= e.deltaX;
+                LightboxState.y -= e.deltaY;
+            }
+            updateLightboxTransform();
+        }, { passive: false });
+
+        let startScale = 1;
+        lightbox.addEventListener('gesturestart', e => { e.preventDefault(); startScale = LightboxState.scale; });
+        lightbox.addEventListener('gesturechange', e => {
+            e.preventDefault();
+            const prev = LightboxState.scale;
+            LightboxState.scale = Math.max(0.5, Math.min(startScale * e.scale, 10));
+            const rect = lightboxImg.getBoundingClientRect();
+            const ox = e.clientX - (rect.left + rect.width / 2);
+            const oy = e.clientY - (rect.top + rect.height / 2);
+            LightboxState.x -= ox * (LightboxState.scale / prev - 1);
+            LightboxState.y -= oy * (LightboxState.scale / prev - 1);
+            updateLightboxTransform();
+        });
+
+        lightboxImg.addEventListener('mousedown', e => {
+            if (e.button !== 0) return;
+            LightboxState.isDragging = true;
+            LightboxState.lastX = e.clientX;
+            LightboxState.lastY = e.clientY;
+            lightboxImg.style.cursor = 'grabbing';
+            e.preventDefault();
+        });
+
+        window.addEventListener('mousemove', e => {
+            if (!LightboxState.isDragging) return;
+            LightboxState.x += e.clientX - LightboxState.lastX;
+            LightboxState.y += e.clientY - LightboxState.lastY;
+            LightboxState.lastX = e.clientX;
+            LightboxState.lastY = e.clientY;
+            updateLightboxTransform();
+        });
+
+        window.addEventListener('mouseup', () => {
+            LightboxState.isDragging = false;
+            lightboxImg.style.cursor = 'zoom-out';
+        });
 
         // 并行启动：先渲染内容，后台同步数据，不再阻塞首屏
         (async () => {
