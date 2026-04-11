@@ -1262,8 +1262,9 @@
                         <input type="text" id="dateInputIndex" readonly>
                     </div>
                     <button onclick="location.reload()" class="icon-btn"><i class="fas fa-sync-alt"></i></button>
-                    <button onclick="goToPage('orders')" class="icon-btn"><i class="fas fa-clipboard-list"></i></button>
-                    <button onclick="goToPage('admin')" class="icon-btn"><i class="fas fa-cog"></i></button>
+                    <button onclick="goToPage('orders')" class="icon-btn" title="核对清单"><i class="fas fa-clipboard-list"></i></button>
+                    <button onclick="goToPage('analytics')" class="icon-btn" title="周月分析"><i class="fas fa-chart-bar"></i></button>
+                    <button onclick="goToPage('admin')" class="icon-btn" title="管理商品"><i class="fas fa-cog"></i></button>
                 </div>
             </div>
         </header>
@@ -1353,6 +1354,27 @@
         </main>
 
         <div class="fab-add" id="openAddModal"><i class="fas fa-plus"></i></div>
+    </div>
+
+    <!-- 4. 分析页 -->
+    <div id="analyticsPage" class="page">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="header-title-group">
+                    <button onclick="goToPage('index')" class="icon-btn"><i class="fas fa-chevron-left"></i></button>
+                    <h1>周月数据分析</h1>
+                </div>
+            </div>
+        </header>
+        <div style="max-width: 800px; margin: 20px auto; padding: 0 16px; padding-bottom: 60px;">
+            <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+                <button id="tab7" class="tag-chip active" onclick="switchAnalyticsTab(7)">最近 7 天</button>
+                <button id="tab30" class="tag-chip" onclick="switchAnalyticsTab(30)">最近 30 天</button>
+            </div>
+            <div id="analyticsContainer" style="background: var(--glass-bg); backdrop-filter: blur(var(--blur)); padding: 24px; border-radius: var(--radius-md); box-shadow: var(--shadow); border: 1px solid var(--glass-border);">
+                <div style="text-align: center; color: var(--text-sub);">加载中...</div>
+            </div>
+        </div>
     </div>
 
     <!-- Modals -->
@@ -1615,11 +1637,121 @@
             document.getElementById('productForm').onsubmit = handleAdd;
         }
 
+        let analyticsMode = 7;
+        let analyticsData = [];
+
         function goToPage(id) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById(id + 'Page').classList.add('active');
             if (id === 'orders') fetchDayData();
             if (id === 'admin') renderAdminTable();
+            if (id === 'analytics') renderAnalytics();
+        }
+
+        async function renderAnalytics() {
+            document.getElementById('analyticsContainer').innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-sub);"><i class="fas fa-spinner fa-spin fa-2x"></i><p style="margin-top:10px;">读取大数据中...</p></div>';
+            
+            const end = new Date();
+            const start = new Date();
+            start.setDate(end.getDate() - 30);
+            
+            // 为了让查询覆盖整天
+            const endStr = new Date(end.getTime() - end.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+            const startStr = new Date(start.getTime() - start.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+            
+            const start7 = new Date();
+            start7.setDate(end.getDate() - 7);
+            const start7Str = new Date(start7.getTime() - start7.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+
+            try {
+                const { data, error } = await sb.from('jlhcdh_cart')
+                    .select('*')
+                    .gte('order_date', startStr)
+                    .lte('order_date', endStr);
+                
+                if (error) throw error;
+                
+                const stats = {};
+                data.forEach(item => {
+                    const pid = item.product_id;
+                    const qty = parseFloat(item.quantity) || 0;
+                    if (qty <= 0) return;
+                    
+                    if (!stats[pid]) {
+                        const product = state.products.find(p => p.id == pid);
+                        stats[pid] = {
+                            id: pid,
+                            name: product ? product.name : `未知商品(${pid})`,
+                            unit: product ? product.unit : '',
+                            category: product ? product.category : '',
+                            qty7: 0,
+                            qty30: 0
+                        };
+                    }
+                    
+                    stats[pid].qty30 += qty;
+                    if (item.order_date >= start7Str) {
+                        stats[pid].qty7 += qty;
+                    }
+                });
+
+                analyticsData = Object.values(stats);
+                drawAnalytics();
+            } catch (err) {
+                console.error(err);
+                document.getElementById('analyticsContainer').innerHTML = `<div style="color:var(--accent); text-align:center; padding: 20px;">读取数据失败: ${err.message}</div>`;
+            }
+        }
+
+        window.switchAnalyticsTab = function(mode) {
+            analyticsMode = mode;
+            document.getElementById('tab7').classList.toggle('active', mode === 7);
+            document.getElementById('tab30').classList.toggle('active', mode === 30);
+            drawAnalytics();
+        };
+
+        function drawAnalytics() {
+            if (!analyticsData || analyticsData.length === 0) {
+                document.getElementById('analyticsContainer').innerHTML = '<div style="text-align: center; color: var(--text-sub); padding: 20px;">暂无订货数据</div>';
+                return;
+            }
+
+            const sortKey = analyticsMode === 7 ? 'qty7' : 'qty30';
+            const filteredData = analyticsData.filter(d => d[sortKey] > 0);
+            filteredData.sort((a, b) => b[sortKey] - a[sortKey]);
+            
+            if (filteredData.length === 0) {
+                document.getElementById('analyticsContainer').innerHTML = '<div style="text-align: center; color: var(--text-sub); padding: 20px;">所选时间范围内暂无订货记录</div>';
+                return;
+            }
+
+            const maxQty = Math.max(...filteredData.map(d => d[sortKey]), 1);
+            let html = '<div style="display: flex; flex-direction: column; gap: 20px;">';
+            
+            filteredData.forEach((item, index) => {
+                const qty = item[sortKey];
+                // 计算百分比但保留最小可见宽度
+                const pct = Math.max((qty / maxQty) * 100, 2); 
+                const barColor = index === 0 ? 'var(--accent)' : index === 1 ? '#ff9500' : index === 2 ? '#ffcc00' : 'var(--primary)';
+                
+                html += `
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items:flex-end;">
+                        <span style="font-weight: 700; font-size: 15px;">
+                            <span style="display:inline-block; width:24px; color:var(--text-sub); font-size: 13px;">${index+1}.</span>
+                            ${item.name} 
+                            <span style="font-size:11px; color:var(--text-sub); margin-left: 4px; font-weight: 500">${item.category}</span>
+                        </span>
+                        <span style="font-weight: 800; font-size: 15px; color: ${barColor};">${parseFloat(qty.toFixed(2))} <span style="font-size:12px; color:var(--text-sub); font-weight:500;">${item.unit}</span></span>
+                    </div>
+                    <div style="width: 100%; background: var(--input-bg); height: 10px; border-radius: 5px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);">
+                        <div style="width: ${pct}%; background: ${barColor}; height: 100%; border-radius: 5px; box-shadow: 0 0 10px ${barColor}40;"></div>
+                    </div>
+                </div>`;
+            });
+            
+            html += '</div>';
+            document.getElementById('analyticsContainer').innerHTML = html;
         }
 
         async function fetchProducts() {
