@@ -23,6 +23,7 @@
         /* 全局变量与 Apple 风格重塑 */
         :root {
             --primary: #0071e3;
+            --primary-rgb: 0, 113, 227;
             --primary-light: #409eff;
             --accent: #ff3b30;
             --bg-gradient: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
@@ -54,7 +55,7 @@
             background: var(--card-bg);
         }
 
-        body.dark-mode .cat-btn {
+        body.dark-mode .loc-btn {
             background: var(--glass-bg);
             color: var(--text-sub);
         }
@@ -682,6 +683,35 @@
             animation: pulse-yellow 1.5s infinite alternate;
         }
 
+        .sync-status.polling {
+            background: #34c759;
+            box-shadow: 0 0 10px #34c759;
+            animation: pulse-green 3s infinite alternate;
+        }
+
+        @keyframes pulse-green {
+            from { opacity: 1; transform: scale(1); }
+            to { opacity: 0.7; transform: scale(0.9); }
+        }
+
+        .product-location-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: var(--primary);
+            background: rgba(var(--primary-rgb), 0.08);
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-top: 4px;
+            font-weight: 600;
+        }
+
+        .product-location-tag i {
+            font-size: 10px;
+            opacity: 0.8;
+        }
+
         @keyframes pulse {
             from {
                 transform: scale(1);
@@ -813,8 +843,8 @@
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
         }
 
-        /* 分类导航 - 药丸风格 */
-        #categoryList {
+        /* 定位导航 - 药丸风格 */
+        #locationList {
             display: flex;
             gap: 10px;
             padding: 0 16px 16px;
@@ -824,12 +854,12 @@
             /* Firefox */
         }
 
-        #categoryList::-webkit-scrollbar {
+        #locationList::-webkit-scrollbar {
             display: none;
             /* Chrome/Safari */
         }
 
-        .cat-btn {
+        .loc-btn {
             padding: 10px 20px;
             border-radius: 20px;
             background: rgba(255, 255, 255, 0.6);
@@ -845,7 +875,7 @@
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .cat-btn.active {
+        .loc-btn.active {
             background: var(--primary);
             color: white;
             border-color: var(--primary);
@@ -1113,13 +1143,13 @@
             }
 
             /* 移动端标签自动换行展现 */
-            #categoryList {
+            #locationList {
                 flex-wrap: wrap;
                 gap: 8px;
                 padding: 0 16px 12px;
             }
 
-            .cat-btn {
+            .loc-btn {
                 padding: 6px 12px;
                 font-size: 13px;
                 border-radius: 10px;
@@ -1280,8 +1310,8 @@
         </div>
         <div class="filter-section-title"><i class="fas fa-tags"></i> 常用标签</div>
         <div id="tagFilterList" class="tag-row"></div>
-        <div class="filter-section-title"><i class="fas fa-th-large"></i> 商品分类</div>
-        <div id="categoryList"></div>
+        <div class="filter-section-title"><i class="fas fa-compass"></i> 商品定位</div>
+        <div id="locationList"></div>
         <main class="product-grid" id="productList"></main>
     </div>
 
@@ -1344,9 +1374,9 @@
         <div class="toolbar">
             <div class="search-box">
                 <i class="fas fa-search"></i>
-                <input type="text" id="adminSearchInput" placeholder="搜索名称或分类...">
+                <input type="text" id="adminSearchInput" placeholder="搜索名称或定位...">
             </div>
-            <select id="adminCatFilter" class="select-custom"></select>
+            <select id="adminLocFilter" class="select-custom"></select>
         </div>
 
         <main class="admin-main">
@@ -1383,10 +1413,10 @@
             <h3 style="margin-bottom:24px;text-align:center;">添加新商品</h3>
             <form id="productForm">
                 <div class="card-field" style="margin-bottom:16px;">
-                    <label class="card-label">商品分类</label>
-                    <input type="text" id="editCategory" class="card-input-small" list="catList" required
+                    <label class="card-label">商品定位</label>
+                    <input type="text" id="editLocation" class="card-input-small" list="locList" required
                         placeholder="如：生鲜蔬菜">
-                    <datalist id="catList"></datalist>
+                    <datalist id="locList"></datalist>
                 </div>
                 <div class="card-field" style="margin-bottom:16px;">
                     <label class="card-label">名称</label>
@@ -1416,9 +1446,9 @@
                     <input type="text" id="editProductName" class="card-input-small" required>
                 </div>
                 <div class="card-field" style="margin-bottom:16px;">
-                    <label class="card-label">分类</label>
-                    <input type="text" id="editProductCategory" class="card-input-small" list="catListEdit" required>
-                    <datalist id="catListEdit"></datalist>
+                    <label class="card-label">定位</label>
+                    <input type="text" id="editProductLocation" class="card-input-small" list="locListEdit" required>
+                    <datalist id="locListEdit"></datalist>
                 </div>
                 <div class="card-field" style="margin-bottom:16px;">
                     <label class="card-label">单位</label>
@@ -1464,11 +1494,11 @@
         const state = {
             products: [],
             orders: {},
-            currentCategory: '全部',
+            currentLocation: '全部',
             onlyFavorites: false,
             searchQuery: '',
             adminSearch: '',
-            adminCat: '全部',
+            adminLoc: '全部',
             isLocked: false,
             editMode: false,
             currentDate: getLocalBusinessDate(),
@@ -1476,7 +1506,7 @@
             activeSyncs: 0,
             hasDataDates: new Set(),
             activeTags: new Set(),
-            sortBy: 'category', // 'category', 'custom_tags'
+            sortBy: 'location', // 'location', 'custom_tags'
             fpIndex: null,  // flatpickr 实例引用
             fpOrders: null,  // flatpickr 实例引用
             realtimeConnected: false, // 实时连接状态
@@ -1484,8 +1514,9 @@
             lastLocalUpdate: 0, // 最后本地更新时间戳，用于过滤自己的实时事件
             skipRealtimeUntil: 0, // 跳过实时更新直到此时间戳
             realtimeRetryCount: 0, // 实时连接重试次数
-            maxRealtimeRetries: 3, // 最大重试次数
-            isAuthorized: false // 管理操作授权状态
+            maxRealtimeRetries: 2, // 最大重试次数
+            isAuthorized: false, // 管理操作授权状态
+            pollingFallbackActive: false // 轮询降级状态
         };
 
         // 密码保护
@@ -1515,13 +1546,14 @@
             'receiving': '↓ 正在接收数据...',
             'error': '✗ 同步失败，点击重试',
             'disconnected': '○ 连接已断开，点击重连',
-            'connecting': '◐ 正在连接服务器...'
+            'connecting': '◐ 正在连接服务器...',
+            'polling': '✓ 核心系统已接管防断连 (HTTP模式)'
         };
 
         function setGlobalSyncStatus(s) {
             const els = document.querySelectorAll('.sync-status');
             els.forEach(el => {
-                el.classList.remove('online', 'syncing', 'receiving', 'error', 'disconnected', 'connecting');
+                el.classList.remove('online', 'syncing', 'receiving', 'error', 'disconnected', 'connecting', 'polling');
                 el.classList.add(s);
                 el.title = statusTitles[s] || s;
             });
@@ -1531,7 +1563,11 @@
         function showReceiving() {
             setGlobalSyncStatus('receiving');
             setTimeout(() => {
-                if (state.activeSyncs === 0) setGlobalSyncStatus('online');
+                if (state.activeSyncs === 0) {
+                    if (state.realtimeConnected) setGlobalSyncStatus('online');
+                    else if (state.pollingFallbackActive) setGlobalSyncStatus('polling');
+                    else setGlobalSyncStatus('disconnected');
+                }
             }, 500);
         }
 
@@ -1546,7 +1582,9 @@
                 setGlobalSyncStatus('error');
                 setTimeout(() => { if (state.activeSyncs === 0 && state.realtimeConnected) setGlobalSyncStatus('online'); }, 3000);
             } else if (state.activeSyncs === 0) {
-                setGlobalSyncStatus(state.realtimeConnected ? 'online' : 'disconnected');
+                if (state.realtimeConnected) setGlobalSyncStatus('online');
+                else if (state.pollingFallbackActive) setGlobalSyncStatus('polling');
+                else setGlobalSyncStatus('disconnected');
             }
         }
 
@@ -1555,11 +1593,28 @@
 
             await fetchProducts();
             await fetchCart();
-            renderCategories();
+            renderLocations();
             renderTags();
             renderProducts();
             setupRealtime();
             setupStatusIndicatorClick(); // 添加状态指示灯点击事件
+
+            // --- 中国区网络专项优化：页面唤醒同步 ---
+            // 当用户切回系统或手机点亮屏幕时，立即强制刷一次数据，防止实时连接在后台断掉
+            document.addEventListener('visibilitychange', async () => {
+                if (document.visibilityState === 'visible') {
+                    console.log('🔦 页面可见性恢复，正在执行强制同步...');
+                    showReceiving();
+                    await fetchCart();
+                    if (document.getElementById('ordersPage').classList.contains('active')) {
+                        fetchDayData();
+                    } else if (document.getElementById('indexPage').classList.contains('active')) {
+                        await fetchProducts();
+                        renderProducts();
+                    }
+                    await refreshCalendarMarkers();
+                }
+            });
 
             const onDateChange = async (selectedDates, dateStr) => {
                 state.currentDate = dateStr;
@@ -1625,11 +1680,11 @@
 
             document.getElementById('searchInput').oninput = e => { state.searchQuery = e.target.value.trim(); renderProducts(); };
             document.getElementById('adminSearchInput').oninput = e => { state.adminSearch = e.target.value.trim(); renderAdminTable(); };
-            document.getElementById('adminCatFilter').onchange = e => { state.adminCat = e.target.value; renderAdminTable(); };
+            document.getElementById('adminLocFilter').onchange = e => { state.adminLoc = e.target.value; renderAdminTable(); };
             document.getElementById('filterFavBtn').onclick = () => { state.onlyFavorites = !state.onlyFavorites; document.getElementById('filterFavBtn').classList.toggle('active', state.onlyFavorites); renderProducts(); };
             document.getElementById('sortBtn').onclick = () => {
-                state.sortBy = state.sortBy === 'category' ? 'tags' : 'category';
-                showToast(`已按${state.sortBy === 'category' ? '分类' : '标签'}排序`);
+                state.sortBy = state.sortBy === 'location' ? 'tags' : 'location';
+                showToast(`已按${state.sortBy === 'location' ? '定位' : '标签'}排序`);
                 renderProducts();
             };
 
@@ -1683,7 +1738,7 @@
                             id: pid,
                             name: product ? product.name : `未知商品(${pid})`,
                             unit: product ? product.unit : '',
-                            category: product ? product.category : '',
+                            location: product ? product.location : '',
                             qty7: 0,
                             qty30: 0
                         };
@@ -1740,7 +1795,7 @@
                         <span style="font-weight: 700; font-size: 15px;">
                             <span style="display:inline-block; width:24px; color:var(--text-sub); font-size: 13px;">${index+1}.</span>
                             ${item.name} 
-                            <span style="font-size:11px; color:var(--text-sub); margin-left: 4px; font-weight: 500">${item.category}</span>
+                            <span style="font-size:11px; color:var(--text-sub); margin-left: 4px; font-weight: 500">${item.location}</span>
                         </span>
                         <span style="font-weight: 800; font-size: 15px; color: ${barColor};">${parseFloat(qty.toFixed(2))} <span style="font-size:12px; color:var(--text-sub); font-weight:500;">${item.unit}</span></span>
                     </div>
@@ -1757,7 +1812,7 @@
         async function fetchProducts() {
             startSync();
             try {
-                const { data, error } = await sb.from('jlhcdh_products').select('*').order('category');
+                const { data, error } = await sb.from('jlhcdh_products').select('*').order('location');
                 if (data) {
                     state.products = data.map(p => ({
                         ...p,
@@ -1979,20 +2034,20 @@
             renderProducts();
         };
         function renderAdminTable() {
-            const cats = [...new Set(state.products.map(p => p.category))];
-            document.getElementById('adminCatFilter').innerHTML = '<option value="全部">全部品类</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
-            document.getElementById('catList').innerHTML = cats.map(c => `<option value="${c}">`).join('');
+            const locs = [...new Set(state.products.map(p => p.location))];
+            document.getElementById('adminLocFilter').innerHTML = '<option value="全部">全部定位</option>' + locs.map(c => `<option value="${c}">${c}</option>`).join('');
+            document.getElementById('locList').innerHTML = locs.map(c => `<option value="${c}">`).join('');
 
             let filtered = state.products;
-            if (state.adminCat !== '全部') filtered = filtered.filter(p => p.category === state.adminCat);
+            if (state.adminLoc !== '全部') filtered = filtered.filter(p => p.location === state.adminLoc);
             if (state.adminSearch) {
                 const q = state.adminSearch.toLowerCase();
                 filtered = filtered.filter(p => {
                     const nameMatch = p.name.toLowerCase().includes(q);
-                    const categoryMatch = p.category.toLowerCase().includes(q);
+                    const locationMatch = p.location.toLowerCase().includes(q);
                     const pinyinMatch = p.pinyin && p.pinyin.toLowerCase().includes(q);
                     const tagMatch = p.tags && p.tags.some(t => t.toLowerCase().includes(q));
-                    return nameMatch || categoryMatch || pinyinMatch || tagMatch;
+                    return nameMatch || locationMatch || pinyinMatch || tagMatch;
                 });
             }
 
@@ -2005,8 +2060,8 @@
                         <input type="text" class="admin-input-flat" value="${p.name}" onchange="updateField(${p.id}, 'name', this.value)">
                     </div>
                     <div class="admin-cell">
-                        <span class="card-label">分类</span>
-                        <input type="text" class="admin-input-flat" value="${p.category}" onchange="updateField(${p.id}, 'category', this.value)">
+                        <span class="card-label">定位</span>
+                        <input type="text" class="admin-input-flat" value="${p.location}" onchange="updateField(${p.id}, 'location', this.value)">
                     </div>
                     <div class="admin-cell">
                         <span class="card-label">单位</span>
@@ -2067,9 +2122,9 @@
                 } else {
                     document.getElementById('saveStatus').innerText = '已保存';
                     await fetchProducts();
-                    if (field === 'category' || field === 'name') {
+                    if (field === 'location' || field === 'name') {
                         renderAdminTable();
-                        renderCategories();
+                        renderLocations();
                     }
                 }
                 endSync(!!error);
@@ -2096,7 +2151,7 @@
                         showToast('已删除');
                         await fetchProducts();
                         renderAdminTable();
-                        renderCategories();
+                        renderLocations();
                         renderTags();
                         renderProducts();
                     }
@@ -2113,16 +2168,16 @@
             e.preventDefault();
             if (!checkPassword('添加商品')) return;
             const nameInput = document.getElementById('editName');
-            const categoryInput = document.getElementById('editCategory');
+            const locationInput = document.getElementById('editLocation');
             const unitInput = document.getElementById('editUnit');
 
             const name = nameInput.value.trim();
-            const category = categoryInput.value.trim();
+            const location = locationInput.value.trim();
             const unit = unitInput.value.trim() || '斤';
 
             // 验证必填字段
-            if (!name || !category) {
-                showToast('请填写商品名称和分类');
+            if (!name || !location) {
+                showToast('请填写商品名称和定位');
                 return;
             }
 
@@ -2132,7 +2187,7 @@
             try {
                 // 注意：pinyin 字段是本地计算的，不存储在数据库中
                 const { data, error } = await sb.from('jlhcdh_products')
-                    .insert([{ name, category, unit, is_favorite: false, tags: [] }])
+                    .insert([{ name, location, unit, is_favorite: false, tags: [] }])
                     .select();
 
                 if (error) {
@@ -2143,12 +2198,12 @@
                     showToast('已添加: ' + name);
                     // 重置表单
                     nameInput.value = '';
-                    categoryInput.value = '';
+                    locationInput.value = '';
                     unitInput.value = '斤';
                     closeModal();
                     await fetchProducts();
                     renderAdminTable();
-                    renderCategories();
+                    renderLocations();
                     renderTags();
                     renderProducts();
                 }
@@ -2187,14 +2242,14 @@
                 return;
             }
 
-            // 填充分类列表
-            const cats = [...new Set(state.products.map(p => p.category))];
-            document.getElementById('catListEdit').innerHTML = cats.map(c => `<option value="${c}">`).join('');
+            // 填充定位列表
+            const locs = [...new Set(state.products.map(p => p.location))];
+            document.getElementById('locListEdit').innerHTML = locs.map(c => `<option value="${c}">`).join('');
 
             // 填充表单
             document.getElementById('editProductId').value = product.id;
             document.getElementById('editProductName').value = product.name;
-            document.getElementById('editProductCategory').value = product.category;
+            document.getElementById('editProductLocation').value = product.location;
             document.getElementById('editProductUnit').value = product.unit || '斤';
             document.getElementById('editProductTags').value = (product.tags || []).join(', ');
 
@@ -2212,13 +2267,13 @@
 
             const id = parseInt(document.getElementById('editProductId').value);
             const name = document.getElementById('editProductName').value.trim();
-            const category = document.getElementById('editProductCategory').value.trim();
+            const location = document.getElementById('editProductLocation').value.trim();
             const unit = document.getElementById('editProductUnit').value.trim() || '斤';
             const tagsStr = document.getElementById('editProductTags').value;
             const tags = tagsStr.split(/[，,]/).map(t => t.trim()).filter(t => t);
 
-            if (!name || !category) {
-                showToast('请填写商品名称和分类');
+            if (!name || !location) {
+                showToast('请填写商品名称和定位');
                 return;
             }
 
@@ -2227,7 +2282,7 @@
 
             try {
                 const { error } = await sb.from('jlhcdh_products')
-                    .update({ name, category, unit, tags })
+                    .update({ name, location, unit, tags })
                     .eq('id', id);
 
                 if (error) {
@@ -2238,7 +2293,7 @@
                     closeEditProductModal();
                     await fetchProducts();
                     renderProducts();
-                    renderCategories();
+                    renderLocations();
                     renderTags();
                     if (document.getElementById('adminPage').classList.contains('active')) {
                         renderAdminTable();
@@ -2279,7 +2334,7 @@
                     closeEditProductModal();
                     await fetchProducts();
                     renderProducts();
-                    renderCategories();
+                    renderLocations();
                     renderTags();
                     if (document.getElementById('adminPage').classList.contains('active')) {
                         renderAdminTable();
@@ -2358,30 +2413,36 @@
 
         async function toggleLock() { }
 
-        function renderCategories() {
-            const cats = ['全部', ...new Set(state.products.map(p => p.category))];
-            document.getElementById('categoryList').innerHTML = cats.map(c =>
-                `<button class="cat-btn ${c === state.currentCategory ? 'active' : ''}" onclick="filterCat('${c}')">${c}</button>`
+        function renderLocations(availableLocs = null) {
+            let locsSource = availableLocs || new Set(state.products.map(p => p.location).filter(l => l && l.trim()));
+            const locs = ['全部', ...[...locsSource].sort((a,b) => a.localeCompare(b, 'zh'))];
+            
+            // 如果当前选中的定位在可用列表中消失了，自动重置为“全部”
+            if (state.currentLocation !== '全部' && !locsSource.has(state.currentLocation)) {
+                state.currentLocation = '全部';
+            }
+
+            document.getElementById('locationList').innerHTML = locs.map(l =>
+                `<button class="loc-btn ${l === state.currentLocation ? 'active' : ''}" onclick="filterLoc('${l}')">${l}</button>`
             ).join('');
         }
 
-        window.filterCat = cat => {
-            state.currentCategory = cat;
-            renderCategories();
-            renderProducts();
+        window.filterLoc = cat => {
+            state.currentLocation = cat;
+            renderProducts(); // renderProducts 会处理 renderLocations 的更新
         };
 
-        function renderTags() {
-            const allTags = [...new Set(state.products.flatMap(p => p.tags || []))];
+        function renderTags(availableTags = null) {
+            let tagsSource = availableTags || new Set(state.products.flatMap(p => p.tags || []).filter(t => t && t.trim()));
+            const allTags = [...tagsSource].sort((a,b) => a.localeCompare(b, 'zh'));
 
-            // 清理已不存在的activeTags，防止筛选结果为空
-            const tagsToRemove = [];
-            state.activeTags.forEach(tag => {
-                if (!allTags.includes(tag)) {
-                    tagsToRemove.push(tag);
-                }
-            });
-            tagsToRemove.forEach(tag => state.activeTags.delete(tag));
+            // 自动清理不再可用的已选标签
+            if (state.activeTags.size > 0) {
+                state.activeTags.forEach(tag => {
+                    if (!tagsSource.has(tag)) state.activeTags.delete(tag);
+                });
+            }
+
             const container = document.getElementById('tagFilterList');
             const titles = document.querySelectorAll('.filter-section-title');
 
@@ -2402,36 +2463,57 @@
         window.toggleTagFilter = (tag) => {
             if (state.activeTags.has(tag)) state.activeTags.delete(tag);
             else state.activeTags.add(tag);
-            renderTags();
-            renderProducts();
+            renderProducts(); // renderProducts 会处理 renderTags 的更新
         };
 
         function renderProducts() {
-            let f = [...state.products];
+            let base = [...state.products];
 
-            // 排序逻辑
-            if (state.sortBy === 'category') {
-                f.sort((a, b) => a.category.localeCompare(b.category, 'zh'));
-            } else if (state.sortBy === 'tags') {
-                f.sort((a, b) => {
-                    const tagA = (a.tags && a.tags[0]) || 'zzzz';
-                    const tagB = (b.tags && b.tags[0]) || 'zzzz';
-                    return tagA.localeCompare(tagB, 'zh');
-                });
-            }
-
-            if (state.currentCategory !== '全部') f = f.filter(p => p.category === state.currentCategory);
-            if (state.onlyFavorites) f = f.filter(p => p.is_favorite);
-            if (state.activeTags.size > 0) {
-                f = f.filter(p => p.tags && Array.from(state.activeTags).every(t => p.tags.includes(t)));
-            }
+            // 1. 基础过滤 (搜索 + 收藏)
             if (state.searchQuery) {
                 const q = state.searchQuery.toLowerCase();
-                f = f.filter(p => {
+                base = base.filter(p => {
                     const nameMatch = p.name.toLowerCase().includes(q);
                     const pinyinMatch = p.pinyin && p.pinyin.toLowerCase().includes(q);
-                    const tagMatch = p.tags && p.tags.some(t => t.toLowerCase().includes(q));
-                    return nameMatch || pinyinMatch || tagMatch;
+                    const locMatch = p.location && p.location.toLowerCase().includes(q);
+                    return nameMatch || pinyinMatch || locMatch;
+                });
+            }
+            if (state.onlyFavorites) {
+                base = base.filter(p => p.is_favorite);
+            }
+
+            // 2. 交互式过滤响应 (定位按钮 受 搜索+收藏+已选标签 影响)
+            let locContext = [...base];
+            const activeTagsArray = Array.from(state.activeTags);
+            if (activeTagsArray.length > 0) {
+                locContext = locContext.filter(p => p.tags && activeTagsArray.every(t => p.tags.includes(t)));
+            }
+            const availableLocs = new Set(locContext.map(p => (p.location || '').trim()).filter(l => l));
+            renderLocations(availableLocs);
+
+            // 3. 标签显示逻辑：始终显示所有可用的标签 (定位不影响标签显示)
+            const availableTags = new Set(base.flatMap(p => p.tags || []).filter(t => t && t.trim()));
+            renderTags(availableTags);
+
+            // 4. 最终显示的商品列表
+            let f = [...locContext];
+            if (state.currentLocation !== '全部') {
+                f = f.filter(p => (p.location || '').trim() === state.currentLocation.trim());
+            }
+
+            // 5. 排序逻辑
+            if (state.sortBy === 'location') {
+                f.sort((a, b) => {
+                    const locA = (a.location || '').trim();
+                    const locB = (b.location || '').trim();
+                    return locA.localeCompare(locB, 'zh') || a.name.localeCompare(b.name, 'zh');
+                });
+            } else {
+                f.sort((a, b) => {
+                    const tA = (a.tags && a.tags[0]) || 'zzzz';
+                    const tB = (b.tags && b.tags[0]) || 'zzzz';
+                    return tA.localeCompare(tB, 'zh') || a.name.localeCompare(b.name, 'zh');
                 });
             }
 
@@ -2454,7 +2536,9 @@
                             ${p.name}
                             <div style="display:flex;gap:4px;">${tagsHtml}</div>
                         </div>
-                        <div style="font-size:12px;color:var(--text-sub);margin-top:2px;">${p.category}</div>
+                        <div class="product-location-tag">
+                            <i class="fas fa-location-arrow"></i> ${p.location}
+                        </div>
                     </div>
                     <div id="wrapper-${p.id}" class="qty-control">
                         <button class="icon-btn" style="width:32px;height:32px;background:none;" onclick="updateQty(${p.id}, -1)">−</button>
@@ -2641,8 +2725,8 @@
                         const aggName = document.querySelector(`.agg-item #check-${changedProductId}`)?.closest('.agg-item')?.querySelector('.agg-name');
                         if (aggName) aggName.textContent = payload.new.name;
 
-                        // 如果有分类、标签或收藏状态变化，可能需要重新过滤列表
-                        if (state.onlyFavorites || state.currentCategory !== '全部' || state.activeTags.size > 0) {
+                        // 如果有定位、标签或收藏状态变化，可能需要重新过滤列表
+                        if (state.onlyFavorites || state.currentLocation !== '全部' || state.activeTags.size > 0) {
                             // 延迟一小会儿刷新，避免频繁抖动
                             clearTimeout(window.renderTimer);
                             window.renderTimer = setTimeout(renderProducts, 300);
@@ -2657,7 +2741,7 @@
                     // INSERT 或 DELETE 需要完全重新加载
                     await fetchProducts();
                     renderProducts();
-                    renderCategories();
+                    renderLocations();
                     renderTags();
                     if (document.getElementById('adminPage').classList.contains('active')) {
                         renderAdminTable();
@@ -2681,21 +2765,34 @@
                 }
             });
 
+            // --- 中国区网络专项优化：快速响应降级 ---
+            // 如果 3秒内 实时订阅没变成 SUBSCRIBED，直接先行启动 HTTP 轮询，不让用户等待
+            state.realtimeConnectTimer = setTimeout(() => {
+                if (!state.realtimeConnected) {
+                    console.log('🌐 中国区网络检测：实时连接较慢，已先行启动 HTTP 稳健同步');
+                    startPollingFallback();
+                }
+            }, 3000);
+
             // 订阅并监听连接状态
             channel.subscribe((status) => {
                 console.log('🔌 实时连接状态:', status);
                 if (status === 'SUBSCRIBED') {
+                    if (state.realtimeConnectTimer) clearTimeout(state.realtimeConnectTimer);
                     state.realtimeConnected = true;
                     state.realtimeRetryCount = 0; // 连接成功，重置重试计数
                     setGlobalSyncStatus('online');
+                    if (window.stopPollingFallback) stopPollingFallback();
                     console.log('✅ 实时订阅已建立');
                 } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+                    if (state.realtimeConnectTimer) clearTimeout(state.realtimeConnectTimer);
                     state.realtimeConnected = false;
                     setGlobalSyncStatus('disconnected');
 
                     // 检查是否超过最大重试次数
                     if (state.realtimeRetryCount >= state.maxRealtimeRetries) {
-                        console.log('⚠️ 已达到最大重试次数，停止自动重连。可手动点击状态指示灯重试。');
+                        console.log('⚠️ 已达到最大重试次数，自动切换至 HTTP 稳定轮询降级模式。');
+                        if (window.startPollingFallback) startPollingFallback();
                         return;
                     }
 
@@ -2714,6 +2811,46 @@
 
             state.realtimeChannels.push(channel);
         }
+
+        // --- HTTP 轮询备用方案（保护中国区网络阻断） ---
+        let pollingInterval = null;
+        window.startPollingFallback = function() {
+            if (pollingInterval) return;
+            state.pollingFallbackActive = true;
+            setGlobalSyncStatus('polling');
+            console.log('🔄 启动强制 8秒 HTTP 轮询同步机制');
+            pollingInterval = setInterval(async () => {
+                if (state.realtimeConnected) {
+                    window.stopPollingFallback();
+                    return;
+                }
+                const now = Date.now();
+                if (now < state.skipRealtimeUntil) return;
+                
+                showReceiving();
+                try {
+                    await fetchCart();
+                    if (document.getElementById('ordersPage').classList.contains('active')) {
+                        fetchDayData();
+                    } else if (document.getElementById('indexPage').classList.contains('active')) {
+                        await fetchProducts();
+                        renderProducts();
+                    }
+                    await refreshCalendarMarkers();
+                } catch(e) {
+                    console.error('HTTP轮询同步失败', e);
+                }
+            }, 8000); // 8秒一次
+        };
+
+        window.stopPollingFallback = function() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+                state.pollingFallbackActive = false;
+                console.log('⏹️ WebSocket恢复，停用 HTTP 轮询');
+            }
+        };
 
         // 重新连接实时订阅
         async function reconnectRealtime(forceRetry = false) {
@@ -2743,7 +2880,7 @@
             await fetchCart();
             await refreshCalendarMarkers();
             renderProducts();
-            renderCategories();
+            renderLocations();
             renderTags();
         }
 
