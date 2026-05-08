@@ -946,6 +946,10 @@
                 return `%${String(keyword).replace(/[\\%_]/g, '\\$&')}%`;
             }
 
+            function hasChineseKeyword(keyword) {
+                return /[\u3400-\u9fff]/.test(keyword);
+            }
+
             // ==================== 加载遮罩控制 ====================
             const loadingOverlay = document.getElementById('loadingOverlay');
             const loadingText = document.getElementById('loadingText');
@@ -1165,6 +1169,8 @@
             }
 
             async function searchContentInSupabase(searchKey) {
+                if (!hasChineseKeyword(searchKey)) return [];
+
                 const { data, error } = await supabase
                     .from(CONFIG.TABLE_NAME)
                     .select(LIST_COLUMNS)
@@ -1188,6 +1194,8 @@
                 if (searchKey) {
                     const localMatches = getLocalSearchMatches(searchKey);
                     render(localMatches, true, searchKey);
+
+                    if (!hasChineseKeyword(searchKey)) return;
 
                     searchTimer = setTimeout(async () => {
                         try {
