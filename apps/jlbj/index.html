@@ -11,13 +11,20 @@
     <script src="supabase.min.js"></script>
     <style>
         :root {
-            --bg: #1a1a2e;
-            --border: #8b7fa8;
-            --text: #e6e6f0;
-            --highlight: #9b86bd;
-            --muted: #7a7a8c;
-            --overlay-bg: rgba(26, 26, 46, 0.9);
-            --panel-bg: #232339;
+            --bg: #000c18;
+            --border: #1f4b6e;
+            --text: #c8d7f0;
+            --content-text: #9db7d6;
+            --highlight: #5fb3ff;
+            --muted: #58708f;
+            --overlay-bg: rgba(0, 12, 24, 0.92);
+            --panel-bg: #071526;
+            --field-bg: #031224;
+            --line: #102842;
+            --danger: #d96c75;
+            --danger-highlight: #ff8a96;
+            --glow: rgba(95, 179, 255, 0.32);
+            --danger-glow: rgba(217, 108, 117, 0.35);
         }
 
         body {
@@ -121,7 +128,7 @@
         .btn-icon:hover {
             color: var(--highlight);
             border-color: var(--border);
-            box-shadow: 0 0 10px rgba(155, 134, 189, 0.3);
+            box-shadow: 0 0 10px var(--glow);
         }
 
         .btn-icon:active {
@@ -182,7 +189,7 @@
             width: 100%;
             height: 100%;
             z-index: 2000;
-            background: rgba(26, 26, 46, 0.85);
+            background: rgba(0, 12, 24, 0.86);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -202,7 +209,7 @@
         .spinner {
             width: 50px;
             height: 50px;
-            border: 3px solid rgba(155, 134, 189, 0.2);
+            border: 3px solid rgba(95, 179, 255, 0.2);
             border-top-color: var(--highlight);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
@@ -228,7 +235,7 @@
 
         .form-input {
             width: 100%;
-            background: #1a1a2e;
+            background: var(--field-bg);
             border: 1px solid var(--border);
             color: var(--text);
             padding: 8px 10px;
@@ -270,7 +277,7 @@
             left: -100%;
             width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(155, 134, 189, 0.3), transparent);
+            background: linear-gradient(90deg, transparent, var(--glow), transparent);
             transition: left 0.5s ease;
         }
 
@@ -278,7 +285,7 @@
             background: var(--border);
             color: var(--bg);
             border-color: var(--highlight);
-            box-shadow: 0 0 12px rgba(155, 134, 189, 0.4);
+            box-shadow: 0 0 12px var(--glow);
         }
 
         .btn-save:hover:not(:disabled)::before {
@@ -287,7 +294,7 @@
 
         .btn-save:active:not(:disabled) {
             transform: translateY(1px);
-            box-shadow: 0 0 8px rgba(155, 134, 189, 0.3);
+            box-shadow: 0 0 8px var(--glow);
         }
 
         .btn-save:disabled {
@@ -311,7 +318,7 @@
         .btn-cancel:hover {
             color: var(--text);
             border-color: var(--border);
-            box-shadow: 0 0 10px rgba(139, 127, 168, 0.3);
+            box-shadow: 0 0 10px var(--glow);
         }
 
         .btn-cancel:active {
@@ -321,7 +328,7 @@
         /* 删除按钮样式（面板中） */
         .btn-danger {
             background: transparent;
-            color: #c47a9f;
+            color: var(--danger);
             border: 1px solid transparent;
             padding: 8px 20px;
             font-family: inherit;
@@ -332,9 +339,9 @@
         }
 
         .btn-danger:hover {
-            color: #e8a0bf;
-            border-color: #c47a9f;
-            box-shadow: 0 0 10px rgba(196, 122, 159, 0.4);
+            color: var(--danger-highlight);
+            border-color: var(--danger);
+            box-shadow: 0 0 10px var(--danger-glow);
         }
 
         .btn-danger:active {
@@ -343,12 +350,11 @@
 
         .list-item {
             padding: 15px 0;
-            border-bottom: 1px solid #3a3a4a;
+            border-bottom: 1px solid var(--line);
             cursor: pointer;
-            transition: color 0.2s;
         }
 
-        .list-item:hover {
+        .list-item>.item-header:hover>.title {
             color: var(--highlight);
         }
 
@@ -356,6 +362,7 @@
             display: flex;
             justify-content: space-between;
             align-items: baseline;
+            cursor: pointer;
         }
 
         .title {
@@ -374,7 +381,7 @@
         .content {
             display: none;
             margin-top: 10px;
-            color: #c0c0d0;
+            color: var(--content-text);
             font-size: 14px;
             padding-left: 12px;
             border-left: 2px solid var(--border);
@@ -395,14 +402,14 @@
             display: block;
         }
 
-        .list-item.expanded .title {
+        .list-item.expanded>.item-header>.title {
             color: var(--highlight);
         }
 
         .btn-delete {
             float: right;
             font-size: 12px;
-            color: #c47a9f;
+            color: var(--danger);
             margin-top: 10px;
             border: 1px solid transparent;
             background: none;
@@ -413,9 +420,9 @@
         }
 
         .btn-delete:hover {
-            color: #e8a0bf;
-            border-color: #c47a9f;
-            box-shadow: 0 0 10px rgba(196, 122, 159, 0.4);
+            color: var(--danger-highlight);
+            border-color: var(--danger);
+            box-shadow: 0 0 10px var(--danger-glow);
         }
 
         .btn-delete:active {
@@ -445,35 +452,45 @@
 
         /* WEBAPP 小程序容器样式 */
         .webapp-container {
-            margin: 15px 0;
+            margin: 18px 0 15px;
             padding: 15px;
-            background: rgba(155, 134, 189, 0.05);
+            background: rgba(95, 179, 255, 0.05);
             border: 1px dashed var(--border);
-            border-radius: 4px;
+            border-radius: 6px;
             position: relative;
             min-height: 40px;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            overflow: visible;
         }
 
         .webapp-container.webapp-active {
-            background: rgba(155, 134, 189, 0.08);
+            background: rgba(95, 179, 255, 0.08);
             border-style: solid;
             border-color: var(--highlight);
-            box-shadow: 0 0 8px rgba(155, 134, 189, 0.2);
+            box-shadow: 0 0 8px rgba(95, 179, 255, 0.2);
             padding: 0;
-            /* 移除内边距，让内容完全控制自己的空间 */
         }
 
         .webapp-container::before {
-            content: 'Mini App';
+            content: '小程序';
             position: absolute;
-            top: -10px;
-            left: 10px;
-            background: var(--bg);
-            padding: 0 8px;
-            font-size: 11px;
+            top: -12px;
+            left: 18px;
+            display: block;
+            background-color: var(--bg);
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%235fb3ff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='7' height='7' rx='1.5'/%3E%3Crect x='14' y='3' width='7' height='7' rx='1.5'/%3E%3Crect x='3' y='14' width='7' height='7' rx='1.5'/%3E%3Crect x='14' y='14' width='7' height='7' rx='1.5'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: 10px center;
+            padding: 0 12px 0 30px;
+            font-size: 12px;
+            line-height: 22px;
             color: var(--highlight);
             letter-spacing: 0.5px;
-            z-index: 1;
+            z-index: 3;
+            white-space: nowrap;
+            pointer-events: none;
         }
 
         /* WEBAPP 内容隔离包装器 */
@@ -492,16 +509,17 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             font-size: 16px;
             line-height: 1.5;
-            color: #000;
+            color: #d6e6ff;
 
             /* 重置背景 */
-            background: #fff;
+            background: var(--panel-bg);
 
             /* 确保内容可见 */
             overflow: auto;
 
             /* 1:1 显示 - 不缩放 */
             width: 100%;
+            max-width: 100%;
             min-height: 40px;
         }
 
@@ -510,6 +528,7 @@
             all: unset;
             display: revert;
             box-sizing: border-box;
+            max-width: 100%;
         }
 
         /* 恢复常用 HTML 元素的默认样式 */
@@ -595,7 +614,7 @@
 
         .password-input {
             width: 100%;
-            background: #1a1a2e;
+            background: var(--field-bg);
             border: 1px solid var(--border);
             color: var(--text);
             padding: 8px 10px;
@@ -634,7 +653,7 @@
             left: -100%;
             width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(155, 134, 189, 0.3), transparent);
+            background: linear-gradient(90deg, transparent, var(--glow), transparent);
             transition: left 0.5s ease;
         }
 
@@ -642,7 +661,7 @@
             background: var(--border);
             color: var(--bg);
             border-color: var(--highlight);
-            box-shadow: 0 0 12px rgba(155, 134, 189, 0.4);
+            box-shadow: 0 0 12px var(--glow);
         }
 
         .password-btn:hover::before {
@@ -651,7 +670,7 @@
 
         .password-btn:active {
             transform: translateY(1px);
-            box-shadow: 0 0 8px rgba(155, 134, 189, 0.3);
+            box-shadow: 0 0 8px var(--glow);
         }
 
         .password-btn.cancel {
@@ -663,7 +682,7 @@
         .password-btn.cancel:hover {
             color: var(--text);
             border-color: var(--border);
-            box-shadow: 0 0 10px rgba(139, 127, 168, 0.3);
+            box-shadow: 0 0 10px var(--glow);
         }
 
         .password-btn.cancel::before {
@@ -672,14 +691,14 @@
 
         .password-btn.delete {
             background: transparent;
-            color: #c47a9f;
+            color: var(--danger);
             border: 1px solid transparent;
         }
 
         .password-btn.delete:hover {
-            color: #e8a0bf;
-            border-color: #c47a9f;
-            box-shadow: 0 0 10px rgba(196, 122, 159, 0.4);
+            color: var(--danger-highlight);
+            border-color: var(--danger);
+            box-shadow: 0 0 10px var(--danger-glow);
         }
 
         .password-btn.delete::before {
@@ -687,7 +706,7 @@
         }
 
         .password-error {
-            color: #c47a9f;
+            color: var(--danger);
             font-size: 12px;
             margin-top: -10px;
             margin-bottom: 10px;
@@ -850,7 +869,7 @@
 
             // ==================== WEBAPP 小程序配置 ====================
             const WEBAPP_PARSER = {
-                REGEX: /\[WEBAPP\]([\s\S]*?)\[\/WEBAPP\]/g,
+                LEGACY_REGEX: /\[WEBAPP\]([\s\S]*?)\[\/WEBAPP\]/g,
                 UNIQUE_PREFIX: 'webapp_'
             };
             const WEBAPP_INSTANCES = new Map(); // 存储小程序实例的清理函数
@@ -858,6 +877,62 @@
             let db = [];
             let editingId = null;
             let passwordResolve = null;
+            let pendingImagePromises = [];
+            let cacheMode = 'full';
+
+            // localStorage 容量很小，base64 图片容易撑爆；缓存失败不应该影响真实保存。
+            function isQuotaError(error) {
+                return error && (
+                    error.name === 'QuotaExceededError'
+                    || error.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+                    || error.code === 22
+                    || error.code === 1014
+                );
+            }
+
+            function createLightweightCache(items) {
+                return (items || []).map(item => ({
+                    ...item,
+                    info: stripInlineImagesForCache(item.info)
+                }));
+            }
+
+            function stripInlineImagesForCache(html) {
+                if (!html || !/data:image\//i.test(html)) return html || '';
+                return html.replace(/<img\b[^>]*\bsrc=(["'])data:image\/[^"']+\1[^>]*>/gi, '<span style="color:var(--muted);">[图片未缓存，联网后显示]</span>');
+            }
+
+            function writeCacheSnapshot(items, lightweight = false) {
+                const snapshot = lightweight ? createLightweightCache(items) : items;
+                localStorage.setItem('jlbj_cache', JSON.stringify(snapshot));
+                localStorage.setItem('jlbj_cache_time', Date.now().toString());
+            }
+
+            function updateLocalCache() {
+                try {
+                    writeCacheSnapshot(db, cacheMode === 'lightweight');
+                } catch (error) {
+                    if (!isQuotaError(error)) {
+                        console.warn('本地缓存写入失败:', error);
+                        return;
+                    }
+
+                    try {
+                        cacheMode = 'lightweight';
+                        localStorage.removeItem('jlbj_cache');
+                        writeCacheSnapshot(db, true);
+                        console.warn('本地缓存空间不足，已切换为无图片缓存');
+                    } catch (fallbackError) {
+                        console.warn('本地缓存已关闭:', fallbackError);
+                        try {
+                            localStorage.removeItem('jlbj_cache');
+                            localStorage.removeItem('jlbj_cache_time');
+                        } catch (cleanupError) {
+                            console.warn('本地缓存清理失败:', cleanupError);
+                        }
+                    }
+                }
+            }
 
             // ==================== 加载遮罩控制 ====================
             const loadingOverlay = document.getElementById('loadingOverlay');
@@ -903,7 +978,13 @@
                     if (items[i].type.indexOf('image') !== -1) {
                         hasImage = true;
                         const blob = items[i].getAsFile();
-                        processImage(blob);
+                        const imagePromise = processImage(blob);
+                        pendingImagePromises.push(imagePromise);
+                        imagePromise.then(() => {
+                            pendingImagePromises = pendingImagePromises.filter(p => p !== imagePromise);
+                        }, () => {
+                            pendingImagePromises = pendingImagePromises.filter(p => p !== imagePromise);
+                        });
                         e.preventDefault();
                         break;
                     }
@@ -918,13 +999,17 @@
             }
 
             function processImage(blob) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const base64 = e.target.result;
-                    const imgHtml = `<img src="${base64}"><div><br></div>`;
-                    document.execCommand('insertHTML', false, imgHtml);
-                };
-                reader.readAsDataURL(blob);
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const base64 = e.target.result;
+                        const imgHtml = `<img src="${base64}"><div><br></div>`;
+                        document.execCommand('insertHTML', false, imgHtml);
+                        resolve();
+                    };
+                    reader.onerror = () => reject(reader.error || new Error('图片读取失败'));
+                    reader.readAsDataURL(blob);
+                });
             }
 
             function formatDate(dateString) {
@@ -960,8 +1045,7 @@
 
                     // 更新数据和缓存
                     db = data || [];
-                    localStorage.setItem('jlbj_cache', JSON.stringify(db));
-                    localStorage.setItem('jlbj_cache_time', Date.now().toString());
+                    updateLocalCache();
 
                     // 重新渲染（保持搜索状态）
                     filterAndRender();
@@ -1045,7 +1129,7 @@
                         const titleMatch = PinyinUtil.match(i.title, searchKey);
 
                         // 移除WEBAPP块后再搜索内容
-                        const contentWithoutWebapp = i.info.replace(WEBAPP_PARSER.REGEX, '');
+                        const contentWithoutWebapp = i.info.replace(WEBAPP_PARSER.LEGACY_REGEX, '');
                         const infoMatch = contentWithoutWebapp && contentWithoutWebapp.toLowerCase().includes(searchKey.toLowerCase());
 
                         return titleMatch || infoMatch;
@@ -1124,11 +1208,23 @@
                 return text;
             }
 
-            // 处理实时插入
+            function upsertLocalItem(item) {
+                if (!item || !item.id) return;
+                const index = db.findIndex(existing => existing.id === item.id);
+                if (index === -1) {
+                    db.unshift(item);
+                } else {
+                    db[index] = item;
+                }
+                updateLocalCache();
+                filterAndRender();
+            }
+
             function handleRealtimeInsert(newItem) {
                 // 避免重复添加
                 if (db.find(item => item.id === newItem.id)) return;
                 db.unshift(newItem);
+                updateLocalCache();
                 filterAndRender();
             }
 
@@ -1137,6 +1233,7 @@
                 const index = db.findIndex(item => item.id === updatedItem.id);
                 if (index !== -1) {
                     db[index] = updatedItem;
+                    updateLocalCache();
                     filterAndRender();
                 }
             }
@@ -1146,11 +1243,72 @@
                 const index = db.findIndex(item => item.id === deletedItem.id);
                 if (index !== -1) {
                     db.splice(index, 1);
+                    updateLocalCache();
                     filterAndRender();
                 }
             }
 
             // ==================== WEBAPP 小程序解析和执行引擎 ====================
+
+            function htmlToPlainText(html) {
+                const temp = document.createElement('div');
+                temp.innerHTML = html
+                    .replace(/<br\s*\/?>/gi, '\n')
+                    .replace(/<\/div>\s*<div[^>]*>/gi, '\n')
+                    .replace(/<\/p>\s*<p[^>]*>/gi, '\n');
+                return (temp.textContent || '').trim();
+            }
+
+            function looksLikeWebpageCode(code) {
+                const trimmed = (code || '').trim();
+                if (!trimmed) return false;
+
+                return /^<!doctype\s+html/i.test(trimmed)
+                    || /^<html[\s>]/i.test(trimmed)
+                    || (/<head[\s>]/i.test(trimmed) && /<body[\s>]/i.test(trimmed))
+                    || (/<style[\s>]/i.test(trimmed) && /<script[\s>]/i.test(trimmed));
+            }
+
+            function normalizeWebpageCode(code) {
+                const raw = (code || '').trim();
+                if (looksLikeWebpageCode(raw)) return raw;
+
+                const plainText = htmlToPlainText(raw);
+                if (looksLikeWebpageCode(plainText)) return plainText;
+
+                return raw;
+            }
+
+            function getAutoWebappCode(content) {
+                const raw = (content || '').trim();
+                if (looksLikeWebpageCode(raw)) return raw;
+
+                const plainText = htmlToPlainText(raw);
+                if (looksLikeWebpageCode(plainText)) return plainText;
+
+                return null;
+            }
+
+            function findEmbeddedWebpageCode(content) {
+                const raw = content || '';
+                const lower = raw.toLowerCase();
+                const markers = ['<!doctype', '<html', '&lt;!doctype', '&lt;html'];
+                const markerIndex = markers
+                    .map(marker => lower.indexOf(marker))
+                    .filter(index => index >= 0)
+                    .sort((a, b) => a - b)[0];
+
+                if (markerIndex === undefined || markerIndex <= 0) return null;
+
+                const before = raw.slice(0, markerIndex)
+                    .replace(/<div[^>]*>\s*<br\s*\/?>\s*$/i, '\n')
+                    .replace(/<p[^>]*>\s*<br\s*\/?>\s*$/i, '\n');
+                const code = raw.slice(markerIndex);
+
+                if (!getAutoWebappCode(code)) return null;
+
+                return { before, code };
+            }
 
             /**
              * 解析单个 WEBAPP 块
@@ -1161,28 +1319,45 @@
              */
             function parseWebappBlock(webappCode, itemId, blockIndex) {
                 const uniqueId = `${WEBAPP_PARSER.UNIQUE_PREFIX}${itemId}_${blockIndex}`;
+                const normalizedCode = normalizeWebpageCode(webappCode);
 
                 let html = '', css = '', js = '';
 
-                // 提取 <style> 标签
-                const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
-                let styleMatch;
-                while ((styleMatch = styleRegex.exec(webappCode)) !== null) {
-                    css += styleMatch[1] + '\n';
-                }
+                if (looksLikeWebpageCode(normalizedCode)) {
+                    const doc = new DOMParser().parseFromString(normalizedCode, 'text/html');
 
-                // 提取 <script> 标签
-                const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
-                let scriptMatch;
-                while ((scriptMatch = scriptRegex.exec(webappCode)) !== null) {
-                    js += scriptMatch[1] + '\n';
-                }
+                    doc.querySelectorAll('style').forEach(style => {
+                        css += style.textContent + '\n';
+                        style.remove();
+                    });
 
-                // 移除style和script后，剩余的就是HTML
-                html = webappCode
-                    .replace(styleRegex, '')
-                    .replace(scriptRegex, '')
-                    .trim();
+                    doc.querySelectorAll('script').forEach(script => {
+                        if (!script.src) js += script.textContent + '\n';
+                        script.remove();
+                    });
+
+                    html = (doc.body && doc.body.innerHTML.trim()) || '';
+                } else {
+                    // 提取 <style> 标签
+                    const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+                    let styleMatch;
+                    while ((styleMatch = styleRegex.exec(normalizedCode)) !== null) {
+                        css += styleMatch[1] + '\n';
+                    }
+
+                    // 提取 <script> 标签
+                    const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+                    let scriptMatch;
+                    while ((scriptMatch = scriptRegex.exec(normalizedCode)) !== null) {
+                        js += scriptMatch[1] + '\n';
+                    }
+
+                    // 移除style和script后，剩余的就是HTML
+                    html = normalizedCode
+                        .replace(styleRegex, '')
+                        .replace(scriptRegex, '')
+                        .trim();
+                }
 
                 return {
                     id: uniqueId,
@@ -1203,18 +1378,57 @@
             function processContentWithWebapps(content, itemId) {
                 const webappBlocks = [];
                 let blockIndex = 0;
+                const createPlaceholder = (parsed) => `<div class="webapp-container" data-webapp-id="${parsed.id}"></div>`;
 
-                // 替换所有WEBAPP块为占位符，并收集解析结果
-                const renderedContent = content.replace(WEBAPP_PARSER.REGEX, (match, webappCode) => {
+                // 兼容旧格式：[WEBAPP]...[/WEBAPP]
+                let renderedContent = content.replace(WEBAPP_PARSER.LEGACY_REGEX, (match, webappCode) => {
                     const parsed = parseWebappBlock(webappCode, itemId, blockIndex);
                     webappBlocks.push(parsed);
                     blockIndex++;
 
-                    // 返回占位容器
-                    return `<div class="webapp-container" data-webapp-id="${parsed.id}"></div>`;
+                    return createPlaceholder(parsed);
                 });
 
+                // 新格式：整条内容本身就是网页代码时，直接作为小程序渲染。
+                if (!webappBlocks.length) {
+                    const embeddedWebpage = findEmbeddedWebpageCode(content);
+                    if (embeddedWebpage) {
+                        const parsed = parseWebappBlock(embeddedWebpage.code, itemId, blockIndex);
+                        webappBlocks.push(parsed);
+                        renderedContent = embeddedWebpage.before + createPlaceholder(parsed);
+                    } else {
+                        const autoWebappCode = getAutoWebappCode(content);
+                        if (autoWebappCode) {
+                            const parsed = parseWebappBlock(autoWebappCode, itemId, blockIndex);
+                            webappBlocks.push(parsed);
+                            renderedContent = createPlaceholder(parsed);
+                        }
+                    }
+                }
+
                 return { renderedContent, webappBlocks };
+            }
+
+            function preservePlainTextLineBreaks(content) {
+                const placeholderRegex = /<div class="webapp-container" data-webapp-id="[^"]+"><\/div>/g;
+                const preserveSegment = (segment) => {
+                    if (!segment) return segment;
+                    if (/<br\s*\/?>|<\/?(div|p|li|ul|ol|img|table|h[1-6])\b/i.test(segment)) return segment;
+                    return segment.replace(/\n/g, '<br>');
+                };
+
+                let result = '';
+                let lastIndex = 0;
+                let match;
+
+                while ((match = placeholderRegex.exec(content)) !== null) {
+                    result += preserveSegment(content.slice(lastIndex, match.index));
+                    result += match[0];
+                    lastIndex = match.index + match[0].length;
+                }
+
+                result += preserveSegment(content.slice(lastIndex));
+                return result;
             }
 
             /**
@@ -1243,29 +1457,88 @@
              */
             function scopeCss(css, scopeId) {
                 if (!css.trim()) return '';
+                const scopeSelector = `.webapp-isolate[data-webapp-scope="${scopeId}"]`;
 
-                // 为每个选择器添加作用域前缀（限定到 .webapp-isolate 内部）
-                const scopedCss = css.replace(/([^{}]+)\s*{/g, (match, selector) => {
-                    // 跳过 @media, @keyframes 等规则
-                    if (selector.trim().startsWith('@')) {
-                        return match;
+                const findMatchingBrace = (text, openIndex) => {
+                    let depth = 0;
+                    for (let i = openIndex; i < text.length; i++) {
+                        if (text[i] === '{') depth++;
+                        if (text[i] === '}') {
+                            depth--;
+                            if (depth === 0) return i;
+                        }
+                    }
+                    return -1;
+                };
+
+                const splitSelectors = (selectorText) => {
+                    const selectors = [];
+                    let current = '';
+                    let depth = 0;
+
+                    for (const char of selectorText) {
+                        if (char === '(' || char === '[') depth++;
+                        if (char === ')' || char === ']') depth = Math.max(0, depth - 1);
+
+                        if (char === ',' && depth === 0) {
+                            selectors.push(current.trim());
+                            current = '';
+                        } else {
+                            current += char;
+                        }
                     }
 
-                    // 为每个逗号分隔的选择器添加前缀
-                    const selectors = selector.split(',').map(s => {
-                        s = s.trim();
-                        // 特殊处理：body/html -> 直接替换为隔离容器
-                        if (s === 'body' || s === 'html') {
-                            return `.webapp-isolate[data-webapp-scope="${scopeId}"]`;
+                    if (current.trim()) selectors.push(current.trim());
+                    return selectors;
+                };
+
+                const prefixSelector = (selectorText) => splitSelectors(selectorText).map(selector => {
+                    if (!selector) return selector;
+                    if (selector.startsWith(scopeSelector)) return selector;
+                    if (/^(html|body|:root)(?=$|[\s>+~.#:[*])/i.test(selector)) {
+                        return selector.replace(/^(html|body|:root)/i, scopeSelector);
+                    }
+                    return `${scopeSelector} ${selector}`;
+                }).join(', ');
+
+                const scopeBlock = (blockCss) => {
+                    let result = '';
+                    let index = 0;
+
+                    while (index < blockCss.length) {
+                        const openIndex = blockCss.indexOf('{', index);
+                        if (openIndex === -1) {
+                            result += blockCss.slice(index);
+                            break;
                         }
-                        // 其他选择器：添加 .webapp-isolate 前缀
-                        return `.webapp-isolate[data-webapp-scope="${scopeId}"] ${s}`;
-                    }).join(', ');
 
-                    return `${selectors} {`;
-                });
+                        const prelude = blockCss.slice(index, openIndex).trim();
+                        const closeIndex = findMatchingBrace(blockCss, openIndex);
+                        if (closeIndex === -1) {
+                            result += blockCss.slice(index);
+                            break;
+                        }
 
-                return scopedCss;
+                        const inner = blockCss.slice(openIndex + 1, closeIndex);
+                        const lowerPrelude = prelude.toLowerCase();
+
+                        if (/^@(media|supports|container|layer|scope)\b/.test(lowerPrelude)) {
+                            result += `${prelude} {${scopeBlock(inner)}}`;
+                        } else if (/^@(keyframes|-webkit-keyframes|font-face|page|property)\b/.test(lowerPrelude)) {
+                            result += `${prelude} {${inner}}`;
+                        } else if (prelude.startsWith('@')) {
+                            result += `${prelude} {${inner}}`;
+                        } else {
+                            result += `${prefixSelector(prelude)} {${inner}}`;
+                        }
+
+                        index = closeIndex + 1;
+                    }
+
+                    return result;
+                };
+
+                return scopeBlock(css);
             }
 
             /**
@@ -1310,7 +1583,7 @@
 
                 } catch (error) {
                     console.error(`[WEBAPP ${scopeId}] 执行错误:`, error);
-                    containerElement.innerHTML += `<div style="color:#c47a9f;padding:10px;border:1px solid #c47a9f;margin-top:10px;">⚠ 小程序执行失败: ${error.message}</div>`;
+                    containerElement.innerHTML += `<div style="color:var(--danger);padding:10px;border:1px solid var(--danger);margin-top:10px;">⚠ 小程序执行失败: ${error.message}</div>`;
                 }
             }
 
@@ -1397,43 +1670,79 @@
                 });
             }
 
-            // ==================== 渲染函数 ====================
-            // ==================== 渲染函数 ====================
             function render(list, showDate = false, searchKeyword = '') {
+                DOM.results.innerHTML = '';
+
                 if (!list.length) {
                     DOM.results.innerHTML = '<div style="color:var(--muted);padding-top:20px;">暂无数据</div>';
                     return;
                 }
 
-                // 第一步：生成基础HTML结构（带WEBAPP占位符）
-                DOM.results.innerHTML = list.map(item => {
+                const fragment = document.createDocumentFragment();
+
+                list.forEach(item => {
                     const { renderedContent, webappBlocks } = processContentWithWebapps(item.info, item.id);
+                    const displayContent = preservePlainTextLineBreaks(renderedContent);
 
                     // 高亮列表编号（如 1. 2. 3.）
-                    const highlightedContent = renderedContent.replace(/(^|\n)(\d+)\./g, '$1<span style="color:var(--highlight);">$2.</span>');
+                    const highlightedContent = displayContent.replace(/(^|\n|<br\s*\/?>)(\d+)\./g, '$1<span style="color:var(--highlight);">$2.</span>');
 
-                    // 将webappBlocks存储到元素的dataset中，供后续使用
-                    const webappData = JSON.stringify(webappBlocks.map(b => ({
+                    const listItem = document.createElement('div');
+                    listItem.className = 'list-item';
+                    listItem.onclick = () => toggleExpand(listItem);
+                    listItem.dataset.webappBlocks = JSON.stringify(webappBlocks.map(b => ({
                         id: b.id,
                         html: b.html,
                         css: b.css,
                         js: b.js
                     })));
 
-                    return `
-        <div class="list-item" onclick="toggleExpand(this)" data-webapp-blocks='${webappData.replace(/'/g, '&apos;')}'>
-            <div class="item-header">
-                <span class="title">${searchKeyword ? highlightText(item.title, searchKeyword) : item.title}</span>
-                <div>
-                    ${showDate ? `<span style="font-size:12px;color:var(--muted);margin-right:8px;">${formatDate(item.created_at)}</span>` : ''}
-                    <span class="tag">${item.tag || 'MISC'}</span>
-                </div>
-            </div>
-            <div class="content" onclick="event.stopPropagation()">${highlightedContent}
-                <button class="btn-delete" onclick="editItem(${item.id})">[ 编辑 ]</button>
-            </div>
-        </div>`;
-                }).join('');
+                    const header = document.createElement('div');
+                    header.className = 'item-header';
+
+                    const title = document.createElement('span');
+                    title.className = 'title';
+                    if (searchKeyword) {
+                        title.innerHTML = highlightText(item.title, searchKeyword);
+                    } else {
+                        title.textContent = item.title;
+                    }
+
+                    const meta = document.createElement('div');
+                    if (showDate) {
+                        const date = document.createElement('span');
+                        date.style.fontSize = '12px';
+                        date.style.color = 'var(--muted)';
+                        date.style.marginRight = '8px';
+                        date.textContent = formatDate(item.created_at);
+                        meta.appendChild(date);
+                    }
+
+                    const tag = document.createElement('span');
+                    tag.className = 'tag';
+                    tag.textContent = item.tag || 'MISC';
+                    meta.appendChild(tag);
+
+                    header.appendChild(title);
+                    header.appendChild(meta);
+
+                    const content = document.createElement('div');
+                    content.className = 'content';
+                    content.onclick = (event) => event.stopPropagation();
+                    content.innerHTML = highlightedContent;
+
+                    const editButton = document.createElement('button');
+                    editButton.className = 'btn-delete';
+                    editButton.textContent = '[ 编辑 ]';
+                    editButton.onclick = () => editItem(item.id);
+                    content.appendChild(editButton);
+
+                    listItem.appendChild(header);
+                    listItem.appendChild(content);
+                    fragment.appendChild(listItem);
+                });
+
+                DOM.results.appendChild(fragment);
             }
 
             function toggleExpand(el) {
@@ -1587,6 +1896,15 @@
 
             // ==================== 保存与删除（乐观更新 + 实时同步） ====================
             async function saveData() {
+                if (pendingImagePromises.length) {
+                    try {
+                        await Promise.all(pendingImagePromises);
+                    } catch (err) {
+                        alert('图片读取失败: ' + err.message);
+                        return;
+                    }
+                }
+
                 const tag = DOM.newTag.value.trim().toUpperCase();
                 const title = DOM.newTitle.value.trim();
                 const content = DOM.newContent.innerHTML.trim();
@@ -1608,20 +1926,22 @@
                         promise = supabase
                             .from(CONFIG.TABLE_NAME)
                             .update({ tag: tag || CONFIG.DEFAULT_TAG, title, info: content })
-                            .eq('id', editingId);
+                            .eq('id', editingId)
+                            .select('id, tag, title, info, created_at, updated_at')
+                            .single();
                     } else {
                         promise = supabase
                             .from(CONFIG.TABLE_NAME)
-                            .insert([{ tag: tag || CONFIG.DEFAULT_TAG, title, info: content }]);
+                            .insert([{ tag: tag || CONFIG.DEFAULT_TAG, title, info: content }])
+                            .select('id, tag, title, info, created_at, updated_at')
+                            .single();
                     }
 
-                    const { error } = await Promise.race([promise, timeoutPromise]);
+                    const { data, error } = await Promise.race([promise, timeoutPromise]);
 
                     if (error) throw error;
 
-                    // 成功后仅关闭面板和遮罩，数据更新交给实时监听器处理
-                    // localStorage缓存更新也交给实时监听器处理（如果需要严格一致性）
-                    // 但为了体验流畅，这里只需关闭UI，等待数据自动刷新
+                    upsertLocalItem(data);
 
                     hideLoading();
                     togglePanel();
