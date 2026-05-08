@@ -860,6 +860,9 @@
                 DEFAULT_TAG: 'MISC',
                 PASSWORD: '654321'
             };
+            const LIST_COLUMNS = 'id, tag, title, created_at, updated_at';
+            const DETAIL_COLUMNS = 'id, tag, title, info, created_at, updated_at';
+            const CACHE_PARSE_LIMIT = 1024 * 1024;
 
             // 防止重复初始化 - 使用 window 对象存储实例
             if (!window.__jlbjSupabaseClient) {
@@ -878,9 +881,12 @@
             let editingId = null;
             let passwordResolve = null;
             let pendingImagePromises = [];
-            let cacheMode = 'full';
+            const itemDetails = new Map();
+            const detailPromises = new Map();
+            let searchTimer = null;
+            let searchSeq = 0;
 
-            // localStorage 容量很小，base64 图片容易撑爆；缓存失败不应该影响真实保存。
+            // localStorage 容量很小，缓存只保存列表元数据，完整内容按需从 Supabase 拉取。
             function isQuotaError(error) {
                 return error && (
                     error.name === 'QuotaExceededError'
@@ -890,27 +896,30 @@
                 );
             }
 
-            function createLightweightCache(items) {
-                return (items || []).map(item => ({
-                    ...item,
-                    info: stripInlineImagesForCache(item.info)
-                }));
+            function createListItem(item) {
+                return {
+                    id: item.id,
+                    tag: item.tag,
+                    title: item.title,
+                    created_at: item.created_at,
+                    updated_at: item.updated_at
+                };
             }
 
-            function stripInlineImagesForCache(html) {
-                if (!html || !/data:image\//i.test(html)) return html || '';
-                return html.replace(/<img\b[^>]*\bsrc=(["'])data:image\/[^"']+\1[^>]*>/gi, '<span style="color:var(--muted);">[图片未缓存，联网后显示]</span>');
+            function rememberItemDetail(item) {
+                if (item && item.id && typeof item.info === 'string') {
+                    itemDetails.set(String(item.id), item);
+                }
             }
 
-            function writeCacheSnapshot(items, lightweight = false) {
-                const snapshot = lightweight ? createLightweightCache(items) : items;
-                localStorage.setItem('jlbj_cache', JSON.stringify(snapshot));
+            function writeCacheSnapshot(items) {
+                localStorage.setItem('jlbj_cache', JSON.stringify((items || []).map(createListItem)));
                 localStorage.setItem('jlbj_cache_time', Date.now().toString());
             }
 
             function updateLocalCache() {
                 try {
-                    writeCacheSnapshot(db, cacheMode === 'lightweight');
+                    writeCacheSnapshot(db);
                 } catch (error) {
                     if (!isQuotaError(error)) {
                         console.warn('本地缓存写入失败:', error);
@@ -918,10 +927,9 @@
                     }
 
                     try {
-                        cacheMode = 'lightweight';
                         localStorage.removeItem('jlbj_cache');
-                        writeCacheSnapshot(db, true);
-                        console.warn('本地缓存空间不足，已切换为无图片缓存');
+                        writeCacheSnapshot([]);
+                        console.warn('本地缓存空间不足，已清空列表缓存');
                     } catch (fallbackError) {
                         console.warn('本地缓存已关闭:', fallbackError);
                         try {
@@ -932,6 +940,10 @@
                         }
                     }
                 }
+            }
+
+            function createIlikePattern(keyword) {
+                return `%${String(keyword).replace(/[\\%_]/g, '\\$&')}%`;
             }
 
             // ==================== 加载遮罩控制 ====================
@@ -1025,12 +1037,18 @@
                 // 2. 先立即显示缓存数据（无 loading 遮罩）
                 const cachedData = localStorage.getItem('jlbj_cache');
                 if (cachedData) {
-                    try {
-                        db = JSON.parse(cachedData);
-                        render(db);
-                        console.log('✓ 已加载缓存数据');
-                    } catch (e) {
-                        console.warn('缓存解析失败:', e);
+                    if (cachedData.length > CACHE_PARSE_LIMIT) {
+                        localStorage.removeItem('jlbj_cache');
+                        localStorage.removeItem('jlbj_cache_time');
+                        console.warn('缓存过大，已清理旧缓存');
+                    } else {
+                        try {
+                            db = JSON.parse(cachedData).map(createListItem);
+                            render(db);
+                            console.log('✓ 已加载缓存列表');
+                        } catch (e) {
+                            console.warn('缓存解析失败:', e);
+                        }
                     }
                 }
 
@@ -1038,13 +1056,13 @@
                 try {
                     const { data, error } = await supabase
                         .from(CONFIG.TABLE_NAME)
-                        .select('id, tag, title, info, created_at, updated_at')
+                        .select(LIST_COLUMNS)
                         .order('created_at', { ascending: false });
 
                     if (error) throw error;
 
                     // 更新数据和缓存
-                    db = data || [];
+                    db = (data || []).map(createListItem);
                     updateLocalCache();
 
                     // 重新渲染（保持搜索状态）
@@ -1122,19 +1140,70 @@
             }
 
             // ==================== 搜索过滤工具 ====================
+            function getLocalSearchMatches(searchKey) {
+                if (!searchKey) return db;
+                return db.filter(i => {
+                    const titleMatch = PinyinUtil.match(i.title, searchKey);
+                    const tagMatch = PinyinUtil.match(i.tag || '', searchKey);
+                    const detail = itemDetails.get(String(i.id));
+                    const info = detail && detail.info ? detail.info : '';
+
+                    const contentWithoutWebapp = info.replace(WEBAPP_PARSER.LEGACY_REGEX, '');
+                    const infoMatch = contentWithoutWebapp && contentWithoutWebapp.toLowerCase().includes(searchKey.toLowerCase());
+
+                    return titleMatch || tagMatch || infoMatch;
+                });
+            }
+
+            function mergeSearchResults(localMatches, remoteMatches) {
+                const merged = new Map();
+                [...localMatches, ...remoteMatches].forEach(item => {
+                    if (!item || !item.id || merged.has(item.id)) return;
+                    merged.set(item.id, createListItem(item));
+                });
+                return Array.from(merged.values());
+            }
+
+            async function searchContentInSupabase(searchKey) {
+                const { data, error } = await supabase
+                    .from(CONFIG.TABLE_NAME)
+                    .select(LIST_COLUMNS)
+                    .ilike('info', createIlikePattern(searchKey))
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+                return (data || []).map(createListItem);
+            }
+
             function filterAndRender() {
                 const searchKey = DOM.input.value.trim();
+                searchSeq++;
+                const currentSeq = searchSeq;
+
+                if (searchTimer) {
+                    clearTimeout(searchTimer);
+                    searchTimer = null;
+                }
+
                 if (searchKey) {
-                    const filtered = db.filter(i => {
-                        const titleMatch = PinyinUtil.match(i.title, searchKey);
+                    const localMatches = getLocalSearchMatches(searchKey);
+                    render(localMatches, true, searchKey);
 
-                        // 移除WEBAPP块后再搜索内容
-                        const contentWithoutWebapp = i.info.replace(WEBAPP_PARSER.LEGACY_REGEX, '');
-                        const infoMatch = contentWithoutWebapp && contentWithoutWebapp.toLowerCase().includes(searchKey.toLowerCase());
+                    searchTimer = setTimeout(async () => {
+                        try {
+                            const remoteMatches = await searchContentInSupabase(searchKey);
+                            if (currentSeq !== searchSeq || DOM.input.value.trim() !== searchKey) return;
 
-                        return titleMatch || infoMatch;
-                    });
-                    render(filtered, true, searchKey);
+                            const merged = mergeSearchResults(localMatches, remoteMatches);
+                            render(merged, true, searchKey);
+                        } catch (error) {
+                            if (currentSeq !== searchSeq) return;
+                            console.warn('全库内容搜索失败:', error);
+                            if (!localMatches.length) {
+                                DOM.results.innerHTML = '<div style="color:var(--muted);padding-top:20px;">搜索失败，请检查网络后重试</div>';
+                            }
+                        }
+                    }, 300);
                 } else {
                     render(db, false, '');
                 }
@@ -1210,11 +1279,13 @@
 
             function upsertLocalItem(item) {
                 if (!item || !item.id) return;
+                rememberItemDetail(item);
+                const listItem = createListItem(item);
                 const index = db.findIndex(existing => existing.id === item.id);
                 if (index === -1) {
-                    db.unshift(item);
+                    db.unshift(listItem);
                 } else {
-                    db[index] = item;
+                    db[index] = listItem;
                 }
                 updateLocalCache();
                 filterAndRender();
@@ -1223,7 +1294,8 @@
             function handleRealtimeInsert(newItem) {
                 // 避免重复添加
                 if (db.find(item => item.id === newItem.id)) return;
-                db.unshift(newItem);
+                rememberItemDetail(newItem);
+                db.unshift(createListItem(newItem));
                 updateLocalCache();
                 filterAndRender();
             }
@@ -1232,7 +1304,8 @@
             function handleRealtimeUpdate(updatedItem) {
                 const index = db.findIndex(item => item.id === updatedItem.id);
                 if (index !== -1) {
-                    db[index] = updatedItem;
+                    rememberItemDetail(updatedItem);
+                    db[index] = createListItem(updatedItem);
                     updateLocalCache();
                     filterAndRender();
                 }
@@ -1243,9 +1316,40 @@
                 const index = db.findIndex(item => item.id === deletedItem.id);
                 if (index !== -1) {
                     db.splice(index, 1);
+                    itemDetails.delete(String(deletedItem.id));
                     updateLocalCache();
                     filterAndRender();
                 }
+            }
+
+            async function fetchItemDetail(id) {
+                const key = String(id);
+                if (itemDetails.has(key)) return itemDetails.get(key);
+                if (detailPromises.has(key)) return detailPromises.get(key);
+
+                const promise = supabase
+                    .from(CONFIG.TABLE_NAME)
+                    .select(DETAIL_COLUMNS)
+                    .eq('id', id)
+                    .single()
+                    .then(({ data, error }) => {
+                        if (error) throw error;
+                        rememberItemDetail(data);
+
+                        const index = db.findIndex(item => item.id === data.id);
+                        if (index !== -1) {
+                            db[index] = createListItem(data);
+                            updateLocalCache();
+                        }
+
+                        return data;
+                    })
+                    .finally(() => {
+                        detailPromises.delete(key);
+                    });
+
+                detailPromises.set(key, promise);
+                return promise;
             }
 
             // ==================== WEBAPP 小程序解析和执行引擎 ====================
@@ -1376,6 +1480,7 @@
              * @returns {object} { renderedContent, webappBlocks }
              */
             function processContentWithWebapps(content, itemId) {
+                content = content || '';
                 const webappBlocks = [];
                 let blockIndex = 0;
                 const createPlaceholder = (parsed) => `<div class="webapp-container" data-webapp-id="${parsed.id}"></div>`;
@@ -1681,21 +1786,11 @@
                 const fragment = document.createDocumentFragment();
 
                 list.forEach(item => {
-                    const { renderedContent, webappBlocks } = processContentWithWebapps(item.info, item.id);
-                    const displayContent = preservePlainTextLineBreaks(renderedContent);
-
-                    // 高亮列表编号（如 1. 2. 3.）
-                    const highlightedContent = displayContent.replace(/(^|\n|<br\s*\/?>)(\d+)\./g, '$1<span style="color:var(--highlight);">$2.</span>');
-
                     const listItem = document.createElement('div');
                     listItem.className = 'list-item';
                     listItem.onclick = () => toggleExpand(listItem);
-                    listItem.dataset.webappBlocks = JSON.stringify(webappBlocks.map(b => ({
-                        id: b.id,
-                        html: b.html,
-                        css: b.css,
-                        js: b.js
-                    })));
+                    listItem.dataset.itemId = item.id;
+                    listItem.dataset.webappBlocks = '[]';
 
                     const header = document.createElement('div');
                     header.className = 'item-header';
@@ -1729,13 +1824,7 @@
                     const content = document.createElement('div');
                     content.className = 'content';
                     content.onclick = (event) => event.stopPropagation();
-                    content.innerHTML = highlightedContent;
-
-                    const editButton = document.createElement('button');
-                    editButton.className = 'btn-delete';
-                    editButton.textContent = '[ 编辑 ]';
-                    editButton.onclick = () => editItem(item.id);
-                    content.appendChild(editButton);
+                    content.innerHTML = '<div style="color:var(--muted);padding:8px 0;">点击加载内容...</div>';
 
                     listItem.appendChild(header);
                     listItem.appendChild(content);
@@ -1745,16 +1834,60 @@
                 DOM.results.appendChild(fragment);
             }
 
-            function toggleExpand(el) {
-                const wasExpanded = el.classList.contains('expanded');
-                el.classList.toggle('expanded');
+            function renderItemContent(listItemElement, item, searchKeyword = '') {
+                const content = listItemElement.querySelector('.content');
+                if (!content || !item) return;
 
-                // 如果是展开操作，执行WEBAPP
-                if (!wasExpanded) {
-                    executeWebapps(el);
-                } else {
-                    // 收起时清理WEBAPP
+                const { renderedContent, webappBlocks } = processContentWithWebapps(item.info, item.id);
+                const displayContent = preservePlainTextLineBreaks(renderedContent);
+                const highlightedContent = displayContent.replace(/(^|\n|<br\s*\/?>)(\d+)\./g, '$1<span style="color:var(--highlight);">$2.</span>');
+
+                listItemElement.dataset.webappBlocks = JSON.stringify(webappBlocks.map(b => ({
+                    id: b.id,
+                    html: b.html,
+                    css: b.css,
+                    js: b.js
+                })));
+
+                content.innerHTML = highlightedContent;
+
+                const editButton = document.createElement('button');
+                editButton.className = 'btn-delete';
+                editButton.textContent = '[ 编辑 ]';
+                editButton.onclick = () => editItem(item.id);
+                content.appendChild(editButton);
+            }
+
+            async function toggleExpand(el) {
+                const wasExpanded = el.classList.contains('expanded');
+
+                if (wasExpanded) {
+                    el.classList.remove('expanded');
                     cleanupWebapps(el);
+                    return;
+                }
+
+                el.classList.add('expanded');
+                const content = el.querySelector('.content');
+                const itemId = el.dataset.itemId;
+
+                try {
+                    const cachedDetail = itemDetails.get(String(itemId));
+                    if (cachedDetail) {
+                        renderItemContent(el, cachedDetail, DOM.input.value.trim());
+                    } else {
+                        if (content) content.innerHTML = '<div style="color:var(--muted);padding:8px 0;">正在加载内容...</div>';
+                        const detail = await fetchItemDetail(itemId);
+                        if (!el.classList.contains('expanded')) return;
+                        renderItemContent(el, detail, DOM.input.value.trim());
+                    }
+
+                    executeWebapps(el);
+                } catch (error) {
+                    console.warn('内容加载失败:', error);
+                    if (content) {
+                        content.innerHTML = `<div style="color:var(--danger);padding:8px 0;">内容加载失败：${error.message}</div>`;
+                    }
                 }
             }
 
@@ -1927,13 +2060,13 @@
                             .from(CONFIG.TABLE_NAME)
                             .update({ tag: tag || CONFIG.DEFAULT_TAG, title, info: content })
                             .eq('id', editingId)
-                            .select('id, tag, title, info, created_at, updated_at')
+                            .select(DETAIL_COLUMNS)
                             .single();
                     } else {
                         promise = supabase
                             .from(CONFIG.TABLE_NAME)
                             .insert([{ tag: tag || CONFIG.DEFAULT_TAG, title, info: content }])
-                            .select('id, tag, title, info, created_at, updated_at')
+                            .select(DETAIL_COLUMNS)
                             .single();
                     }
 
@@ -1953,16 +2086,23 @@
                 }
             }
 
-            function editItem(id) {
-                const item = db.find(i => i.id === id);
-                if (!item) return;
-                DOM.newTag.value = item.tag || '';
-                DOM.newTitle.value = item.title;
-                DOM.newContent.innerHTML = item.info;
-                DOM.lastModifiedDisplay.textContent = formatDate(item.updated_at || item.created_at) ? `最后更新: ${formatDate(item.updated_at || item.created_at)}` : '';
-                editingId = id;
-                DOM.overlay.classList.add('active');
-                DOM.newTag.focus();
+            async function editItem(id) {
+                try {
+                    showLoading('正在加载内容...');
+                    const item = await fetchItemDetail(id);
+                    hideLoading();
+
+                    DOM.newTag.value = item.tag || '';
+                    DOM.newTitle.value = item.title;
+                    DOM.newContent.innerHTML = item.info;
+                    DOM.lastModifiedDisplay.textContent = formatDate(item.updated_at || item.created_at) ? `最后更新: ${formatDate(item.updated_at || item.created_at)}` : '';
+                    editingId = id;
+                    DOM.overlay.classList.add('active');
+                    DOM.newTag.focus();
+                } catch (error) {
+                    hideLoading();
+                    alert('内容加载失败: ' + error.message);
+                }
             }
 
             async function deleteCurrentItem() {
@@ -1990,7 +2130,11 @@
 
                     if (error) throw error;
 
-                    // 成功后仅关闭面板，数据更新交给实时监听器
+                    itemDetails.delete(String(editingId));
+                    db = db.filter(item => item.id !== editingId);
+                    updateLocalCache();
+                    filterAndRender();
+
                     hideLoading();
                     togglePanel();
                     clearForm();
