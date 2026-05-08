@@ -140,9 +140,19 @@
             height: 8px;
             border-radius: 50%;
             background-color: var(--muted);
-            transition: background-color 0.3s ease;
+            transition: background-color 0.3s ease, box-shadow 0.2s ease, transform 0.2s ease;
             margin-right: 8px;
-            cursor: help;
+            cursor: pointer;
+            flex: 0 0 auto;
+        }
+
+        .status-dot:hover {
+            box-shadow: 0 0 10px var(--glow);
+            transform: scale(1.25);
+        }
+
+        .status-dot:active {
+            transform: scale(1);
         }
 
         /* 编辑面板遮罩 */
@@ -744,7 +754,7 @@
 <body>
     <div class="container">
         <div class="top-bar">
-            <div id="status-dot" class="status-dot" title="连接中..."></div>
+            <div id="status-dot" class="status-dot" title="连接中，点击重新连接" role="button" tabindex="0"></div>
             <div class="input-group">
                 <input type="text" id="search" placeholder="> 输入关键词或简拼..." autofocus autocomplete="off"
                     name="search-field">
@@ -885,6 +895,7 @@
             const detailPromises = new Map();
             let searchTimer = null;
             let searchSeq = 0;
+            let reconnectingRealtime = false;
 
             // localStorage 容量很小，缓存只保存列表元数据，完整内容按需从 Supabase 拉取。
             function isQuotaError(error) {
@@ -950,6 +961,14 @@
                 return /[\u3400-\u9fff]/.test(keyword);
             }
 
+            function setRealtimeIndicator(color, title) {
+                const indicator = document.getElementById('status-dot');
+                if (!indicator) return;
+                indicator.style.background = color;
+                indicator.title = title;
+                indicator.setAttribute('aria-label', title);
+            }
+
             // ==================== 加载遮罩控制 ====================
             const loadingOverlay = document.getElementById('loadingOverlay');
             const loadingText = document.getElementById('loadingText');
@@ -981,6 +1000,17 @@
                 // 添加粘贴事件监听
                 if (DOM.newContent) {
                     DOM.newContent.addEventListener('paste', handlePaste);
+                }
+
+                const statusDot = document.getElementById('status-dot');
+                if (statusDot) {
+                    statusDot.addEventListener('click', reconnectRealtime);
+                    statusDot.addEventListener('keydown', (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            reconnectRealtime();
+                        }
+                    });
                 }
             }
 
@@ -1087,13 +1117,16 @@
                 // 如果已存在订阅，先取消
                 if (realtimeChannel) {
                     supabase.removeChannel(realtimeChannel);
+                    realtimeChannel = null;
                 }
 
                 console.log('正在建立实时连接...');
+                setRealtimeIndicator('var(--highlight)', '正在重新连接...');
+                const channelName = `jlbj_db_changes_${Date.now()}`;
 
                 // 创建新的订阅通道
                 realtimeChannel = supabase
-                    .channel('jlbj_db_changes')
+                    .channel(channelName)
                     .on(
                         'postgres_changes',
                         {
@@ -1120,27 +1153,46 @@
                     )
                     .subscribe((status) => {
                         console.log(`📡 实时服务状态: ${status}`);
-                        const indicator = document.getElementById('status-dot');
 
                         if (status === 'SUBSCRIBED') {
                             console.log('✓ 实时同步已就绪，正在监听数据变化...');
-                            if (indicator) {
-                                indicator.style.background = '#4caf50'; // 绿色
-                                indicator.title = "实时同步在线";
-                            }
+                            setRealtimeIndicator('#4caf50', '实时同步在线，点击重新连接');
                         } else if (status === 'CHANNEL_ERROR') {
                             console.error('✗ 实时连接发生错误');
-                            if (indicator) {
-                                indicator.style.background = '#f44336'; // 红色
-                                indicator.title = "连接错误 - 请刷新重试";
-                            }
+                            setRealtimeIndicator('#f44336', '连接错误，点击重新连接');
                         } else if (status === 'CLOSED') {
-                            if (indicator) {
-                                indicator.style.background = '#7a7a8c'; // 灰色
-                                indicator.title = "连接断开";
-                            }
+                            setRealtimeIndicator('#7a7a8c', '连接断开，点击重新连接');
                         }
                     });
+            }
+
+            async function refreshListData() {
+                const { data, error } = await supabase
+                    .from(CONFIG.TABLE_NAME)
+                    .select(LIST_COLUMNS)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                db = (data || []).map(createListItem);
+                updateLocalCache();
+                filterAndRender();
+            }
+
+            async function reconnectRealtime() {
+                if (reconnectingRealtime) return;
+                reconnectingRealtime = true;
+                setRealtimeIndicator('var(--highlight)', '正在重新连接...');
+
+                try {
+                    setupRealtimeSubscription();
+                    await refreshListData();
+                } catch (error) {
+                    console.warn('重新连接失败:', error);
+                    setRealtimeIndicator('#f44336', '重新连接失败，点击重试');
+                } finally {
+                    reconnectingRealtime = false;
+                }
             }
 
             // ==================== 搜索过滤工具 ====================
@@ -1562,6 +1614,23 @@
                 return { html: processedHtml, idMap };
             }
 
+            function cssEscape(value) {
+                if (window.CSS && typeof window.CSS.escape === 'function') {
+                    return window.CSS.escape(value);
+                }
+                return String(value).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+            }
+
+            function rewriteSelectorIds(selector, idMap) {
+                if (!selector || !Object.keys(idMap).length) return selector;
+                let rewritten = selector;
+                Object.entries(idMap).forEach(([oldId, newId]) => {
+                    const plainPattern = new RegExp(`#${oldId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g');
+                    rewritten = rewritten.replace(plainPattern, `#${cssEscape(newId)}`);
+                });
+                return rewritten;
+            }
+
             /**
              * 处理CSS作用域隔离
              * @param {string} css - 原始CSS代码
@@ -1654,50 +1723,149 @@
                 return scopeBlock(css);
             }
 
-            /**
-             * 在隔离作用域中执行JavaScript
-             * @param {string} jsCode - JavaScript代码
-             * @param {string} scopeId - 作用域ID
-             * @param {object} idMap - ID映射表
-             * @param {HTMLElement} containerElement - 容器DOM元素
-             */
-            function executeIsolatedJs(jsCode, scopeId, idMap, containerElement) {
-                if (!jsCode.trim()) return;
+            function showWebappError(containerElement, scopeId, error) {
+                console.error(`[WEBAPP ${scopeId}] 执行错误:`, error);
+                const errorElement = document.createElement('div');
+                errorElement.style.cssText = 'color:var(--danger);padding:10px;border:1px solid var(--danger);margin-top:10px;';
+                errorElement.textContent = `⚠ 小程序执行失败: ${error.message}`;
+                containerElement.appendChild(errorElement);
+            }
 
-                // 重写代码中的 getElementById 调用
-                let rewrittenJs = jsCode;
+            function exposeTopLevelFunctions(jsCode) {
+                return jsCode.replace(/(^|[\n;]\s*)function\s+([A-Za-z_$][\w$]*)\s*\(/g, '$1scope.$2 = function $2(');
+            }
 
-                // 替换 document.getElementById('xxx') 为新ID
-                Object.keys(idMap).forEach(oldId => {
-                    const regex = new RegExp(`getElementById\\s*\\(\\s*['"\`]${oldId}['"\`]\\s*\\)`, 'g');
-                    rewrittenJs = rewrittenJs.replace(regex, `getElementById('${idMap[oldId]}')`);
+            function createWebappScriptContext(scopeId, idMap, containerElement) {
+                const cleanupFns = [];
+                const timerIds = new Set();
+                let context;
+
+                const getScopedElementById = (id) => {
+                    const mappedId = idMap[id] || id;
+                    return document.getElementById(mappedId) || containerElement.querySelector(`#${cssEscape(mappedId)}`);
+                };
+
+                const scopedDocument = {
+                    getElementById: getScopedElementById,
+                    querySelector: (selector) => containerElement.querySelector(rewriteSelectorIds(selector, idMap)),
+                    querySelectorAll: (selector) => containerElement.querySelectorAll(rewriteSelectorIds(selector, idMap)),
+                    addEventListener: (type, handler, options) => {
+                        if (type === 'DOMContentLoaded') {
+                            const timerId = window.setTimeout(() => {
+                                timerIds.delete(timerId);
+                                try {
+                                    handler.call(scopedDocument);
+                                } catch (error) {
+                                    showWebappError(containerElement, scopeId, error);
+                                }
+                            }, 0);
+                            timerIds.add(timerId);
+                            return;
+                        }
+                        document.addEventListener(type, handler, options);
+                        cleanupFns.push(() => document.removeEventListener(type, handler, options));
+                    },
+                    removeEventListener: (type, handler, options) => document.removeEventListener(type, handler, options),
+                    createElement: (...args) => document.createElement(...args),
+                    createTextNode: (...args) => document.createTextNode(...args),
+                    body: containerElement,
+                    head: document.head
+                };
+
+                const scopedWindow = {
+                    document: scopedDocument,
+                    addEventListener: (type, handler, options) => {
+                        window.addEventListener(type, handler, options);
+                        cleanupFns.push(() => window.removeEventListener(type, handler, options));
+                    },
+                    removeEventListener: (type, handler, options) => window.removeEventListener(type, handler, options),
+                    setTimeout: (handler, delay, ...args) => {
+                        const timerId = window.setTimeout(() => {
+                            timerIds.delete(timerId);
+                            try {
+                                typeof handler === 'function' ? handler(...args) : context.run(String(handler));
+                            } catch (error) {
+                                showWebappError(containerElement, scopeId, error);
+                            }
+                        }, delay);
+                        timerIds.add(timerId);
+                        return timerId;
+                    },
+                    clearTimeout: (timerId) => {
+                        timerIds.delete(timerId);
+                        window.clearTimeout(timerId);
+                    }
+                };
+
+                const scope = {};
+                Object.assign(scope, {
+                    scope,
+                    container: containerElement,
+                    scopeId,
+                    document: scopedDocument,
+                    window: scopedWindow,
+                    console,
+                    Math,
+                    Date,
+                    Number,
+                    String,
+                    Boolean,
+                    Array,
+                    Object,
+                    JSON,
+                    parseFloat,
+                    parseInt,
+                    isNaN,
+                    getElementById: getScopedElementById,
+                    $: (selector) => containerElement.querySelector(rewriteSelectorIds(selector, idMap)),
+                    $$: (selector) => containerElement.querySelectorAll(rewriteSelectorIds(selector, idMap)),
+                    setTimeout: scopedWindow.setTimeout,
+                    clearTimeout: scopedWindow.clearTimeout
                 });
 
-                // 创建隔离的执行环境
-                try {
-                    // 使用Function构造器创建闭包，限制全局污染
-                    const isolatedFunction = new Function(
-                        'container',
-                        'scopeId',
-                        `
-            // 创建局部作用域的 $ 查询函数（可选）
-            const $ = (selector) => container.querySelector(selector);
-            const $$ = (selector) => container.querySelectorAll(selector);
+                context = {
+                    scope,
+                    run(code, event = null) {
+                        if (!code || !String(code).trim()) return;
+                        scope.event = event;
+                        const rewrittenCode = exposeTopLevelFunctions(String(code));
+                        try {
+                            const isolatedFunction = new Function('scope', `with (scope) {\n${rewrittenCode}\n}`);
+                            return isolatedFunction(scope);
+                        } catch (error) {
+                            showWebappError(containerElement, scopeId, error);
+                        } finally {
+                            scope.event = null;
+                        }
+                    },
+                    addCleanup(cleanupFn) {
+                        cleanupFns.push(cleanupFn);
+                    },
+                    cleanup() {
+                        cleanupFns.splice(0).forEach(cleanupFn => cleanupFn());
+                        timerIds.forEach(timerId => window.clearTimeout(timerId));
+                        timerIds.clear();
+                    }
+                };
 
-            // 执行用户代码
-            ${rewrittenJs}
-            `
-                    );
+                scopedWindow.window = scopedWindow;
+                return context;
+            }
 
-                    // 异步执行，避免阻塞主渲染
-                    setTimeout(() => {
-                        isolatedFunction(containerElement, scopeId);
-                    }, 0);
+            function bindInlineEventHandlers(rootElement, scriptContext) {
+                rootElement.querySelectorAll('*').forEach(element => {
+                    Array.from(element.attributes).forEach(attribute => {
+                        if (!/^on[a-z]+$/i.test(attribute.name)) return;
 
-                } catch (error) {
-                    console.error(`[WEBAPP ${scopeId}] 执行错误:`, error);
-                    containerElement.innerHTML += `<div style="color:var(--danger);padding:10px;border:1px solid var(--danger);margin-top:10px;">⚠ 小程序执行失败: ${error.message}</div>`;
-                }
+                        const eventType = attribute.name.slice(2).toLowerCase();
+                        const code = attribute.value;
+                        element.removeAttribute(attribute.name);
+
+                        const handler = (event) => scriptContext.run(code, event);
+                        element.addEventListener(eventType, handler);
+                        scriptContext.addCleanup(() => element.removeEventListener(eventType, handler));
+                    });
+                });
             }
 
             /**
@@ -1751,6 +1919,8 @@
                     container.innerHTML = '';
                     container.appendChild(isolateWrapper);
 
+                    const scriptContext = createWebappScriptContext(block.id, idMap, isolateWrapper);
+
                     // 3. 注入作用域CSS（应用到隔离包装器内部）
                     if (block.css) {
                         const styleId = `style_${block.id}`;
@@ -1767,11 +1937,14 @@
                         styleElement.textContent = scopedCssContent;
                     }
 
-                    // 4. 执行隔离的JavaScript（传入隔离包装器作为容器）
-                    executeIsolatedJs(block.js, block.id, idMap, isolateWrapper);
+                    // 4. 执行隔离的JavaScript，并绑定动态插入后才会生效的内联事件
+                    scriptContext.run(block.js);
+                    bindInlineEventHandlers(isolateWrapper, scriptContext);
 
                     // 5. 注册清理函数
                     registerWebappCleanup(block.id, () => {
+                        scriptContext.cleanup();
+
                         // 移除style标签
                         const styleElement = document.getElementById(`style_${block.id}`);
                         if (styleElement) styleElement.remove();
