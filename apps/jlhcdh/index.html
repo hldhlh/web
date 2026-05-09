@@ -2220,9 +2220,17 @@
         let longPressTimer = null;
         const LONG_PRESS_DURATION = 500; // 500ms 触发长按
 
-        window.startLongPress = (productId) => {
+        function shouldIgnoreLongPress(event) {
+            const target = event && event.target;
+            return !!(target && target.closest('button, input, select, textarea, .fav-icon, .check-wrapper, .qty-control, .btn-delete-icon'));
+        }
+
+        window.startLongPress = (productId, event) => {
+            if (shouldIgnoreLongPress(event)) return;
+            window.cancelLongPress();
             longPressTimer = setTimeout(() => {
                 openEditProductModal(productId);
+                longPressTimer = null;
                 // 触发震动反馈（如果支持）
                 if (navigator.vibrate) navigator.vibrate(50);
             }, LONG_PRESS_DURATION);
@@ -2377,7 +2385,14 @@
 
             list.innerHTML = state.cartItems.map(item => {
                 return `
-                <div class="agg-item ${item.is_purchased ? 'checked' : ''}">
+                <div class="agg-item ${item.is_purchased ? 'checked' : ''}"
+                    onmousedown="startLongPress(${item.id}, event)"
+                    onmouseup="cancelLongPress()"
+                    onmouseleave="cancelLongPress()"
+                    ontouchstart="startLongPress(${item.id}, event)"
+                    ontouchmove="cancelLongPress()"
+                    ontouchend="cancelLongPress()"
+                    ontouchcancel="cancelLongPress()">
                     <div class="check-wrapper">
                         <input type="checkbox" id="check-${item.id}" class="custom-checkbox" 
                             ${item.is_purchased ? 'checked' : ''} 
@@ -2522,10 +2537,11 @@
                 const tagsHtml = (p.tags || []).map(t => `<span class="tag-badge">${t}</span>`).join('');
                 return `
                 <div class="product-card" data-id="${p.id}" 
-                    onmousedown="startLongPress(${p.id})" 
+                    onmousedown="startLongPress(${p.id}, event)" 
                     onmouseup="cancelLongPress()" 
                     onmouseleave="cancelLongPress()"
-                    ontouchstart="startLongPress(${p.id})" 
+                    ontouchstart="startLongPress(${p.id}, event)" 
+                    ontouchmove="cancelLongPress()"
                     ontouchend="cancelLongPress()" 
                     ontouchcancel="cancelLongPress()">
                     <div class="fav-icon ${p.is_favorite ? 'active' : ''}" onclick="toggleFav(${p.id})">
