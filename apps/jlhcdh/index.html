@@ -712,6 +712,23 @@
             opacity: 0.8;
         }
 
+        .prediction-hint {
+            margin-top: 5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: var(--text-sub);
+            font-size: 11px;
+            font-weight: 600;
+            opacity: 0.58;
+            line-height: 1.2;
+        }
+
+        .prediction-hint i {
+            font-size: 10px;
+            opacity: 0.7;
+        }
+
         @keyframes pulse {
             from {
                 transform: scale(1);
@@ -1516,7 +1533,9 @@
             realtimeRetryCount: 0, // 实时连接重试次数
             maxRealtimeRetries: 2, // 最大重试次数
             isAuthorized: false, // 管理操作授权状态
-            pollingFallbackActive: false // 轮询降级状态
+            pollingFallbackActive: false, // 轮询降级状态
+            predictions: {}, // 基于历史订货的低调参考量
+            predictionDate: ''
         };
 
         // 密码保护
@@ -1593,6 +1612,7 @@
 
             await fetchProducts();
             await fetchCart();
+            await fetchOrderPredictions();
             renderLocations();
             renderTags();
             renderProducts();
@@ -1610,6 +1630,7 @@
                         fetchDayData();
                     } else if (document.getElementById('indexPage').classList.contains('active')) {
                         await fetchProducts();
+                        await fetchOrderPredictions();
                         renderProducts();
                     }
                     await refreshCalendarMarkers();
@@ -1623,6 +1644,7 @@
                 if (state.fpOrders) state.fpOrders.setDate(dateStr, false);
 
                 await fetchCart();
+                await fetchOrderPredictions();
                 renderProducts();
                 if (document.getElementById('ordersPage').classList.contains('active')) {
                     fetchDayData();
@@ -1862,6 +1884,180 @@
             } catch (e) { endSync(true); }
         }
 
+        function parseDateOnly(dateStr) {
+            const [y, m, d] = dateStr.split('-').map(Number);
+            return new Date(y, m - 1, d);
+        }
+
+        function formatDateOnly(date) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function addDays(date, days) {
+            const next = new Date(date);
+            next.setDate(next.getDate() + days);
+            return next;
+        }
+
+        function getLocalDateFromIso(isoString) {
+            const utcDate = new Date(isoString);
+            const localDate = new Date(utcDate.getTime() + 8 * 60 * 60 * 1000);
+            const y = localDate.getUTCFullYear();
+            const m = String(localDate.getUTCMonth() + 1).padStart(2, '0');
+            const d = String(localDate.getUTCDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function roundPredictionQty(qty) {
+            if (!Number.isFinite(qty) || qty <= 0) return 0;
+            if (qty < 1) return Math.round(qty * 10) / 10;
+            if (qty < 5) return Math.round(qty * 2) / 2;
+            if (qty < 20) return Math.round(qty);
+            return Math.round(qty / 5) * 5;
+        }
+
+        function formatPredictionQty(qty) {
+            const rounded = roundPredictionQty(qty);
+            if (!rounded) return '';
+            return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1).replace(/\.0$/, '');
+        }
+
+        async function fetchOrderPredictions() {
+            const targetDate = parseDateOnly(state.currentDate);
+            const startDate = addDays(targetDate, -365);
+            const endDate = addDays(targetDate, -1);
+            const startStr = formatDateOnly(startDate);
+            const endStr = formatDateOnly(endDate);
+            const targetWeekday = targetDate.getDay();
+            const recentStart = formatDateOnly(addDays(targetDate, -45));
+            const history = {};
+            const cartKeys = new Set();
+            const historyKeys = new Set();
+
+            const addHistory = (productId, date, qty, preferExisting = false) => {
+                const pid = parseInt(productId);
+                const value = parseFloat(qty);
+                if (!pid || !date || !Number.isFinite(value) || value <= 0) return;
+                if (date >= state.currentDate) return;
+                const key = `${date}:${pid}`;
+                if (preferExisting && cartKeys.has(key)) return;
+                if (historyKeys.has(key)) return;
+                if (!history[pid]) history[pid] = [];
+                history[pid].push({ date, qty: value, weekday: parseDateOnly(date).getDay() });
+                historyKeys.add(key);
+                if (!preferExisting) cartKeys.add(key);
+            };
+
+            try {
+                const { data: cartRows, error: cartError } = await sb.from('jlhcdh_cart')
+                    .select('product_id,quantity,order_date')
+                    .gte('order_date', startStr)
+                    .lte('order_date', endStr);
+                if (cartError) throw cartError;
+
+                (cartRows || []).forEach(row => addHistory(row.product_id, row.order_date, row.quantity, false));
+
+                const { data: legacyRows } = await sb.from('jlhcdh_orders')
+                    .select('created_at,order_data')
+                    .gte('created_at', `${startStr}T00:00:00+08:00`)
+                    .lte('created_at', `${endStr}T23:59:59+08:00`)
+                    .order('created_at', { ascending: false });
+
+                (legacyRows || []).forEach(row => {
+                    const date = getLocalDateFromIso(row.created_at);
+                    const raw = row.order_data;
+                    const items = Array.isArray(raw) ? raw : (raw?.order_data || []);
+                    items.forEach(item => {
+                        const pid = item.id || item.product_id;
+                        const qty = item.qty || item.quantity;
+                        addHistory(pid, date, qty, true);
+                    });
+                });
+
+                const predictions = {};
+                Object.entries(history).forEach(([pid, rows]) => {
+                    rows.sort((a, b) => b.date.localeCompare(a.date));
+                    const sameWeekday = rows.filter(r => r.weekday === targetWeekday).map(r => r.qty);
+                    const recent = rows.filter(r => r.date >= recentStart).map(r => r.qty);
+                    const all = rows.map(r => r.qty);
+                    const avg = arr => arr.reduce((sum, n) => sum + n, 0) / arr.length;
+
+                    let rawQty = 0;
+                    let level = '';
+                    if (sameWeekday.length >= 2 && recent.length >= 2) {
+                        rawQty = avg(sameWeekday) * 0.65 + avg(recent) * 0.35;
+                        level = '同星期+近期';
+                    } else if (sameWeekday.length === 1 && recent.length >= 2) {
+                        rawQty = sameWeekday[0] * 0.55 + avg(recent) * 0.45;
+                        level = '同星期+近期';
+                    } else if (sameWeekday.length >= 2) {
+                        rawQty = avg(sameWeekday);
+                        level = '同星期';
+                    } else if (recent.length >= 2) {
+                        rawQty = avg(recent);
+                        level = '近期';
+                    } else if (all.length >= 3) {
+                        rawQty = avg(all);
+                        level = '历史';
+                    } else if (all.length > 0) {
+                        rawQty = all[0];
+                        level = '上次';
+                    }
+
+                    const qty = roundPredictionQty(rawQty);
+                    if (qty > 0) predictions[pid] = { qty, level };
+                });
+
+                state.predictions = predictions;
+                state.predictionDate = state.currentDate;
+                console.log('建议预测完成:', Object.keys(predictions).length, predictions);
+                applyPredictionHintsToDOM();
+            } catch (e) {
+                console.warn('预测建议读取失败:', e);
+                state.predictions = {};
+                state.predictionDate = state.currentDate;
+                applyPredictionHintsToDOM();
+            }
+        }
+
+        function getPredictionHintHtml(product, prediction) {
+            if (!prediction) return '';
+            return `
+                <div class="prediction-hint" title="按最近历史自动估算，只作订货参考">
+                    <i class="far fa-lightbulb"></i> 参考 ${formatPredictionQty(prediction.qty)}${product.unit || ''}
+                </div>`;
+        }
+
+        function applyPredictionHintsToDOM() {
+            document.querySelectorAll('.product-card').forEach(card => {
+                const id = parseInt(card.dataset.id);
+                const product = state.products.find(p => p.id === id);
+                const prediction = state.predictions[id];
+                const hasQty = !!state.orders[id]?.qty;
+                const oldHint = card.querySelector('.prediction-hint');
+
+                if (oldHint) oldHint.remove();
+                const input = card.querySelector('.qty-control input');
+                if (input && (!prediction || hasQty)) {
+                    input.placeholder = '0';
+                    input.title = '';
+                }
+                if (!product || !prediction || hasQty) return;
+
+                if (input) {
+                    input.placeholder = formatPredictionQty(prediction.qty);
+                    input.title = `建议参考 ${formatPredictionQty(prediction.qty)}${product.unit || ''}`;
+                }
+
+                const locTag = card.querySelector('.product-location-tag');
+                if (!locTag) return;
+                locTag.insertAdjacentHTML('afterend', getPredictionHintHtml(product, prediction));
+            });
+        }
+
         async function fetchHistoryDates() {
             try {
                 // 从历史订单表获取近 30 天有数据的日期
@@ -1917,6 +2113,9 @@
             updateFooter();
             const input = document.querySelector(`.product-card[data-id="${id}"] input`);
             if (input && document.activeElement !== input) input.value = qty || '';
+            const hint = document.querySelector(`.product-card[data-id="${id}"] .prediction-hint`);
+            if (hint) hint.remove();
+            if (qty <= 0) applyPredictionHintsToDOM();
         }
         const syncTimeouts = {};
         function syncToSupabase(productId, quantity) {
@@ -2535,6 +2734,9 @@
             document.getElementById('productList').innerHTML = f.map(p => {
                 const qty = state.orders[p.id]?.qty || '';
                 const tagsHtml = (p.tags || []).map(t => `<span class="tag-badge">${t}</span>`).join('');
+                const prediction = state.predictions[p.id];
+                const predictionHtml = prediction && !qty ? getPredictionHintHtml(p, prediction) : '';
+                const qtyPlaceholder = prediction && !qty ? formatPredictionQty(prediction.qty) : '0';
                 return `
                 <div class="product-card" data-id="${p.id}" 
                     onmousedown="startLongPress(${p.id}, event)" 
@@ -2555,10 +2757,11 @@
                         <div class="product-location-tag">
                             <i class="fas fa-location-arrow"></i> ${p.location}
                         </div>
+                        ${predictionHtml}
                     </div>
                     <div id="wrapper-${p.id}" class="qty-control">
                         <button class="icon-btn" style="width:32px;height:32px;background:none;" onclick="updateQty(${p.id}, -1)">−</button>
-                        <input type="number" class="card-input-small" style="width:50px;text-align:center;background:none;padding:0;" value="${qty}" placeholder="0" onchange="onQtyChange(${p.id}, this.value)">
+                        <input type="number" class="card-input-small" style="width:50px;text-align:center;background:none;padding:0;" value="${qty}" placeholder="${qtyPlaceholder}" title="${prediction && !qty ? `建议参考 ${formatPredictionQty(prediction.qty)}${p.unit || ''}` : ''}" onchange="onQtyChange(${p.id}, this.value)">
                         <button class="icon-btn" style="width:32px;height:32px;background:none;" onclick="updateQty(${p.id}, 1)">+</button>
                     </div>
                     <span style="margin-left:8px;font-size:14px;color:var(--text-sub);min-width:20px;">${p.unit || '斤'}</span>
@@ -2850,6 +3053,7 @@
                         fetchDayData();
                     } else if (document.getElementById('indexPage').classList.contains('active')) {
                         await fetchProducts();
+                        await fetchOrderPredictions();
                         renderProducts();
                     }
                     await refreshCalendarMarkers();
@@ -2894,6 +3098,7 @@
             // 同时刷新所有数据
             await fetchProducts();
             await fetchCart();
+            await fetchOrderPredictions();
             await refreshCalendarMarkers();
             renderProducts();
             renderLocations();
