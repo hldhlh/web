@@ -77,7 +77,7 @@
             box-shadow: 
                 0 4px 24px -1px rgba(0, 0, 0, 0.2),
                 0 0 1px 0 rgba(255, 255, 255, 0.1) inset;
-            transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+            transition: opacity 0.5s, transform 0.5s, background 0.3s, border-color 0.3s, box-shadow 0.3s;
             cursor: grab;
             display: flex;
             align-items: center;
@@ -227,7 +227,7 @@
             opacity: 0;
             transform: scale(0.95);
             pointer-events: none;
-            transition: all 0.2s cubic-bezier(0.2, 1, 0.3, 1);
+            transition: opacity 0.2s cubic-bezier(0.2, 1, 0.3, 1), transform 0.2s cubic-bezier(0.2, 1, 0.3, 1);
             min-width: 180px;
         }
 
@@ -327,11 +327,15 @@
             cursor: pointer;
             pointer-events: auto;
             user-select: none;
+            font-weight: 400;
+            letter-spacing: 0.05em;
+            fill: rgba(148, 163, 184, 0.8);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
         }
 
         .connection-group:hover .conn-label {
             fill: #fff;
-            text-shadow: 0 0 8px rgba(129, 140, 248, 0.6);
+            filter: drop-shadow(0 0 4px rgba(129, 140, 248, 0.4));
         }
 
         .selection-toolbar {
@@ -349,7 +353,7 @@
             opacity: 0;
             transform: translateY(10px) scale(0.95);
             pointer-events: none;
-            transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+            transition: opacity 0.3s cubic-bezier(0.23, 1, 0.32, 1), transform 0.3s cubic-bezier(0.23, 1, 0.32, 1);
         }
 
         .selection-toolbar.show {
@@ -572,12 +576,12 @@
             <div class="toolbar-divider"></div>
             <div class="toolbar-btn" id="distributeH" title="水平等分">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 21V3M20 21V3M12 7v10M8 12h8"></path>
+                    <path d="M3 2v20M21 2v20M12 5v14"/>
                 </svg>
             </div>
             <div class="toolbar-btn" id="distributeV" title="垂直等分">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 4h18M3 20h18M7 12h10M12 8v8"></path>
+                    <path d="M2 3h20M2 21h20M5 12h14"/>
                 </svg>
             </div>
             <div class="toolbar-divider"></div>
@@ -627,7 +631,8 @@
             interaction: {
                 isPanning: false, isDragging: false, isSelecting: false, isLinking: false,
                 linkingFrom: null, currentTag: null, selectedTags: [], dragOffset: { x: 0, y: 0 },
-                contextEntity: null, contextType: null, lastTap: 0, lastBlurTime: 0
+                contextEntity: null, contextType: null, lastTap: 0, lastBlurTime: 0,
+                targetSpacePos: null, menuSpacePos: null, currentAngle: 0
             },
             trackpad: {
                 zoomSensitivity: 0.0035,
@@ -686,6 +691,11 @@
 
             DOM.grid.style.backgroundSize = `${s1}px ${s1}px, ${s2}px ${s2}px, ${s2}px ${s2}px`;
             DOM.grid.style.backgroundPosition = `${ox}px ${oy}px, ${ox}px ${oy}px, ${ox}px ${oy}px`;
+            
+            // Sync UI elements with canvas transform
+            Input.updatePosition();
+            Toolbar.updatePosition();
+            Menu.updatePosition();
 
             saveViewState();
         }
@@ -731,8 +741,13 @@
             const mouseY = clientY - rect.top - rect.height / 2;
             const prevScale = State.transform.scale;
             const clamped = Math.max(0.02, Math.min(nextScale, 8.0));
-            State.transform.x -= mouseX * (clamped / prevScale - 1);
-            State.transform.y -= mouseY * (clamped / prevScale - 1);
+            
+            // Correct math for zooming at a point (mouseX, mouseY) relative to viewport center:
+            // The point in canvas space is (mouseX - transform.x) / prevScale.
+            // We want this point to stay at mouseX after scaling.
+            const ratio = clamped / prevScale;
+            State.transform.x = mouseX - (mouseX - State.transform.x) * ratio;
+            State.transform.y = mouseY - (mouseY - State.transform.y) * ratio;
             State.transform.scale = clamped;
             updateMatrix();
         }
@@ -741,7 +756,7 @@
             async create(text, x, y, id = null, color = null) {
                 const isNewDb = (id === null);
                 const node = document.createElement('div');
-                node.id = id || `tag-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+                node.id = id || crypto.randomUUID();
                 node.className = 'tag';
                 node.innerHTML = `<span>${text}</span><div class="tag-add-btn"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="2" x2="6" y2="10"></line><line x1="2" y1="6" x2="10" y2="6"></line></svg></div>`;
                 node.style.left = `${x}px`;
@@ -918,12 +933,13 @@
                     const from = document.getElementById(conn.from_id || conn.fromId);
                     const to = document.getElementById(conn.to_id || conn.toId);
                     if (from && to) {
-                        const g = this.drawLine(from, to, false, conn);
+                        const isEditing = (State.interaction.contextType === 'connection' && State.interaction.contextEntity === conn);
+                        const g = this.drawLine(from, to, false, conn, isEditing);
                         if (g) DOM.svgGroup.appendChild(g);
                     }
                 });
             },
-            drawLine(fromNode, toNodeOrPos, isPreview = false, connData = null) {
+            drawLine(fromNode, toNodeOrPos, isPreview = false, connData = null, hideLabel = false) {
                 const getBox = (node) => {
                     const r = node.getBoundingClientRect();
                     const w = r.width / State.transform.scale;
@@ -980,6 +996,7 @@
                     hitLine.style.cursor = "pointer";
                     hitLine.style.pointerEvents = "stroke";
 
+                    hitLine.addEventListener('mousedown', e => e.stopPropagation());
                     hitLine.addEventListener('click', (e) => {
                         e.stopPropagation();
                         const sStart = spaceToScreen(startX, startY);
@@ -988,21 +1005,56 @@
                     });
                     group.appendChild(hitLine);
 
-                    if (connData.label) {
+                    if (connData.label || connData.isEditing) {
+                        const pathId = `p-${connData.id || Math.random().toString(36).substr(2, 9)}`;
+                        path.setAttribute("id", pathId);
+
+                        const displayText = connData.label + (connData.isEditing ? ' |' : '');
+                        const font = "400 12px Outfit, Noto Sans SC, sans-serif";
+                        const tw = getTextWidth(displayText, font);
+
+                        if (connData.isEditing) {
+                            const totalLen = path.getTotalLength();
+                            const highlight = path.cloneNode();
+                            highlight.removeAttribute("id");
+                            highlight.setAttribute("stroke", "rgba(129, 140, 248, 0.25)");
+                            highlight.setAttribute("stroke-width", "22");
+                            highlight.setAttribute("stroke-linecap", "round");
+                            highlight.style.pointerEvents = "none";
+                            
+                            // Use dasharray to only highlight the text area
+                            const dashLen = tw + 20;
+                            const dashOffset = -(totalLen * 0.5 - dashLen / 2);
+                            highlight.setAttribute("stroke-dasharray", `${dashLen} ${totalLen}`);
+                            highlight.setAttribute("stroke-dashoffset", dashOffset);
+                            group.insertBefore(highlight, path);
+                        }
+
                         const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                        text.setAttribute("x", midX); text.setAttribute("y", midY);
-                        text.setAttribute("text-anchor", "middle"); text.setAttribute("dominant-baseline", "middle");
-                        text.setAttribute("fill", "#94a3b8"); text.setAttribute("font-size", "11");
-                        text.setAttribute("dy", "-6");
                         text.setAttribute("class", "conn-label");
-                        text.textContent = connData.label;
+                        if (connData.isEditing) {
+                            text.style.fill = "#fff";
+                            text.style.filter = "drop-shadow(0 0 8px rgba(129, 140, 248, 0.6))";
+                        }
+                        text.setAttribute("dy", "-8");
+
+                        const tp = document.createElementNS("http://www.w3.org/2000/svg", "textPath");
+                        tp.setAttribute("href", `#${pathId}`);
+                        tp.setAttribute("startOffset", "50%");
+                        tp.setAttribute("text-anchor", "middle");
+                        tp.textContent = displayText;
+
+                        text.appendChild(tp);
                         
-                        text.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            const sStart = spaceToScreen(startX, startY);
-                            const sEnd = spaceToScreen(endX, endY);
-                            Input.show((sStart.x + sEnd.x) / 2, (sStart.y + sEnd.y) / 2, connData.label || '', connData, 'connection', 0);
-                        });
+                        text.addEventListener('mousedown', e => e.stopPropagation());
+                        if (!connData.isEditing) {
+                            text.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                const sStart = spaceToScreen(startX, startY);
+                                const sEnd = spaceToScreen(endX, endY);
+                                Input.show((sStart.x + sEnd.x) / 2, (sStart.y + sEnd.y) / 2, connData.label || '', connData, 'connection', 0);
+                            });
+                        }
 
                         group.appendChild(text);
                     }
@@ -1078,9 +1130,15 @@
 
         const Input = {
             show(x, y, text = '', entity = null, type = 'node', angle = 0) {
+                if (DOM.input.style.display !== 'none') {
+                    // Force a blur to trigger saving the previous session
+                    DOM.input.blur();
+                }
+
                 State.interaction.contextEntity = entity;
                 State.interaction.contextType = type;
-                if (!entity) State.interaction.targetSpacePos = screenToSpace(x, y);
+                State.interaction.targetSpacePos = screenToSpace(x, y);
+                State.interaction.currentAngle = angle;
 
                 DOM.input.style.display = 'block';
                 DOM.input.value = text;
@@ -1089,9 +1147,18 @@
                 if (type === 'connection') {
                     DOM.input.style.left = `${x}px`;
                     DOM.input.style.top = `${y}px`;
-                    DOM.input.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
-                    DOM.input.style.textAlign = 'center';
-                    DOM.input.style.width = '200px';
+                    DOM.input.style.opacity = '0'; // Hidden but focused
+                    DOM.input.style.pointerEvents = 'none';
+                    
+                    entity.isEditing = true;
+                    entity.originalLabel = entity.label; // For cancel
+
+                    DOM.input.oninput = () => {
+                        entity.label = DOM.input.value;
+                        LineManager.render();
+                    };
+
+                    LineManager.render();
                 } else if (type === 'node' && entity) {
                     // Match exact position of the span within the tag
                     const span = entity.querySelector('span');
@@ -1136,7 +1203,33 @@
 
                 setTimeout(() => {
                     DOM.input.focus();
+                    const length = DOM.input.value.length;
+                    DOM.input.setSelectionRange(length, length);
                 }, 10);
+            },
+            updatePosition() {
+                if (DOM.input.style.display === 'none') return;
+                const entity = State.interaction.contextEntity;
+                const type = State.interaction.contextType;
+                const angle = State.interaction.currentAngle || 0;
+
+                if (type === 'node' && entity) {
+                    const span = entity.querySelector('span');
+                    const rect = span.getBoundingClientRect();
+                    DOM.input.style.left = `${rect.left}px`;
+                    DOM.input.style.top = `${rect.top}px`;
+                    const baseSize = 1.05 * 16;
+                    DOM.input.style.fontSize = `${baseSize * State.transform.scale}px`;
+                    if (DOM.input.oninput) DOM.input.oninput();
+                } else if (State.interaction.targetSpacePos) {
+                    const pos = spaceToScreen(State.interaction.targetSpacePos.x, State.interaction.targetSpacePos.y);
+                    DOM.input.style.left = `${pos.x}px`;
+                    DOM.input.style.top = `${pos.y}px`;
+                    DOM.input.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+                    if (type === 'connection') {
+                        DOM.input.style.fontSize = `${12 * State.transform.scale}px`;
+                    }
+                }
             },
             hide() {
                 const entity = State.interaction.contextEntity;
@@ -1148,15 +1241,35 @@
                     entity.classList.remove('editing');
                 }
                 
+                if (type === 'connection' && entity) {
+                    if (!State.interaction.didSave) {
+                        entity.label = entity.originalLabel;
+                    }
+                    delete entity.isEditing;
+                    delete entity.originalLabel;
+                }
+
                 DOM.input.style.display = 'none';
                 DOM.input.style.transform = "none";
+                DOM.input.style.background = "transparent";
+                DOM.input.style.backdropFilter = "none";
+                DOM.input.style.padding = "0";
+                DOM.input.style.opacity = "1";
+                DOM.input.style.pointerEvents = "auto";
                 State.interaction.contextEntity = null;
                 State.interaction.contextType = null;
+                State.interaction.targetSpacePos = null;
+                State.interaction.currentAngle = 0;
+                State.interaction.didSave = false;
+                LineManager.render();
             },
             async save() {
+                State.interaction.didSave = true;
                 const val = DOM.input.value.trim();
                 const entity = State.interaction.contextEntity;
                 const type = State.interaction.contextType;
+
+                this.hide(); 
 
                 if (entity) {
                     if (type === 'connection') {
@@ -1182,7 +1295,6 @@
                     }
                 }
                 
-                this.hide(); 
                 LineManager.render();
             }
         };
@@ -1190,6 +1302,7 @@
         const Menu = {
             show(x, y, node) {
                 this.contextEntity = node;
+                State.interaction.menuSpacePos = screenToSpace(x, y);
                 DOM.menu.style.left = `${Math.min(x, window.innerWidth - 200)}px`;
                 DOM.menu.style.top = `${Math.min(y, window.innerHeight - 250)}px`;
                 DOM.menu.classList.add('show');
@@ -1203,6 +1316,13 @@
             hide() { 
                 DOM.menu.classList.remove('show'); 
                 this.contextEntity = null; 
+                State.interaction.menuSpacePos = null;
+            },
+            updatePosition() {
+                if (!DOM.menu.classList.contains('show') || !State.interaction.menuSpacePos) return;
+                const pos = spaceToScreen(State.interaction.menuSpacePos.x, State.interaction.menuSpacePos.y);
+                DOM.menu.style.left = `${Math.min(pos.x, window.innerWidth - 200)}px`;
+                DOM.menu.style.top = `${Math.min(pos.y, window.innerHeight - 250)}px`;
             },
             async changeColor(color) {
                 const node = this.contextEntity;
@@ -1255,6 +1375,20 @@
             },
             hide() {
                 DOM.toolbar.classList.remove('show');
+            },
+            updatePosition() {
+                if (!DOM.toolbar.classList.contains('show')) return;
+                
+                // Calculate bounding box of selected tags
+                let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                State.interaction.selectedTags.forEach(t => {
+                    const r = t.getBoundingClientRect();
+                    minX = Math.min(minX, r.left); maxX = Math.max(maxX, r.right);
+                    minY = Math.min(minY, r.top); maxY = Math.max(maxY, r.bottom);
+                });
+
+                DOM.toolbar.style.left = `${(minX + maxX) / 2}px`;
+                DOM.toolbar.style.top = `${minY - 60}px`;
             },
             async toggleStyle(style) {
                 const node = State.interaction.selectedTags[0];
@@ -1657,9 +1791,9 @@
                         const centerY = TouchState.initialCenter.y - rect.top - rect.height / 2;
 
                         // Calculate new transform based on scale change from current scale
-                        const scaleDiff = newScale / State.transform.scale;
-                        State.transform.x -= centerX * (scaleDiff - 1);
-                        State.transform.y -= centerY * (scaleDiff - 1);
+                        const ratio = newScale / State.transform.scale;
+                        State.transform.x = centerX - (centerX - State.transform.x) * ratio;
+                        State.transform.y = centerY - (centerY - State.transform.y) * ratio;
                         State.transform.scale = newScale;
                     }
 
