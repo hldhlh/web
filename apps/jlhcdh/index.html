@@ -2047,11 +2047,6 @@
                 }
                 if (!product || !prediction || hasQty) return;
 
-                if (input) {
-                    input.placeholder = formatPredictionQty(prediction.qty);
-                    input.title = `建议参考 ${formatPredictionQty(prediction.qty)}${product.unit || ''}`;
-                }
-
                 const locTag = card.querySelector('.product-location-tag');
                 if (!locTag) return;
                 locTag.insertAdjacentHTML('afterend', getPredictionHintHtml(product, prediction));
@@ -2736,7 +2731,7 @@
                 const tagsHtml = (p.tags || []).map(t => `<span class="tag-badge">${t}</span>`).join('');
                 const prediction = state.predictions[p.id];
                 const predictionHtml = prediction && !qty ? getPredictionHintHtml(p, prediction) : '';
-                const qtyPlaceholder = prediction && !qty ? formatPredictionQty(prediction.qty) : '0';
+                const qtyPlaceholder = '0';
                 return `
                 <div class="product-card" data-id="${p.id}" 
                     onmousedown="startLongPress(${p.id}, event)" 
@@ -2761,7 +2756,7 @@
                     </div>
                     <div id="wrapper-${p.id}" class="qty-control">
                         <button class="icon-btn" style="width:32px;height:32px;background:none;" onclick="updateQty(${p.id}, -1)">−</button>
-                        <input type="number" class="card-input-small" style="width:50px;text-align:center;background:none;padding:0;" value="${qty}" placeholder="${qtyPlaceholder}" title="${prediction && !qty ? `建议参考 ${formatPredictionQty(prediction.qty)}${p.unit || ''}` : ''}" onchange="onQtyChange(${p.id}, this.value)">
+                        <input type="number" class="card-input-small" style="width:50px;text-align:center;background:none;padding:0;" value="${qty}" placeholder="${qtyPlaceholder}" onchange="onQtyChange(${p.id}, this.value)">
                         <button class="icon-btn" style="width:32px;height:32px;background:none;" onclick="updateQty(${p.id}, 1)">+</button>
                     </div>
                     <span style="margin-left:8px;font-size:14px;color:var(--text-sub);min-width:20px;">${p.unit || '斤'}</span>
