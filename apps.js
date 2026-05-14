@@ -1,9 +1,9 @@
-﻿export async function getAppDirectories() {
+export async function getAppDirectories() {
   return [
     { name: "节假日日历", path: "calendar/index.html" },
     { name: "待办事项", path: "todo/index.html" },
     { name: "图片转换", path: "image-converter/index.html" },
-    { name: "思维导图", path: "mindmap/index.html" },
+    { name: "思维矩阵", path: "wordcanvas/index.html" },
     { name: "云盘", path: "cloud/index.html" },
     { name: "吃什么", path: "eatwhat/index.html" },
     { name: "今岭笔记", path: "jlbj/index.html" },
