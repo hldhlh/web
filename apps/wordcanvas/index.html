@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>WordCanvas | 无限灵感矩阵</title>
+    <title>思维矩阵</title>
     <script src="https://cdn.staticfile.org/tailwindcss/2.2.19/tailwind.min.js"></script>
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;400&family=Noto+Sans+SC:wght@200;400&display=swap"
@@ -265,10 +265,22 @@
             transition: all 0.3s ease;
         }
 
-        .connection-line:hover {
+        .connection-group:hover .connection-line {
             stroke: var(--primary);
             stroke-width: 2;
             opacity: 1;
+        }
+
+        .conn-label {
+            transition: all 0.3s ease;
+            cursor: pointer;
+            pointer-events: auto;
+            user-select: none;
+        }
+
+        .connection-group:hover .conn-label {
+            fill: #fff;
+            text-shadow: 0 0 8px rgba(129, 140, 248, 0.6);
         }
 
         .selection-toolbar {
@@ -679,14 +691,16 @@
                     const parentY = parseFloat(node.dataset.y);
                     const parentW = node.offsetWidth;
                     
-                    let newY = parentY;
-                    if (children.length > 0) {
-                        const maxY = Math.max(...children.map(c => parseFloat(c.dataset.y)));
-                        newY = maxY + 80; // Standard 80px vertical gap
-                    }
-                    
                     const newX = Math.round((parentX + parentW + 120) / 40) * 40;
-                    newY = Math.round(newY / 40) * 40;
+                    let newY;
+                    if (children.length === 0) {
+                        // First child: align with parent's top exactly
+                        newY = parentY;
+                    } else {
+                        // Subsequent children: place below the last child and snap to grid
+                        const maxY = Math.max(...children.map(c => parseFloat(c.dataset.y)));
+                        newY = Math.round((maxY + 80) / 40) * 40;
+                    }
                     
                     const newNode = await Tag.create('', newX, newY);
                     
@@ -706,14 +720,26 @@
                 });
                 this.bind(node);
                 DOM.content.appendChild(node);
-
-                if (!id) {
-                    node.classList.add('new');
-                    const { data, error } = await SyncManager.wrap(_client.from('canvas_nodes').insert({ text, x, y }).select().single());
-                    if (!error && data) node.id = data.id;
-                    setTimeout(() => node.classList.remove('new'), 1000);
-                }
                 return node;
+            },
+            async deleteRecursive(nodeId) {
+                // Find all child connections
+                const children = State.connections.filter(c => c.from_id === nodeId);
+                
+                // Recursively delete children first
+                for (const conn of children) {
+                    await this.deleteRecursive(conn.to_id);
+                }
+                
+                // Delete the node itself from DB
+                await SyncManager.wrap(_client.from('canvas_nodes').delete().eq('id', nodeId));
+                
+                // Locally remove
+                const node = document.getElementById(nodeId);
+                if (node) node.remove();
+                
+                // Remove connections from state
+                State.connections = State.connections.filter(c => c.from_id !== nodeId && c.to_id !== nodeId);
             },
             bind(node) {
                 node.addEventListener('mousedown', e => {
@@ -838,6 +864,7 @@
                 const endY = b2.cy;
 
                 const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                group.setAttribute("class", "connection-group");
                 const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
                 
                 // Mind-map Style S-Curve (Cubic Bezier)
@@ -879,8 +906,16 @@
                         text.setAttribute("text-anchor", "middle"); text.setAttribute("dominant-baseline", "middle");
                         text.setAttribute("fill", "#94a3b8"); text.setAttribute("font-size", "11");
                         text.setAttribute("dy", "-6");
+                        text.setAttribute("class", "conn-label");
                         text.textContent = connData.label;
-                        text.style.pointerEvents = "none";
+                        
+                        text.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const sStart = spaceToScreen(startX, startY);
+                            const sEnd = spaceToScreen(endX, endY);
+                            Input.show((sStart.x + sEnd.x) / 2, (sStart.y + sEnd.y) / 2, connData.label || '', connData, 'connection', 0);
+                        });
+
                         group.appendChild(text);
                     }
                 }
@@ -984,6 +1019,10 @@
                         const textWidth = getTextWidth(DOM.input.value, font);
                         DOM.input.style.width = `${Math.max(textWidth + 10, rect.width, 20)}px`;
                     };
+
+                    // Sync font size with zoomed node
+                    const baseSize = 1.05 * 16; // 1.05rem in pixels
+                    DOM.input.style.fontSize = `${baseSize * State.transform.scale}px`;
 
                     DOM.input.oninput = updateWidth;
 
@@ -1191,8 +1230,7 @@
                 const tags = [...State.interaction.selectedTags];
                 Toolbar.hide();
                 for (const t of tags) {
-                    await SyncManager.wrap(_client.from('canvas_nodes').delete().eq('id', t.id));
-                    t.remove();
+                    await Tag.deleteRecursive(t.id);
                 }
                 Tag.deselect();
                 LineManager.render();
@@ -1351,10 +1389,10 @@
             window.addEventListener('keydown', e => {
                 if ((e.key === 'Delete' || e.key === 'Backspace') && State.interaction.selectedTags.length > 0 && document.activeElement !== DOM.input) {
                     State.interaction.selectedTags.forEach(async t => {
-                        await SyncManager.wrap(_client.from('canvas_nodes').delete().eq('id', t.id));
-                        t.remove();
+                        await Tag.deleteRecursive(t.id);
+                        LineManager.render();
                     });
-                    State.interaction.selectedTags = []; LineManager.render();
+                    State.interaction.selectedTags = [];
                 }
             });
 
@@ -1364,8 +1402,8 @@
             document.getElementById('menuDelete').addEventListener('click', async () => {
                 const node = State.interaction.contextEntity;
                 if (node && State.interaction.contextType === 'node') {
-                    await SyncManager.wrap(_client.from('canvas_nodes').delete().eq('id', node.id));
-                    node.remove(); Tag.deselect(); LineManager.render();
+                    await Tag.deleteRecursive(node.id);
+                    Tag.deselect(); LineManager.render();
                 }
                 Menu.hide();
             });
