@@ -1851,14 +1851,6 @@
                 } else if (dur < 250 && e.target === DOM.viewport) {
                     if (Date.now() - State.interaction.lastBlurTime > 200) {
                         Tag.deselect();
-                        const spacePos = screenToSpace(e.clientX, e.clientY);
-                        const newNode = await Tag.create('', spacePos.x, spacePos.y);
-                        newNode.dataset.isNew = 'true';
-                        Tag.select(newNode);
-                        setTimeout(() => {
-                            const r = newNode.getBoundingClientRect();
-                            Input.show(r.left + r.width / 2, r.top + r.height / 2, '', newNode, 'node');
-                        }, 10);
                     }
                 }
             });
@@ -1956,7 +1948,20 @@
                 });
             });
 
-            document.addEventListener('contextmenu', e => e.preventDefault());
+            document.addEventListener('contextmenu', async e => {
+                e.preventDefault();
+                if (e.target.closest('.tag') || e.target.closest('.selection-toolbar') || e.target.closest('.minimal-menu')) return;
+                
+                Tag.deselect();
+                const spacePos = screenToSpace(e.clientX, e.clientY);
+                const newNode = await Tag.create('', spacePos.x, spacePos.y);
+                newNode.dataset.isNew = 'true';
+                Tag.select(newNode);
+                setTimeout(() => {
+                    const r = newNode.getBoundingClientRect();
+                    Input.show(r.left + r.width / 2, r.top + r.height / 2, '', newNode, 'node');
+                }, 10);
+            });
             window.addEventListener('resize', updateMatrix);
 
             // ========== Mobile Touch Support ==========
@@ -2121,35 +2126,9 @@
                             State.interaction.currentTag.classList.remove('dragging');
                         }
                     } else if (duration < 300 && !e.target.closest('.tag') && !e.target.closest('.selection-toolbar') && !e.target.closest('.minimal-menu')) {
-                        // Quick tap - check for double tap
-                        const now = Date.now();
-                        const tapX = State.mouse.startX;
-                        const tapY = State.mouse.startY;
-                        const timeDiff = now - TouchState.lastTapTime;
-                        const posDiff = Math.sqrt(
-                            Math.pow(tapX - TouchState.lastTapPos.x, 2) +
-                            Math.pow(tapY - TouchState.lastTapPos.y, 2)
-                        );
-
-                        if (timeDiff < 400 && posDiff < 50) {
-                            // Double tap - create new node
-                            Tag.deselect();
-                            const spacePos = screenToSpace(tapX, tapY);
-                            const newNode = await Tag.create('', spacePos.x, spacePos.y);
-                            newNode.dataset.isNew = 'true';
-                            Tag.select(newNode);
-                            setTimeout(() => {
-                                const r = newNode.getBoundingClientRect();
-                                Input.show(r.left + r.width / 2, r.top + r.height / 2, '', newNode, 'node');
-                            }, 10);
-                            TouchState.lastTapTime = 0; // Reset
-                        } else {
-                            // Single tap - record for potential double tap
-                            TouchState.lastTapTime = now;
-                            TouchState.lastTapPos = { x: tapX, y: tapY };
-                            // Also deselect on single tap on empty area
-                            Tag.deselect();
-                        }
+                        // Tap on empty area - just deselect
+                        Tag.deselect();
+                        TouchState.lastTapTime = 0;
                     }
                 }
             }, { passive: false });
