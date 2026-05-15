@@ -1405,7 +1405,7 @@
                     DOM.input.focus();
                     const length = DOM.input.value.length;
                     DOM.input.setSelectionRange(length, length);
-                }, 10);
+                }, 100);
             },
             updatePosition() {
                 if (DOM.input.style.display === 'none') return;
@@ -1894,7 +1894,9 @@
                 }
             });
 
-            document.getElementById('menuEdit').addEventListener('click', () => {
+            document.getElementById('menuEdit').addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 const entity = Menu.contextEntity;
                 const type = Menu.contextType || 'node';
                 if (entity) {
