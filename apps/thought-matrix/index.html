@@ -334,6 +334,8 @@
             box-shadow: 0 4px 20px rgba(100, 116, 139, 0.15);
         }
 
+        .bg-none { background-color: transparent; border: 1px solid rgba(255, 255, 255, 0.4) !important; position: relative; }
+        .bg-none::after { content: ''; position: absolute; top: 50%; left: 50%; width: 100%; height: 1px; background: rgba(255, 255, 255, 0.4); transform: translate(-50%, -50%) rotate(45deg); }
         .bg-c1 { background-color: #E91E63; }
         .tag.color-c1 { --c-bg: rgba(233, 30, 99, 0.85); --c-border: #E91E63; --c-shadow: rgba(233, 30, 99, 0.4); --c-shadow-hover: rgba(233, 30, 99, 0.6); }
         .bg-c2 { background-color: #C2185B; }
@@ -377,7 +379,6 @@
             stroke: var(--primary);
             stroke-width: 2;
             opacity: 1;
-            marker-end: url(#arrowHeadHover);
         }
 
         .conn-label {
@@ -572,10 +573,7 @@
                         <stop offset="100%" stop-color="#c084fc" />
                     </linearGradient>
                     <marker id="arrowHead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
-                        <path d="M0,0 L0,6 L9,3 z" fill="rgba(255, 255, 255, 0.15)" />
-                    </marker>
-                    <marker id="arrowHeadHover" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
-                        <path d="M0,0 L0,6 L9,3 z" fill="var(--primary)" />
+                        <path d="M0,0 L9,3 L0,6 L2,3 z" fill="context-stroke" />
                     </marker>
                 </defs>
                 <g id="lineGroups"></g>
@@ -697,6 +695,7 @@
         </div>
         <div class="menu-separator"></div>
         <div class="color-picker">
+            <div class="color-dot bg-none" data-color="none" title="无颜色"></div>
             <div class="color-dot bg-c1" data-color="c1"></div>
             <div class="color-dot bg-c2" data-color="c2"></div>
             <div class="color-dot bg-c3" data-color="c3"></div>
@@ -881,6 +880,7 @@
                     }
 
                     const newNode = await Tag.create('', newX, newY);
+                    newNode.dataset.isNew = 'true';
 
                     // Create connection
                     const conn = { from_id: node.id, to_id: newNode.id };
@@ -1064,7 +1064,9 @@
                 const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
 
                 // Mind-map Style S-Curve (Cubic Bezier)
-                const offset = Math.max(Math.abs(endX - startX) * 0.5, 40);
+                const distX = Math.abs(endX - startX);
+                const distY = Math.abs(endY - startY);
+                const offset = Math.max(distX * 0.5, distY * 0.3, 40);
                 const cp1x = startX + (isRight ? offset : -offset);
                 const cp2x = endX + (isRight ? -offset : offset);
 
@@ -1073,7 +1075,10 @@
                 path.setAttribute("d", d);
                 path.setAttribute("class", isPreview ? "connection-line line-preview" : "connection-line");
                 if (!isPreview) path.setAttribute("marker-end", "url(#arrowHead)");
-                if (connData && connData.color) path.style.stroke = connData.color;
+                if (connData && connData.color) {
+                    const colorMap = { c1: '#E91E63', c2: '#C2185B', c3: '#9C27B0', c4: '#5727B0', c5: '#272AB0', c6: '#276BB0', c7: '#57ACDC', c8: '#57DCBE', c9: '#60C689' };
+                    path.style.stroke = colorMap[connData.color] || connData.color;
+                }
 
                 group.appendChild(path);
 
@@ -1090,6 +1095,10 @@
                     hitLine.style.pointerEvents = "stroke";
 
                     hitLine.addEventListener('mousedown', e => e.stopPropagation());
+                    hitLine.addEventListener('contextmenu', (e) => {
+                        e.preventDefault(); e.stopPropagation();
+                        Menu.show(e.clientX, e.clientY, connData, 'connection');
+                    });
                     hitLine.addEventListener('click', (e) => {
                         e.stopPropagation();
                         const sStart = spaceToScreen(startX, startY);
@@ -1140,6 +1149,10 @@
                         text.appendChild(tp);
 
                         text.addEventListener('mousedown', e => e.stopPropagation());
+                        text.addEventListener('contextmenu', (e) => {
+                            e.preventDefault(); e.stopPropagation();
+                            Menu.show(e.clientX, e.clientY, connData, 'connection');
+                        });
                         if (!connData.isEditing) {
                             text.addEventListener('click', (e) => {
                                 e.stopPropagation();
@@ -1378,6 +1391,9 @@
                             await SyncManager.wrap(_client.from('canvas_nodes').update({ text: val }).eq('id', entity.id));
                         } else {
                             if (isNew) {
+                                entity.remove();
+                                State.connections = State.connections.filter(c => c.from_id !== entity.id && c.to_id !== entity.id);
+                                LineManager.render();
                                 await Tag.deleteRecursive(entity.id);
                                 Tag.deselect();
                             } else {
@@ -1393,22 +1409,39 @@
         };
 
         const Menu = {
-            show(x, y, node) {
-                this.contextEntity = node;
+            show(x, y, entity, type = 'node') {
+                this.contextEntity = entity;
+                this.contextType = type;
                 State.interaction.menuSpacePos = screenToSpace(x, y);
                 DOM.menu.style.left = `${Math.min(x, window.innerWidth - 200)}px`;
                 DOM.menu.style.top = `${Math.min(y, window.innerHeight - 250)}px`;
                 DOM.menu.classList.add('show');
 
+                document.getElementById('menuConnect').style.display = type === 'node' ? 'flex' : 'none';
+
                 // Mark current color
                 DOM.menu.querySelectorAll('.color-dot').forEach(dot => {
                     const color = dot.dataset.color;
-                    dot.classList.toggle('selected', node.classList.contains(`color-${color}`));
+                    if (type === 'node') {
+                        if (color === 'none') {
+                            const hasColor = Array.from(entity.classList).some(c => c.startsWith('color-'));
+                            dot.classList.toggle('selected', !hasColor);
+                        } else {
+                            dot.classList.toggle('selected', entity.classList.contains(`color-${color}`));
+                        }
+                    } else if (type === 'connection') {
+                        if (color === 'none') {
+                            dot.classList.toggle('selected', !entity.color);
+                        } else {
+                            dot.classList.toggle('selected', entity.color === color);
+                        }
+                    }
                 });
             },
             hide() {
                 DOM.menu.classList.remove('show');
                 this.contextEntity = null;
+                this.contextType = null;
                 State.interaction.menuSpacePos = null;
             },
             updatePosition() {
@@ -1418,17 +1451,26 @@
                 DOM.menu.style.top = `${Math.min(pos.y, window.innerHeight - 250)}px`;
             },
             async changeColor(color) {
-                const node = this.contextEntity;
-                if (!node) return;
+                const entity = this.contextEntity;
+                const type = this.contextType || 'node';
+                if (!entity) return;
 
-                // Remove existing colors
-                ['orange', 'blue', 'purple', 'green', 'grey', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'].forEach(c => node.classList.remove(`color-${c}`));
+                if (type === 'node') {
+                    // Remove existing colors
+                    ['orange', 'blue', 'purple', 'green', 'grey', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'].forEach(c => entity.classList.remove(`color-${c}`));
 
-                // Add new color
-                node.classList.add(`color-${color}`);
+                    if (color !== 'none') {
+                        // Add new color
+                        entity.classList.add(`color-${color}`);
+                    }
 
-                // Sync to DB
-                await SyncManager.wrap(_client.from('canvas_nodes').update({ color: color }).eq('id', node.id));
+                    // Sync to DB
+                    await SyncManager.wrap(_client.from('canvas_nodes').update({ color: color === 'none' ? null : color }).eq('id', entity.id));
+                } else if (type === 'connection') {
+                    entity.color = color === 'none' ? null : color;
+                    LineManager.render();
+                    await SyncManager.wrap(_client.from('canvas_connections').update({ color: color === 'none' ? null : color }).eq('id', entity.id));
+                }
                 this.hide();
             }
         };
@@ -1767,16 +1809,31 @@
             });
 
             document.getElementById('menuEdit').addEventListener('click', () => {
-                const node = Menu.contextEntity;
-                if (node) {
-                    const rect = node.getBoundingClientRect();
-                    Input.show(rect.left + rect.width / 2, rect.top + rect.height / 2, node.querySelector('span').textContent, node);
+                const entity = Menu.contextEntity;
+                const type = Menu.contextType || 'node';
+                if (entity) {
+                    if (type === 'node') {
+                        const rect = entity.getBoundingClientRect();
+                        Input.show(rect.left + rect.width / 2, rect.top + rect.height / 2, entity.querySelector('span').textContent, entity, 'node');
+                    } else if (type === 'connection') {
+                        const fromNode = document.getElementById(entity.from_id);
+                        const toNode = document.getElementById(entity.to_id);
+                        if (fromNode && toNode) {
+                            const startX = parseFloat(fromNode.dataset.x) + fromNode.offsetWidth/2;
+                            const startY = parseFloat(fromNode.dataset.y) + fromNode.offsetHeight/2;
+                            const endX = parseFloat(toNode.dataset.x) + toNode.offsetWidth/2;
+                            const endY = parseFloat(toNode.dataset.y) + toNode.offsetHeight/2;
+                            const sStart = spaceToScreen(startX, startY);
+                            const sEnd = spaceToScreen(endX, endY);
+                            Input.show((sStart.x + sEnd.x) / 2, (sStart.y + sEnd.y) / 2, entity.label || '', entity, 'connection', 0);
+                        }
+                    }
                 }
                 Menu.hide();
             });
             document.getElementById('menuConnect').addEventListener('click', () => {
                 const node = Menu.contextEntity;
-                if (node) {
+                if (node && Menu.contextType !== 'connection') {
                     State.mouse.startTime = Date.now();
                     State.interaction.isLinking = true;
                     State.interaction.linkingFrom = node;
@@ -1784,10 +1841,17 @@
                 Menu.hide();
             });
             document.getElementById('menuDelete').addEventListener('click', async () => {
-                const node = Menu.contextEntity;
-                if (node) {
-                    await Tag.deleteRecursive(node.id);
-                    Tag.deselect(); LineManager.render();
+                const entity = Menu.contextEntity;
+                const type = Menu.contextType || 'node';
+                if (entity) {
+                    if (type === 'node') {
+                        await Tag.deleteRecursive(entity.id);
+                        Tag.deselect(); LineManager.render();
+                    } else if (type === 'connection') {
+                        State.connections = State.connections.filter(c => c.id !== entity.id);
+                        LineManager.render();
+                        await SyncManager.wrap(_client.from('canvas_connections').delete().eq('id', entity.id));
+                    }
                 }
                 Menu.hide();
             });
