@@ -334,26 +334,121 @@
             box-shadow: 0 4px 20px rgba(100, 116, 139, 0.15);
         }
 
-        .bg-none { background-color: transparent; border: 1px solid rgba(255, 255, 255, 0.4) !important; position: relative; }
-        .bg-none::after { content: ''; position: absolute; top: 50%; left: 50%; width: 100%; height: 1px; background: rgba(255, 255, 255, 0.4); transform: translate(-50%, -50%) rotate(45deg); }
-        .bg-c1 { background-color: #E91E63; }
-        .tag.color-c1 { --c-bg: rgba(233, 30, 99, 0.85); --c-border: #E91E63; --c-shadow: rgba(233, 30, 99, 0.4); --c-shadow-hover: rgba(233, 30, 99, 0.6); }
-        .bg-c2 { background-color: #C2185B; }
-        .tag.color-c2 { --c-bg: rgba(194, 24, 91, 0.85); --c-border: #C2185B; --c-shadow: rgba(194, 24, 91, 0.4); --c-shadow-hover: rgba(194, 24, 91, 0.6); }
-        .bg-c3 { background-color: #9C27B0; }
-        .tag.color-c3 { --c-bg: rgba(156, 39, 176, 0.85); --c-border: #9C27B0; --c-shadow: rgba(156, 39, 176, 0.4); --c-shadow-hover: rgba(156, 39, 176, 0.6); }
-        .bg-c4 { background-color: #5727B0; }
-        .tag.color-c4 { --c-bg: rgba(87, 39, 176, 0.85); --c-border: #5727B0; --c-shadow: rgba(87, 39, 176, 0.4); --c-shadow-hover: rgba(87, 39, 176, 0.6); }
-        .bg-c5 { background-color: #272AB0; }
-        .tag.color-c5 { --c-bg: rgba(39, 42, 176, 0.85); --c-border: #272AB0; --c-shadow: rgba(39, 42, 176, 0.4); --c-shadow-hover: rgba(39, 42, 176, 0.6); }
-        .bg-c6 { background-color: #276BB0; }
-        .tag.color-c6 { --c-bg: rgba(39, 107, 176, 0.85); --c-border: #276BB0; --c-shadow: rgba(39, 107, 176, 0.4); --c-shadow-hover: rgba(39, 107, 176, 0.6); }
-        .bg-c7 { background-color: #57ACDC; }
-        .tag.color-c7 { --c-bg: rgba(87, 172, 220, 0.85); --c-border: #57ACDC; --c-shadow: rgba(87, 172, 220, 0.4); --c-shadow-hover: rgba(87, 172, 220, 0.6); }
-        .bg-c8 { background-color: #57DCBE; }
-        .tag.color-c8 { --c-bg: rgba(87, 220, 190, 0.85); --c-border: #57DCBE; --c-shadow: rgba(87, 220, 190, 0.4); --c-shadow-hover: rgba(87, 220, 190, 0.6); }
-        .bg-c9 { background-color: #60C689; }
-        .tag.color-c9 { --c-bg: rgba(96, 198, 137, 0.85); --c-border: #60C689; --c-shadow: rgba(96, 198, 137, 0.4); --c-shadow-hover: rgba(96, 198, 137, 0.6); }
+        .bg-none {
+            background-color: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.4) !important;
+            position: relative;
+        }
+
+        .bg-none::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 100%;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.4);
+            transform: translate(-50%, -50%) rotate(45deg);
+        }
+
+        .bg-c1 {
+            background-color: #E91E63;
+        }
+
+        .tag.color-c1 {
+            --c-bg: rgba(233, 30, 99, 0.85);
+            --c-border: #E91E63;
+            --c-shadow: rgba(233, 30, 99, 0.4);
+            --c-shadow-hover: rgba(233, 30, 99, 0.6);
+        }
+
+        .bg-c2 {
+            background-color: #C2185B;
+        }
+
+        .tag.color-c2 {
+            --c-bg: rgba(194, 24, 91, 0.85);
+            --c-border: #C2185B;
+            --c-shadow: rgba(194, 24, 91, 0.4);
+            --c-shadow-hover: rgba(194, 24, 91, 0.6);
+        }
+
+        .bg-c3 {
+            background-color: #9C27B0;
+        }
+
+        .tag.color-c3 {
+            --c-bg: rgba(156, 39, 176, 0.85);
+            --c-border: #9C27B0;
+            --c-shadow: rgba(156, 39, 176, 0.4);
+            --c-shadow-hover: rgba(156, 39, 176, 0.6);
+        }
+
+        .bg-c4 {
+            background-color: #5727B0;
+        }
+
+        .tag.color-c4 {
+            --c-bg: rgba(87, 39, 176, 0.85);
+            --c-border: #5727B0;
+            --c-shadow: rgba(87, 39, 176, 0.4);
+            --c-shadow-hover: rgba(87, 39, 176, 0.6);
+        }
+
+        .bg-c5 {
+            background-color: #272AB0;
+        }
+
+        .tag.color-c5 {
+            --c-bg: rgba(39, 42, 176, 0.85);
+            --c-border: #272AB0;
+            --c-shadow: rgba(39, 42, 176, 0.4);
+            --c-shadow-hover: rgba(39, 42, 176, 0.6);
+        }
+
+        .bg-c6 {
+            background-color: #276BB0;
+        }
+
+        .tag.color-c6 {
+            --c-bg: rgba(39, 107, 176, 0.85);
+            --c-border: #276BB0;
+            --c-shadow: rgba(39, 107, 176, 0.4);
+            --c-shadow-hover: rgba(39, 107, 176, 0.6);
+        }
+
+        .bg-c7 {
+            background-color: #57ACDC;
+        }
+
+        .tag.color-c7 {
+            --c-bg: rgba(87, 172, 220, 0.85);
+            --c-border: #57ACDC;
+            --c-shadow: rgba(87, 172, 220, 0.4);
+            --c-shadow-hover: rgba(87, 172, 220, 0.6);
+        }
+
+        .bg-c8 {
+            background-color: #57DCBE;
+        }
+
+        .tag.color-c8 {
+            --c-bg: rgba(87, 220, 190, 0.85);
+            --c-border: #57DCBE;
+            --c-shadow: rgba(87, 220, 190, 0.4);
+            --c-shadow-hover: rgba(87, 220, 190, 0.6);
+        }
+
+        .bg-c9 {
+            background-color: #60C689;
+        }
+
+        .tag.color-c9 {
+            --c-bg: rgba(96, 198, 137, 0.85);
+            --c-border: #60C689;
+            --c-shadow: rgba(96, 198, 137, 0.4);
+            --c-shadow-hover: rgba(96, 198, 137, 0.6);
+        }
 
         .tag[class*="color-c"] {
             background: var(--c-bg) !important;
@@ -572,8 +667,9 @@
                         <stop offset="0%" stop-color="#818cf8" />
                         <stop offset="100%" stop-color="#c084fc" />
                     </linearGradient>
-                    <marker id="arrowHead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
-                        <path d="M0,0 L9,3 L0,6 L2,3 z" fill="context-stroke" />
+                    <marker id="arrowHead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"
+                        markerUnits="strokeWidth">
+                        <path d="M0,0 L0,6 L9,3 z" fill="context-stroke" />
                     </marker>
                 </defs>
                 <g id="lineGroups"></g>
@@ -1064,9 +1160,7 @@
                 const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
 
                 // Mind-map Style S-Curve (Cubic Bezier)
-                const distX = Math.abs(endX - startX);
-                const distY = Math.abs(endY - startY);
-                const offset = Math.max(distX * 0.5, distY * 0.3, 40);
+                const offset = Math.max(Math.abs(endX - startX) * 0.5, 40);
                 const cp1x = startX + (isRight ? offset : -offset);
                 const cp2x = endX + (isRight ? -offset : offset);
 
@@ -1819,10 +1913,10 @@
                         const fromNode = document.getElementById(entity.from_id);
                         const toNode = document.getElementById(entity.to_id);
                         if (fromNode && toNode) {
-                            const startX = parseFloat(fromNode.dataset.x) + fromNode.offsetWidth/2;
-                            const startY = parseFloat(fromNode.dataset.y) + fromNode.offsetHeight/2;
-                            const endX = parseFloat(toNode.dataset.x) + toNode.offsetWidth/2;
-                            const endY = parseFloat(toNode.dataset.y) + toNode.offsetHeight/2;
+                            const startX = parseFloat(fromNode.dataset.x) + fromNode.offsetWidth / 2;
+                            const startY = parseFloat(fromNode.dataset.y) + fromNode.offsetHeight / 2;
+                            const endX = parseFloat(toNode.dataset.x) + toNode.offsetWidth / 2;
+                            const endY = parseFloat(toNode.dataset.y) + toNode.offsetHeight / 2;
                             const sStart = spaceToScreen(startX, startY);
                             const sEnd = spaceToScreen(endX, endY);
                             Input.show((sStart.x + sEnd.x) / 2, (sStart.y + sEnd.y) / 2, entity.label || '', entity, 'connection', 0);
