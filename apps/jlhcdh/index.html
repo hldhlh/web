@@ -1393,7 +1393,10 @@
                 <i class="fas fa-search"></i>
                 <input type="text" id="adminSearchInput" placeholder="搜索名称或定位...">
             </div>
-            <select id="adminLocFilter" class="select-custom"></select>
+            <div style="display: flex; gap: 8px;">
+                <select id="adminLocFilter" class="select-custom" style="flex: 1;"></select>
+                <button class="select-custom" style="padding: 0 12px; display: flex; align-items: center; justify-content: center;" onclick="openCategoryManager()" title="管理商品定位"><i class="fas fa-cog"></i></button>
+            </div>
         </div>
 
         <main class="admin-main">
@@ -1425,15 +1428,50 @@
     </div>
 
     <!-- Modals -->
+    <!-- 商品定位管理模态框 -->
+    <div id="categoryManagerModal" class="modal">
+        <div class="modal-card">
+            <h3 style="margin-bottom:24px;text-align:center;">管理商品定位</h3>
+            
+            <div style="margin-bottom: 16px; display: flex; gap: 8px;">
+                <input type="text" id="newCategoryName" class="card-input-small" placeholder="输入新定位名称" style="flex: 1;">
+                <button type="button" class="btn-delete" style="width: auto; padding: 0 16px; background: var(--primary); color: white;" onclick="addCategory()">
+                    添加
+                </button>
+            </div>
+
+            <div id="categoryList" style="max-height: 400px; overflow-y: auto; margin-bottom: 24px; display: flex; flex-direction: column; gap: 8px;">
+                <!-- list items here -->
+            </div>
+
+            <div style="display:flex; justify-content: center;">
+                <button type="button" class="btn-delete" style="background:#f2f2f7;color:#1d1d1f; width: 100%;"
+                    onclick="closeCategoryManager()">关闭</button>
+            </div>
+        </div>
+    </div>
+
     <div id="editModal" class="modal">
         <div class="modal-card">
             <h3 style="margin-bottom:24px;text-align:center;">添加新商品</h3>
             <form id="productForm">
                 <div class="card-field" style="margin-bottom:16px;">
                     <label class="card-label">商品定位</label>
-                    <input type="text" id="editLocation" class="card-input-small" list="locList" required
-                        placeholder="如：生鲜蔬菜">
-                    <datalist id="locList"></datalist>
+                    <div style="display: flex; gap: 8px;">
+                        <select id="editLocationSelect" class="card-input-small" style="flex: 1;" onchange="
+                            if(this.value === '_custom_') {
+                                document.getElementById('editLocation').style.display = 'block';
+                                document.getElementById('editLocation').value = '';
+                                document.getElementById('editLocation').focus();
+                            } else {
+                                document.getElementById('editLocation').style.display = 'none';
+                                document.getElementById('editLocation').value = this.value;
+                            }
+                        ">
+                        </select>
+                        <input type="text" id="editLocation" class="card-input-small" required
+                            placeholder="输入新定位" style="flex: 1; display: none;">
+                    </div>
                 </div>
                 <div class="card-field" style="margin-bottom:16px;">
                     <label class="card-label">名称</label>
@@ -1464,8 +1502,21 @@
                 </div>
                 <div class="card-field" style="margin-bottom:16px;">
                     <label class="card-label">定位</label>
-                    <input type="text" id="editProductLocation" class="card-input-small" list="locListEdit" required>
-                    <datalist id="locListEdit"></datalist>
+                    <div style="display: flex; gap: 8px;">
+                        <select id="editProductLocationSelect" class="card-input-small" style="flex: 1;" onchange="
+                            if(this.value === '_custom_') {
+                                document.getElementById('editProductLocation').style.display = 'block';
+                                document.getElementById('editProductLocation').value = '';
+                                document.getElementById('editProductLocation').focus();
+                            } else {
+                                document.getElementById('editProductLocation').style.display = 'none';
+                                document.getElementById('editProductLocation').value = this.value;
+                            }
+                        ">
+                        </select>
+                        <input type="text" id="editProductLocation" class="card-input-small" required
+                            placeholder="输入新定位" style="flex: 1; display: none;">
+                    </div>
                 </div>
                 <div class="card-field" style="margin-bottom:16px;">
                     <label class="card-label">单位</label>
@@ -2227,10 +2278,154 @@
             fetchDayData();
             renderProducts();
         };
+        function getDynamicLocations() {
+            return [...new Set(state.products.map(p => p.location))].filter(l => l && l.trim());
+        }
+
+        function getAllLocations() {
+            const dynamicLocs = getDynamicLocations();
+            const customCategories = JSON.parse(localStorage.getItem('jlhcdh_custom_categories') || '[]');
+            return [...new Set([...dynamicLocs, ...customCategories])].sort((a,b) => a.localeCompare(b, 'zh'));
+        }
+
+        function openCategoryManager() {
+            if (!checkPassword('管理定位')) return;
+            renderCategoryManager();
+            document.getElementById('categoryManagerModal').classList.add('visible');
+        }
+
+        function closeCategoryManager() {
+            document.getElementById('categoryManagerModal').classList.remove('visible');
+        }
+
+        function renderCategoryManager() {
+            const dynamicLocs = getDynamicLocations();
+            const allLocs = getAllLocations();
+            
+            const listEl = document.getElementById('categoryList');
+            if (allLocs.length === 0) {
+                listEl.innerHTML = '<div style="text-align:center; color:var(--text-sub); padding:20px;">暂无定位</div>';
+                return;
+            }
+            listEl.innerHTML = allLocs.map(loc => {
+                const isUsed = dynamicLocs.includes(loc);
+                const count = isUsed ? state.products.filter(p => p.location === loc).length : 0;
+                
+                return `
+                <div style="display: flex; align-items: center; justify-content: space-between; background: var(--glass-bg); padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--glass-border);">
+                    <div>
+                        <div style="font-weight: 600; font-size: 15px;">${loc}</div>
+                        <div style="font-size: 11px; color: var(--text-sub); margin-top: 2px;">
+                            ${count > 0 ? `关联 ${count} 个商品` : '未使用 (自定义)'}
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="icon-btn" style="width: 32px; height: 32px; background: rgba(0,113,227,0.1); color: var(--primary);" onclick="renameCategory('${loc}')">
+                            <i class="fas fa-edit" style="font-size: 12px;"></i>
+                        </button>
+                        <button class="icon-btn" style="width: 32px; height: 32px; background: rgba(255,59,48,0.1); color: var(--accent);" onclick="deleteCategory('${loc}', ${count})">
+                            <i class="fas fa-trash-alt" style="font-size: 12px;"></i>
+                        </button>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        function addCategory() {
+            const input = document.getElementById('newCategoryName');
+            const name = input.value.trim();
+            if (!name) return;
+            
+            const allLocs = getAllLocations();
+            if (allLocs.includes(name)) {
+                showToast('该定位已存在');
+                return;
+            }
+            
+            let customCategories = JSON.parse(localStorage.getItem('jlhcdh_custom_categories') || '[]');
+            customCategories.push(name);
+            localStorage.setItem('jlhcdh_custom_categories', JSON.stringify(customCategories));
+            input.value = '';
+            
+            renderCategoryManager();
+            renderAdminTable();
+            renderLocations();
+        }
+
+        async function renameCategory(oldName) {
+            const newName = prompt(`将定位 "${oldName}" 重命名为:`, oldName);
+            if (!newName || newName.trim() === '' || newName === oldName) return;
+            const finalName = newName.trim();
+            
+            let customCategories = JSON.parse(localStorage.getItem('jlhcdh_custom_categories') || '[]');
+            
+            if (customCategories.includes(oldName)) {
+                customCategories = customCategories.map(c => c === oldName ? finalName : c);
+            }
+            if (!customCategories.includes(finalName) && !getDynamicLocations().includes(finalName)) {
+                customCategories.push(finalName);
+            }
+            localStorage.setItem('jlhcdh_custom_categories', JSON.stringify(customCategories));
+            
+            const dynamicLocs = getDynamicLocations();
+            if (dynamicLocs.includes(oldName)) {
+                state.skipRealtimeUntil = Date.now() + 5000;
+                startSync();
+                try {
+                    const { error } = await sb.from('jlhcdh_products').update({ location: finalName }).eq('location', oldName);
+                    if (error) throw error;
+                    showToast('已更新关联商品的定位');
+                    await fetchProducts();
+                } catch (e) {
+                    console.error('重命名定位失败:', e);
+                    showToast('重命名失败');
+                }
+                endSync(false);
+            }
+            
+            renderCategoryManager();
+            renderAdminTable();
+            renderLocations();
+        }
+
+        async function deleteCategory(name, count) {
+            if (count > 0) {
+                if (!confirm(`确定要删除 "${name}" 吗？这会将关联的 ${count} 个商品的定位设为 "未分类"！`)) return;
+                
+                state.skipRealtimeUntil = Date.now() + 5000;
+                startSync();
+                try {
+                    const { error } = await sb.from('jlhcdh_products').update({ location: '未分类' }).eq('location', name);
+                    if (error) throw error;
+                    showToast('已删除定位，关联商品已设为"未分类"');
+                    await fetchProducts();
+                } catch (e) {
+                    console.error('删除定位失败:', e);
+                    showToast('删除失败');
+                }
+                endSync(false);
+            }
+            
+            let customCategories = JSON.parse(localStorage.getItem('jlhcdh_custom_categories') || '[]');
+            if (customCategories.includes(name)) {
+                customCategories = customCategories.filter(c => c !== name);
+                localStorage.setItem('jlhcdh_custom_categories', JSON.stringify(customCategories));
+                if(count === 0) showToast('已移除自定义定位');
+            }
+            
+            renderCategoryManager();
+            renderAdminTable();
+            renderLocations();
+        }
+
         function renderAdminTable() {
-            const locs = [...new Set(state.products.map(p => p.location))];
+            const locs = getAllLocations();
             document.getElementById('adminLocFilter').innerHTML = '<option value="全部">全部定位</option>' + locs.map(c => `<option value="${c}">${c}</option>`).join('');
-            document.getElementById('locList').innerHTML = locs.map(c => `<option value="${c}">`).join('');
+            
+            const locOptions = '<option value="">请选择商品定位</option>' + locs.map(c => `<option value="${c}">${c}</option>`).join('') + '<option value="_custom_">➕ 新增定位...</option>';
+            const editLocSelect = document.getElementById('editLocationSelect');
+            if (editLocSelect) editLocSelect.innerHTML = locOptions;
 
             let filtered = state.products;
             if (state.adminLoc !== '全部') filtered = filtered.filter(p => p.location === state.adminLoc);
@@ -2394,6 +2589,11 @@
                     nameInput.value = '';
                     locationInput.value = '';
                     unitInput.value = '斤';
+                    const editLocSelect = document.getElementById('editLocationSelect');
+                    if (editLocSelect) {
+                        editLocSelect.value = '';
+                        locationInput.style.display = 'none';
+                    }
                     closeModal();
                     await fetchProducts();
                     renderAdminTable();
@@ -2445,13 +2645,26 @@
             }
 
             // 填充定位列表
-            const locs = [...new Set(state.products.map(p => p.location))];
-            document.getElementById('locListEdit').innerHTML = locs.map(c => `<option value="${c}">`).join('');
+            const locs = getAllLocations();
+            const locOptionsEdit = '<option value="">请选择商品定位</option>' + locs.map(c => `<option value="${c}">${c}</option>`).join('') + '<option value="_custom_">➕ 新增定位...</option>';
+            document.getElementById('editProductLocationSelect').innerHTML = locOptionsEdit;
 
             // 填充表单
             document.getElementById('editProductId').value = product.id;
             document.getElementById('editProductName').value = product.name;
-            document.getElementById('editProductLocation').value = product.location;
+            
+            const locSelect = document.getElementById('editProductLocationSelect');
+            const locInput = document.getElementById('editProductLocation');
+            if (locs.includes(product.location)) {
+                locSelect.value = product.location;
+                locInput.style.display = 'none';
+                locInput.value = product.location;
+            } else {
+                locSelect.value = '_custom_';
+                locInput.style.display = 'block';
+                locInput.value = product.location;
+            }
+
             document.getElementById('editProductUnit').value = product.unit || '斤';
             document.getElementById('editProductTags').value = (product.tags || []).join(', ');
 
@@ -2623,7 +2836,7 @@
         async function toggleLock() { }
 
         function renderLocations(availableLocs = null) {
-            let locsSource = availableLocs || new Set(state.products.map(p => p.location).filter(l => l && l.trim()));
+            let locsSource = availableLocs || new Set(getAllLocations());
             const locs = ['全部', ...[...locsSource].sort((a,b) => a.localeCompare(b, 'zh'))];
             
             // 如果当前选中的定位在可用列表中消失了，自动重置为“全部”
