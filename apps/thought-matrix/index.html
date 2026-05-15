@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>思维矩阵</title>
+    <title>WordCanvas - 实时协作思维导图与脑暴工具</title>
     <script src="https://cdn.staticfile.org/tailwindcss/2.2.19/tailwind.min.js"></script>
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;400&family=Noto+Sans+SC:wght@200;400&display=swap"
@@ -36,7 +36,7 @@
             height: 100vh;
             position: relative;
             overflow: hidden;
-            background: 
+            background:
                 radial-gradient(circle at 0% 0%, rgba(129, 140, 248, 0.08) 0%, transparent 50%),
                 radial-gradient(circle at 100% 100%, rgba(244, 63, 94, 0.05) 0%, transparent 50%),
                 #020617;
@@ -74,7 +74,7 @@
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 16px;
             padding: 14px 28px;
-            box-shadow: 
+            box-shadow:
                 0 4px 24px -1px rgba(0, 0, 0, 0.2),
                 0 0 1px 0 rgba(255, 255, 255, 0.1) inset;
             transition: opacity 0.5s, transform 0.5s, background 0.3s, border-color 0.3s, box-shadow 0.3s;
@@ -87,7 +87,7 @@
             background: rgba(255, 255, 255, 0.06);
             border-color: rgba(255, 255, 255, 0.2);
             transform: translateY(-2px);
-            box-shadow: 
+            box-shadow:
                 0 12px 40px -10px rgba(0, 0, 0, 0.4),
                 0 0 1px 0 rgba(255, 255, 255, 0.2) inset;
         }
@@ -148,8 +148,15 @@
         }
 
         @keyframes tagEntrance {
-            from { opacity: 0; transform: scale(0.9) translateY(10px); }
-            to { opacity: 1; transform: scale(1) translateY(0); }
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
         }
 
         .tag.new {
@@ -301,11 +308,30 @@
             transform: scale(1.1);
         }
 
-        .tag.color-orange { border-color: #f97316; box-shadow: 0 4px 20px rgba(249, 115, 22, 0.15); }
-        .tag.color-blue { border-color: #3b82f6; box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15); }
-        .tag.color-purple { border-color: #a855f7; box-shadow: 0 4px 20px rgba(168, 85, 247, 0.15); }
-        .tag.color-green { border-color: #22c55e; box-shadow: 0 4px 20px rgba(34, 197, 94, 0.15); }
-        .tag.color-grey { border-color: #64748b; box-shadow: 0 4px 20px rgba(100, 116, 139, 0.15); }
+        .tag.color-orange {
+            border-color: #f97316;
+            box-shadow: 0 4px 20px rgba(249, 115, 22, 0.15);
+        }
+
+        .tag.color-blue {
+            border-color: #3b82f6;
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
+        }
+
+        .tag.color-purple {
+            border-color: #a855f7;
+            box-shadow: 0 4px 20px rgba(168, 85, 247, 0.15);
+        }
+
+        .tag.color-green {
+            border-color: #22c55e;
+            box-shadow: 0 4px 20px rgba(34, 197, 94, 0.15);
+        }
+
+        .tag.color-grey {
+            border-color: #64748b;
+            box-shadow: 0 4px 20px rgba(100, 116, 139, 0.15);
+        }
 
         .connection-line {
             fill: none;
@@ -320,6 +346,7 @@
             stroke: var(--primary);
             stroke-width: 2;
             opacity: 1;
+            marker-end: url(#arrowHeadHover);
         }
 
         .conn-label {
@@ -513,6 +540,12 @@
                         <stop offset="0%" stop-color="#818cf8" />
                         <stop offset="100%" stop-color="#c084fc" />
                     </linearGradient>
+                    <marker id="arrowHead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                        <path d="M0,0 L0,6 L9,3 z" fill="rgba(255, 255, 255, 0.15)" />
+                    </marker>
+                    <marker id="arrowHeadHover" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                        <path d="M0,0 L0,6 L9,3 z" fill="var(--primary)" />
+                    </marker>
                 </defs>
                 <g id="lineGroups"></g>
             </svg>
@@ -535,7 +568,8 @@
 
     <div class="fab-container">
         <button id="btnCenter" class="fab-button" title="定位到中心 (Center View)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
                 <circle cx="12" cy="12" r="9"></circle>
                 <path d="M12 8v8M8 12h8"></path>
             </svg>
@@ -546,13 +580,15 @@
         <!-- Single select actions -->
         <div id="singleActions" style="display: flex; gap: 4px;">
             <div class="toolbar-btn" id="btnBold" title="加粗">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                    stroke-linejoin="round">
                     <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
                     <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
                 </svg>
             </div>
             <div class="toolbar-btn" id="btnItalic" title="斜体">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                    stroke-linejoin="round">
                     <line x1="19" y1="4" x2="10" y2="4"></line>
                     <line x1="14" y1="20" x2="5" y2="20"></line>
                     <line x1="15" y1="4" x2="9" y2="20"></line>
@@ -564,31 +600,36 @@
         <!-- Multi select actions -->
         <div id="multiActions" style="display: flex; gap: 4px;">
             <div class="toolbar-btn" id="alignLeft" title="向左对齐">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
                     <path d="M4 2v20M20 7H8M16 17H8"></path>
                 </svg>
             </div>
             <div class="toolbar-btn" id="alignTop" title="顶部对齐">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
                     <path d="M22 4H2M7 20V8M17 16V8"></path>
                 </svg>
             </div>
             <div class="toolbar-divider"></div>
             <div class="toolbar-btn" id="distributeH" title="水平等分">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 2v20M21 2v20M12 5v14"/>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M3 2v20M21 2v20M12 5v14" />
                 </svg>
             </div>
             <div class="toolbar-btn" id="distributeV" title="垂直等分">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M2 3h20M2 21h20M5 12h14"/>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M2 3h20M2 21h20M5 12h14" />
                 </svg>
             </div>
             <div class="toolbar-divider"></div>
         </div>
 
         <div class="toolbar-btn danger" id="deleteSelection" title="删除选中">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
                 <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                 <line x1="10" y1="11" x2="10" y2="17"></line>
                 <line x1="14" y1="11" x2="14" y2="17"></line>
@@ -598,15 +639,29 @@
 
     <div id="minimalMenu" class="minimal-menu">
         <div class="menu-item" id="menuEdit">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
             Edit
         </div>
         <div class="menu-item" id="menuCopyLink">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+            </svg>
             Copy link
         </div>
         <div class="menu-item" id="menuDelete">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+            </svg>
             Delete
         </div>
         <div class="menu-separator"></div>
@@ -691,7 +746,7 @@
 
             DOM.grid.style.backgroundSize = `${s1}px ${s1}px, ${s2}px ${s2}px, ${s2}px ${s2}px`;
             DOM.grid.style.backgroundPosition = `${ox}px ${oy}px, ${ox}px ${oy}px, ${ox}px ${oy}px`;
-            
+
             // Sync UI elements with canvas transform
             Input.updatePosition();
             Toolbar.updatePosition();
@@ -741,7 +796,7 @@
             const mouseY = clientY - rect.top - rect.height / 2;
             const prevScale = State.transform.scale;
             const clamped = Math.max(0.02, Math.min(nextScale, 8.0));
-            
+
             // Correct math for zooming at a point (mouseX, mouseY) relative to viewport center:
             // The point in canvas space is (mouseX - transform.x) / prevScale.
             // We want this point to stay at mouseX after scaling.
@@ -774,11 +829,11 @@
                         .filter(c => c.from_id === parentId)
                         .map(c => document.getElementById(c.to_id))
                         .filter(n => n);
-                    
+
                     const parentX = parseFloat(node.dataset.x);
                     const parentY = parseFloat(node.dataset.y);
                     const parentW = node.offsetWidth;
-                    
+
                     const newX = Math.round((parentX + parentW + 120) / 40) * 40;
                     let newY;
                     if (children.length === 0) {
@@ -789,26 +844,26 @@
                         const maxY = Math.max(...children.map(c => parseFloat(c.dataset.y)));
                         newY = Math.round((maxY + 80) / 40) * 40;
                     }
-                    
+
                     const newNode = await Tag.create('', newX, newY);
-                    
+
                     // Create connection
                     const conn = { from_id: node.id, to_id: newNode.id };
                     await SyncManager.wrap(_client.from('canvas_connections').insert(conn));
                     State.connections.push(conn);
                     LineManager.render();
-                    
+
                     // Auto focus and edit new node
                     Tag.deselect();
                     Tag.select(newNode);
                     setTimeout(() => {
                         const r = newNode.getBoundingClientRect();
-                        Input.show(r.left + r.width/2, r.top + r.height/2, '', newNode, 'node');
+                        Input.show(r.left + r.width / 2, r.top + r.height / 2, '', newNode, 'node');
                     }, 100);
                 });
                 this.bind(node);
                 DOM.content.appendChild(node);
-                
+
                 if (isNewDb) {
                     await SyncManager.wrap(_client.from('canvas_nodes').insert({
                         id: node.id,
@@ -823,19 +878,19 @@
             async deleteRecursive(nodeId) {
                 // Find all child connections
                 const children = State.connections.filter(c => c.from_id === nodeId);
-                
+
                 // Recursively delete children first
                 for (const conn of children) {
                     await this.deleteRecursive(conn.to_id);
                 }
-                
+
                 // Delete the node itself from DB
                 await SyncManager.wrap(_client.from('canvas_nodes').delete().eq('id', nodeId));
-                
+
                 // Locally remove
                 const node = document.getElementById(nodeId);
                 if (node) node.remove();
-                
+
                 // Remove connections from state
                 State.connections = State.connections.filter(c => c.from_id !== nodeId && c.to_id !== nodeId);
             },
@@ -959,29 +1014,30 @@
 
                 const dx = b2.cx - b1.cx;
                 const isRight = dx > 0;
-                
+
                 // Anchors like the mind-map image: Parent Side -> Child Side
                 const startX = isRight ? b1.x + b1.w : b1.x;
                 const startY = b1.cy;
-                
+
                 const endX = isRight ? b2.x : b2.x + b2.w;
                 const endY = b2.cy;
 
                 const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
                 group.setAttribute("class", "connection-group");
                 const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                
+
                 // Mind-map Style S-Curve (Cubic Bezier)
                 const offset = Math.max(Math.abs(endX - startX) * 0.5, 40);
                 const cp1x = startX + (isRight ? offset : -offset);
                 const cp2x = endX + (isRight ? -offset : offset);
-                
+
                 const d = `M ${startX} ${startY} C ${cp1x} ${startY}, ${cp2x} ${endY}, ${endX} ${endY}`;
-                
+
                 path.setAttribute("d", d);
                 path.setAttribute("class", isPreview ? "connection-line line-preview" : "connection-line");
+                if (!isPreview) path.setAttribute("marker-end", "url(#arrowHead)");
                 if (connData && connData.color) path.style.stroke = connData.color;
-                
+
                 group.appendChild(path);
 
                 if (!isPreview && connData) {
@@ -1021,7 +1077,7 @@
                             highlight.setAttribute("stroke-width", "22");
                             highlight.setAttribute("stroke-linecap", "round");
                             highlight.style.pointerEvents = "none";
-                            
+
                             // Use dasharray to only highlight the text area
                             const dashLen = tw + 20;
                             const dashOffset = -(totalLen * 0.5 - dashLen / 2);
@@ -1045,7 +1101,7 @@
                         tp.textContent = displayText;
 
                         text.appendChild(tp);
-                        
+
                         text.addEventListener('mousedown', e => e.stopPropagation());
                         if (!connData.isEditing) {
                             text.addEventListener('click', (e) => {
@@ -1077,7 +1133,7 @@
                         // But overlaySvg is fixed.
                         // I'll just append it to svgGroup for now or fix overlay.
                         // Let's use svgGroup for previews too, it's simpler and correct.
-                        DOM.svgGroup.appendChild(g); 
+                        DOM.svgGroup.appendChild(g);
                     }
                 }
             },
@@ -1100,10 +1156,10 @@
 
                     const cx = (minX + maxX) / 2;
                     const cy = (minY + maxY) / 2;
-                    
+
                     const targetX = -cx * State.transform.scale;
                     const targetY = -cy * State.transform.scale;
-                    
+
                     this.animateTo(targetX, targetY);
                 }
             },
@@ -1149,7 +1205,7 @@
                     DOM.input.style.top = `${y}px`;
                     DOM.input.style.opacity = '0'; // Hidden but focused
                     DOM.input.style.pointerEvents = 'none';
-                    
+
                     entity.isEditing = true;
                     entity.originalLabel = entity.label; // For cancel
 
@@ -1234,13 +1290,13 @@
             hide() {
                 const entity = State.interaction.contextEntity;
                 const type = State.interaction.contextType;
-                
+
                 if (entity && type === 'node') {
                     const span = entity.querySelector('span');
                     if (span) span.style.visibility = 'visible';
                     entity.classList.remove('editing');
                 }
-                
+
                 if (type === 'connection' && entity) {
                     if (!State.interaction.didSave) {
                         entity.label = entity.originalLabel;
@@ -1269,7 +1325,7 @@
                 const entity = State.interaction.contextEntity;
                 const type = State.interaction.contextType;
 
-                this.hide(); 
+                this.hide();
 
                 if (entity) {
                     if (type === 'connection') {
@@ -1294,7 +1350,7 @@
                         }
                     }
                 }
-                
+
                 LineManager.render();
             }
         };
@@ -1313,9 +1369,9 @@
                     dot.classList.toggle('selected', node.classList.contains(`color-${color}`));
                 });
             },
-            hide() { 
-                DOM.menu.classList.remove('show'); 
-                this.contextEntity = null; 
+            hide() {
+                DOM.menu.classList.remove('show');
+                this.contextEntity = null;
                 State.interaction.menuSpacePos = null;
             },
             updatePosition() {
@@ -1327,13 +1383,13 @@
             async changeColor(color) {
                 const node = this.contextEntity;
                 if (!node) return;
-                
+
                 // Remove existing colors
                 ['orange', 'blue', 'purple', 'green', 'grey'].forEach(c => node.classList.remove(`color-${c}`));
-                
+
                 // Add new color
                 node.classList.add(`color-${color}`);
-                
+
                 // Sync to DB
                 await SyncManager.wrap(_client.from('canvas_nodes').update({ color: color }).eq('id', node.id));
                 this.hide();
@@ -1356,7 +1412,7 @@
             show() {
                 const count = State.interaction.selectedTags.length;
                 if (count === 0) return this.hide();
-                
+
                 document.getElementById('singleActions').style.display = count === 1 ? 'flex' : 'none';
                 document.getElementById('multiActions').style.display = count > 1 ? 'flex' : 'none';
 
@@ -1378,7 +1434,7 @@
             },
             updatePosition() {
                 if (!DOM.toolbar.classList.contains('show')) return;
-                
+
                 // Calculate bounding box of selected tags
                 let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
                 State.interaction.selectedTags.forEach(t => {
@@ -1417,7 +1473,7 @@
                 } else if (type === 'distV') {
                     const sorted = [...tags].sort((a, b) => parseFloat(a.dataset.y) - parseFloat(b.dataset.y));
                     const minY = parseFloat(sorted[0].dataset.y);
-                    const maxY = parseFloat(sorted[sorted.length-1].dataset.y);
+                    const maxY = parseFloat(sorted[sorted.length - 1].dataset.y);
                     const gap = (maxY - minY) / (tags.length - 1);
                     sorted.forEach((t, i) => {
                         const ny = minY + i * gap;
@@ -1426,7 +1482,7 @@
                 } else if (type === 'distH') {
                     const sorted = [...tags].sort((a, b) => parseFloat(a.dataset.x) - parseFloat(b.dataset.x));
                     const minX = parseFloat(sorted[0].dataset.x);
-                    const maxX = parseFloat(sorted[sorted.length-1].dataset.x);
+                    const maxX = parseFloat(sorted[sorted.length - 1].dataset.x);
                     const gap = (maxX - minX) / (tags.length - 1);
                     sorted.forEach((t, i) => {
                         const nx = minX + i * gap;
@@ -1458,7 +1514,7 @@
                     if (tr.left >= r.left && tr.right <= r.right && tr.top >= r.top && tr.bottom <= r.bottom) Tag.select(t);
                 });
                 State.interaction.isSelecting = false; DOM.selection.style.display = 'none';
-                
+
                 if (State.interaction.selectedTags.length > 1) Toolbar.show();
                 else if (State.interaction.selectedTags.length === 1) Toolbar.show();
                 else Toolbar.hide();
@@ -1530,7 +1586,7 @@
                             node.style.left = `${newTag.x}px`;
                             node.style.top = `${newTag.y}px`;
                             node.dataset.x = newTag.x; node.dataset.y = newTag.y;
-                            
+
                             // Update color
                             ['orange', 'blue', 'purple', 'green', 'grey'].forEach(c => node.classList.remove(`color-${c}`));
                             if (newTag.color) node.classList.add(`color-${newTag.color}`);
@@ -1640,7 +1696,7 @@
                         Tag.select(newNode);
                         setTimeout(() => {
                             const r = newNode.getBoundingClientRect();
-                            Input.show(r.left + r.width/2, r.top + r.height/2, '', newNode, 'node');
+                            Input.show(r.left + r.width / 2, r.top + r.height / 2, '', newNode, 'node');
                         }, 10);
                     }
                 }
@@ -1896,7 +1952,7 @@
                             Tag.select(newNode);
                             setTimeout(() => {
                                 const r = newNode.getBoundingClientRect();
-                                Input.show(r.left + r.width/2, r.top + r.height/2, '', newNode, 'node');
+                                Input.show(r.left + r.width / 2, r.top + r.height / 2, '', newNode, 'node');
                             }, 10);
                             TouchState.lastTapTime = 0; // Reset
                         } else {
