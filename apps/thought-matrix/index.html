@@ -858,6 +858,60 @@
                     this.set('error');
                     throw e;
                 }
+            },
+            async reconcile() {
+                this.set('syncing');
+                try {
+                    const { data: nodes } = await _client.from('canvas_nodes').select('*');
+                    const { data: conns } = await _client.from('canvas_connections').select('*');
+
+                    if (nodes) {
+                        const nodeIds = new Set(nodes.map(n => n.id));
+                        
+                        // Remove nodes that are no longer in DB
+                        const existingNodes = document.querySelectorAll('.tag');
+                        existingNodes.forEach(node => {
+                            if (!nodeIds.has(node.id)) {
+                                // Don't remove if currently being edited
+                                if (State.interaction.contextEntity !== node) node.remove();
+                            }
+                        });
+
+                        // Add or Update nodes
+                        for (const n of nodes) {
+                            const node = document.getElementById(n.id);
+                            if (!node) {
+                                await Tag.create(n.text, n.x, n.y, n.id, n.color);
+                            } else {
+                                // Update existing node if values changed, unless being edited
+                                if (State.interaction.contextEntity !== node) {
+                                    if (n.text !== undefined) node.querySelector('span').textContent = n.text;
+                                    if (n.x !== undefined) {
+                                        node.style.left = `${n.x}px`;
+                                        node.dataset.x = n.x;
+                                    }
+                                    if (n.y !== undefined) {
+                                        node.style.top = `${n.y}px`;
+                                        node.dataset.y = n.y;
+                                    }
+                                    if (n.color !== undefined) {
+                                        ['orange', 'blue', 'purple', 'green', 'grey', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'].forEach(c => node.classList.remove(`color-${c}`));
+                                        if (n.color) node.classList.add(`color-${n.color}`);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (conns) {
+                        State.connections = conns;
+                        LineManager.render();
+                    }
+                    setTimeout(() => this.set('idle'), 500);
+                } catch (e) {
+                    console.error('Reconciliation failed:', e);
+                    this.set('error');
+                }
             }
         };
 
@@ -1822,7 +1876,20 @@
                         LineManager.render();
                     }
                 })
-                .subscribe();
+                .subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                        console.log('Realtime subscribed/reconnected');
+                        SyncManager.reconcile();
+                    }
+                });
+
+            // Handle device wake/pause
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                    console.log('App visible, reconciling...');
+                    SyncManager.reconcile();
+                }
+            });
 
             window.addEventListener('mousedown', e => {
                 if (e.target.closest('.tag') || e.target.closest('.selection-toolbar') || e.target.closest('.minimal-menu')) return;
