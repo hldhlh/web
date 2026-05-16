@@ -979,7 +979,7 @@
                     newNode.dataset.isNew = 'true';
 
                     // Create connection
-                    const conn = { from_id: node.id, to_id: newNode.id };
+                    const conn = { id: crypto.randomUUID(), from_id: node.id, to_id: newNode.id };
                     await SyncManager.wrap(_client.from('canvas_connections').insert(conn));
                     State.connections.push(conn);
                     LineManager.render();
@@ -1028,6 +1028,7 @@
             bind(node) {
                 node.addEventListener('mousedown', e => {
                     e.stopPropagation(); e.preventDefault();
+                    if (DOM.input.style.display !== 'none') DOM.input.blur();
                     if (State.interaction.isLinking) return;
                     if (e.button === 0) {
                         State.interaction.isDragging = true;
@@ -1061,6 +1062,7 @@
                 node.addEventListener('touchstart', e => {
                     // If already pinching/panning with two fingers, ignore
                     if (e.touches.length > 1) return;
+                    if (DOM.input.style.display !== 'none') DOM.input.blur();
                     if (State.interaction.isLinking) return;
 
                     const t = e.touches[0];
@@ -1560,10 +1562,24 @@
 
                     // Sync to DB
                     await SyncManager.wrap(_client.from('canvas_nodes').update({ color: color === 'none' ? null : color }).eq('id', entity.id));
+                    
+                    // Broadcast
+                    _client.channel('canvas_changes').send({
+                        type: 'broadcast',
+                        event: 'node_color',
+                        payload: { id: entity.id, color: color === 'none' ? null : color }
+                    });
                 } else if (type === 'connection') {
                     entity.color = color === 'none' ? null : color;
                     LineManager.render();
                     await SyncManager.wrap(_client.from('canvas_connections').update({ color: color === 'none' ? null : color }).eq('id', entity.id));
+                    
+                    // Broadcast
+                    _client.channel('canvas_changes').send({
+                        type: 'broadcast',
+                        event: 'conn_color',
+                        payload: { id: entity.id, color: color === 'none' ? null : color }
+                    });
                 }
                 this.hide();
             }
@@ -1653,6 +1669,7 @@
 
                 LineManager.render();
                 for (const t of tags) await Tag.updatePos(t);
+                Input.updatePosition();
                 this.show(); // reposition toolbar
             }
         };
@@ -1743,16 +1760,24 @@
                     } else if (eventType === 'UPDATE') {
                         const node = document.getElementById(newTag.id);
                         if (node) {
-                            node.querySelector('span').textContent = newTag.text;
-                            node.style.left = `${newTag.x}px`;
-                            node.style.top = `${newTag.y}px`;
-                            node.dataset.x = newTag.x; node.dataset.y = newTag.y;
+                            if (newTag.text !== undefined) node.querySelector('span').textContent = newTag.text;
+                            if (newTag.x !== undefined) {
+                                node.style.left = `${newTag.x}px`;
+                                node.dataset.x = newTag.x;
+                            }
+                            if (newTag.y !== undefined) {
+                                node.style.top = `${newTag.y}px`;
+                                node.dataset.y = newTag.y;
+                            }
 
                             // Update color
-                            ['orange', 'blue', 'purple', 'green', 'grey', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'].forEach(c => node.classList.remove(`color-${c}`));
-                            if (newTag.color) node.classList.add(`color-${newTag.color}`);
+                            if (newTag.color !== undefined) {
+                                ['orange', 'blue', 'purple', 'green', 'grey', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'].forEach(c => node.classList.remove(`color-${c}`));
+                                if (newTag.color) node.classList.add(`color-${newTag.color}`);
+                            }
 
                             LineManager.render();
+                            Input.updatePosition();
                         }
                     } else if (eventType === 'DELETE') {
                         const node = document.getElementById(oldTag.id);
@@ -1775,15 +1800,33 @@
                     } else if (eventType === 'UPDATE') {
                         const idx = State.connections.findIndex(c => c.id === newConn.id);
                         if (idx !== -1) {
-                            State.connections[idx] = newConn;
+                            State.connections[idx] = { ...State.connections[idx], ...newConn };
                             LineManager.render();
                         }
+                    }
+                })
+                .on('broadcast', { event: 'node_color' }, payload => {
+                    const { id, color } = payload.payload;
+                    const node = document.getElementById(id);
+                    if (node) {
+                        ['orange', 'blue', 'purple', 'green', 'grey', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'].forEach(c => node.classList.remove(`color-${c}`));
+                        if (color) node.classList.add(`color-${color}`);
+                        LineManager.render();
+                    }
+                })
+                .on('broadcast', { event: 'conn_color' }, payload => {
+                    const { id, color } = payload.payload;
+                    const idx = State.connections.findIndex(c => c.id === id);
+                    if (idx !== -1) {
+                        State.connections[idx].color = color;
+                        LineManager.render();
                     }
                 })
                 .subscribe();
 
             window.addEventListener('mousedown', e => {
                 if (e.target.closest('.tag') || e.target.closest('.selection-toolbar') || e.target.closest('.minimal-menu')) return;
+                if (DOM.input.style.display !== 'none') DOM.input.blur();
                 Menu.hide();
                 Tag.deselect();
                 Toolbar.hide();
@@ -1817,6 +1860,7 @@
                         t.style.left = `${nx}px`; t.style.top = `${ny}px`; t.dataset.x = nx; t.dataset.y = ny;
                     });
                     LineManager.render();
+                    Input.updatePosition();
                 } else if (State.interaction.isLinking) {
                     LineManager.renderOverlay();
                 } else if (e.buttons === 1 && !State.interaction.isDragging && !State.interaction.isPanning) {
@@ -1842,7 +1886,9 @@
                         const toId = tagUnderMouse.id;
                         const exists = State.connections.some(c => (c.from_id === fromId && c.to_id === toId) || (c.from_id === toId && c.to_id === fromId));
                         if (!exists) {
-                            await SyncManager.wrap(_client.from('canvas_connections').insert({ from_id: fromId, to_id: toId }));
+                            const conn = { id: crypto.randomUUID(), from_id: fromId, to_id: toId };
+                            await SyncManager.wrap(_client.from('canvas_connections').insert(conn));
+                            State.connections.push(conn);
                         }
                     }
                     State.interaction.isLinking = false; State.interaction.linkingFrom = null; LineManager.render();
@@ -1953,7 +1999,7 @@
             document.addEventListener('contextmenu', async e => {
                 e.preventDefault();
                 if (e.target.closest('.tag') || e.target.closest('.selection-toolbar') || e.target.closest('.minimal-menu')) return;
-                
+
                 Tag.deselect();
                 const spacePos = screenToSpace(e.clientX, e.clientY);
                 const newNode = await Tag.create('', spacePos.x, spacePos.y);
@@ -1997,6 +2043,7 @@
                 // Ignore if touching a tag (handled by tag's own listener)
                 if (e.target.closest('.tag') || e.target.closest('.selection-toolbar') || e.target.closest('.minimal-menu')) return;
 
+                if (DOM.input.style.display !== 'none') DOM.input.blur();
                 TouchState.startTime = Date.now();
 
                 if (e.touches.length === 1) {
@@ -2097,6 +2144,7 @@
                         t.dataset.y = ny;
                     });
                     LineManager.render();
+                    Input.updatePosition();
                 }
             }, { passive: false });
 
