@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>WordCanvas - 实时协作思维导图与脑暴工具</title>
+    <title>思维矩阵</title>
     <script src="https://cdn.staticfile.org/tailwindcss/2.2.19/tailwind.min.js"></script>
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;400&family=Noto+Sans+SC:wght@200;400&display=swap"
@@ -604,6 +604,20 @@
             opacity: 1;
         }
 
+        .dev-version {
+            position: absolute;
+            bottom: 24px;
+            left: 24px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 11px;
+            font-weight: 400;
+            color: rgba(255, 255, 255, 0.45);
+            letter-spacing: 0.05em;
+            pointer-events: none;
+            z-index: 10000;
+            user-select: none;
+        }
+
         .fab-container {
             position: fixed;
             bottom: 32px;
@@ -685,6 +699,7 @@
             </defs>
             <g id="overlayLines"></g>
         </svg>
+        <div class="dev-version">v1.2.0-dev</div>
     </div>
 
     <input type="text" id="floatingInput" spellcheck="false" autocomplete="off">
@@ -826,6 +841,9 @@
             connections: [],
             saveViewTimer: null
         };
+
+        let longPressTimer = null;
+        let isLongPressTriggered = false;
 
         const DOM = {
             viewport: document.getElementById('viewport'),
@@ -1061,23 +1079,40 @@
                 return node;
             },
             async deleteRecursive(nodeId) {
-                // Find all child connections
-                const children = State.connections.filter(c => c.from_id === nodeId);
+                if (!nodeId) return;
 
-                // Recursively delete children first
-                for (const conn of children) {
-                    await this.deleteRecursive(conn.to_id);
+                // 1. Find all connections involving this node (source or target)
+                const relatedConns = State.connections.filter(c => c.from_id === nodeId || c.to_id === nodeId);
+                
+                // 2. Identify children to delete (nodes where this node is the source)
+                const childNodeIds = State.connections
+                    .filter(c => c.from_id === nodeId)
+                    .map(c => c.to_id);
+
+                // 3. Delete all related connections from DB first (prevents FK violations)
+                for (const conn of relatedConns) {
+                    await SyncManager.wrap(_client.from('canvas_connections').delete().eq('id', conn.id));
+                    // Update local state immediately to prevent ghost rendering
+                    State.connections = State.connections.filter(c => c.id !== conn.id);
                 }
 
-                // Delete the node itself from DB
+                // 4. Recursively delete child nodes
+                for (const childId of childNodeIds) {
+                    // Check if node exists to avoid errors on already deleted nodes
+                    if (document.getElementById(childId)) {
+                        await this.deleteRecursive(childId);
+                    }
+                }
+
+                // 5. Delete the node itself from DB
                 await SyncManager.wrap(_client.from('canvas_nodes').delete().eq('id', nodeId));
 
-                // Locally remove
+                // 6. Final local cleanup
                 const node = document.getElementById(nodeId);
                 if (node) node.remove();
 
-                // Remove connections from state
-                State.connections = State.connections.filter(c => c.from_id !== nodeId && c.to_id !== nodeId);
+                // Clear from selection
+                State.interaction.selectedTags = State.interaction.selectedTags.filter(t => t.id !== nodeId);
             },
             bind(node) {
                 node.addEventListener('mousedown', e => {
@@ -1753,6 +1788,18 @@
             }
         };
 
+        async function createNewTagAtScreen(clientX, clientY) {
+            Tag.deselect();
+            const spacePos = screenToSpace(clientX, clientY);
+            const newNode = await Tag.create('', spacePos.x, spacePos.y);
+            newNode.dataset.isNew = 'true';
+            Tag.select(newNode);
+            setTimeout(() => {
+                const r = newNode.getBoundingClientRect();
+                Input.show(r.left + r.width / 2, r.top + r.height / 2, '', newNode, 'node');
+            }, 10);
+        }
+
         async function bootstrap() {
             Selection.init();
 
@@ -1795,9 +1842,15 @@
             document.getElementById('distributeV').onclick = () => Toolbar.align('distV');
             document.getElementById('deleteSelection').onclick = async () => {
                 const tags = [...State.interaction.selectedTags];
+                if (tags.length === 0) return;
+                
                 Toolbar.hide();
-                for (const t of tags) {
-                    await Tag.deleteRecursive(t.id);
+                try {
+                    for (const t of tags) {
+                        await Tag.deleteRecursive(t.id);
+                    }
+                } catch (e) {
+                    console.error("Batch deletion failed:", e);
                 }
                 Tag.deselect();
                 LineManager.render();
@@ -1903,10 +1956,41 @@
                 if (e.button === 1 || (e.button === 0 && (e.altKey || e.ctrlKey))) {
                     State.interaction.isPanning = true; DOM.viewport.style.cursor = 'grabbing';
                 }
+
+                // Reset long press
+                isLongPressTriggered = false;
+                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+
+                // Start long press timer for mouse on left click with no modifiers
+                if (e.button === 0 && !e.altKey && !e.ctrlKey) {
+                    longPressTimer = setTimeout(async () => {
+                        isLongPressTriggered = true;
+                        longPressTimer = null;
+
+                        // Cancel potential selection/panning state
+                        State.interaction.isPanning = false;
+                        State.interaction.isSelecting = false;
+                        DOM.selection.style.display = 'none';
+
+                        await createNewTagAtScreen(e.clientX, e.clientY);
+                    }, 600);
+                }
             });
 
             window.addEventListener('mousemove', e => {
                 const dx = e.clientX - State.mouse.lastX, dy = e.clientY - State.mouse.lastY;
+
+                // Cancel long press if mouse moves significantly
+                if (longPressTimer) {
+                    const totalDx = e.clientX - State.mouse.startX;
+                    const totalDy = e.clientY - State.mouse.startY;
+                    const totalDist = Math.sqrt(totalDx * totalDx + totalDy * totalDy);
+                    if (totalDist > 6) {
+                        clearTimeout(longPressTimer);
+                        longPressTimer = null;
+                    }
+                }
+
                 if (State.interaction.isPanning) {
                     State.transform.x += dx; State.transform.y += dy; updateMatrix();
                 } else if (State.interaction.isDragging && State.interaction.currentTag) {
@@ -1937,6 +2021,16 @@
             });
 
             window.addEventListener('mouseup', async e => {
+                if (longPressTimer) {
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
+                }
+                if (isLongPressTriggered) {
+                    isLongPressTriggered = false;
+                    e.preventDefault();
+                    return; // Prevent normal mouseup click actions
+                }
+
                 const dur = Date.now() - State.mouse.startTime;
                 if (State.interaction.isPanning) {
                     State.interaction.isPanning = false; DOM.viewport.style.cursor = 'crosshair';
@@ -2045,14 +2139,18 @@
                 const entity = Menu.contextEntity;
                 const type = Menu.contextType || 'node';
                 if (entity) {
-                    if (type === 'node') {
-                        await Tag.deleteRecursive(entity.id);
-                        Tag.deselect(); LineManager.render();
-                    } else if (type === 'connection') {
-                        State.connections = State.connections.filter(c => c.id !== entity.id);
-                        LineManager.render();
-                        await SyncManager.wrap(_client.from('canvas_connections').delete().eq('id', entity.id));
+                    try {
+                        if (type === 'node') {
+                            await Tag.deleteRecursive(entity.id);
+                            Tag.deselect();
+                        } else if (type === 'connection') {
+                            State.connections = State.connections.filter(c => c.id !== entity.id);
+                            await SyncManager.wrap(_client.from('canvas_connections').delete().eq('id', entity.id));
+                        }
+                    } catch (e) {
+                        console.error("Deletion failed:", e);
                     }
+                    LineManager.render();
                 }
                 Menu.hide();
             });
@@ -2066,16 +2164,7 @@
             document.addEventListener('contextmenu', async e => {
                 e.preventDefault();
                 if (e.target.closest('.tag') || e.target.closest('.selection-toolbar') || e.target.closest('.minimal-menu')) return;
-
-                Tag.deselect();
-                const spacePos = screenToSpace(e.clientX, e.clientY);
-                const newNode = await Tag.create('', spacePos.x, spacePos.y);
-                newNode.dataset.isNew = 'true';
-                Tag.select(newNode);
-                setTimeout(() => {
-                    const r = newNode.getBoundingClientRect();
-                    Input.show(r.left + r.width / 2, r.top + r.height / 2, '', newNode, 'node');
-                }, 10);
+                await createNewTagAtScreen(e.clientX, e.clientY);
             });
             window.addEventListener('resize', updateMatrix);
 
@@ -2121,8 +2210,28 @@
                     State.mouse.lastX = touch.clientX;
                     State.mouse.lastY = touch.clientY;
                     State.mouse.startTime = Date.now();
+
+                    // Start long press timer for touch on empty canvas area
+                    isLongPressTriggered = false;
+                    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+                    
+                    longPressTimer = setTimeout(async () => {
+                        isLongPressTriggered = true;
+                        longPressTimer = null;
+
+                        // Cancel potential selection/panning state
+                        State.interaction.isPanning = false;
+                        State.interaction.isSelecting = false;
+                        DOM.selection.style.display = 'none';
+
+                        await createNewTagAtScreen(touch.clientX, touch.clientY);
+                    }, 600);
                 } else if (e.touches.length === 2) {
                     e.preventDefault();
+                    
+                    // Cancel touch long press
+                    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+
                     // Two fingers - pinch/pan mode
                     TouchState.isPinching = true;
                     TouchState.isTwoFingerPanning = true;
@@ -2183,6 +2292,14 @@
                     const totalDy = touch.clientY - State.mouse.startY;
                     const totalDist = Math.sqrt(totalDx * totalDx + totalDy * totalDy);
 
+                    // Cancel long press if touch moves significantly
+                    if (totalDist > 6) {
+                        if (longPressTimer) {
+                            clearTimeout(longPressTimer);
+                            longPressTimer = null;
+                        }
+                    }
+
                     if (totalDist > 10) {
                         State.interaction.isPanning = true;
                         State.transform.x += dx;
@@ -2216,6 +2333,16 @@
             }, { passive: false });
 
             DOM.viewport.addEventListener('touchend', async e => {
+                if (longPressTimer) {
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
+                }
+                if (isLongPressTriggered) {
+                    isLongPressTriggered = false;
+                    e.preventDefault();
+                    return;
+                }
+
                 const duration = Date.now() - TouchState.startTime;
 
                 if (TouchState.isPinching || TouchState.isTwoFingerPanning) {
@@ -2249,6 +2376,14 @@
                     }
                 }
             }, { passive: false });
+
+            DOM.viewport.addEventListener('touchcancel', () => {
+                if (longPressTimer) {
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
+                }
+                isLongPressTriggered = false;
+            });
 
             // Prevent default touch behaviors
             document.addEventListener('gesturestart', e => e.preventDefault(), { passive: false });
