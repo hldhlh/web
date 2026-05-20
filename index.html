@@ -285,6 +285,7 @@
         Object.keys(localStorage).forEach(k => {
           if (k.startsWith(CACHE_PREFIX)) localStorage.removeItem(k);
         });
+        sessionStorage.setItem('force_clear_cache', 'true');
         if (reload) location.reload();
       }
     };
@@ -310,7 +311,10 @@
     // 获取并处理图标数据
     const fetchIconData = async (dir, url) => {
       try {
-        const res = await fetch(url);
+        const isForce = sessionStorage.getItem('force_clear_cache') === 'true';
+        const fetchOptions = isForce ? { cache: 'reload' } : {};
+        const fetchUrl = isForce ? `${url}?t=${Date.now()}` : url;
+        const res = await fetch(fetchUrl, fetchOptions);
         if (!res.ok) return null;
 
         const etag = res.headers.get('ETag');
@@ -444,7 +448,7 @@
         }
 
         const el = document.createElement('a');
-        el.href = `./apps/${app.path}`;
+        el.href = `./apps/${app.path}?t=${Date.now()}`;
         el.className = 'app-icon';
         el.title = app.name;
         el.setAttribute('data-dir', dir); // 标记以便更新
@@ -484,6 +488,7 @@
         });
         container.innerHTML = '';
         container.appendChild(frag);
+        sessionStorage.removeItem('force_clear_cache');
       });
     }
 

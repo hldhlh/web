@@ -219,6 +219,8 @@
             padding: 0;
             margin: 0;
             text-align: center;
+            user-select: text;
+            -webkit-user-select: text;
         }
 
         .minimal-menu {
@@ -1296,7 +1298,7 @@
                         const pathId = `p-${connData.id || Math.random().toString(36).substr(2, 9)}`;
                         path.setAttribute("id", pathId);
 
-                        const displayText = connData.label + (connData.isEditing ? ' |' : '');
+                        const displayText = (connData.label || '') + (connData.isEditing ? ' |' : '');
                         const font = "400 12px Outfit, Noto Sans SC, sans-serif";
                         const tw = getTextWidth(displayText, font);
 
@@ -1438,8 +1440,10 @@
                 if (type === 'connection') {
                     DOM.input.style.left = `${x}px`;
                     DOM.input.style.top = `${y}px`;
+                    DOM.input.style.width = '1px';
+                    DOM.input.style.height = '1px';
                     DOM.input.style.opacity = '0'; // Hidden but focused
-                    DOM.input.style.pointerEvents = 'none';
+                    DOM.input.style.pointerEvents = 'auto';
 
                     entity.isEditing = true;
                     entity.originalLabel = entity.label; // For cancel
@@ -1455,6 +1459,8 @@
                     const span = entity.querySelector('span');
                     const rect = span.getBoundingClientRect();
 
+                    entity.originalText = span.textContent;
+
                     DOM.input.style.left = `${rect.left}px`;
                     DOM.input.style.top = `${rect.top}px`;
 
@@ -1463,14 +1469,18 @@
                         const style = window.getComputedStyle(DOM.input);
                         const font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
                         const textWidth = getTextWidth(DOM.input.value, font);
-                        DOM.input.style.width = `${Math.max(textWidth + 10, rect.width, 20)}px`;
+                        DOM.input.style.width = `${Math.max(textWidth + 10, 20)}px`;
                     };
 
                     // Sync font size with zoomed node
                     const baseSize = 1.05 * 16; // 1.05rem in pixels
                     DOM.input.style.fontSize = `${baseSize * State.transform.scale}px`;
 
-                    DOM.input.oninput = updateWidth;
+                    DOM.input.oninput = () => {
+                        span.textContent = DOM.input.value;
+                        updateWidth();
+                        LineManager.render();
+                    };
 
                     DOM.input.style.height = `${rect.height}px`;
                     DOM.input.style.transform = 'none';
@@ -1492,11 +1502,15 @@
                     DOM.input.oninput = null; // Reset for new nodes
                 }
 
+                DOM.input.focus();
+                const length = DOM.input.value.length;
+                DOM.input.setSelectionRange(length, length);
                 setTimeout(() => {
-                    DOM.input.focus();
-                    const length = DOM.input.value.length;
-                    DOM.input.setSelectionRange(length, length);
-                }, 100);
+                    if (document.activeElement !== DOM.input) {
+                        DOM.input.focus();
+                        DOM.input.setSelectionRange(length, length);
+                    }
+                }, 50);
             },
             updatePosition() {
                 if (DOM.input.style.display === 'none') return;
@@ -1528,7 +1542,13 @@
 
                 if (entity && type === 'node') {
                     const span = entity.querySelector('span');
-                    if (span) span.style.visibility = 'visible';
+                    if (span) {
+                        span.style.visibility = 'visible';
+                        if (!State.interaction.didSave) {
+                            span.textContent = entity.originalText || '';
+                        }
+                    }
+                    delete entity.originalText;
                     entity.classList.remove('editing');
                 }
 
@@ -1945,7 +1965,8 @@
             });
 
             window.addEventListener('mousedown', e => {
-                if (e.target.closest('.tag') || e.target.closest('.selection-toolbar') || e.target.closest('.minimal-menu')) return;
+                State.interaction.isSelectingReady = false;
+                if (e.target === DOM.input || e.target.closest('.tag') || e.target.closest('.selection-toolbar') || e.target.closest('.minimal-menu')) return;
                 if (DOM.input.style.display !== 'none') DOM.input.blur();
                 Menu.hide();
                 Tag.deselect();
@@ -1955,6 +1976,9 @@
                 State.mouse.lastX = e.clientX; State.mouse.lastY = e.clientY;
                 if (e.button === 1 || (e.button === 0 && (e.altKey || e.ctrlKey))) {
                     State.interaction.isPanning = true; DOM.viewport.style.cursor = 'grabbing';
+                }
+                if (e.button === 0 && !e.altKey && !e.ctrlKey) {
+                    State.interaction.isSelectingReady = true;
                 }
 
                 // Reset long press
@@ -2014,7 +2038,7 @@
                     Input.updatePosition();
                 } else if (State.interaction.isLinking) {
                     LineManager.renderOverlay();
-                } else if (e.buttons === 1 && !State.interaction.isDragging && !State.interaction.isPanning) {
+                } else if (e.buttons === 1 && State.interaction.isSelectingReady && !State.interaction.isDragging && !State.interaction.isPanning) {
                     Selection.update(e.clientX, e.clientY);
                 }
                 State.mouse.lastX = e.clientX; State.mouse.lastY = e.clientY;
@@ -2060,6 +2084,7 @@
                         Tag.deselect();
                     }
                 }
+                State.interaction.isSelectingReady = false;
             });
 
             DOM.viewport.addEventListener('wheel', e => {
