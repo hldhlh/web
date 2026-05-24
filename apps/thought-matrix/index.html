@@ -826,6 +826,7 @@
         const SUPABASE_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
         const _client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const realtimeChannel = _client.channel('canvas_changes');
 
         const State = {
             transform: { x: 0, y: 0, scale: 1 },
@@ -901,7 +902,7 @@
                         for (const n of nodes) {
                             const node = document.getElementById(n.id);
                             if (!node) {
-                                await Tag.create(n.text, n.x, n.y, n.id, n.color);
+                                await Tag.create(n.text, n.x, n.y, n.id, n.color, n.bold, n.italic);
                             } else {
                                 // Update existing node if values changed, unless being edited
                                 if (State.interaction.contextEntity !== node) {
@@ -918,6 +919,8 @@
                                         ['orange', 'blue', 'purple', 'green', 'grey', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'].forEach(c => node.classList.remove(`color-${c}`));
                                         if (n.color) node.classList.add(`color-${n.color}`);
                                     }
+                                    if (n.bold !== undefined) node.querySelector('span').style.fontWeight = n.bold ? 'bold' : 'normal';
+                                    if (n.italic !== undefined) node.querySelector('span').style.fontStyle = n.italic ? 'italic' : 'normal';
                                 }
                             }
                         }
@@ -1012,7 +1015,7 @@
         }
 
         const Tag = {
-            async create(text, x, y, id = null, color = null) {
+            async create(text, x, y, id = null, color = null, bold = false, italic = false) {
                 const isNewDb = (id === null);
                 const node = document.createElement('div');
                 node.id = id || crypto.randomUUID();
@@ -1021,6 +1024,10 @@
                 node.style.left = `${x}px`;
                 node.style.top = `${y}px`;
                 node.dataset.x = x; node.dataset.y = y;
+
+                const span = node.querySelector('span');
+                if (bold) span.style.fontWeight = 'bold';
+                if (italic) span.style.fontStyle = 'italic';
 
                 // Load color if available
                 if (color) node.classList.add(`color-${color}`);
@@ -1056,6 +1063,12 @@
                     const conn = { id: crypto.randomUUID(), from_id: node.id, to_id: newNode.id };
                     await SyncManager.wrap(_client.from('canvas_connections').insert(conn));
                     State.connections.push(conn);
+                    // Broadcast new connection
+                    realtimeChannel.send({
+                        type: 'broadcast',
+                        event: 'conn_created',
+                        payload: conn
+                    });
                     LineManager.render();
 
                     // Auto focus and edit new node
@@ -1075,12 +1088,20 @@
                         text: text,
                         x: x,
                         y: y,
-                        color: color
+                        color: color,
+                        bold: bold,
+                        italic: italic
                     }));
+                    // Broadcast new node
+                    realtimeChannel.send({
+                        type: 'broadcast',
+                        event: 'node_created',
+                        payload: { id: node.id, text, x, y, color, bold, italic }
+                    });
                 }
                 return node;
             },
-            async deleteRecursive(nodeId) {
+            async deleteRecursive(nodeId, deleteFromDb = true) {
                 if (!nodeId) return;
 
                 // 1. Find all connections involving this node (source or target)
@@ -1091,10 +1112,13 @@
                     .filter(c => c.from_id === nodeId)
                     .map(c => c.to_id);
 
-                // 3. Delete all related connections from DB first (prevents FK violations)
+                // 3. Delete all related connections
+                if (deleteFromDb) {
+                    for (const conn of relatedConns) {
+                        await SyncManager.wrap(_client.from('canvas_connections').delete().eq('id', conn.id));
+                    }
+                }
                 for (const conn of relatedConns) {
-                    await SyncManager.wrap(_client.from('canvas_connections').delete().eq('id', conn.id));
-                    // Update local state immediately to prevent ghost rendering
                     State.connections = State.connections.filter(c => c.id !== conn.id);
                 }
 
@@ -1102,12 +1126,14 @@
                 for (const childId of childNodeIds) {
                     // Check if node exists to avoid errors on already deleted nodes
                     if (document.getElementById(childId)) {
-                        await this.deleteRecursive(childId);
+                        await this.deleteRecursive(childId, deleteFromDb);
                     }
                 }
 
-                // 5. Delete the node itself from DB
-                await SyncManager.wrap(_client.from('canvas_nodes').delete().eq('id', nodeId));
+                // 5. Delete the node itself
+                if (deleteFromDb) {
+                    await SyncManager.wrap(_client.from('canvas_nodes').delete().eq('id', nodeId));
+                }
 
                 // 6. Final local cleanup
                 const node = document.getElementById(nodeId);
@@ -1586,6 +1612,12 @@
                     if (type === 'connection') {
                         entity.label = val;
                         await SyncManager.wrap(_client.from('canvas_connections').update({ label: val }).eq('id', entity.id));
+                        // Broadcast connection label update
+                        realtimeChannel.send({
+                            type: 'broadcast',
+                            event: 'conn_updated',
+                            payload: { id: entity.id, label: val }
+                        });
                     } else if (type === 'node') {
                         const span = entity.querySelector('span');
                         const isNew = entity.dataset.isNew === 'true';
@@ -1594,6 +1626,12 @@
                             if (span) span.textContent = val;
                             if (isNew) delete entity.dataset.isNew;
                             await SyncManager.wrap(_client.from('canvas_nodes').update({ text: val }).eq('id', entity.id));
+                            // Broadcast node text update
+                            realtimeChannel.send({
+                                type: 'broadcast',
+                                event: 'node_text_updated',
+                                payload: { id: entity.id, text: val }
+                            });
                         } else {
                             if (isNew) {
                                 entity.remove();
@@ -1601,9 +1639,21 @@
                                 LineManager.render();
                                 await Tag.deleteRecursive(entity.id);
                                 Tag.deselect();
+                                // Broadcast node deletion
+                                realtimeChannel.send({
+                                    type: 'broadcast',
+                                    event: 'node_deleted',
+                                    payload: { id: entity.id }
+                                });
                             } else {
                                 if (span) span.textContent = val;
                                 await SyncManager.wrap(_client.from('canvas_nodes').update({ text: val }).eq('id', entity.id));
+                                // Broadcast node text update
+                                realtimeChannel.send({
+                                    type: 'broadcast',
+                                    event: 'node_text_updated',
+                                    payload: { id: entity.id, text: val }
+                                });
                             }
                         }
                     }
@@ -1673,7 +1723,7 @@
                     await SyncManager.wrap(_client.from('canvas_nodes').update({ color: color === 'none' ? null : color }).eq('id', entity.id));
                     
                     // Broadcast
-                    _client.channel('canvas_changes').send({
+                    realtimeChannel.send({
                         type: 'broadcast',
                         event: 'node_color',
                         payload: { id: entity.id, color: color === 'none' ? null : color }
@@ -1684,7 +1734,7 @@
                     await SyncManager.wrap(_client.from('canvas_connections').update({ color: color === 'none' ? null : color }).eq('id', entity.id));
                     
                     // Broadcast
-                    _client.channel('canvas_changes').send({
+                    realtimeChannel.send({
                         type: 'broadcast',
                         event: 'conn_color',
                         payload: { id: entity.id, color: color === 'none' ? null : color }
@@ -1740,10 +1790,22 @@
                     const isBold = span.style.fontWeight === 'bold';
                     span.style.fontWeight = isBold ? 'normal' : 'bold';
                     await SyncManager.wrap(_client.from('canvas_nodes').update({ bold: !isBold }).eq('id', node.id));
+                    // Broadcast
+                    realtimeChannel.send({
+                        type: 'broadcast',
+                        event: 'node_style_updated',
+                        payload: { id: node.id, bold: !isBold }
+                    });
                 } else if (style === 'italic') {
                     const isItalic = span.style.fontStyle === 'italic';
                     span.style.fontStyle = isItalic ? 'normal' : 'italic';
                     await SyncManager.wrap(_client.from('canvas_nodes').update({ italic: !isItalic }).eq('id', node.id));
+                    // Broadcast
+                    realtimeChannel.send({
+                        type: 'broadcast',
+                        event: 'node_style_updated',
+                        payload: { id: node.id, italic: !isItalic }
+                    });
                 }
             },
             async align(type) {
@@ -1778,6 +1840,19 @@
 
                 LineManager.render();
                 for (const t of tags) await Tag.updatePos(t);
+
+                // Broadcast alignment
+                const movedNodes = tags.map(t => ({
+                    id: t.id,
+                    x: parseFloat(t.dataset.x),
+                    y: parseFloat(t.dataset.y)
+                }));
+                realtimeChannel.send({
+                    type: 'broadcast',
+                    event: 'nodes_moved',
+                    payload: movedNodes
+                });
+
                 Input.updatePosition();
                 this.show(); // reposition toolbar
             }
@@ -1828,7 +1903,11 @@
             const { data: conns } = await _client.from('canvas_connections').select('*');
             const { data: viewState } = await _client.from('canvas_state').select('*').eq('id', 1).single();
 
-            if (nodes) for (const n of nodes) await Tag.create(n.text, n.x, n.y, n.id, n.color);
+            if (nodes) {
+                for (const n of nodes) {
+                    await Tag.create(n.text, n.x, n.y, n.id, n.color, n.bold, n.italic);
+                }
+            }
             if (conns) { State.connections = conns; LineManager.render(); }
             if (viewState) {
                 State.transform = { x: viewState.x, y: viewState.y, scale: viewState.scale };
@@ -1867,7 +1946,13 @@
                 Toolbar.hide();
                 try {
                     for (const t of tags) {
-                        await Tag.deleteRecursive(t.id);
+                        await Tag.deleteRecursive(t.id, true);
+                        // Broadcast node deletion
+                        realtimeChannel.send({
+                            type: 'broadcast',
+                            event: 'node_deleted',
+                            payload: { id: t.id }
+                        });
                     }
                 } catch (e) {
                     console.error("Batch deletion failed:", e);
@@ -1879,11 +1964,11 @@
             updateMatrix();
 
             // Realtime setup
-            _client.channel('canvas_changes')
+            realtimeChannel
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'canvas_nodes' }, payload => {
                     const { eventType, new: newTag, old: oldTag } = payload;
                     if (eventType === 'INSERT') {
-                        if (!document.getElementById(newTag.id)) Tag.create(newTag.text, newTag.x, newTag.y, newTag.id);
+                        if (!document.getElementById(newTag.id)) Tag.create(newTag.text, newTag.x, newTag.y, newTag.id, newTag.color, newTag.bold, newTag.italic);
                     } else if (eventType === 'UPDATE') {
                         const node = document.getElementById(newTag.id);
                         if (node) {
@@ -1902,6 +1987,10 @@
                                 ['orange', 'blue', 'purple', 'green', 'grey', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'].forEach(c => node.classList.remove(`color-${c}`));
                                 if (newTag.color) node.classList.add(`color-${newTag.color}`);
                             }
+
+                            // Update styles
+                            if (newTag.bold !== undefined) node.querySelector('span').style.fontWeight = newTag.bold ? 'bold' : 'normal';
+                            if (newTag.italic !== undefined) node.querySelector('span').style.fontStyle = newTag.italic ? 'italic' : 'normal';
 
                             LineManager.render();
                             Input.updatePosition();
@@ -1946,6 +2035,71 @@
                     const idx = State.connections.findIndex(c => c.id === id);
                     if (idx !== -1) {
                         State.connections[idx].color = color;
+                        LineManager.render();
+                    }
+                })
+                .on('broadcast', { event: 'nodes_moved' }, payload => {
+                    const nodes = payload.payload;
+                    nodes.forEach(n => {
+                        const node = document.getElementById(n.id);
+                        if (node && State.interaction.contextEntity !== node) {
+                            node.style.left = `${n.x}px`;
+                            node.style.top = `${n.y}px`;
+                            node.dataset.x = n.x;
+                            node.dataset.y = n.y;
+                        }
+                    });
+                    LineManager.render();
+                    Input.updatePosition();
+                })
+                .on('broadcast', { event: 'node_created' }, payload => {
+                    const n = payload.payload;
+                    if (!document.getElementById(n.id)) {
+                        Tag.create(n.text, n.x, n.y, n.id, n.color, n.bold, n.italic);
+                    }
+                })
+                .on('broadcast', { event: 'node_deleted' }, async payload => {
+                    const { id } = payload.payload;
+                    await Tag.deleteRecursive(id, false); // Local only!
+                    LineManager.render();
+                })
+                .on('broadcast', { event: 'node_text_updated' }, payload => {
+                    const { id, text } = payload.payload;
+                    const node = document.getElementById(id);
+                    if (node && State.interaction.contextEntity !== node) {
+                        node.querySelector('span').textContent = text;
+                        LineManager.render();
+                        Input.updatePosition();
+                    }
+                })
+                .on('broadcast', { event: 'node_style_updated' }, payload => {
+                    const { id, bold, italic } = payload.payload;
+                    const node = document.getElementById(id);
+                    if (node) {
+                        const span = node.querySelector('span');
+                        if (span) {
+                            if (bold !== undefined) span.style.fontWeight = bold ? 'bold' : 'normal';
+                            if (italic !== undefined) span.style.fontStyle = italic ? 'italic' : 'normal';
+                        }
+                    }
+                })
+                .on('broadcast', { event: 'conn_created' }, payload => {
+                    const conn = payload.payload;
+                    if (!State.connections.find(c => c.id === conn.id)) {
+                        State.connections.push(conn);
+                        LineManager.render();
+                    }
+                })
+                .on('broadcast', { event: 'conn_deleted' }, payload => {
+                    const { id } = payload.payload;
+                    State.connections = State.connections.filter(c => c.id !== id);
+                    LineManager.render();
+                })
+                .on('broadcast', { event: 'conn_updated' }, payload => {
+                    const { id, label } = payload.payload;
+                    const idx = State.connections.findIndex(c => c.id === id);
+                    if (idx !== -1) {
+                        State.connections[idx].label = label;
                         LineManager.render();
                     }
                 })
@@ -2061,6 +2215,19 @@
                 } else if (State.interaction.isDragging) {
                     State.interaction.isDragging = false;
                     State.interaction.selectedTags.forEach(t => Tag.updatePos(t));
+
+                    // Broadcast moved nodes
+                    const movedNodes = State.interaction.selectedTags.map(t => ({
+                        id: t.id,
+                        x: parseFloat(t.dataset.x),
+                        y: parseFloat(t.dataset.y)
+                    }));
+                    realtimeChannel.send({
+                        type: 'broadcast',
+                        event: 'nodes_moved',
+                        payload: movedNodes
+                    });
+
                     State.interaction.currentTag.classList.remove('dragging');
                     DOM.viewport.style.cursor = 'crosshair';
                     if (State.interaction.selectedTags.length >= 1) Toolbar.show();
@@ -2074,6 +2241,12 @@
                             const conn = { id: crypto.randomUUID(), from_id: fromId, to_id: toId };
                             await SyncManager.wrap(_client.from('canvas_connections').insert(conn));
                             State.connections.push(conn);
+                            // Broadcast connection created
+                            realtimeChannel.send({
+                                type: 'broadcast',
+                                event: 'conn_created',
+                                payload: conn
+                            });
                         }
                     }
                     State.interaction.isLinking = false; State.interaction.linkingFrom = null; LineManager.render();
@@ -2119,7 +2292,13 @@
             window.addEventListener('keydown', e => {
                 if ((e.key === 'Delete' || e.key === 'Backspace') && State.interaction.selectedTags.length > 0 && document.activeElement !== DOM.input) {
                     State.interaction.selectedTags.forEach(async t => {
-                        await Tag.deleteRecursive(t.id);
+                        await Tag.deleteRecursive(t.id, true);
+                        // Broadcast node deletion
+                        realtimeChannel.send({
+                            type: 'broadcast',
+                            event: 'node_deleted',
+                            payload: { id: t.id }
+                        });
                         LineManager.render();
                     });
                     State.interaction.selectedTags = [];
@@ -2166,11 +2345,23 @@
                 if (entity) {
                     try {
                         if (type === 'node') {
-                            await Tag.deleteRecursive(entity.id);
+                            await Tag.deleteRecursive(entity.id, true);
                             Tag.deselect();
+                            // Broadcast node deletion
+                            realtimeChannel.send({
+                                type: 'broadcast',
+                                event: 'node_deleted',
+                                payload: { id: entity.id }
+                            });
                         } else if (type === 'connection') {
                             State.connections = State.connections.filter(c => c.id !== entity.id);
                             await SyncManager.wrap(_client.from('canvas_connections').delete().eq('id', entity.id));
+                            // Broadcast connection deletion
+                            realtimeChannel.send({
+                                type: 'broadcast',
+                                event: 'conn_deleted',
+                                payload: { id: entity.id }
+                            });
                         }
                     } catch (e) {
                         console.error("Deletion failed:", e);
@@ -2391,6 +2582,19 @@
                     } else if (State.interaction.isDragging) {
                         State.interaction.isDragging = false;
                         State.interaction.selectedTags.forEach(t => Tag.updatePos(t));
+
+                        // Broadcast moved nodes
+                        const movedNodes = State.interaction.selectedTags.map(t => ({
+                            id: t.id,
+                            x: parseFloat(t.dataset.x),
+                            y: parseFloat(t.dataset.y)
+                        }));
+                        realtimeChannel.send({
+                            type: 'broadcast',
+                            event: 'nodes_moved',
+                            payload: movedNodes
+                        });
+
                         if (State.interaction.currentTag) {
                             State.interaction.currentTag.classList.remove('dragging');
                         }
