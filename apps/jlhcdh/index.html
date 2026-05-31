@@ -3289,6 +3289,15 @@
                             clearTimeout(window.renderTimer);
                             window.renderTimer = setTimeout(renderProducts, 300);
                         }
+                    } else {
+                        // 以前不在本地活跃列表中（之前已被软删，现从回收站恢复），需重新获取商品数据并刷新列表
+                        await fetchProducts();
+                        renderProducts();
+                        renderLocations();
+                        renderTags();
+                        if (document.getElementById('adminPage').classList.contains('active')) {
+                            renderAdminTable();
+                        }
                     }
 
                     // 管理后台如果打开则刷新
