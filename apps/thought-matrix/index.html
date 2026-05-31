@@ -828,6 +828,75 @@
         const _client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const realtimeChannel = _client.channel('canvas_changes');
 
+        // ========== 自定义极简密码确认弹窗 ==========
+        const CustomConfirm = {
+            show(message = '此操作需要管理员密码验证：', title = '敏感操作确认') {
+                return new Promise((resolve) => {
+                    const modal = document.getElementById('pwdConfirmModal');
+                    const titleEl = document.getElementById('pwdModalTitle');
+                    const descEl = document.getElementById('pwdModalDesc');
+                    const input = document.getElementById('pwdModalInput');
+                    const errorEl = document.getElementById('pwdModalError');
+                    const confirmBtn = document.getElementById('pwdModalConfirm');
+                    const cancelBtn = document.getElementById('pwdModalCancel');
+
+                    titleEl.textContent = title;
+                    descEl.textContent = message;
+                    input.value = '';
+                    errorEl.classList.add('opacity-0');
+                    errorEl.classList.remove('opacity-100');
+                    
+                    modal.classList.remove('pointer-events-none', 'opacity-0');
+                    modal.classList.add('opacity-100');
+                    const container = modal.querySelector('.modal-card-container');
+                    container.classList.remove('scale-95');
+                    container.classList.add('scale-100');
+                    
+                    // 延迟 focus 保证浏览器能调起键盘并聚焦
+                    setTimeout(() => input.focus(), 150);
+
+                    const cleanup = () => {
+                        modal.classList.add('pointer-events-none', 'opacity-0');
+                        modal.classList.remove('opacity-100');
+                        container.classList.remove('scale-100');
+                        container.classList.add('scale-95');
+                        confirmBtn.onclick = null;
+                        cancelBtn.onclick = null;
+                        input.onkeydown = null;
+                    };
+
+                    const onConfirm = () => {
+                        if (input.value === '123456') {
+                            cleanup();
+                            resolve(true);
+                        } else {
+                            errorEl.classList.remove('opacity-0');
+                            errorEl.classList.add('opacity-100');
+                            input.select();
+                            input.focus();
+                        }
+                    };
+
+                    const onCancel = () => {
+                        cleanup();
+                        resolve(false);
+                    };
+
+                    confirmBtn.onclick = onConfirm;
+                    cancelBtn.onclick = onCancel;
+                    input.onkeydown = (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            onConfirm();
+                        } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            onCancel();
+                        }
+                    };
+                });
+            }
+        };
+
         const State = {
             transform: { x: 0, y: 0, scale: 1 },
             mouse: { lastX: 0, lastY: 0, startX: 0, startY: 0, startTime: 0 },
@@ -1943,22 +2012,27 @@
                 const tags = [...State.interaction.selectedTags];
                 if (tags.length === 0) return;
                 
-                Toolbar.hide();
-                try {
-                    for (const t of tags) {
-                        await Tag.deleteRecursive(t.id, true);
-                        // Broadcast node deletion
-                        realtimeChannel.send({
-                            type: 'broadcast',
-                            event: 'node_deleted',
-                            payload: { id: t.id }
-                        });
+                const title = tags.length === 1 ? '删除节点' : '批量删除节点';
+                const msg = tags.length === 1 ? '确定要删除选中的节点及其子节点吗？此操作不可恢复。' : `确定要批量删除选中的 ${tags.length} 个节点及其子节点吗？此操作不可恢复。`;
+                
+                if (await CustomConfirm.show(msg, title)) {
+                    Toolbar.hide();
+                    try {
+                        for (const t of tags) {
+                            await Tag.deleteRecursive(t.id, true);
+                            // Broadcast node deletion
+                            realtimeChannel.send({
+                                type: 'broadcast',
+                                event: 'node_deleted',
+                                payload: { id: t.id }
+                            });
+                        }
+                    } catch (e) {
+                        console.error("Batch deletion failed:", e);
                     }
-                } catch (e) {
-                    console.error("Batch deletion failed:", e);
+                    Tag.deselect();
+                    LineManager.render();
                 }
-                Tag.deselect();
-                LineManager.render();
             };
 
             updateMatrix();
@@ -2289,19 +2363,27 @@
                 if (DOM.input.style.display !== 'none') Input.save();
             });
 
-            window.addEventListener('keydown', e => {
+            window.addEventListener('keydown', async e => {
                 if ((e.key === 'Delete' || e.key === 'Backspace') && State.interaction.selectedTags.length > 0 && document.activeElement !== DOM.input) {
-                    State.interaction.selectedTags.forEach(async t => {
-                        await Tag.deleteRecursive(t.id, true);
-                        // Broadcast node deletion
-                        realtimeChannel.send({
-                            type: 'broadcast',
-                            event: 'node_deleted',
-                            payload: { id: t.id }
-                        });
+                    e.preventDefault();
+                    const tags = [...State.interaction.selectedTags];
+                    const title = tags.length === 1 ? '删除节点' : '批量删除节点';
+                    const msg = tags.length === 1 ? '确定要删除选中的节点及其子节点吗？此操作不可恢复。' : `确定要批量删除选中的 ${tags.length} 个节点及其子节点吗？此操作不可恢复。`;
+                    
+                    if (await CustomConfirm.show(msg, title)) {
+                        for (const t of tags) {
+                            await Tag.deleteRecursive(t.id, true);
+                            // Broadcast node deletion
+                            realtimeChannel.send({
+                                type: 'broadcast',
+                                event: 'node_deleted',
+                                payload: { id: t.id }
+                            });
+                        }
+                        State.interaction.selectedTags = [];
                         LineManager.render();
-                    });
-                    State.interaction.selectedTags = [];
+                        Toolbar.hide();
+                    }
                 }
             });
 
@@ -2343,30 +2425,35 @@
                 const entity = Menu.contextEntity;
                 const type = Menu.contextType || 'node';
                 if (entity) {
-                    try {
-                        if (type === 'node') {
-                            await Tag.deleteRecursive(entity.id, true);
-                            Tag.deselect();
-                            // Broadcast node deletion
-                            realtimeChannel.send({
-                                type: 'broadcast',
-                                event: 'node_deleted',
-                                payload: { id: entity.id }
-                            });
-                        } else if (type === 'connection') {
-                            State.connections = State.connections.filter(c => c.id !== entity.id);
-                            await SyncManager.wrap(_client.from('canvas_connections').delete().eq('id', entity.id));
-                            // Broadcast connection deletion
-                            realtimeChannel.send({
-                                type: 'broadcast',
-                                event: 'conn_deleted',
-                                payload: { id: entity.id }
-                            });
+                    const confirmMsg = type === 'node' ? '确定要删除该节点及其子节点吗？此操作不可恢复。' : '确定要删除该连接线吗？此操作不可恢复。';
+                    const confirmTitle = type === 'node' ? '删除节点' : '删除连接线';
+                    
+                    if (await CustomConfirm.show(confirmMsg, confirmTitle)) {
+                        try {
+                            if (type === 'node') {
+                                await Tag.deleteRecursive(entity.id, true);
+                                Tag.deselect();
+                                // Broadcast node deletion
+                                realtimeChannel.send({
+                                    type: 'broadcast',
+                                    event: 'node_deleted',
+                                    payload: { id: entity.id }
+                                });
+                            } else if (type === 'connection') {
+                                State.connections = State.connections.filter(c => c.id !== entity.id);
+                                await SyncManager.wrap(_client.from('canvas_connections').delete().eq('id', entity.id));
+                                // Broadcast connection deletion
+                                realtimeChannel.send({
+                                    type: 'broadcast',
+                                    event: 'conn_deleted',
+                                    payload: { id: entity.id }
+                                });
+                            }
+                        } catch (e) {
+                            console.error("Deletion failed:", e);
                         }
-                    } catch (e) {
-                        console.error("Deletion failed:", e);
+                        LineManager.render();
                     }
-                    LineManager.render();
                 }
                 Menu.hide();
             });
@@ -2622,6 +2709,31 @@
 
         bootstrap();
     </script>
+
+    <!-- 简约密码确认对话框 -->
+    <div id="pwdConfirmModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 opacity-0 pointer-events-none transition-opacity duration-300" style="backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);">
+        <div class="modal-card-container bg-slate-900 border border-white border-opacity-10 rounded-2xl p-6 shadow-2xl max-w-sm w-full mx-4 transform scale-95 transition-transform duration-300" style="background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
+            <div class="text-center">
+                <div class="w-12 h-12 bg-rose-500 bg-opacity-10 text-rose-400 rounded-full flex items-center justify-center mx-auto mb-4 border border-rose-500 border-opacity-20">
+                    <svg class="w-6 h-6 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-100 mb-2" id="pwdModalTitle">确认操作</h3>
+                <p class="text-sm text-slate-400 mb-4" id="pwdModalDesc">此操作需要安全验证：</p>
+                <div class="mb-5 relative">
+                    <input type="password" id="pwdModalInput" class="w-full bg-slate-950 border border-white border-opacity-10 text-slate-100 rounded-xl px-4 py-3 text-center text-lg tracking-widest focus:outline-none focus:border-indigo-500 transition-colors" placeholder="••••••" autocomplete="off" style="background: rgba(2, 6, 23, 0.6);">
+                    <div id="pwdModalError" class="text-rose-500 text-xs mt-2 opacity-0 transition-opacity duration-200">密码错误，请重试</div>
+                </div>
+                <div class="flex gap-3">
+                    <button type="button" id="pwdModalCancel" class="flex-1 py-3 bg-white bg-opacity-5 hover:bg-opacity-10 text-slate-300 rounded-xl font-medium transition-all border border-white border-opacity-10">取消</button>
+                    <button type="button" id="pwdModalConfirm" class="flex-1 py-3 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-medium transition-all shadow-lg shadow-indigo-500/20">确定</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>

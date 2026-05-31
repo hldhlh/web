@@ -794,15 +794,18 @@
             transition: transform 0.2s;
         }
 
-        .fav-icon {
-            color: #ccc;
-            cursor: pointer;
-            padding: 10px;
-            transition: color 0.2s;
-        }
-
-        .fav-icon.active {
-            color: #ff9500;
+        .history-badge {
+            background: var(--input-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-sub);
+            padding: 2px 6px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
         }
 
         .qty-control {
@@ -1322,7 +1325,6 @@
             </div>
             <div style="display:flex; gap:8px;">
                 <button id="sortBtn" class="icon-btn" title="排序方式"><i class="fas fa-sort-amount-down"></i></button>
-                <button id="filterFavBtn" class="icon-btn"><i class="far fa-star"></i></button>
             </div>
         </div>
         <div class="filter-section-title"><i class="fas fa-tags"></i> 常用标签</div>
@@ -1494,9 +1496,13 @@
                     <label class="card-label">名称</label>
                     <input type="text" id="editName" class="card-input-small" required placeholder="如：土豆">
                 </div>
-                <div class="card-field" style="margin-bottom:24px;">
+                <div class="card-field" style="margin-bottom:16px;">
                     <label class="card-label">单位</label>
                     <input type="text" id="editUnit" class="card-input-small" required value="斤">
+                </div>
+                <div class="card-field" style="margin-bottom:24px;">
+                    <label class="card-label">标签 (逗号分隔)</label>
+                    <input type="text" id="editTagsInput" class="card-input-small" placeholder="如：后厨, 常用">
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                     <button type="button" class="btn-delete" style="background:#f2f2f7;color:#1d1d1f;"
@@ -1580,7 +1586,6 @@
             products: [],
             orders: {},
             currentLocation: '全部',
-            onlyFavorites: false,
             searchQuery: '',
             adminSearch: '',
             adminLoc: '全部',
@@ -1771,7 +1776,6 @@
             document.getElementById('searchInput').oninput = e => { state.searchQuery = e.target.value.trim(); renderProducts(); };
             document.getElementById('adminSearchInput').oninput = e => { state.adminSearch = e.target.value.trim(); renderAdminTable(); };
             document.getElementById('adminLocFilter').onchange = e => { state.adminLoc = e.target.value; renderAdminTable(); };
-            document.getElementById('filterFavBtn').onclick = () => { state.onlyFavorites = !state.onlyFavorites; document.getElementById('filterFavBtn').classList.toggle('active', state.onlyFavorites); renderProducts(); };
             document.getElementById('sortBtn').onclick = () => {
                 state.sortBy = state.sortBy === 'location' ? 'tags' : 'location';
                 showToast(`已按${state.sortBy === 'location' ? '定位' : '标签'}排序`);
@@ -1902,7 +1906,7 @@
         async function fetchProducts() {
             startSync();
             try {
-                const { data, error } = await sb.from('jlhcdh_products').select('*').eq('is_deleted', false).order('location');
+                const { data, error } = await sb.from('jlhcdh_products_view').select('*').eq('is_deleted', false).order('location');
                 if (data) {
                     state.products = data.map(p => ({
                         ...p,
@@ -2690,10 +2694,13 @@
             const nameInput = document.getElementById('editName');
             const locationInput = document.getElementById('editLocation');
             const unitInput = document.getElementById('editUnit');
+            const tagsInput = document.getElementById('editTagsInput');
 
             const name = nameInput.value.trim();
             const location = locationInput.value.trim();
             const unit = unitInput.value.trim() || '斤';
+            const tagsStr = tagsInput ? tagsInput.value.trim() : '';
+            const tags = tagsStr ? tagsStr.split(/[，,]/).map(t => t.trim()).filter(t => t) : [];
 
             // 验证必填字段
             if (!name || !location) {
@@ -2707,7 +2714,7 @@
             try {
                 // 注意：pinyin 字段是本地计算的，不存储在数据库中
                 const { data, error } = await sb.from('jlhcdh_products')
-                    .insert([{ name, location, unit, is_favorite: false, tags: [] }])
+                    .insert([{ name, location, unit, tags }])
                     .select();
 
                 if (error) {
@@ -2720,6 +2727,7 @@
                     nameInput.value = '';
                     locationInput.value = '';
                     unitInput.value = '斤';
+                    if (tagsInput) tagsInput.value = '';
                     const editLocSelect = document.getElementById('editLocationSelect');
                     if (editLocSelect) {
                         editLocSelect.value = '';
@@ -2747,7 +2755,7 @@
 
         function shouldIgnoreLongPress(event) {
             const target = event && event.target;
-            return !!(target && target.closest('button, input, select, textarea, .fav-icon, .check-wrapper, .qty-control, .btn-delete-icon'));
+            return !!(target && target.closest('button, input, select, textarea, .check-wrapper, .qty-control, .btn-delete-icon'));
         }
 
         window.startLongPress = (productId, event) => {
@@ -3022,7 +3030,7 @@
         function renderProducts() {
             let base = [...state.products];
 
-            // 1. 基础过滤 (搜索 + 收藏)
+            // 1. 基础过滤 (搜索)
             if (state.searchQuery) {
                 const q = state.searchQuery.toLowerCase();
                 base = base.filter(p => {
@@ -3032,11 +3040,8 @@
                     return nameMatch || pinyinMatch || locMatch;
                 });
             }
-            if (state.onlyFavorites) {
-                base = base.filter(p => p.is_favorite);
-            }
 
-            // 2. 交互式过滤响应 (定位按钮 受 搜索+收藏+已选标签 影响)
+            // 2. 交互式过滤响应 (定位按钮 受 搜索+已选标签 影响)
             let locContext = [...base];
             const activeTagsArray = Array.from(state.activeTags);
             if (activeTagsArray.length > 0) {
@@ -3073,6 +3078,8 @@
             document.getElementById('productList').innerHTML = f.map(p => {
                 const qty = state.orders[p.id]?.qty || '';
                 const tagsHtml = (p.tags || []).map(t => `<span class="tag-badge">${t}</span>`).join('');
+                const historyLabel = getHistoryLabel(p.last_purchased_date);
+                const historyBadgeHtml = historyLabel ? `<span class="history-badge"><i class="fas fa-history"></i> ${historyLabel}</span>` : '';
                 const prediction = state.predictions[p.id];
                 const predictionHtml = prediction && !qty ? getPredictionHintHtml(p, prediction) : '';
                 const qtyPlaceholder = '0';
@@ -3085,13 +3092,13 @@
                     ontouchmove="cancelLongPress()"
                     ontouchend="cancelLongPress()" 
                     ontouchcancel="cancelLongPress()">
-                    <div class="fav-icon ${p.is_favorite ? 'active' : ''}" onclick="toggleFav(${p.id})">
-                        <i class="fas fa-star"></i>
-                    </div>
                     <div style="flex:1;">
-                        <div style="font-weight:700;font-size:17px;display:flex;align-items:baseline;gap:8px;">
+                        <div style="font-weight:700;font-size:17px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
                             ${p.name}
-                            <div style="display:flex;gap:4px;">${tagsHtml}</div>
+                            <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
+                                ${tagsHtml}
+                                ${historyBadgeHtml}
+                            </div>
                         </div>
                         <div class="product-location-tag">
                             <i class="fas fa-location-arrow"></i> ${p.location}
@@ -3108,39 +3115,7 @@
             }).join('');
         }
 
-        window.toggleFav = async id => {
-            // 设置跳过实时事件的时间窗口
-            state.skipRealtimeUntil = Date.now() + 2000;
 
-            const p = state.products.find(x => x.id === id);
-            p.is_favorite = !p.is_favorite;
-
-            // 增量更新 UI：更新收藏图标状态
-            const favIcon = document.querySelector(`.product-card[data-id="${id}"] .fav-icon`);
-            if (favIcon) {
-                favIcon.classList.toggle('active', p.is_favorite);
-                const icon = favIcon.querySelector('i');
-                if (icon) {
-                    icon.className = p.is_favorite ? 'fas fa-star' : 'fas fa-star'; // 保持实心，通过颜色区分
-                }
-            }
-
-            startSync();
-            try {
-                const { error } = await sb.from('jlhcdh_products').update({ is_favorite: p.is_favorite }).eq('id', id);
-                if (error) throw error;
-                endSync(false);
-            } catch (e) {
-                console.error('收藏同步失败:', e);
-                // 失败时回滚
-                p.is_favorite = !p.is_favorite;
-                if (favIcon) {
-                    favIcon.classList.toggle('active', p.is_favorite);
-                }
-                endSync(true);
-                showToast('收藏失败');
-            }
-        };
 
         function setupRealtime() {
             setGlobalSyncStatus('connecting');
@@ -3252,10 +3227,12 @@
                     // 增量更新：更新本地产品数据
                     const productIndex = state.products.findIndex(p => p.id === changedProductId);
                     if (productIndex > -1) {
-                        // 保留 pinyin 字段，更新其他字段
+                        // 保留 pinyin 字段和 last_purchased_date 字段，更新其他字段
                         const oldPinyin = state.products[productIndex].pinyin;
+                        const oldLastPurchasedDate = state.products[productIndex].last_purchased_date;
                         state.products[productIndex] = {
                             ...payload.new,
+                            last_purchased_date: oldLastPurchasedDate,
                             pinyin: oldPinyin || (window.pinyinPro ? window.pinyinPro.pinyin(payload.new.name, { pattern: 'first', toneType: 'none' }).replace(/\s/g, '') : '')
                         };
 
@@ -3269,22 +3246,14 @@
                             // 更新单位
                             const unitEl = card.querySelector('span[style*="margin-left:8px"]');
                             if (unitEl) unitEl.textContent = payload.new.unit || '斤';
-
-                            // 关键：实时同步收藏状态
-                            const favIcon = card.querySelector('.fav-icon');
-                            if (favIcon) {
-                                favIcon.classList.toggle('active', !!payload.new.is_favorite);
-                                const icon = favIcon.querySelector('i');
-                                if (icon) icon.className = payload.new.is_favorite ? 'fas fa-star' : 'fas fa-star';
-                            }
                         }
 
                         // 更新核对页中的名称
                         const aggName = document.querySelector(`.agg-item #check-${changedProductId}`)?.closest('.agg-item')?.querySelector('.agg-name');
                         if (aggName) aggName.textContent = payload.new.name;
 
-                        // 如果有定位、标签或收藏状态变化，可能需要重新过滤列表
-                        if (state.onlyFavorites || state.currentLocation !== '全部' || state.activeTags.size > 0) {
+                        // 如果有定位或标签变化，可能需要重新过滤列表
+                        if (state.currentLocation !== '全部' || state.activeTags.size > 0) {
                             // 延迟一小会儿刷新，避免频繁抖动
                             clearTimeout(window.renderTimer);
                             window.renderTimer = setTimeout(renderProducts, 300);
@@ -3486,6 +3455,20 @@
             const m = String(n.getMonth() + 1).padStart(2, '0');
             const d = String(n.getDate()).padStart(2, '0');
             return `${y}-${m}-${d}`;
+        }
+
+        function getHistoryLabel(lastDateStr) {
+            if (!lastDateStr) return '';
+            const todayStr = getLocalBusinessDate();
+            if (lastDateStr === todayStr) return '今天买过';
+            const today = new Date(todayStr);
+            const lastDate = new Date(lastDateStr);
+            const diffTime = today.getTime() - lastDate.getTime();
+            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays === 1) return '昨天买过';
+            if (diffDays === 2) return '前天买过';
+            if (diffDays > 2) return `${diffDays}天前买过`;
+            return '';
         }
 
         function showToast(msg) {
