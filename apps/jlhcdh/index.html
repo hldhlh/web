@@ -1396,6 +1396,7 @@
             <div style="display: flex; gap: 8px;">
                 <select id="adminLocFilter" class="select-custom" style="flex: 1;"></select>
                 <button class="select-custom" style="padding: 0 12px; display: flex; align-items: center; justify-content: center;" onclick="openCategoryManager()" title="管理商品定位"><i class="fas fa-cog"></i></button>
+                <button class="select-custom" style="padding: 0 12px; display: flex; align-items: center; justify-content: center; background: rgba(255, 59, 48, 0.1); color: var(--accent);" onclick="openTrashBin()" title="回收站"><i class="fas fa-trash-alt"></i></button>
             </div>
         </div>
 
@@ -1447,6 +1448,22 @@
             <div style="display:flex; justify-content: center;">
                 <button type="button" class="btn-delete" style="background:#f2f2f7;color:#1d1d1f; width: 100%;"
                     onclick="closeCategoryManager()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 商品回收站模态框 -->
+    <div id="trashBinModal" class="modal">
+        <div class="modal-card" style="max-width: 600px; width: 90%;">
+            <h3 style="margin-bottom:24px;text-align:center;">商品回收站</h3>
+            
+            <div id="trashBinList" style="max-height: 400px; overflow-y: auto; margin-bottom: 24px; display: flex; flex-direction: column; gap: 8px;">
+                <!-- list items here -->
+            </div>
+
+            <div style="display:flex; justify-content: center;">
+                <button type="button" class="btn-delete" style="background:#f2f2f7;color:#1d1d1f; width: 100%;"
+                    onclick="closeTrashBin()">关闭</button>
             </div>
         </div>
     </div>
@@ -1527,8 +1544,8 @@
                     <input type="text" id="editProductTags" class="card-input-small" placeholder="如：后厨, 常用">
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
-                    <button type="button" class="btn-delete" onclick="deleteFromEditModal()">
-                        <i class="fas fa-trash-alt"></i> 删除
+                    <button type="button" class="btn-delete" onclick="deleteFromEditModal()" style="font-size: 13px; padding: 0 4px;">
+                        <i class="fas fa-trash-alt"></i> 移到回收站
                     </button>
                     <button type="button" class="btn-delete" style="background:#f2f2f7;color:#1d1d1f;"
                         onclick="closeEditProductModal()">取消</button>
@@ -1885,7 +1902,7 @@
         async function fetchProducts() {
             startSync();
             try {
-                const { data, error } = await sb.from('jlhcdh_products').select('*').order('location');
+                const { data, error } = await sb.from('jlhcdh_products').select('*').eq('is_deleted', false).order('location');
                 if (data) {
                     state.products = data.map(p => ({
                         ...p,
@@ -2298,6 +2315,120 @@
             document.getElementById('categoryManagerModal').classList.remove('visible');
         }
 
+        // ========== 回收站功能 ==========
+        window.openTrashBin = async () => {
+            if (!checkPassword('查看回收站')) return;
+            await renderTrashBin();
+            document.getElementById('trashBinModal').classList.add('visible');
+        };
+
+        window.closeTrashBin = () => {
+            document.getElementById('trashBinModal').classList.remove('visible');
+        };
+
+        window.renderTrashBin = async () => {
+            const listEl = document.getElementById('trashBinList');
+            listEl.innerHTML = '<div style="text-align:center; color:var(--text-sub); padding:20px;">加载中...</div>';
+            
+            try {
+                const { data, error } = await sb.from('jlhcdh_products')
+                    .select('*')
+                    .eq('is_deleted', true)
+                    .order('name');
+                
+                if (error) throw error;
+                
+                if (!data || data.length === 0) {
+                    listEl.innerHTML = '<div style="text-align:center; color:var(--text-sub); padding:20px;">回收站为空</div>';
+                    return;
+                }
+                
+                listEl.innerHTML = data.map(p => `
+                <div style="display: flex; align-items: center; justify-content: space-between; background: var(--glass-bg); padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--glass-border);">
+                    <div style="text-align: left;">
+                        <div style="font-weight: 600; font-size: 15px; color: var(--text);">${p.name}</div>
+                        <div style="font-size: 11px; color: var(--text-sub); margin-top: 2px;">
+                            定位: ${p.location || '未分类'} | 单位: ${p.unit || '斤'}
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn-delete" style="width: auto; padding: 4px 12px; background: rgba(52,199,89,0.1); color: #34c759; border: none; font-size: 13px;" onclick="restoreProduct(${p.id})">
+                            <i class="fas fa-undo-alt" style="font-size: 11px; margin-right: 4px;"></i> 恢复
+                        </button>
+                        <button class="btn-delete" style="width: auto; padding: 4px 12px; background: rgba(255,59,48,0.1); color: var(--accent); border: none; font-size: 13px;" onclick="deleteProductPermanently(${p.id}, '${p.name}')">
+                            <i class="fas fa-trash-alt" style="font-size: 11px; margin-right: 4px;"></i> 彻底删除
+                        </button>
+                    </div>
+                </div>
+                `).join('');
+            } catch (e) {
+                console.error('获取回收站商品失败:', e);
+                listEl.innerHTML = '<div style="text-align:center; color:var(--text-sub); padding:20px;">加载失败</div>';
+            }
+        };
+
+        window.restoreProduct = async (id) => {
+            state.skipRealtimeUntil = Date.now() + 2000;
+            startSync();
+            try {
+                const { error } = await sb.from('jlhcdh_products')
+                    .update({ is_deleted: false })
+                    .eq('id', id);
+                
+                if (error) {
+                    console.error('恢复商品失败:', error);
+                    showToast('恢复失败');
+                } else {
+                    showToast('已恢复商品');
+                    await renderTrashBin();
+                    await fetchProducts();
+                    renderProducts();
+                    renderLocations();
+                    renderTags();
+                    if (document.getElementById('adminPage').classList.contains('active')) {
+                        renderAdminTable();
+                    }
+                }
+                endSync(!!error);
+            } catch (e) {
+                console.error('恢复商品异常:', e);
+                showToast('恢复失败');
+                endSync(true);
+            }
+        };
+
+        window.deleteProductPermanently = async (id, name) => {
+            if (!checkPassword('彻底删除商品')) return;
+            if (!confirm(`警告：彻底删除 "${name}" 将无法恢复，且会清除该商品在所有订单和购物车中的记录。确定要继续吗？`)) {
+                return;
+            }
+            
+            state.skipRealtimeUntil = Date.now() + 2000;
+            startSync();
+            try {
+                const { error } = await sb.from('jlhcdh_products').delete().eq('id', id);
+                if (error) {
+                    console.error('彻底删除商品失败:', error);
+                    showToast('删除失败: ' + error.message);
+                } else {
+                    showToast('商品已彻底删除');
+                    await renderTrashBin();
+                    await fetchProducts();
+                    renderProducts();
+                    renderLocations();
+                    renderTags();
+                    if (document.getElementById('adminPage').classList.contains('active')) {
+                        renderAdminTable();
+                    }
+                }
+                endSync(!!error);
+            } catch (e) {
+                console.error('彻底删除商品异常:', e);
+                showToast('删除失败');
+                endSync(true);
+            }
+        };
+
         function renderCategoryManager() {
             const dynamicLocs = getDynamicLocations();
             const allLocs = getAllLocations();
@@ -2463,7 +2594,7 @@
                             value="${tags.join(', ')}" 
                             onchange="updateTags(${p.id}, this.value)">
                     </div>
-                    <button class="btn-delete-icon" onclick="deleteProduct(${p.id})" title="删除">
+                    <button class="btn-delete-icon" onclick="deleteProduct(${p.id})" title="移到回收站">
                         <i class="fas fa-trash-alt"></i>
                     </button>
                 </div>`;
@@ -2526,18 +2657,18 @@
         };
 
         window.deleteProduct = async id => {
-            if (!checkPassword('删除商品')) return;
-            if (confirm('删除后不可恢复，确定？')) {
+            if (!checkPassword('将商品移到回收站')) return;
+            if (confirm('确定要将此商品移到回收站吗？')) {
                 // 设置跳过实时事件的时间窗口
                 state.skipRealtimeUntil = Date.now() + 2000;
                 startSync();
                 try {
-                    const { error } = await sb.from('jlhcdh_products').delete().eq('id', id);
+                    const { error } = await sb.from('jlhcdh_products').update({ is_deleted: true }).eq('id', id);
                     if (error) {
-                        console.error('删除商品失败:', error);
-                        showToast('删除失败: ' + error.message);
+                        console.error('移到回收站失败:', error);
+                        showToast('操作失败: ' + error.message);
                     } else {
-                        showToast('已删除');
+                        showToast('已移到回收站');
                         await fetchProducts();
                         renderAdminTable();
                         renderLocations();
@@ -2546,8 +2677,8 @@
                     }
                     endSync(!!error);
                 } catch (e) {
-                    console.error('删除商品异常:', e);
-                    showToast('删除失败');
+                    console.error('移到回收站异常:', e);
+                    showToast('操作失败');
                     endSync(true);
                 }
             }
@@ -2728,11 +2859,11 @@
 
         // 从编辑模态框删除商品
         window.deleteFromEditModal = async () => {
-            if (!checkPassword('删除商品')) return;
+            if (!checkPassword('将商品移到回收站')) return;
             const id = parseInt(document.getElementById('editProductId').value);
             const name = document.getElementById('editProductName').value;
 
-            if (!confirm(`确定要删除 "${name}" 吗？此操作不可恢复。`)) {
+            if (!confirm(`确定要将 "${name}" 移到回收站吗？`)) {
                 return;
             }
 
@@ -2740,12 +2871,12 @@
             startSync();
 
             try {
-                const { error } = await sb.from('jlhcdh_products').delete().eq('id', id);
+                const { error } = await sb.from('jlhcdh_products').update({ is_deleted: true }).eq('id', id);
                 if (error) {
-                    console.error('删除商品失败:', error);
-                    showToast('删除失败: ' + error.message);
+                    console.error('移到回收站失败:', error);
+                    showToast('操作失败: ' + error.message);
                 } else {
-                    showToast('已删除: ' + name);
+                    showToast('已移到回收站: ' + name);
                     closeEditProductModal();
                     await fetchProducts();
                     renderProducts();
@@ -2761,8 +2892,8 @@
                 }
                 endSync(!!error);
             } catch (e) {
-                console.error('删除商品异常:', e);
-                showToast('删除失败');
+                console.error('移到回收站异常:', e);
+                showToast('操作失败');
                 endSync(true);
             }
         };
@@ -3117,7 +3248,7 @@
 
                 const changedProductId = payload.new?.id || payload.old?.id;
 
-                if (payload.eventType === 'UPDATE' && payload.new) {
+                if (payload.eventType === 'UPDATE' && payload.new && !payload.new.is_deleted) {
                     // 增量更新：更新本地产品数据
                     const productIndex = state.products.findIndex(p => p.id === changedProductId);
                     if (productIndex > -1) {
