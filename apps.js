@@ -16,6 +16,7 @@ export async function getAppDirectories() {
     { name: "SVG", path: "svg/index.html" },
     { name: "日志", path: "log/index.html" },
     { name: "蔬菜盘点程序", path: "vegcheck/index.html" },
-    { name: "情景故事", path: "course/index.html" }
+    { name: "情景故事", path: "course/index.html" },
+    { name: "我的头像", path: "avatar/index.html" }
   ];
 }
