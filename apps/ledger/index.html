@@ -8,7 +8,9 @@
   <!-- Supabase JS Library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Google Fonts Outfit & Inter -->
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
   <style>
     :root {
       --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -72,8 +74,10 @@
       justify-content: center;
       padding: 1.5rem 1rem;
       transition: background-color 0.4s ease, color 0.4s ease;
-      -ms-overflow-style: none;  /* IE and Edge */
-      scrollbar-width: none;  /* Firefox */
+      -ms-overflow-style: none;
+      /* IE and Edge */
+      scrollbar-width: none;
+      /* Firefox */
     }
 
     .app-layout {
@@ -141,27 +145,6 @@
       gap: 1.5rem;
     }
 
-    .scope-selector {
-      display: flex;
-      background: var(--bg-input);
-      border-radius: 20px;
-      padding: 3px;
-      width: 220px;
-    }
-
-    .scope-btn {
-      flex: 1;
-      padding: 0.45rem;
-      border: none;
-      background: transparent;
-      color: var(--text-secondary);
-      font-weight: 600;
-      font-size: 0.8rem;
-      cursor: pointer;
-      border-radius: 17px;
-      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
     .scope-btn.active {
       background: var(--bg-card);
       color: var(--text-primary);
@@ -205,8 +188,13 @@
     }
 
     @keyframes expandLine {
-      from { transform: scaleX(0); }
-      to { transform: scaleX(1); }
+      from {
+        transform: scaleX(0);
+      }
+
+      to {
+        transform: scaleX(1);
+      }
     }
 
     .balance-label {
@@ -333,6 +321,7 @@
       .modal-backdrop {
         align-items: center;
       }
+
       .modal-content {
         border-radius: 28px;
         border: 1px solid var(--border-color);
@@ -340,6 +329,7 @@
         opacity: 0;
         transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s;
       }
+
       .modal-backdrop.active .modal-content {
         transform: translateY(0) scale(1);
         opacity: 1;
@@ -461,16 +451,6 @@
       color: var(--income);
     }
 
-    .segmented-btn.active[data-scope="public"] {
-      background: var(--public-bg);
-      color: var(--public-color);
-    }
-
-    .segmented-btn.active[data-scope="private"] {
-      background: var(--private-bg);
-      color: var(--private-color);
-    }
-
     /* Category selection pill box */
     .category-pills {
       display: flex;
@@ -518,11 +498,7 @@
       fill: none;
     }
 
-    .form-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-    }
+
 
     .text-input {
       width: 100%;
@@ -539,6 +515,136 @@
 
     .text-input:focus {
       border-color: var(--text-primary);
+    }
+
+    /* Custom Calendar Style */
+    .calendar-dropdown {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 0;
+      right: 0;
+      width: 100%;
+      background: var(--bg-card);
+      backdrop-filter: blur(var(--card-blur));
+      -webkit-backdrop-filter: blur(var(--card-blur));
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 1rem;
+      box-shadow: 0 -12px 30px var(--shadow-color), 0 12px 30px var(--shadow-color);
+      z-index: 120;
+      animation: slideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.8rem;
+    }
+
+    .calendar-month-year {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--text-primary);
+    }
+
+    .calendar-nav-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      transition: background 0.2s;
+    }
+
+    .calendar-nav-btn:hover {
+      background: var(--bg-card);
+      color: var(--text-primary);
+    }
+
+    .calendar-weekdays {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      text-align: center;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 0.5rem;
+    }
+
+    .calendar-days {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+
+    .calendar-day {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 500;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: var(--text-primary);
+      user-select: none;
+    }
+
+    .calendar-day:hover {
+      background: var(--bg-card);
+    }
+
+    .calendar-day.other-month {
+      color: var(--text-secondary);
+      opacity: 0.25;
+    }
+
+    .calendar-day.selected {
+      background: var(--text-primary);
+      color: var(--bg-color);
+      font-weight: 700;
+    }
+
+    .calendar-day.today {
+      border: 1.5px solid var(--text-primary);
+    }
+
+    .calendar-footer {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 0.8rem;
+      border-top: 1px solid var(--border-color);
+      padding-top: 0.6rem;
+    }
+
+    .calendar-footer-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-weight: 700;
+      font-size: 0.78rem;
+      cursor: pointer;
+      padding: 0.2rem 0.6rem;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+
+    .calendar-footer-btn:hover {
+      background: var(--bg-card);
     }
 
     .btn-save {
@@ -609,8 +715,15 @@
     }
 
     @keyframes animFadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .tx-icon-box {
@@ -650,23 +763,6 @@
     .tx-category {
       font-weight: 600;
       font-size: 0.9rem;
-    }
-
-    .tx-badge {
-      font-size: 0.65rem;
-      font-weight: 700;
-      padding: 0.05rem 0.3rem;
-      border-radius: 5px;
-    }
-
-    .tx-badge.public {
-      background: var(--public-bg);
-      color: var(--public-color);
-    }
-
-    .tx-badge.private {
-      background: var(--private-bg);
-      color: var(--private-color);
     }
 
     .tx-note {
@@ -846,13 +942,15 @@
     <!-- Top Navigation Header -->
     <header class="header">
       <a href="../../index.html" class="btn-icon" title="返回首页" style="text-decoration:none;">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
           <polyline points="15 18 9 12 15 6" />
         </svg>
       </a>
       <h1>记账</h1>
       <button id="theme-toggle-btn" class="btn-icon" title="切换主题">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="5" />
           <line x1="12" y1="1" x2="12" y2="3" />
           <line x1="12" y1="21" x2="12" y2="23" />
@@ -868,19 +966,12 @@
 
     <!-- Main Dashboard summary card -->
     <section class="dashboard">
-      <div style="display:flex; flex-direction:column; gap:0.5rem; align-items:center; width:100%;">
-        <div class="scope-selector">
-          <button class="scope-btn active" data-filter="all">全部</button>
-          <button class="scope-btn" data-filter="public">公账</button>
-          <button class="scope-btn" data-filter="private">私账</button>
-        </div>
-        <div class="time-selector">
-          <button class="time-btn active" data-time="all">全部</button>
-          <button class="time-btn" data-time="year">年</button>
-          <button class="time-btn" data-time="month">月</button>
-          <button class="time-btn" data-time="week">周</button>
-          <button class="time-btn" data-time="day">日</button>
-        </div>
+      <div class="time-selector">
+        <button class="time-btn active" data-time="all">全部</button>
+        <button class="time-btn" data-time="year">年</button>
+        <button class="time-btn" data-time="month">月</button>
+        <button class="time-btn" data-time="week">周</button>
+        <button class="time-btn" data-time="day">日</button>
       </div>
 
       <div style="display:flex; flex-direction:column; gap:0.25rem;">
@@ -893,7 +984,8 @@
           <span class="summary-label">收入</span>
           <span class="summary-val income" id="total-income">¥0.00</span>
         </div>
-        <div class="summary-item" style="border-left: 1px solid var(--border-color); height: 30px; align-self: center;"></div>
+        <div class="summary-item" style="border-left: 1px solid var(--border-color); height: 30px; align-self: center;">
+        </div>
         <div class="summary-item">
           <span class="summary-label">支出</span>
           <span class="summary-val expense" id="total-expense">¥0.00</span>
@@ -904,7 +996,8 @@
     <!-- Minimal Category Analytics Trigger & Box -->
     <div class="analysis-trigger" id="analysis-trigger">
       <span class="analysis-trigger-title">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
           <line x1="18" y1="20" x2="18" y2="10"></line>
           <line x1="12" y1="20" x2="12" y2="4"></line>
           <line x1="6" y1="20" x2="6" y2="14"></line>
@@ -920,7 +1013,8 @@
     <!-- Transaction List Grouped by Date -->
     <main class="transactions-container" id="transactions-container">
       <div class="empty-state">
-        <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
           <line x1="9" y1="9" x2="15" y2="9"></line>
           <line x1="9" y1="13" x2="15" y2="13"></line>
@@ -932,7 +1026,8 @@
 
     <!-- Floating Action Button to open Drawer -->
     <button class="fab" id="open-modal-btn" title="记一笔">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+        stroke-linecap="round" stroke-linejoin="round">
         <line x1="12" y1="5" x2="12" y2="19" />
         <line x1="5" y1="12" x2="19" y2="12" />
       </svg>
@@ -956,21 +1051,11 @@
         </div>
 
         <!-- Segment Type Selection -->
-        <div class="form-row">
-          <div class="form-group">
-            <label>账目类型</label>
-            <div class="segmented" id="form-type">
-              <button class="segmented-btn active" data-type="expense">支出</button>
-              <button class="segmented-btn" data-type="income">收入</button>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>归属</label>
-            <div class="segmented" id="form-scope">
-              <button class="segmented-btn active" data-scope="public">公账</button>
-              <button class="segmented-btn" data-scope="private">私账</button>
-            </div>
+        <div class="form-group">
+          <label>账目类型</label>
+          <div class="segmented" id="form-type">
+            <button class="segmented-btn active" data-type="expense">支出</button>
+            <button class="segmented-btn" data-type="income">收入</button>
           </div>
         </div>
 
@@ -982,15 +1067,35 @@
           </div>
         </div>
 
-        <!-- Date & Notes -->
-        <div class="form-row">
-          <div class="form-group">
-            <label for="tx-date">日期</label>
-            <input type="date" id="tx-date" class="text-input" required>
-          </div>
-          <div class="form-group">
-            <label for="tx-desc">备注</label>
-            <input type="text" id="tx-desc" class="text-input" placeholder="选填，如午餐、打车等">
+        <!-- Remarks -->
+        <div class="form-group">
+          <label for="tx-desc">备注</label>
+          <input type="text" id="tx-desc" class="text-input" placeholder="选填，如午餐、打车等">
+        </div>
+
+        <!-- Date -->
+        <div class="form-group" style="position: relative;">
+          <label for="tx-date">日期</label>
+          <input type="text" id="tx-date" class="text-input" readonly style="cursor: pointer;" required>
+          
+          <!-- Custom Calendar Dropdown -->
+          <div class="calendar-dropdown" id="calendar-dropdown">
+            <div class="calendar-header">
+              <button type="button" class="calendar-nav-btn" id="cal-prev-month">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              </button>
+              <span class="calendar-month-year" id="cal-month-year">2026年06月</span>
+              <button type="button" class="calendar-nav-btn" id="cal-next-month">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </button>
+            </div>
+            <div class="calendar-weekdays">
+              <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+            </div>
+            <div class="calendar-days" id="calendar-days"></div>
+            <div class="calendar-footer">
+              <button type="button" class="calendar-footer-btn" id="cal-btn-today">今天</button>
+            </div>
           </div>
         </div>
 
@@ -1011,10 +1116,8 @@
 
     // App State
     let transactions = [];
-    let currentFilter = 'all'; // 'all', 'public', 'private'
     let currentTimeFilter = 'all'; // 'all', 'week', 'month', 'year'
     let selectedType = 'expense'; // 'expense', 'income'
-    let selectedScope = 'public'; // 'public', 'private'
     let selectedCategory = '';
     let editingTransactionId = null; // null for add mode, UUID for edit mode
 
@@ -1025,7 +1128,7 @@
         { name: '购物', icon: `<svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" stroke-width="2" stroke-linecap="round"/></svg>` },
         { name: '交通', icon: `<svg viewBox="0 0 24 24"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="17" r="2" stroke-width="2"/><circle cx="17" cy="17" r="2" stroke-width="2"/></svg>` },
         { name: '娱乐', icon: `<svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="3" stroke-width="2"/><path d="M6 12h4M8 10v4M15 11h.01M18 13h.01" stroke-width="2" stroke-linecap="round"/></svg>` },
-        { name: '生活缴费', icon: `<svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke-width="2" stroke-linejoin="round"/></svg>` },
+        { name: '虚拟充值', icon: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-width="2"/><polygon points="13 6 8 13 12 13 11 18 16 11 12 11" stroke-width="2" stroke-linejoin="round"/></svg>` },
         { name: '人情往来', icon: `<svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M12 2s-3 4-3 6a3 3 0 0 0 6 0c0-2-3-6-3-6z" stroke-width="2"/></svg>` },
         { name: '其它', icon: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01" stroke-width="2" stroke-linecap="round"/></svg>` }
       ],
@@ -1039,7 +1142,6 @@
 
     // DOM References
     const themeBtn = document.getElementById('theme-toggle-btn');
-    const filterBtns = document.querySelectorAll('.scope-selector button');
     const timeBtns = document.querySelectorAll('.time-selector button');
     const mainBalance = document.getElementById('total-balance');
     const mainIncome = document.getElementById('total-income');
@@ -1056,12 +1158,20 @@
     const closeModalBtn = document.getElementById('close-modal-btn');
     const amountInput = document.getElementById('tx-amount');
     const typeBtns = document.querySelectorAll('#form-type button');
-    const scopeBtns = document.querySelectorAll('#form-scope button');
     const pillsContainer = document.getElementById('category-pills');
     const dateInput = document.getElementById('tx-date');
     const descInput = document.getElementById('tx-desc');
     const saveBtn = document.getElementById('save-btn');
     const toast = document.getElementById('toast');
+
+    // Custom Calendar DOM Elements
+    const calDropdown = document.getElementById('calendar-dropdown');
+    const calMonthYear = document.getElementById('cal-month-year');
+    const calDaysContainer = document.getElementById('calendar-days');
+    const calPrevBtn = document.getElementById('cal-prev-month');
+    const calNextBtn = document.getElementById('cal-next-month');
+    const calTodayBtn = document.getElementById('cal-btn-today');
+    let calCurrentDate = new Date();
 
     // Theme Management
     function initTheme() {
@@ -1074,16 +1184,6 @@
       const nextTheme = currentTheme === 'light' ? 'dark' : 'light';
       document.body.setAttribute('data-theme', nextTheme);
       localStorage.setItem('app-theme', nextTheme);
-    });
-
-    // Scope Filter Change
-    filterBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        filterBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        currentFilter = btn.dataset.filter;
-        renderApp();
-      });
     });
 
     // Time Filter Change
@@ -1107,6 +1207,7 @@
 
     function closeModal() {
       modalBackdrop.classList.remove('active');
+      calDropdown.style.display = 'none';
     }
 
     closeModalBtn.addEventListener('click', closeModal);
@@ -1114,28 +1215,168 @@
       if (e.target === modalBackdrop) closeModal();
     });
 
+    // Custom Calendar Logic
+    function syncCalendarFromInput() {
+      if (dateInput.value) {
+        calCurrentDate = new Date(dateInput.value + 'T00:00:00');
+      } else {
+        calCurrentDate = new Date();
+      }
+      renderCalendar();
+    }
+
+    // Toggle Calendar Dropdown
+    dateInput.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = calDropdown.style.display === 'block';
+      if (isOpen) {
+        calDropdown.style.display = 'none';
+      } else {
+        calDropdown.style.display = 'block';
+        syncCalendarFromInput();
+      }
+    });
+
+    // Close calendar when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!calDropdown.contains(e.target) && e.target !== dateInput) {
+        calDropdown.style.display = 'none';
+      }
+    });
+
+    calPrevBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      calCurrentDate.setMonth(calCurrentDate.getMonth() - 1);
+      renderCalendar();
+    });
+
+    calNextBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      calCurrentDate.setMonth(calCurrentDate.getMonth() + 1);
+      renderCalendar();
+    });
+
+    calTodayBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const today = new Date();
+      setSelectedDate(today);
+      calDropdown.style.display = 'none';
+    });
+
+    function setSelectedDate(date) {
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      dateInput.value = `${yyyy}-${mm}-${dd}`;
+      dateInput.dispatchEvent(new Event('change'));
+    }
+
+    function renderCalendar() {
+      const year = calCurrentDate.getFullYear();
+      const month = calCurrentDate.getMonth(); // 0-indexed
+
+      // Set Header Month Year
+      calMonthYear.innerText = `${year}年${String(month + 1).padStart(2, '0')}月`;
+
+      calDaysContainer.innerHTML = '';
+
+      // First day of current month (0 is Sunday, 1 is Monday, etc.)
+      const firstDayIndex = new Date(year, month, 1).getDay();
+      const startDayOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+
+      // Total days in current month
+      const totalDays = new Date(year, month + 1, 0).getDate();
+
+      // Total days in previous month
+      const prevTotalDays = new Date(year, month, 0).getDate();
+
+      const today = new Date();
+      const selected = dateInput.value ? new Date(dateInput.value + 'T00:00:00') : null;
+
+      // 1. Previous month trailing days
+      for (let i = startDayOffset - 1; i >= 0; i--) {
+        const dayNum = prevTotalDays - i;
+        const dayEl = createDayElement(dayNum, true);
+        
+        const d = new Date(year, month - 1, dayNum);
+        dayEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          setSelectedDate(d);
+          calDropdown.style.display = 'none';
+        });
+
+        calDaysContainer.appendChild(dayEl);
+      }
+
+      // 2. Current month days
+      for (let i = 1; i <= totalDays; i++) {
+        const dayEl = createDayElement(i, false);
+
+        if (selected && selected.getFullYear() === year && selected.getMonth() === month && selected.getDate() === i) {
+          dayEl.classList.add('selected');
+        }
+
+        if (today.getFullYear() === year && today.getMonth() === month && today.getDate() === i) {
+          dayEl.classList.add('today');
+        }
+
+        const d = new Date(year, month, i);
+        dayEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          setSelectedDate(d);
+          calDropdown.style.display = 'none';
+        });
+
+        calDaysContainer.appendChild(dayEl);
+      }
+
+      // 3. Next month leading days (to make 42 days total)
+      const currentRenderedCount = startDayOffset + totalDays;
+      const nextDaysCount = 42 - currentRenderedCount;
+
+      for (let i = 1; i <= nextDaysCount; i++) {
+        const dayEl = createDayElement(i, true);
+
+        const d = new Date(year, month + 1, i);
+        dayEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          setSelectedDate(d);
+          calDropdown.style.display = 'none';
+        });
+
+        calDaysContainer.appendChild(dayEl);
+      }
+    }
+
+    function createDayElement(num, isOtherMonth) {
+      const div = document.createElement('div');
+      div.className = 'calendar-day';
+      if (isOtherMonth) {
+        div.classList.add('other-month');
+      }
+      div.innerText = num;
+      return div;
+    }
+
     // Form Initialization
     function initForm() {
       // Amount
       amountInput.value = '';
-      
+
       // Date default today
       const today = new Date();
       const yyyy = today.getFullYear();
       const mm = String(today.getMonth() + 1).padStart(2, '0');
       const dd = String(today.getDate()).padStart(2, '0');
       dateInput.value = `${yyyy}-${mm}-${dd}`;
-      
+
       // Desc
       descInput.value = '';
-      
+
       // Reset Segments
       typeBtns.forEach(b => b.classList.toggle('active', b.dataset.type === 'expense'));
       selectedType = 'expense';
-      
-      scopeBtns.forEach(b => b.classList.toggle('active', b.dataset.scope === 'public'));
-      selectedScope = 'public';
-      
+
       renderPills();
       setTimeout(() => amountInput.focus(), 150);
     }
@@ -1150,19 +1391,11 @@
       });
     });
 
-    scopeBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        scopeBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        selectedScope = btn.dataset.scope;
-      });
-    });
-
     // Render category pills in form
     function renderPills() {
       pillsContainer.innerHTML = '';
       const list = categoriesConfig[selectedType];
-      
+
       list.forEach((cat, index) => {
         const pill = document.createElement('div');
         pill.className = 'category-pill';
@@ -1191,29 +1424,25 @@
       editingTransactionId = tx.id;
       modalTitle.innerText = '编辑账单';
       saveBtn.innerText = '确认修改';
-      
+
       // Pre-fill amount
       amountInput.value = tx.amount;
-      
+
       // Date
       dateInput.value = tx.date;
-      
+
       // Desc
       descInput.value = tx.description || '';
-      
+
       // Type
       selectedType = tx.type;
       typeBtns.forEach(b => b.classList.toggle('active', b.dataset.type === tx.type));
-      
-      // Scope
-      selectedScope = tx.scope;
-      scopeBtns.forEach(b => b.classList.toggle('active', b.dataset.scope === tx.scope));
-      
+
       // Render Category pills, ensuring the current one is selected
       pillsContainer.innerHTML = '';
       const list = categoriesConfig[selectedType];
       selectedCategory = tx.category;
-      
+
       list.forEach((cat) => {
         const pill = document.createElement('div');
         pill.className = 'category-pill';
@@ -1234,7 +1463,7 @@
 
         pillsContainer.appendChild(pill);
       });
-      
+
       modalBackdrop.classList.add('active');
       setTimeout(() => amountInput.focus(), 150);
     }
@@ -1261,7 +1490,7 @@
 
       const record = {
         type: selectedType,
-        scope: selectedScope,
+        scope: 'private',
         amount: amount,
         date: date,
         category: selectedCategory,
@@ -1324,7 +1553,7 @@
       } else if (dateStr === toDateString(yesterday)) {
         return '昨天';
       }
-      
+
       // Return formatting "MM月DD日"
       const parts = dateStr.split('-');
       if (parts.length === 3) {
@@ -1336,9 +1565,9 @@
     function isToday(dateStr) {
       const date = new Date(dateStr + 'T00:00:00');
       const now = new Date();
-      return date.getFullYear() === now.getFullYear() && 
-             date.getMonth() === now.getMonth() && 
-             date.getDate() === now.getDate();
+      return date.getFullYear() === now.getFullYear() &&
+        date.getMonth() === now.getMonth() &&
+        date.getDate() === now.getDate();
     }
 
     function isInCurrentWeek(dateStr) {
@@ -1370,10 +1599,6 @@
     function renderApp() {
       // 1. Filtered records
       const filtered = transactions.filter(tx => {
-        // Scope filter
-        const matchesScope = currentFilter === 'all' || tx.scope === currentFilter;
-        if (!matchesScope) return false;
-
         // Time filter
         if (currentTimeFilter === 'all') return true;
         if (currentTimeFilter === 'day') return isToday(tx.date);
@@ -1432,7 +1657,7 @@
       analysisDrawer.innerHTML = '';
       sorted.forEach(([catName, amt]) => {
         const pct = Math.round((amt / totalExpense) * 100);
-        
+
         const row = document.createElement('div');
         row.className = 'analysis-bar-row';
         row.innerHTML = `
@@ -1446,7 +1671,7 @@
         `;
 
         analysisDrawer.appendChild(row);
-        
+
         setTimeout(() => {
           const fill = row.querySelector('.analysis-progress-fill');
           if (fill) fill.style.width = `${pct}%`;
@@ -1496,9 +1721,9 @@
           const val = parseFloat(tx.amount);
           dayNet += tx.type === 'income' ? val : -val;
         });
-        
-        const daySumText = dayNet >= 0 
-          ? `+${dayNet.toFixed(2)}` 
+
+        const daySumText = dayNet >= 0
+          ? `+${dayNet.toFixed(2)}`
           : `${dayNet.toFixed(2)}`;
 
         // Header
@@ -1525,10 +1750,7 @@
               ${iconSvg}
             </div>
             <div class="tx-details">
-              <div class="tx-top-row">
-                <span class="tx-category">${tx.category}</span>
-                <span class="tx-badge ${tx.scope}">${tx.scope === 'public' ? '公' : '私'}</span>
-              </div>
+              <span class="tx-category">${tx.category}</span>
               ${tx.description ? `<span class="tx-note">${escapeHTML(tx.description)}</span>` : ''}
             </div>
             <div class="tx-right">
@@ -1588,7 +1810,7 @@
     }
 
     function escapeHTML(str) {
-      return str.replace(/[&<>'"]/g, 
+      return str.replace(/[&<>'"]/g,
         tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
       );
     }
@@ -1629,7 +1851,7 @@
           },
           (payload) => {
             const { eventType, new: newRec, old: oldRec } = payload;
-            
+
             if (eventType === 'INSERT') {
               transactions.unshift(newRec);
               transactions.sort((a, b) => {
@@ -1638,7 +1860,7 @@
                 return new Date(b.created_at) - new Date(a.created_at);
               });
               showToast('同步到一笔新账目', 'success');
-            } 
+            }
             else if (eventType === 'DELETE') {
               const el = document.querySelector(`.tx-item[data-id="${oldRec.id}"]`);
               if (el) {

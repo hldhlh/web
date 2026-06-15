@@ -1,16 +1,21 @@
 <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="ledger-grad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#34D399" />
-      <stop offset="100%" style="stop-color:#059669" />
+    <linearGradient id="ledger-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#06B6D4" />
+      <stop offset="100%" style="stop-color:#10B981" />
     </linearGradient>
   </defs>
-  <rect x="10" y="10" width="80" height="80" rx="20" fill="url(#ledger-grad)" />
-  <!-- Wallet shape -->
-  <path d="M26 35 C26 31.7 28.7 29 32 29 H68 C71.3 29 74 31.7 74 35 V65 C74 68.3 71.3 71 68 71 H32 C28.7 71 26 68.3 26 65 Z" fill="none" stroke="white" stroke-width="4" stroke-linejoin="round" />
+  <rect x="10" y="10" width="80" height="80" rx="22" fill="url(#ledger-grad)" />
+  
+  <!-- Card sticking out from wallet -->
+  <path d="M36 38 V28 C36 26.3 37.3 25 39 25 H61 C62.7 25 64 26.3 64 28 V38" fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.7" />
+  
+  <!-- Wallet body -->
+  <rect x="26" y="38" width="48" height="34" rx="6" fill="none" stroke="white" stroke-width="4" stroke-linejoin="round" />
+  
   <!-- Wallet clasp -->
-  <path d="M54 42 H69 C70.7 42 72 43.3 72 45 V55 C72 56.7 70.7 58 69 58 H54 Z" fill="none" stroke="white" stroke-width="4" stroke-linejoin="round" />
-  <circle cx="63" cy="50" r="3" fill="white" />
-  <!-- Currency sign (Yen/Yuan ¥) -->
-  <path d="M36 41 L43 50 M50 41 L43 50 V61 M38 51 H48 M38 55 H48" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M50 48 H74 V62 H50 Z" fill="none" stroke="white" stroke-width="4" stroke-linejoin="round" />
+  
+  <!-- Small button on clasp -->
+  <circle cx="64" cy="55" r="2.5" fill="white" />
 </svg>
