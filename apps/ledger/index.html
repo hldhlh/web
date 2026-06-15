@@ -263,7 +263,8 @@
     .fab {
       position: fixed;
       bottom: 2rem;
-      right: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
       width: 56px;
       height: 56px;
       border-radius: 28px;
@@ -280,12 +281,12 @@
     }
 
     .fab:hover {
-      transform: scale(1.08) translateY(-2px);
+      transform: translateX(-50%) scale(1.08) translateY(-2px);
       box-shadow: 0 12px 30px var(--shadow-color);
     }
 
     .fab:active {
-      transform: scale(0.95);
+      transform: translateX(-50%) scale(0.95);
     }
 
     /* Modal / Bottom Sheet Drawer */
@@ -941,7 +942,7 @@
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal-content">
         <div class="modal-header">
-          <h3 class="modal-title">记一笔</h3>
+          <h3 class="modal-title" id="modal-title">记一笔</h3>
           <button class="modal-close" id="close-modal-btn">×</button>
         </div>
 
@@ -1015,6 +1016,7 @@
     let selectedType = 'expense'; // 'expense', 'income'
     let selectedScope = 'public'; // 'public', 'private'
     let selectedCategory = '';
+    let editingTransactionId = null; // null for add mode, UUID for edit mode
 
     // Categories Configuration (Clean Line Icons)
     const categoriesConfig = {
@@ -1049,6 +1051,7 @@
 
     // Modal elements
     const modalBackdrop = document.getElementById('modal-backdrop');
+    const modalTitle = document.getElementById('modal-title');
     const openModalBtn = document.getElementById('open-modal-btn');
     const closeModalBtn = document.getElementById('close-modal-btn');
     const amountInput = document.getElementById('tx-amount');
@@ -1095,6 +1098,9 @@
 
     // Modal Opening/Closing
     openModalBtn.addEventListener('click', () => {
+      editingTransactionId = null;
+      modalTitle.innerText = '记一笔';
+      saveBtn.innerText = '确认保存';
       modalBackdrop.classList.add('active');
       initForm();
     });
@@ -1180,6 +1186,59 @@
       });
     }
 
+    // Open Modal in Edit Mode with Prefilled values
+    function openEditModal(tx) {
+      editingTransactionId = tx.id;
+      modalTitle.innerText = '编辑账单';
+      saveBtn.innerText = '确认修改';
+      
+      // Pre-fill amount
+      amountInput.value = tx.amount;
+      
+      // Date
+      dateInput.value = tx.date;
+      
+      // Desc
+      descInput.value = tx.description || '';
+      
+      // Type
+      selectedType = tx.type;
+      typeBtns.forEach(b => b.classList.toggle('active', b.dataset.type === tx.type));
+      
+      // Scope
+      selectedScope = tx.scope;
+      scopeBtns.forEach(b => b.classList.toggle('active', b.dataset.scope === tx.scope));
+      
+      // Render Category pills, ensuring the current one is selected
+      pillsContainer.innerHTML = '';
+      const list = categoriesConfig[selectedType];
+      selectedCategory = tx.category;
+      
+      list.forEach((cat) => {
+        const pill = document.createElement('div');
+        pill.className = 'category-pill';
+        if (cat.name === tx.category) {
+          pill.classList.add('active');
+        }
+
+        pill.innerHTML = `
+          <span class="pill-icon">${cat.icon}</span>
+          <span>${cat.name}</span>
+        `;
+
+        pill.addEventListener('click', () => {
+          document.querySelectorAll('.category-pill').forEach(p => p.classList.remove('active'));
+          pill.classList.add('active');
+          selectedCategory = cat.name;
+        });
+
+        pillsContainer.appendChild(pill);
+      });
+      
+      modalBackdrop.classList.add('active');
+      setTimeout(() => amountInput.focus(), 150);
+    }
+
     // Save Transaction Action
     async function saveTransaction() {
       const amount = parseFloat(amountInput.value);
@@ -1198,7 +1257,7 @@
       }
 
       saveBtn.disabled = true;
-      saveBtn.innerText = '正在保存...';
+      saveBtn.innerText = editingTransactionId ? '修改中...' : '保存中...';
 
       const record = {
         type: selectedType,
@@ -1209,15 +1268,20 @@
         description: desc || null
       };
 
-      const { error } = await supabase.from('ledger_transactions').insert([record]);
+      let res;
+      if (editingTransactionId) {
+        res = await supabase.from('ledger_transactions').update(record).eq('id', editingTransactionId);
+      } else {
+        res = await supabase.from('ledger_transactions').insert([record]);
+      }
 
       saveBtn.disabled = false;
-      saveBtn.innerText = '确认保存';
+      saveBtn.innerText = editingTransactionId ? '确认修改' : '确认保存';
 
-      if (error) {
-        showToast('保存失败: ' + error.message, 'error');
+      if (res.error) {
+        showToast('操作失败: ' + res.error.message, 'error');
       } else {
-        showToast('记录成功', 'success');
+        showToast(editingTransactionId ? '修改成功' : '记账成功', 'success');
         closeModal();
       }
     }
@@ -1489,6 +1553,31 @@
                 showToast('已删除', 'success');
               }
             }
+          });
+
+          // Long Press to Edit Event
+          let pressTimer;
+          const startPress = (e) => {
+            if (e.type === 'mousedown' && e.button !== 0) return; // only left click
+            pressTimer = setTimeout(() => {
+              if (navigator.vibrate) navigator.vibrate(50);
+              openEditModal(tx);
+            }, 600);
+          };
+
+          const cancelPress = () => {
+            clearTimeout(pressTimer);
+          };
+
+          item.addEventListener('touchstart', startPress);
+          item.addEventListener('touchend', cancelPress);
+          item.addEventListener('touchmove', cancelPress);
+          item.addEventListener('mousedown', startPress);
+          item.addEventListener('mouseup', cancelPress);
+          item.addEventListener('mouseleave', cancelPress);
+          // Prevent default context menu during long press
+          item.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
           });
 
           dateBox.appendChild(item);
