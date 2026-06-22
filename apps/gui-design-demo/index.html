@@ -1,0 +1,1911 @@
+<!--
+=======================================================================================
+Win32 C++ Custom-Skinned Borderless GUI DIB Simulator
+=======================================================================================
+Purpose: This application provides rapid visual modeling for borderless (WS_POPUP) 
+         Win32 C++ GUI applications. It renders the custom UI directly into a 
+         simulated DIB (Device Independent Bitmap) buffer.
+Aesthetics: Flat pixel-perfect graphics, no native OS window chrome (no titlebars, no 
+             default bevels), strict 0px border-radius, and completely custom color control.
+Output: Generates clean Win32 Resource Compiler scripts (.rc) with WS_POPUP dialog flags,
+         and C++ Win32 API code (.cpp) containing GDI drawing methods (brushes, pen frames, 
+         color coordinates) in the WM_PAINT message routine to mirror the custom layout.
+=======================================================================================
+-->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Win32 无边框 GUI DIB 预览生成器</title>
+  <meta name="description" content="专为 Win32 C++ 程序员设计的自定义皮肤、无边框 GUI 快速视觉预览与 DIB 缓冲模拟工具。">
+  <link rel="stylesheet" href="style.css?v=1.0.2">
+</head>
+<body>
+  <!-- Visual debug console for runtime exceptions and console errors -->
+  <script>
+    (function() {
+      function showDebugPanel(title, message, isError = true) {
+        let debugDiv = document.getElementById('visual-debug-panel');
+        if (!debugDiv) {
+          debugDiv = document.createElement('div');
+          debugDiv.id = 'visual-debug-panel';
+          debugDiv.style.position = 'fixed';
+          debugDiv.style.top = '0';
+          debugDiv.style.left = '0';
+          debugDiv.style.width = '100vw';
+          debugDiv.style.height = '100vh';
+          debugDiv.style.background = 'rgba(120, 10, 10, 0.95)';
+          debugDiv.style.color = '#fff';
+          debugDiv.style.zIndex = '999999';
+          debugDiv.style.padding = '30px';
+          debugDiv.style.fontFamily = 'monospace';
+          debugDiv.style.fontSize = '14px';
+          debugDiv.style.lineHeight = '1.6';
+          debugDiv.style.whiteSpace = 'pre-wrap';
+          debugDiv.style.overflow = 'auto';
+          debugDiv.innerHTML = '<h1 style="color: #ff5252; margin-bottom: 20px; border-bottom: 2px solid #ff5252; padding-bottom: 10px;">[JS Error / Diagnostic Console]</h1>';
+          document.body.appendChild(debugDiv);
+        }
+        const logLine = document.createElement('div');
+        logLine.style.borderBottom = '1px solid #555';
+        logLine.style.padding = '8px 0';
+        logLine.innerHTML = `<span style="color: #ff8a80;">[${title}]</span> ${message}`;
+        debugDiv.appendChild(logLine);
+      }
+
+      window.onerror = function(msg, url, line, col, error) {
+        showDebugPanel('GLOBAL_ERROR', `${msg}<br>File: ${url}<br>Line: ${line} | Col: ${col}<br>Stack: ${error ? error.stack : 'N/A'}`);
+        return false;
+      };
+
+      const originalError = console.error;
+      console.error = function(...args) {
+        showDebugPanel('CONSOLE_ERROR', args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '));
+        originalError.apply(console, args);
+      };
+    })();
+  </script>
+
+  <div class="app-container">
+    <!-- CENTER WORKSPACE: RETRO SCREEN FRAME -->
+    <main class="workspace">
+      <!-- Toolbar -->
+      <header class="toolbar">
+        <div class="toolbar-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--ide-accent-light);"><rect x="3" y="3" width="18" height="18" rx="0"/></svg>
+          自定义皮肤 DIB 缓冲区 (WS_POPUP 无边框 100% 像素级对齐)
+          <span id="canvas-status" style="margin-left: 16px; font-weight: normal; color: var(--ide-text-secondary); font-size: 0.68rem; font-family: 'Fira Code', monospace; background: rgba(0,0,0,0.25); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05); letter-spacing: 0.02em;">X: 0, Y: 0 (px)</span>
+        </div>
+        <div class="toolbar-controls">
+          <span style="font-size: 0.7rem; color: var(--ide-text-secondary);">背景风格:</span>
+          <button class="toolbar-btn" id="theme-mode-btn" title="切换深浅色背景">
+            <svg id="theme-mode-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            <span id="theme-mode-text">深色</span>
+          </button>
+          <span style="font-size: 0.7rem; color: var(--ide-text-secondary); margin-left: 8px;">DIB 缩放:</span>
+          <button class="toolbar-btn active" data-zoom="1">1x</button>
+          <button class="toolbar-btn" data-zoom="1.5">1.5x</button>
+          <button class="toolbar-btn" data-zoom="2">2x</button>
+          <a href="../../index.html" class="back-to-dashboard">返回导航</a>
+        </div>
+      </header>
+
+      <!-- Workspace Client -->
+      <div class="canvas-area">
+        <!-- Canvas Container -->
+        <div class="dib-canvas-container" id="dib-canvas-container">
+          <div class="zoom-indicator" id="zoom-val">Zoom: 100% (DIB Memory Buffer)</div>
+          <div id="dib-html-layer">
+            <div id="window-html-container"></div>
+            <div id="launcher-html-container"></div>
+          </div>
+          <canvas id="dibCanvas"></canvas>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- JS Code Engine -->
+  <script>
+    const dllItems = [
+      "GDI_Engine.dll",
+      "User32.dll",
+      "Kernel32.dll",
+      "Gdiplus.dll",
+      "Comctl32.dll",
+      "Shell32.dll",
+      "Ole32.dll",
+      "Shlwapi.dll",
+      "Winsock32.dll",
+      "Advapi32.dll"
+    ];
+
+    // State
+    const appState = {
+      zoom: 1,
+      activeTab: 'paint', // 'paint' | 'shader' | 'config'
+      ideMode: 'dark', // 'dark' | 'light'
+      window: {
+        x: 160,
+        y: 80,
+        w: 400,
+        h: 350,
+        visible: true
+      },
+      theme: {
+        h: 172, // Teal default
+        s: 100,
+        l: 37
+      },
+      paint: {
+        grid: Array(16).fill(null).map(() => Array(16).fill('#000000')),
+        colors: ['#000000', 'hsl(172, 100%, 37%)', '#ff5252', '#ffe082', '#ffffff', '#555566'],
+        selectedColor: 'hsl(172, 100%, 37%)'
+      },
+      shader: {
+        running: true,
+        time: 0,
+        progress: 45
+      },
+      config: {
+        doubleBuffering: true,
+        colorDepth: '32', // '16' | '32'
+        customTitle: 'Win32 Custom Skin Demo  [DIB Mode]',
+        editFocused: false,
+        fpsLimit: 'V-Sync', // 'V-Sync' | '60 FPS' | '30 FPS'
+        fpsDropdownOpen: false,
+        fpsDropdownHoveredIndex: -1,
+        shaderSpeed: 1.0 // 0.5 to 2.0
+      },
+      controls: {
+        btnNormalHovered: false,
+        btnConfirmHovered: false,
+        selectedItemIndex: 1, // default "User32.dll"
+        listHoveredIndex: -1,
+        listScrollTop: 0, // scroll position
+        cacheSize: 256,
+        spinnerUpHovered: false,
+        spinnerDownHovered: false,
+        statusText: '就绪',
+        logEnabled: false,
+        renderMode: 'dib',
+        progressVal: 50,
+        checkboxHovered: false,
+        radioGdiHovered: false,
+        radioDibHovered: false,
+        sliderHovered: false
+      },
+      dragMode: null, // null | 'move-window' | 'drag-slider' | 'drag-list-scrollbar'
+      dragStart: { x: 0, y: 0 },
+      dragOffset: { x: 0, y: 0 },
+      closeHovered: false,
+      shaderPauseHovered: false,
+      configResetHovered: false,
+      launcherHovered: false,
+      tabPaintHovered: false,
+      tabShaderHovered: false,
+      tabConfigHovered: false,
+      tabControlsHovered: false,
+      sliderHovered: false,
+      comboboxHovered: false,
+      scrollbarHovered: false
+    };
+
+    function getThemeColor(role, state = null) {
+      const h = appState.theme.h;
+      const s = appState.theme.s; // base saturation (e.g. 100%)
+      const l = appState.theme.l; // base lightness (e.g. 37%)
+
+      const bgSat = Math.round(s * 0.14);
+
+      switch (role) {
+        // Background Surfaces (low saturation, soft lightness steps, slightly translucent for grid show-through)
+        case 'window-header':
+          return `hsla(${h}, ${bgSat}%, 11%, 0.93)`;
+        case 'window-sidebar':
+          return `hsla(${h}, ${bgSat}%, 14%, 0.93)`;
+        case 'window-content':
+          return `hsla(${h}, ${bgSat}%, 18%, 0.93)`;
+          
+        // Controls (sunken / raised, translucent overlays for glass-like depth)
+        case 'control-sunken':
+          return `hsla(${h}, ${Math.round(s * 0.12)}%, 6%, 0.55)`;
+        case 'control-raised':
+          return state === 'hover' 
+            ? `hsla(${h}, ${Math.round(s * 0.16)}%, 31%, 0.92)` 
+            : `hsla(${h}, ${Math.round(s * 0.12)}%, 25%, 0.85)`;
+          
+        // Accent highlights (exact matches with selected HSL swatches, highly luminous)
+        case 'accent-solid':
+          return state === 'hover' 
+            ? `hsl(${h}, ${s}%, ${Math.min(100, l + 8)}%)` 
+            : `hsl(${h}, ${s}%, ${l}%)`;
+        case 'accent-translucent':
+          return state === 'hover' 
+            ? `hsla(${h}, ${s}%, ${l}%, 0.12)` 
+            : `hsla(${h}, ${s}%, ${l}%, 0.22)`;
+          
+        // Text states (tinted and using Apple-style opacity bounds for natural blending)
+        case 'text-primary':
+          return `#ffffff`;
+        case 'text-secondary':
+          return state === 'hover' ? `#ffffff` : `hsla(${h}, 10%, 88%, 0.68)`;
+        case 'text-tertiary':
+          return `hsla(${h}, 8%, 85%, 0.42)`;
+          
+        default:
+          if (typeof role === 'number') {
+            const clampedL = Math.max(0, Math.min(100, role));
+            const clampedS = Math.max(0, Math.min(100, s * (state || 0.4)));
+            return `hsl(${h}, ${clampedS}%, ${clampedL}%)`;
+          }
+          return `hsl(${h}, ${s}%, ${l}%)`;
+      }
+    }
+
+    const themeColors = [
+      { name: 'Teal', h: 172, s: 100, l: 37 },
+      { name: 'Blue', h: 217, s: 91, l: 60 },
+      { name: 'Green', h: 142, s: 72, l: 45 },
+      { name: 'Purple', h: 258, s: 90, l: 66 },
+      { name: 'Rose', h: 350, s: 89, l: 60 },
+      { name: 'Amber', h: 37, s: 90, l: 50 }
+    ];
+
+    function applyThemeToHost() {
+      const accentHSL = `hsl(${appState.theme.h}, ${appState.theme.s}%, ${appState.theme.l}%)`;
+      const accentLightHSL = `hsl(${appState.theme.h}, ${appState.theme.s}%, ${appState.theme.l + 15}%)`;
+      document.documentElement.style.setProperty('--ide-accent', accentHSL);
+      document.documentElement.style.setProperty('--ide-accent-light', accentLightHSL);
+    }
+
+    function applyIdeMode(mode) {
+      appState.ideMode = mode;
+      document.documentElement.classList.toggle('light-mode', mode === 'light');
+      
+      const btnText = document.getElementById('theme-mode-text');
+      const btnIcon = document.getElementById('theme-mode-icon');
+      
+      if (btnText && btnIcon) {
+        if (mode === 'light') {
+          btnText.innerText = '浅色';
+          btnIcon.innerHTML = `<circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>`;
+        } else {
+          btnText.innerText = '深色';
+          btnIcon.innerHTML = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>`;
+        }
+      }
+    }
+
+    function setThemeColor(h, s, l) {
+      appState.theme.h = h;
+      appState.theme.s = s;
+      appState.theme.l = l;
+      
+      const newHex = `hsl(${h}, ${s}%, ${l}%)`;
+      appState.paint.colors[1] = newHex;
+      if (appState.paint.selectedColor.startsWith('hsl')) {
+        appState.paint.selectedColor = newHex;
+      }
+      
+      applyThemeToHost();
+      requestRender();
+      saveAppState();
+    }
+
+    function saveAppState() {
+      try {
+        const stateToSave = {
+          zoom: appState.zoom,
+          activeTab: appState.activeTab,
+          ideMode: appState.ideMode,
+          theme: appState.theme,
+          window: {
+            x: appState.window.x,
+            y: appState.window.y,
+            visible: appState.window.visible
+          },
+          paint: {
+            grid: appState.paint.grid,
+            selectedColor: appState.paint.selectedColor
+          },
+          config: {
+            doubleBuffering: appState.config.doubleBuffering,
+            colorDepth: appState.config.colorDepth,
+            customTitle: appState.config.customTitle,
+            fpsLimit: appState.config.fpsLimit,
+            shaderSpeed: appState.config.shaderSpeed
+          },
+          controls: {
+            selectedItemIndex: appState.controls.selectedItemIndex,
+            cacheSize: appState.controls.cacheSize,
+            listScrollTop: appState.controls.listScrollTop,
+            logEnabled: appState.controls.logEnabled,
+            renderMode: appState.controls.renderMode,
+            progressVal: appState.controls.progressVal
+          }
+        };
+        localStorage.setItem('win32_skinned_gui_state', JSON.stringify(stateToSave));
+      } catch (e) {
+        console.warn('Failed to save state to localStorage:', e);
+      }
+    }
+
+    function loadAppState() {
+      try {
+        const stored = localStorage.getItem('win32_skinned_gui_state');
+        if (stored) {
+          const data = JSON.parse(stored);
+          if (data.zoom) appState.zoom = data.zoom;
+          if (data.activeTab) appState.activeTab = data.activeTab;
+          if (data.ideMode) appState.ideMode = data.ideMode;
+          if (data.theme) {
+            appState.theme.h = data.theme.h;
+            appState.theme.s = data.theme.s;
+            appState.theme.l = data.theme.l;
+            
+            // Sync paint palette color
+            const newHex = `hsl(${appState.theme.h}, ${appState.theme.s}%, ${appState.theme.l}%)`;
+            appState.paint.colors[1] = newHex;
+          }
+          if (data.window) {
+            appState.window.x = data.window.x;
+            appState.window.y = data.window.y;
+            appState.window.visible = data.window.visible;
+          }
+          if (data.paint) {
+            if (data.paint.grid) appState.paint.grid = data.paint.grid;
+            if (data.paint.selectedColor) appState.paint.selectedColor = data.paint.selectedColor;
+          }
+          if (data.config) {
+            if (data.config.doubleBuffering !== undefined) appState.config.doubleBuffering = data.config.doubleBuffering;
+            if (data.config.colorDepth) appState.config.colorDepth = data.config.colorDepth;
+            if (data.config.customTitle) appState.config.customTitle = data.config.customTitle;
+            if (data.config.fpsLimit) appState.config.fpsLimit = data.config.fpsLimit;
+            if (data.config.shaderSpeed !== undefined) appState.config.shaderSpeed = data.config.shaderSpeed;
+          }
+          if (data.controls) {
+            if (data.controls.selectedItemIndex !== undefined) appState.controls.selectedItemIndex = data.controls.selectedItemIndex;
+            if (data.controls.cacheSize !== undefined) appState.controls.cacheSize = data.controls.cacheSize;
+            if (data.controls.listScrollTop !== undefined) appState.controls.listScrollTop = data.controls.listScrollTop;
+            if (data.controls.logEnabled !== undefined) appState.controls.logEnabled = data.controls.logEnabled;
+            if (data.controls.renderMode !== undefined) appState.controls.renderMode = data.controls.renderMode;
+            if (data.controls.progressVal !== undefined) appState.controls.progressVal = data.controls.progressVal;
+          }
+          
+          // Sync zoom control active button in the toolbar
+          document.querySelectorAll('[data-zoom]').forEach(b => {
+            if (Number(b.dataset.zoom) === appState.zoom) {
+              b.classList.add('active');
+            } else {
+              b.classList.remove('active');
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('Failed to load state from localStorage:', e);
+      }
+    }
+
+    const canvas = document.getElementById('dibCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('dib-canvas-container');
+    const zoomValLabel = document.getElementById('zoom-val');
+    const htmlLayer = document.getElementById('dib-html-layer');
+
+    let caretVisible = true;
+    setInterval(() => {
+      if (appState.config.editFocused) {
+        caretVisible = !caretVisible;
+        requestRender();
+      }
+    }, 500);
+
+    function setupCanvasZoom(zoom) {
+      appState.zoom = zoom;
+      zoomValLabel.innerText = `Zoom: ${Math.round(zoom * 100)}% (DIB Memory Buffer)`;
+    }
+
+    function resizeCanvas() {
+      // Make canvas size match parent container client size. Fallback to viewport if parent is collapsed (<= 100px).
+      const parent = container;
+      canvas.width = (parent && parent.clientWidth > 100) ? parent.clientWidth : window.innerWidth;
+      canvas.height = (parent && parent.clientHeight > 100) ? parent.clientHeight : (window.innerHeight - 44);
+      
+      htmlLayer.style.width = `${canvas.width / appState.zoom}px`;
+      htmlLayer.style.height = `${canvas.height / appState.zoom}px`;
+      
+      setupCanvasZoom(appState.zoom);
+    }
+
+    // Drawing Helpers (1px rects)
+    function drawFlatRect(x, y, w, h, fillCol, borderCol, borderW = 1) {
+      if (fillCol && fillCol !== 'transparent') {
+        ctx.fillStyle = fillCol;
+        ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+      }
+      if (borderCol && borderCol !== 'transparent' && borderW > 0) {
+        ctx.strokeStyle = borderCol;
+        ctx.lineWidth = borderW;
+        ctx.strokeRect(
+          Math.round(x) + (borderW / 2),
+          Math.round(y) + (borderW / 2),
+          Math.round(w) - borderW,
+          Math.round(h) - borderW
+        );
+      }
+    }
+
+    function drawPixelLine(x1, y1, x2, y2, color) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(Math.round(x1) + 0.5, Math.round(y1) + 0.5);
+      ctx.lineTo(Math.round(x2) + 0.5, Math.round(y2) + 0.5);
+      ctx.stroke();
+    }
+
+    // Designer's Minimalist Grid background
+    function drawDesignerGrid() {
+      const w = canvas.width / appState.zoom;
+      const h = canvas.height / appState.zoom;
+
+      const isLight = appState.ideMode === 'light';
+      ctx.fillStyle = isLight ? '#f3f4f6' : '#0a0a0d';
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.strokeStyle = isLight ? '#e5e7eb' : '#121215';
+      ctx.lineWidth = 1;
+      
+      ctx.beginPath();
+      for (let x = 0; x < w; x += 20) {
+        ctx.moveTo(x + 0.5, 0);
+        ctx.lineTo(x + 0.5, h);
+      }
+      for (let y = 0; y < h; y += 20) {
+        ctx.moveTo(0, y + 0.5);
+        ctx.lineTo(w, y + 0.5);
+      }
+      ctx.stroke();
+
+      ctx.strokeStyle = isLight ? '#d1d5db' : '#17171e';
+      ctx.beginPath();
+      for (let x = 0; x < w; x += 100) {
+        ctx.moveTo(x + 0.5, 0);
+        ctx.lineTo(x + 0.5, h);
+      }
+      for (let y = 0; y < h; y += 100) {
+        ctx.moveTo(0, y + 0.5);
+        ctx.lineTo(w, y + 0.5);
+      }
+      ctx.stroke();
+    }
+
+    // Header drawing
+    function drawHeader(win) {
+      // Header Panel (borderless)
+      drawFlatRect(win.x, win.y, win.w, 28, getThemeColor('window-header'), 'transparent', 0);
+      
+      // Close Button (Only show red background when hovered)
+      if (appState.closeHovered) {
+        const cbx = win.x + 372;
+        const cby = win.y;
+        const cbw = 28;
+        const cbh = 28;
+        drawFlatRect(cbx, cby, cbw, cbh, '#ff5252', 'transparent', 0);
+      }
+    }
+
+    // Sidebar drawing
+    function drawSidebar(win) {
+      // Sidebar Panel (borderless, offset to be within main window borders)
+      drawFlatRect(win.x, win.y + 28, 100, win.h - 28, getThemeColor('window-sidebar'), 'transparent', 0);
+
+      // Tabs definitions
+      const tabs = [
+        { id: 'paint', text: '像素画板', y: 70 },
+        { id: 'shader', text: '动画生成', y: 98 },
+        { id: 'config', text: '系统参数', y: 126 },
+        { id: 'controls', text: '自绘部件', y: 154 }
+      ];
+
+      tabs.forEach(tab => {
+        const isActive = appState.activeTab === tab.id;
+        const tx = win.x + 8;
+        const ty = win.y + tab.y;
+        const tw = 84;
+        const th = 22;
+
+        let bg = 'transparent';
+        if (isActive) {
+          bg = getThemeColor('accent-translucent');
+        } else {
+          const isHovered = (tab.id === 'paint' && appState.tabPaintHovered) ||
+                            (tab.id === 'shader' && appState.tabShaderHovered) ||
+                            (tab.id === 'config' && appState.tabConfigHovered) ||
+                            (tab.id === 'controls' && appState.tabControlsHovered);
+          if (isHovered) {
+            bg = getThemeColor('accent-translucent', 'hover');
+          }
+        }
+
+        drawFlatRect(tx, ty, tw, th, bg, 'transparent', 0);
+      });
+    }
+
+    // Tab Contents drawing
+    function drawPaintTab(win) {
+      // Grid outline (gap-spaced borderless cells)
+      const gx = win.x + 120;
+      const gy = win.y + 65;
+      const cellSize = 10;
+      const size = 16;
+      
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          const cx = gx + c * cellSize;
+          const cy = gy + r * cellSize;
+          const color = appState.paint.grid[r][c];
+          
+          drawFlatRect(cx, cy, cellSize - 1, cellSize - 1, color === '#000000' ? getThemeColor('control-sunken') : color, 'transparent', 0);
+        }
+      }
+      
+      appState.paint.colors.forEach((color, i) => {
+        const row = Math.floor(i / 3);
+        const col = i % 3;
+        const sx = win.x + 296 + col * 24;
+        const sy = win.y + 85 + row * 24;
+        const sw = 16;
+        const sh = 16;
+        
+        const isSelected = appState.paint.selectedColor === color;
+        drawFlatRect(sx, sy, sw, sh, color, 'transparent', 0);
+        if (isSelected) {
+          drawFlatRect(sx + sw/2 - 2, sy + sh/2 - 2, 4, 4, '#ffffff', 'transparent', 0);
+        }
+      });
+    }
+
+    function drawShaderTab(win) {
+      const sx = win.x + 120;
+      const sy = win.y + 65;
+      const sw = 260;
+      const sh = 140;
+
+      // Draw screen box borderless
+      drawFlatRect(sx, sy, sw, sh, getThemeColor('control-sunken'), 'transparent', 0);
+
+      // Draw animating plasma cells
+      const cols = 52;
+      const rows = 28;
+      const cellSize = 5;
+      const t = appState.shader.time;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const cx = sx + c * cellSize;
+          const cy = sy + r * cellSize;
+
+          // Simple demoscene plasma formula
+          const v1 = Math.sin(c * 0.15 + t);
+          const v2 = Math.sin(0.15 * (r * Math.sin(t / 2) + c * Math.cos(t / 3)) + t);
+          const cx_center = c - cols / 2;
+          const cy_center = r - rows / 2;
+          const v3 = Math.sin(Math.sqrt(cx_center * cx_center + cy_center * cy_center) * 0.15 - t);
+          
+          const val = (v1 + v2 + v3) / 3;
+          
+          // Map val to colors dynamically based on the theme color HSL values
+          let color = getThemeColor(4, 0.3);
+          if (val > 0.4) {
+            color = getThemeColor(appState.theme.l + 15, 1.0);
+          } else if (val > 0.1) {
+            color = getThemeColor(appState.theme.l, 0.85);
+          } else if (val > -0.2) {
+            color = getThemeColor(12, 0.3);
+          } else if (val > -0.5) {
+            color = getThemeColor(appState.theme.l - 15, 0.6);
+          } else {
+            color = getThemeColor(appState.theme.l - 25, 0.4);
+          }
+
+          drawFlatRect(cx + 1, cy + 1, cellSize - 1, cellSize - 1, color, 'transparent', 0);
+        }
+      }
+
+      // Pause/Run button borderless (shifted to bottom-right, supports hover)
+      let btnBg;
+      if (appState.shader.running) {
+        btnBg = getThemeColor('control-raised', appState.shaderPauseHovered ? 'hover' : null);
+      } else {
+        btnBg = getThemeColor('accent-solid', appState.shaderPauseHovered ? 'hover' : null);
+      }
+      drawFlatRect(win.x + 296, win.y + 215, 84, 22, btnBg, 'transparent', 0);
+
+      // Progress bar borderless (positioned inline next to label and button)
+      const pbx = win.x + 180;
+      const pby = win.y + 218;
+      const pbw = 106;
+      const pbh = 16;
+      drawFlatRect(pbx, pby, pbw, pbh, getThemeColor('control-sunken'), 'transparent', 0);
+
+      const fillW = Math.round((pbw - 4) * (appState.shader.progress / 100));
+      if (fillW > 0) {
+        drawFlatRect(pbx + 2, pby + 2, fillW, pbh - 4, getThemeColor(appState.theme.l, 1.0), 'transparent', 0);
+      }
+    }
+
+    function drawConfigTab(win) {
+      // 1. Checkbox: Double Buffering
+      const cbx = win.x + 120;
+      const cby = win.y + 60;
+      const cbSize = 12;
+      drawFlatRect(cbx, cby, cbSize, cbSize, getThemeColor('control-sunken'), 'transparent', 0);
+      if (appState.config.doubleBuffering) {
+        drawFlatRect(cbx + 3, cby + 3, cbSize - 6, cbSize - 6, getThemeColor('accent-solid'), 'transparent', 0);
+      }
+
+      // 2. Combobox (Dropdown) Box
+      const comboX = win.x + 300;
+      const comboY = win.y + 57;
+      const comboW = 80;
+      const comboH = 18;
+      const comboBg = getThemeColor('control-sunken', appState.comboboxHovered || appState.config.fpsDropdownOpen ? 'hover' : null);
+      drawFlatRect(comboX, comboY, comboW, comboH, comboBg, 'transparent', 0);
+
+      // 3. Radio 1 (16-bit)
+      const r1x = win.x + 120;
+      const r1y = win.y + 102;
+      const radSize = 10;
+      drawFlatRect(r1x, r1y, radSize, radSize, getThemeColor('control-sunken'), 'transparent', 0);
+      if (appState.config.colorDepth === '16') {
+        drawFlatRect(r1x + 3, r1y + 3, radSize - 6, radSize - 6, getThemeColor('accent-solid'), 'transparent', 0);
+      }
+
+      // 4. Radio 2 (32-bit)
+      const r2x = win.x + 200;
+      const r2y = win.y + 102;
+      drawFlatRect(r2x, r2y, radSize, radSize, getThemeColor('control-sunken'), 'transparent', 0);
+      if (appState.config.colorDepth === '32') {
+        drawFlatRect(r2x + 3, r2y + 3, radSize - 6, radSize - 6, getThemeColor('accent-solid'), 'transparent', 0);
+      }
+
+      // 5. Trackbar (Slider) Track & Thumb
+      const sliderX = win.x + 270;
+      const sliderY = win.y + 105;
+      const sliderW = 110;
+      const sliderH = 4;
+      drawFlatRect(sliderX, sliderY, sliderW, sliderH, getThemeColor('control-sunken'), 'transparent', 0);
+
+      const speed = appState.config.shaderSpeed || 1.0;
+      const thumbOffset = Math.round(((speed - 0.5) / 1.5) * 102); // 110 - 8 = 102 max offset
+      const thumbX = sliderX + thumbOffset;
+      const thumbY = win.y + 100;
+      const thumbW = 8;
+      const thumbH = 14;
+      const thumbBg = getThemeColor('control-raised', appState.sliderHovered || appState.dragMode === 'drag-slider' ? 'hover' : null);
+      drawFlatRect(thumbX, thumbY, thumbW, thumbH, thumbBg, 'transparent', 0);
+
+      // 6. Accent Swatches (6 colors)
+      themeColors.forEach((tColor, i) => {
+        const swx = win.x + 120 + i * 22;
+        const swy = win.y + 146;
+        const sws = 14;
+        const isSelected = appState.theme.h === tColor.h;
+        const swatchCol = `hsl(${tColor.h}, ${tColor.s}%, ${tColor.l}%)`;
+        
+        drawFlatRect(swx, swy, sws, sws, swatchCol, 'transparent', 0);
+        if (isSelected) {
+          drawFlatRect(swx + sws/2 - 2, swy + sws/2 - 2, 4, 4, '#ffffff', 'transparent', 0);
+        }
+      });
+
+      // 7. Edit Box (Window Title)
+      const ebx = win.x + 120;
+      const eby = win.y + 194;
+      const ebw = 260;
+      const ebh = 20;
+      const editBg = appState.config.editFocused ? getThemeColor('control-raised') : getThemeColor('control-sunken');
+      drawFlatRect(ebx, eby, ebw, ebh, editBg, 'transparent', 0);
+
+      // 8. Reset Button
+      const rstBg = getThemeColor('control-raised', appState.configResetHovered ? 'hover' : null);
+      drawFlatRect(win.x + 280, win.y + 232, 100, 22, rstBg, 'transparent', 0);
+
+      // 9. Expanded Combobox Dropdown List (drawn last to overlay on top)
+      if (appState.config.fpsDropdownOpen) {
+        const ddx = win.x + 300;
+        const ddy = win.y + 75;
+        const ddw = 80;
+        const ddh = 54;
+        drawFlatRect(ddx, ddy, ddw, ddh, getThemeColor('window-sidebar'), 'transparent', 0);
+        
+        // Highlight active hovered dropdown option
+        const hIdx = appState.config.fpsDropdownHoveredIndex;
+        if (hIdx >= 0 && hIdx <= 2) {
+          drawFlatRect(ddx, ddy + hIdx * 18, ddw, 18, getThemeColor('accent-translucent'), 'transparent', 0);
+        }
+      }
+    }
+
+    function drawControlsTab(win) {
+      // 1. GroupBox 1: Buttons
+      drawFlatRect(win.x + 120, win.y + 60, 260, 56, getThemeColor('control-sunken'), 'transparent', 0);
+
+      // Buttons
+      const normalBg = getThemeColor('control-raised', appState.controls.btnNormalHovered ? 'hover' : null);
+      drawFlatRect(win.x + 128, win.y + 72, 70, 20, normalBg, 'transparent', 0);
+
+      const confirmBg = getThemeColor('accent-solid', appState.controls.btnConfirmHovered ? 'hover' : null);
+      drawFlatRect(win.x + 210, win.y + 72, 70, 20, confirmBg, 'transparent', 0);
+
+      const disabledBg = getThemeColor('control-sunken');
+      drawFlatRect(win.x + 292, win.y + 72, 80, 20, disabledBg, 'transparent', 0);
+
+      // 2. GroupBox 2: List and Spinner
+      drawFlatRect(win.x + 120, win.y + 126, 260, 114, getThemeColor('control-sunken'), 'transparent', 0);
+
+      // ListBox Box Frame
+      drawFlatRect(win.x + 128, win.y + 140, 140, 90, getThemeColor('control-sunken'), 'transparent', 0);
+
+      // Selected / Hovered item highlights inside listbox (clipped to ListBox frame)
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(Math.round(win.x + 128), Math.round(win.y + 140), 140, 90);
+      ctx.clip();
+
+      const scrollOffset = appState.controls.listScrollTop || 0;
+      for (let i = 0; i < dllItems.length; i++) {
+        const itemY = win.y + 140 + i * 20 - scrollOffset;
+        if (appState.controls.selectedItemIndex === i) {
+          drawFlatRect(win.x + 128, itemY, 140, 20, getThemeColor('accent-translucent'), 'transparent', 0);
+        } else if (appState.controls.listHoveredIndex === i) {
+          drawFlatRect(win.x + 128, itemY, 140, 20, getThemeColor('accent-translucent', 'hover'), 'transparent', 0);
+        }
+      }
+      ctx.restore();
+
+      // ListBox Scrollbar Track
+      drawFlatRect(win.x + 268, win.y + 140, 10, 90, getThemeColor('control-sunken'), 'transparent', 0);
+      // Scrollbar Thumb position
+      const thumbY = win.y + 140 + Math.round((scrollOffset / 110) * 60);
+      const isThumbHovered = appState.scrollbarHovered || appState.dragMode === 'drag-list-scrollbar';
+      const thumbBg = getThemeColor('control-raised', isThumbHovered ? 'hover' : null);
+      drawFlatRect(win.x + 268, thumbY, 10, 30, thumbBg, 'transparent', 0);
+
+      // Spinner Input box
+      drawFlatRect(win.x + 290, win.y + 156, 60, 18, getThemeColor('control-sunken'), 'transparent', 0);
+
+      // Spinner Up button
+      const upBg = getThemeColor('control-raised', appState.controls.spinnerUpHovered ? 'hover' : null);
+      drawFlatRect(win.x + 350, win.y + 156, 12, 9, upBg, 'transparent', 0);
+
+      // Spinner Down button
+      const downBg = getThemeColor('control-raised', appState.controls.spinnerDownHovered ? 'hover' : null);
+      drawFlatRect(win.x + 350, win.y + 165, 12, 9, downBg, 'transparent', 0);
+
+      // 3. GroupBox 3: Additional Options
+      drawFlatRect(win.x + 120, win.y + 246, 260, 70, getThemeColor('control-sunken'), 'transparent', 0);
+
+      // Checkbox
+      const chkX = win.x + 128;
+      const chkY = win.y + 258;
+      drawFlatRect(chkX, chkY, 12, 12, getThemeColor('control-sunken'), 'transparent', 0);
+      if (appState.controls.logEnabled) {
+        drawFlatRect(chkX + 3, chkY + 3, 6, 6, getThemeColor('accent-solid'), 'transparent', 0);
+      }
+
+      // Radio GDI
+      const radGdiX = win.x + 212;
+      const radGdiY = win.y + 259;
+      drawFlatRect(radGdiX, radGdiY, 10, 10, getThemeColor('control-sunken'), 'transparent', 0);
+      if (appState.controls.renderMode === 'gdi') {
+        drawFlatRect(radGdiX + 3, radGdiY + 3, 4, 4, getThemeColor('accent-solid'), 'transparent', 0);
+      }
+
+      // Radio DIB
+      const radDibX = win.x + 292;
+      const radDibY = win.y + 259;
+      drawFlatRect(radDibX, radDibY, 10, 10, getThemeColor('control-sunken'), 'transparent', 0);
+      if (appState.controls.renderMode === 'dib') {
+        drawFlatRect(radDibX + 3, radDibY + 3, 4, 4, getThemeColor('accent-solid'), 'transparent', 0);
+      }
+
+      // Slider
+      const sldTrackX = win.x + 160;
+      const sldTrackY = win.y + 291;
+      drawFlatRect(sldTrackX, sldTrackY, 80, 4, getThemeColor('control-sunken'), 'transparent', 0);
+      
+      const thumbOffset = Math.round((appState.controls.progressVal / 100) * 72);
+      const sldThumbX = sldTrackX + thumbOffset;
+      const sldThumbY = win.y + 286;
+      const isSldHovered = appState.controls.sliderHovered || appState.dragMode === 'controls-slider';
+      const sldThumbBg = getThemeColor('control-raised', isSldHovered ? 'hover' : null);
+      drawFlatRect(sldThumbX, sldThumbY, 8, 14, sldThumbBg, 'transparent', 0);
+
+      // Progress Bar
+      const prgTrackX = win.x + 252;
+      const prgTrackY = win.y + 289;
+      drawFlatRect(prgTrackX, prgTrackY, 90, 8, getThemeColor('control-sunken'), 'transparent', 0);
+      
+      const prgFillW = Math.round((appState.controls.progressVal / 100) * 86);
+      if (prgFillW > 0) {
+        drawFlatRect(prgTrackX + 2, prgTrackY + 2, prgFillW, 4, getThemeColor(appState.theme.l, 1.0), 'transparent', 0);
+      }
+
+      // 4. StatusBar Bottom Bar (inside the window bounds, spanning content area width)
+      drawFlatRect(win.x + 100, win.y + 326, 300, 24, getThemeColor('window-sidebar'), 'transparent', 0);
+    }
+
+    let lastHTMLContentState = "";
+
+    // HTML Text Layer Updater (zero antialiasing)
+    function updateHTMLText() {
+      if (!htmlLayer) return;
+      
+      const win = appState.window;
+      const winContainer = document.getElementById('window-html-container');
+      const launcherContainer = document.getElementById('launcher-html-container');
+
+      // 1. Unconditionally update positions/visibility of parent containers (hardware accelerated drag)
+      htmlLayer.style.transform = `scale(${appState.zoom})`;
+
+      const listScrollable = document.getElementById('listbox-html-scrollable');
+      if (listScrollable) {
+        listScrollable.style.top = `-${appState.controls.listScrollTop}px`;
+      }
+
+      if (!win.visible) {
+        const btnW = 160;
+        const btnH = 40;
+        const btnX = (canvas.width / appState.zoom - btnW) / 2;
+        const btnY = (canvas.height / appState.zoom - btnH) / 2;
+        
+        launcherContainer.style.left = `${Math.round(btnX)}px`;
+        launcherContainer.style.top = `${Math.round(btnY)}px`;
+        launcherContainer.style.display = 'block';
+        winContainer.style.display = 'none';
+      } else {
+        winContainer.style.left = `${Math.round(win.x)}px`;
+        winContainer.style.top = `${Math.round(win.y)}px`;
+        winContainer.style.display = 'block';
+        launcherContainer.style.display = 'none';
+      }
+
+      // 2. Compute visual content state to check if inner DOM rebuild is needed
+      const currentHTMLContentState = [
+        win.visible,
+        appState.zoom,
+        appState.activeTab,
+        appState.config.customTitle,
+        appState.config.editFocused,
+        caretVisible,
+        appState.closeHovered,
+        appState.tabPaintHovered,
+        appState.tabShaderHovered,
+        appState.tabConfigHovered,
+        appState.tabControlsHovered,
+        appState.shader.running,
+        appState.shaderPauseHovered,
+        appState.configResetHovered,
+        appState.theme.h,
+        appState.theme.s,
+        appState.theme.l,
+        canvas.width,
+        canvas.height,
+        appState.config.fpsLimit,
+        appState.config.fpsDropdownOpen,
+        appState.config.fpsDropdownHoveredIndex,
+        appState.config.shaderSpeed,
+        appState.controls.btnNormalHovered,
+        appState.controls.btnConfirmHovered,
+        appState.controls.selectedItemIndex,
+        appState.controls.listHoveredIndex,
+        appState.controls.cacheSize,
+        appState.controls.spinnerUpHovered,
+        appState.controls.spinnerDownHovered,
+        appState.controls.statusText,
+        appState.controls.logEnabled,
+        appState.controls.renderMode,
+        appState.controls.progressVal
+      ].join('|');
+
+      if (currentHTMLContentState === lastHTMLContentState) {
+        // Drag in progress: content did not change, skip rebuilding inner elements
+        return;
+      }
+      lastHTMLContentState = currentHTMLContentState;
+
+      // 3. Clear and rebuild the active container's inner content
+      if (!win.visible) {
+        launcherContainer.innerHTML = '';
+        const btnW = 160;
+        addHTMLText("启动演示程序", 0, 13, '#ffffff', 'center', btnW, 14, launcherContainer);
+      } else {
+        winContainer.innerHTML = '';
+
+        // 1. Header & Frame Text (relative to winContainer)
+        addHTMLText(appState.config.customTitle, 12, 8, getThemeColor('text-secondary'), 'left', null, 12, winContainer);
+        const closeCol = appState.closeHovered ? '#ffffff' : getThemeColor('text-secondary');
+        addHTMLText("×", 372, 6, closeCol, 'center', 28, 16, winContainer);
+
+        // 2. Sidebar Text
+        addHTMLText("自绘菜单:", 16, 40, getThemeColor('text-tertiary'), 'left', null, 12, winContainer);
+        
+        const tabPaintCol = appState.activeTab === 'paint' ? getThemeColor('text-primary') : getThemeColor('text-secondary', appState.tabPaintHovered ? 'hover' : null);
+        const tabShaderCol = appState.activeTab === 'shader' ? getThemeColor('text-primary') : getThemeColor('text-secondary', appState.tabShaderHovered ? 'hover' : null);
+        const tabConfigCol = appState.activeTab === 'config' ? getThemeColor('text-primary') : getThemeColor('text-secondary', appState.tabConfigHovered ? 'hover' : null);
+        const tabControlsCol = appState.activeTab === 'controls' ? getThemeColor('text-primary') : getThemeColor('text-secondary', appState.tabControlsHovered ? 'hover' : null);
+        
+        addHTMLText("像素画板", 16, 75, tabPaintCol, 'left', null, 12, winContainer);
+        addHTMLText("动画生成", 16, 103, tabShaderCol, 'left', null, 12, winContainer);
+        addHTMLText("系统参数", 16, 131, tabConfigCol, 'left', null, 12, winContainer);
+        addHTMLText("自绘部件", 16, 159, tabControlsCol, 'left', null, 12, winContainer);
+
+        // 3. Tab Specific Text
+        if (appState.activeTab === 'paint') {
+          addHTMLText("DIB 像素位图画板 (点击像素上色)", 120, 39, getThemeColor('text-primary'), 'left', null, 14, winContainer);
+          addHTMLText("色板:", 296, 65, getThemeColor('text-tertiary'), 'left', null, 12, winContainer);
+        } 
+        else if (appState.activeTab === 'shader') {
+          addHTMLText("GDI 实时帧缓冲区渲染", 120, 39, getThemeColor('text-primary'), 'left', null, 14, winContainer);
+          
+          const btnText = appState.shader.running ? "暂停渲染" : "开始渲染";
+          const btnTextCol = appState.shader.running ? (appState.shaderPauseHovered ? '#ffffff' : getThemeColor('text-secondary')) : '#ffffff';
+          addHTMLText(btnText, 296, 220, btnTextCol, 'center', 84, 12, winContainer);
+          
+          addHTMLText("缓存DIB:", 120, 220, getThemeColor('text-tertiary'), 'left', null, 12, winContainer);
+        } 
+        else if (appState.activeTab === 'config') {
+          addHTMLText("GDI 自绘控件选项", 120, 39, getThemeColor('text-primary'), 'left', null, 14, winContainer);
+          addHTMLText("启用双缓冲 (Double Buffering)", 138, 60, getThemeColor('text-secondary'), 'left', null, 12, winContainer);
+          
+          addHTMLText("帧率:", 270, 60, getThemeColor('text-secondary'), 'left', null, 12, winContainer);
+          addHTMLText(appState.config.fpsLimit, 306, 60, getThemeColor('text-primary'), 'left', null, 12, winContainer);
+          addHTMLText("▼", 366, 60, getThemeColor('text-secondary'), 'left', null, 12, winContainer);
+          
+          if (appState.config.fpsDropdownOpen) {
+            addHTMLText("V-Sync", 306, 78, appState.config.fpsLimit === 'V-Sync' ? getThemeColor('text-primary') : getThemeColor('text-secondary'), 'left', null, 12, winContainer);
+            addHTMLText("60 FPS", 306, 96, appState.config.fpsLimit === '60 FPS' ? getThemeColor('text-primary') : getThemeColor('text-secondary'), 'left', null, 12, winContainer);
+            addHTMLText("30 FPS", 306, 114, appState.config.fpsLimit === '30 FPS' ? getThemeColor('text-primary') : getThemeColor('text-secondary'), 'left', null, 12, winContainer);
+          }
+
+          addHTMLText("DIB 颜色深度:", 120, 86, getThemeColor('text-tertiary'), 'left', null, 12, winContainer);
+          addHTMLText("16位色", 135, 101, getThemeColor('text-secondary'), 'left', null, 12, winContainer);
+          addHTMLText("32位色", 215, 101, getThemeColor('text-secondary'), 'left', null, 12, winContainer);
+          
+          const speedLabel = `动画速度 (${appState.config.shaderSpeed.toFixed(1)}x):`;
+          addHTMLText(speedLabel, 270, 86, getThemeColor('text-tertiary'), 'left', null, 12, winContainer);
+
+          addHTMLText("自绘主题色 (明度自动化):", 120, 128, getThemeColor('text-tertiary'), 'left', null, 12, winContainer);
+          
+          addHTMLText("修改窗口标题 (键盘输入):", 120, 176, getThemeColor('text-tertiary'), 'left', null, 12, winContainer);
+          
+          let displayTitle = appState.config.customTitle;
+          if (appState.config.editFocused && caretVisible) {
+            displayTitle += '|';
+          }
+          addHTMLText(displayTitle, 126, 198, appState.config.editFocused ? getThemeColor('text-primary') : getThemeColor('text-secondary'), 'left', null, 12, winContainer);
+          const rstCol = appState.configResetHovered ? '#ffffff' : getThemeColor('text-secondary');
+          addHTMLText("重置参数", 280, 237, rstCol, 'center', 100, 12, winContainer);
+        }
+        else if (appState.activeTab === 'controls') {
+          addHTMLText("自绘基础部件清单", 120, 39, getThemeColor('text-primary'), 'left', null, 14, winContainer);
+
+          // GroupBox 1 labels
+          addHTMLText("常用按钮", 126, 54, getThemeColor('text-tertiary'), 'left', null, 12, winContainer);
+          const btnNormalCol = appState.controls.btnNormalHovered ? '#ffffff' : getThemeColor('text-secondary');
+          addHTMLText("普通按钮", 128, 76, btnNormalCol, 'center', 70, 12, winContainer);
+          addHTMLText("确认按钮", 210, 76, '#ffffff', 'center', 70, 12, winContainer);
+          addHTMLText("禁用按钮", 292, 76, getThemeColor('text-tertiary'), 'center', 80, 12, winContainer);
+
+          // GroupBox 2 labels
+          addHTMLText("数据列表与数值微调", 126, 120, getThemeColor('text-tertiary'), 'left', null, 12, winContainer);
+          
+          // Listbox viewport and scrollable container creation
+          const viewport = document.createElement('div');
+          viewport.id = 'listbox-html-viewport';
+          viewport.style.cssText = 'position: absolute; left: 128px; top: 140px; width: 140px; height: 90px; overflow: hidden; pointer-events: none;';
+          
+          const scrollable = document.createElement('div');
+          scrollable.id = 'listbox-html-scrollable';
+          scrollable.style.cssText = 'position: absolute; left: 0; top: 0; width: 100%; pointer-events: none;';
+          scrollable.style.top = `-${appState.controls.listScrollTop}px`;
+          
+          dllItems.forEach((item, idx) => {
+            const isSel = appState.controls.selectedItemIndex === idx;
+            const isHov = appState.controls.listHoveredIndex === idx;
+            const itemCol = isSel ? getThemeColor('text-primary') : getThemeColor('text-secondary', isHov ? 'hover' : null);
+            // Render relative to scrollable container
+            addHTMLText(item, 6, idx * 20 + 4, itemCol, 'left', null, 12, scrollable);
+          });
+          
+          viewport.appendChild(scrollable);
+          winContainer.appendChild(viewport);
+
+          // Spinner
+          addHTMLText("缓存大小:", 290, 140, getThemeColor('text-secondary'), 'left', null, 12, winContainer);
+          const sizeText = `${appState.controls.cacheSize} MB`;
+          addHTMLText(sizeText, 296, 159, getThemeColor('text-primary'), 'left', null, 12, winContainer);
+          const upArrowCol = appState.controls.spinnerUpHovered ? '#ffffff' : getThemeColor('text-secondary');
+          const downArrowCol = appState.controls.spinnerDownHovered ? '#ffffff' : getThemeColor('text-secondary');
+          addHTMLText("▲", 350, 155, upArrowCol, 'center', 12, 12, winContainer);
+          addHTMLText("▼", 350, 163, downArrowCol, 'center', 12, 12, winContainer);
+
+          // GroupBox 3 labels
+          addHTMLText("附加参数与进度控制", 126, 240, getThemeColor('text-tertiary'), 'left', null, 12, winContainer);
+          addHTMLText("启用日志", 144, 256, getThemeColor('text-secondary'), 'left', null, 12, winContainer);
+          addHTMLText("GDI 模式", 226, 256, getThemeColor('text-secondary'), 'left', null, 12, winContainer);
+          addHTMLText("DIB 模式", 306, 256, getThemeColor('text-secondary'), 'left', null, 12, winContainer);
+          addHTMLText("进度:", 128, 287, getThemeColor('text-secondary'), 'left', null, 12, winContainer);
+          addHTMLText(`${appState.controls.progressVal}%`, 346, 285, getThemeColor('text-primary'), 'center', 30, 12, winContainer);
+
+          // StatusBar text (shifted down from 282 to 332)
+          addHTMLText(appState.controls.statusText, 108, 332, getThemeColor('text-secondary'), 'left', null, 12, winContainer);
+          addHTMLText("DIB: 32bpp", 320, 332, getThemeColor('text-tertiary'), 'left', null, 12, winContainer);
+        }
+      }
+    }
+
+    function addHTMLText(text, x, y, color, align = 'left', width = null, fontSize = 16, targetContainer = htmlLayer) {
+      const el = document.createElement('div');
+      el.className = 'pixel-text';
+      el.innerText = text;
+      el.style.fontSize = `${fontSize}px`;
+      el.style.lineHeight = `${fontSize}px`;
+      el.style.left = `${Math.round(x)}px`;
+      el.style.top = `${Math.round(y)}px`;
+      el.style.color = color;
+      
+      if (width !== null) {
+        el.style.width = `${Math.round(width)}px`;
+      }
+      if (align === 'center') {
+        el.style.textAlign = 'center';
+      }
+      targetContainer.appendChild(el);
+    }
+
+    let renderRequested = false;
+    function requestRender() {
+      if (!renderRequested) {
+        renderRequested = true;
+        requestAnimationFrame(renderDeferred);
+      }
+    }
+    function renderDeferred() {
+      renderRequested = false;
+      renderCanvas();
+    }
+
+    // Render loop
+    function renderCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingEnabled = false;
+
+      ctx.save();
+      ctx.scale(appState.zoom, appState.zoom);
+
+      drawDesignerGrid();
+
+      const win = appState.window;
+
+      if (!win.visible) {
+        // Draw Launcher button background (borderless, supports hover)
+        const btnW = 160;
+        const btnH = 40;
+        const btnX = (canvas.width / appState.zoom - btnW) / 2;
+        const btnY = (canvas.height / appState.zoom - btnH) / 2;
+        const launcherBg = getThemeColor('accent-solid', appState.launcherHovered ? 'hover' : null);
+        drawFlatRect(btnX, btnY, btnW, btnH, launcherBg, 'transparent', 0);
+      } else {
+        // Draw Soft Drop Shadow (using 2D canvas shadow API) for Apple depth/elevation effect
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+        ctx.shadowBlur = 32;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 12;
+        // Draw a solid rectangle for the shadow target
+        ctx.fillStyle = getThemeColor('window-content');
+        ctx.fillRect(Math.round(win.x), Math.round(win.y), Math.round(win.w), Math.round(win.h));
+        ctx.restore();
+
+        // 1. Draw Main Skinned Window Background (fill only)
+        drawFlatRect(win.x, win.y, win.w, win.h, getThemeColor('window-content'), 'transparent', 0);
+
+        // 2. Draw Header Titlebar (fill only)
+        drawHeader(win);
+
+        // 3. Draw Sidebar Menu (fill only)
+        drawSidebar(win);
+
+        // 4. Draw Active Tab content (separators and outermost borders are removed for absolute minimalism)
+        switch (appState.activeTab) {
+          case 'paint':
+            drawPaintTab(win);
+            break;
+          case 'shader':
+            drawShaderTab(win);
+            break;
+          case 'config':
+            drawConfigTab(win);
+            break;
+          case 'controls':
+            drawControlsTab(win);
+            break;
+        }
+      }
+
+      ctx.restore();
+
+      // Update HTML Text Layer
+      updateHTMLText();
+    }
+
+    // ZOOM CONTROL BAR
+    document.querySelectorAll('[data-zoom]').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('[data-zoom]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        setupCanvasZoom(Number(btn.dataset.zoom));
+        requestRender();
+        saveAppState();
+      };
+    });
+
+    function getCanvasMouseCoords(e) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: Math.round((e.clientX - rect.left) / appState.zoom),
+        y: Math.round((e.clientY - rect.top) / appState.zoom)
+      };
+    }
+
+    canvas.onmousedown = (e) => {
+      const mouse = getCanvasMouseCoords(e);
+      const win = appState.window;
+
+      if (!win.visible) {
+        const btnW = 160;
+        const btnH = 40;
+        const btnX = (canvas.width / appState.zoom - btnW) / 2;
+        const btnY = (canvas.height / appState.zoom - btnH) / 2;
+        
+        if (mouse.x >= btnX && mouse.x <= btnX + btnW &&
+            mouse.y >= btnY && mouse.y <= btnY + btnH) {
+          win.visible = true;
+          requestRender();
+          saveAppState();
+        }
+        return;
+      }
+
+      if (mouse.x >= win.x && mouse.x <= win.x + win.w &&
+          mouse.y >= win.y && mouse.y <= win.y + win.h) {
+        
+        const rx = mouse.x - win.x;
+        const ry = mouse.y - win.y;
+
+        // Close dropdown if clicking outside combo/dropdown area
+        let clickedInCombo = false;
+        if (appState.activeTab === 'config') {
+          if (rx >= 300 && rx <= 380 && ry >= 57 && ry <= 75) clickedInCombo = true;
+          if (appState.config.fpsDropdownOpen && rx >= 300 && rx <= 380 && ry >= 75 && ry <= 129) clickedInCombo = true;
+        }
+        if (!clickedInCombo && appState.config.fpsDropdownOpen) {
+          appState.config.fpsDropdownOpen = false;
+          requestRender();
+        }
+
+        // Close Button click
+        if (rx >= 372 && rx <= 400 && ry >= 0 && ry <= 28) {
+          win.visible = false;
+          appState.config.editFocused = false;
+          requestRender();
+          saveAppState();
+          return;
+        }
+
+        // Titlebar drag click (excluding close button area)
+        if (ry >= 0 && ry <= 28) {
+          appState.dragMode = 'move-window';
+          appState.dragStart = { x: mouse.x, y: mouse.y };
+          appState.dragOffset = { x: win.x, y: win.y };
+          appState.config.editFocused = false;
+          return;
+        }
+
+        // Sidebar tab clicks
+        if (rx >= 8 && rx <= 92) {
+          appState.config.editFocused = false;
+          if (ry >= 70 && ry <= 92) {
+            appState.activeTab = 'paint';
+            requestRender();
+            saveAppState();
+            return;
+          } else if (ry >= 98 && ry <= 120) {
+            appState.activeTab = 'shader';
+            requestRender();
+            saveAppState();
+            return;
+          } else if (ry >= 126 && ry <= 148) {
+            appState.activeTab = 'config';
+            requestRender();
+            saveAppState();
+            return;
+          } else if (ry >= 154 && ry <= 176) {
+            appState.activeTab = 'controls';
+            requestRender();
+            saveAppState();
+            return;
+          }
+        }
+
+        // Client Area interactions based on activeTab
+        if (appState.activeTab === 'paint') {
+          // Paint Swatches click (shifted to 3x2 grid on the right)
+          appState.paint.colors.forEach((color, i) => {
+            const row = Math.floor(i / 3);
+            const col = i % 3;
+            const sx = 296 + col * 24;
+            const sy = 85 + row * 24;
+            if (rx >= sx && rx <= sx + 16 && ry >= sy && ry <= sy + 16) {
+              appState.paint.selectedColor = color;
+              requestRender();
+              saveAppState();
+            }
+          });
+
+          // Paint Grid click
+          const gx = 120;
+          const gy = 65;
+          const cellSize = 10;
+          if (rx >= gx && rx <= gx + 160 && ry >= gy && ry <= gy + 160) {
+            const c = Math.floor((rx - gx) / cellSize);
+            const r = Math.floor((ry - gy) / cellSize);
+            if (r >= 0 && r < 16 && c >= 0 && c < 16) {
+              appState.paint.grid[r][c] = appState.paint.selectedColor;
+              requestRender();
+              saveAppState();
+            }
+          }
+        } 
+        
+        else if (appState.activeTab === 'shader') {
+          // Pause/Run button (shifted to right)
+          if (rx >= 296 && rx <= 380 && ry >= 215 && ry <= 237) {
+            appState.shader.running = !appState.shader.running;
+            requestRender();
+          }
+        } 
+        
+        else if (appState.activeTab === 'config') {
+          // If dropdown list is open and clicked inside options
+          if (appState.config.fpsDropdownOpen && rx >= 300 && rx <= 380 && ry >= 75 && ry <= 129) {
+            const optIdx = Math.floor((ry - 75) / 18);
+            if (optIdx === 0) appState.config.fpsLimit = 'V-Sync';
+            else if (optIdx === 1) appState.config.fpsLimit = '60 FPS';
+            else if (optIdx === 2) appState.config.fpsLimit = '30 FPS';
+            appState.config.fpsDropdownOpen = false;
+            requestRender();
+            saveAppState();
+            return;
+          }
+
+          // Checkbox toggle
+          if (rx >= 120 && rx <= 132 && ry >= 60 && ry <= 72) {
+            appState.config.doubleBuffering = !appState.config.doubleBuffering;
+            requestRender();
+            saveAppState();
+          }
+
+          // Combobox box toggle click
+          if (rx >= 300 && rx <= 380 && ry >= 57 && ry <= 75) {
+            appState.config.fpsDropdownOpen = !appState.config.fpsDropdownOpen;
+            appState.config.editFocused = false;
+            requestRender();
+          }
+          
+          // Radio 1 (16-bit)
+          if (rx >= 120 && rx <= 130 && ry >= 102 && ry <= 112) {
+            appState.config.colorDepth = '16';
+            requestRender();
+            saveAppState();
+          }
+          
+          // Radio 2 (32-bit)
+          if (rx >= 200 && rx <= 210 && ry >= 102 && ry <= 112) {
+            appState.config.colorDepth = '32';
+            requestRender();
+            saveAppState();
+          }
+
+          // Trackbar (Slider) Drag start / Jump
+          if (rx >= 270 && rx <= 380 && ry >= 98 && ry <= 116) {
+            appState.dragMode = 'drag-slider';
+            appState.config.editFocused = false;
+            
+            // Map rx position directly to shaderSpeed
+            const pct = Math.max(0, Math.min(1, (rx - 270) / 110));
+            const newSpeed = 0.5 + pct * 1.5;
+            appState.config.shaderSpeed = Math.round(newSpeed * 10) / 10;
+            requestRender();
+            saveAppState();
+          }
+
+          // Accent Swatches clicks
+          themeColors.forEach((tColor, i) => {
+            const swx = 120 + i * 22;
+            const swy = 146;
+            if (rx >= swx && rx <= swx + 14 && ry >= swy && ry <= swy + 14) {
+              setThemeColor(tColor.h, tColor.s, tColor.l);
+            }
+          });
+
+          // Edit Box focus click
+          if (rx >= 120 && rx <= 380 && ry >= 194 && ry <= 214) {
+            appState.config.editFocused = true;
+            caretVisible = true;
+            requestRender();
+          } else if (!(rx >= 270 && rx <= 380 && ry >= 98 && ry <= 116) && !(rx >= 300 && rx <= 380 && ry >= 57 && ry <= 75)) {
+            appState.config.editFocused = false;
+            requestRender();
+          }
+
+          // Reset parameters button (shifted to right)
+          if (rx >= 280 && rx <= 380 && ry >= 232 && ry <= 254) {
+            appState.config.doubleBuffering = true;
+            appState.config.colorDepth = '32';
+            appState.config.customTitle = 'Win32 Custom Skin Demo  [DIB Mode]';
+            appState.config.editFocused = false;
+            appState.config.fpsLimit = 'V-Sync';
+            appState.config.fpsDropdownOpen = false;
+            appState.config.shaderSpeed = 1.0;
+            appState.controls.selectedItemIndex = 1;
+            appState.controls.cacheSize = 256;
+            appState.controls.listScrollTop = 0;
+            appState.controls.logEnabled = false;
+            appState.controls.renderMode = 'dib';
+            appState.controls.progressVal = 50;
+            appState.controls.statusText = '就绪';
+            appState.paint.grid = Array(16).fill(null).map(() => Array(16).fill('#000000'));
+            setThemeColor(172, 100, 37); // resets to Teal HSL and saves internally
+          }
+        }
+        
+        else if (appState.activeTab === 'controls') {
+          // Buttons GroupBox clicks
+          if (rx >= 128 && rx <= 198 && ry >= 72 && ry <= 92) {
+            appState.controls.statusText = '状态: 点击了 [普通按钮]';
+            requestRender();
+          }
+          else if (rx >= 210 && rx <= 280 && ry >= 72 && ry <= 92) {
+            appState.controls.statusText = '状态: 点击了 [确认按钮]';
+            requestRender();
+          }
+
+          // ListBox Scrollbar clicks: rx >= 268 && rx <= 278 && ry >= 140 && ry <= 230
+          else if (rx >= 268 && rx <= 278 && ry >= 140 && ry <= 230) {
+            const scrollOffset = appState.controls.listScrollTop || 0;
+            const thumbY = 140 + Math.round((scrollOffset / 110) * 60);
+            
+            if (ry >= thumbY && ry <= thumbY + 30) {
+              // Clicked on scroll thumb -> drag scrollbar
+              appState.dragMode = 'drag-list-scrollbar';
+              appState.dragStart = { x: mouse.x, y: mouse.y };
+              appState.dragOffset = { x: 0, y: scrollOffset };
+            } else {
+              // Page jump click on scrollbar track
+              const clickPct = (ry - 140 - 15) / 60;
+              appState.controls.listScrollTop = Math.max(0, Math.min(110, clickPct * 110));
+              requestRender();
+              saveAppState();
+            }
+          }
+
+          // ListBox Items Clicks (offset by listScrollTop, items are 20px high)
+          else if (rx >= 128 && rx <= 268 && ry >= 140 && ry <= 230) {
+            const idx = Math.floor((ry - 140 + appState.controls.listScrollTop) / 20);
+            if (idx >= 0 && idx < dllItems.length) {
+              appState.controls.selectedItemIndex = idx;
+              appState.controls.statusText = `当前选中: ${dllItems[idx]}`;
+              requestRender();
+              saveAppState();
+            }
+          }
+
+          // Spinner Up Clicks
+          else if (rx >= 350 && rx <= 362 && ry >= 156 && ry <= 165) {
+            appState.controls.cacheSize = Math.min(1024, appState.controls.cacheSize + 64);
+            appState.controls.statusText = `数值增加，当前缓存: ${appState.controls.cacheSize} MB`;
+            requestRender();
+            saveAppState();
+          }
+          // Spinner Down Clicks
+          else if (rx >= 350 && rx <= 362 && ry >= 165 && ry <= 174) {
+            appState.controls.cacheSize = Math.max(64, appState.controls.cacheSize - 64);
+            appState.controls.statusText = `数值减少，当前缓存: ${appState.controls.cacheSize} MB`;
+            requestRender();
+            saveAppState();
+          }
+          // Checkbox click
+          else if (rx >= 128 && rx <= 140 && ry >= 258 && ry <= 270) {
+            appState.controls.logEnabled = !appState.controls.logEnabled;
+            appState.controls.statusText = `状态: ${appState.controls.logEnabled ? '开启' : '关闭'}日志记录`;
+            requestRender();
+            saveAppState();
+          }
+          // Radio 1 (GDI) click
+          else if (rx >= 212 && rx <= 222 && ry >= 259 && ry <= 269) {
+            appState.controls.renderMode = 'gdi';
+            appState.controls.statusText = '状态: 切换至 GDI 渲染模式';
+            requestRender();
+            saveAppState();
+          }
+          // Radio 2 (DIB) click
+          else if (rx >= 292 && rx <= 302 && ry >= 259 && ry <= 269) {
+            appState.controls.renderMode = 'dib';
+            appState.controls.statusText = '状态: 切换至 DIB 渲染模式';
+            requestRender();
+            saveAppState();
+          }
+          // Slider click/drag start
+          else if (rx >= 160 && rx <= 240 && ry >= 284 && ry <= 300) {
+            appState.dragMode = 'controls-slider';
+            const pct = Math.max(0, Math.min(1, (rx - 160) / 72));
+            appState.controls.progressVal = Math.round(pct * 100);
+            appState.controls.statusText = `设置进度: ${appState.controls.progressVal}%`;
+            requestRender();
+            saveAppState();
+          }
+        }
+
+      } else {
+        appState.config.editFocused = false;
+        requestRender();
+      }
+    };
+
+    window.onmousemove = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = Math.round((e.clientX - rect.left) / appState.zoom);
+      const my = Math.round((e.clientY - rect.top) / appState.zoom);
+      const win = appState.window;
+
+      if (mx >= 0 && mx <= canvas.width / appState.zoom && my >= 0 && my <= canvas.height / appState.zoom) {
+        document.getElementById('canvas-status').innerText = `X: ${mx}, Y: ${my} (px)`;
+      }
+
+      let isCloseHovered = false;
+      let isShaderPauseHovered = false;
+      let isConfigResetHovered = false;
+      let isLauncherHovered = false;
+      let isTabPaintHovered = false;
+      let isTabShaderHovered = false;
+      let isTabConfigHovered = false;
+      let isTabControlsHovered = false;
+      let isComboboxHovered = false;
+      let isSliderHovered = false;
+      let isScrollbarHovered = false;
+
+      let isBtnNormalHovered = false;
+      let isBtnConfirmHovered = false;
+      let isListHoveredIndex = -1;
+      let isSpinnerUpHovered = false;
+      let isSpinnerDownHovered = false;
+      let isCheckboxHovered = false;
+      let isRadioGdiHovered = false;
+      let isRadioDibHovered = false;
+      let isControlsSliderHovered = false;
+
+      if (!appState.dragMode) {
+        if (win.visible && mx >= win.x && mx <= win.x + win.w && my >= win.y && my <= win.y + win.h) {
+          const rx = mx - win.x;
+          const ry = my - win.y;
+          
+          let isClickable = false;
+          
+          // Close button
+          if (rx >= 372 && rx <= 400 && ry >= 0 && ry <= 28) {
+            isClickable = true;
+            isCloseHovered = true;
+          }
+          // Sidebar tabs
+          else if (rx >= 8 && rx <= 92) {
+            if (ry >= 70 && ry <= 92) {
+              isClickable = true;
+              isTabPaintHovered = true;
+            } else if (ry >= 98 && ry <= 120) {
+              isClickable = true;
+              isTabShaderHovered = true;
+            } else if (ry >= 126 && ry <= 148) {
+              isClickable = true;
+              isTabConfigHovered = true;
+            } else if (ry >= 154 && ry <= 176) {
+              isClickable = true;
+              isTabControlsHovered = true;
+            }
+          }
+          
+          if (appState.activeTab === 'paint') {
+            // Palette swatches (3x2 grid on right)
+            appState.paint.colors.forEach((_, i) => {
+              const row = Math.floor(i / 3);
+              const col = i % 3;
+              const sx = 296 + col * 24;
+              const sy = 85 + row * 24;
+              if (rx >= sx && rx <= sx + 16 && ry >= sy && ry <= sy + 16) isClickable = true;
+            });
+            // Paint grid
+            if (rx >= 120 && rx <= 280 && ry >= 65 && ry <= 225) isClickable = true;
+          } 
+          else if (appState.activeTab === 'shader') {
+            // Pause button (shifted to right)
+            if (rx >= 296 && rx <= 380 && ry >= 215 && ry <= 237) {
+              isClickable = true;
+              isShaderPauseHovered = true;
+            }
+          } 
+          else if (appState.activeTab === 'config') {
+            // Dropdown option hover
+            if (appState.config.fpsDropdownOpen && rx >= 300 && rx <= 380 && ry >= 75 && ry <= 129) {
+              isClickable = true;
+              const optIdx = Math.floor((ry - 75) / 18);
+              if (optIdx >= 0 && optIdx <= 2) {
+                appState.config.fpsDropdownHoveredIndex = optIdx;
+              }
+            } else {
+              appState.config.fpsDropdownHoveredIndex = -1;
+            }
+
+            // Checkbox
+            if (rx >= 120 && rx <= 132 && ry >= 60 && ry <= 72) {
+              isClickable = true;
+            }
+            // Combobox box
+            else if (rx >= 300 && rx <= 380 && ry >= 57 && ry <= 75) {
+              isClickable = true;
+              isComboboxHovered = true;
+            }
+            // Radios
+            else if (rx >= 120 && rx <= 130 && ry >= 102 && ry <= 112) {
+              isClickable = true;
+            }
+            else if (rx >= 200 && rx <= 210 && ry >= 102 && ry <= 112) {
+              isClickable = true;
+            }
+            // Slider (Trackbar)
+            else if (rx >= 270 && rx <= 380 && ry >= 98 && ry <= 116) {
+              isClickable = true;
+              isSliderHovered = true;
+            }
+            // Swatches
+            themeColors.forEach((tColor, i) => {
+              const swx = 120 + i * 22;
+              const swy = 146;
+              if (rx >= swx && rx <= swx + 14 && ry >= swy && ry <= swy + 14) {
+                isClickable = true;
+              }
+            });
+            // Edit box
+            if (rx >= 120 && rx <= 380 && ry >= 194 && ry <= 214) {
+              isClickable = true;
+            }
+            // Reset button (shifted to right)
+            else if (rx >= 280 && rx <= 380 && ry >= 232 && ry <= 254) {
+              isClickable = true;
+              isConfigResetHovered = true;
+            }
+          }
+          else if (appState.activeTab === 'controls') {
+            // GroupBox 1: Buttons
+            if (rx >= 128 && rx <= 198 && ry >= 72 && ry <= 92) {
+              isClickable = true;
+              isBtnNormalHovered = true;
+            }
+            else if (rx >= 210 && rx <= 280 && ry >= 72 && ry <= 92) {
+              isClickable = true;
+              isBtnConfirmHovered = true;
+            }
+            
+            // GroupBox 2: ListBox and Spinner
+            else if (rx >= 128 && rx <= 268 && ry >= 140 && ry <= 230) {
+              isClickable = true;
+              const idx = Math.floor((ry - 140 + appState.controls.listScrollTop) / 20);
+              if (idx >= 0 && idx < dllItems.length) {
+                isListHoveredIndex = idx;
+              }
+            }
+            else if (rx >= 268 && rx <= 278 && ry >= 140 && ry <= 230) {
+              isClickable = true;
+              isScrollbarHovered = true;
+            }
+            else if (rx >= 350 && rx <= 362 && ry >= 156 && ry <= 165) {
+              isClickable = true;
+              isSpinnerUpHovered = true;
+            }
+            else if (rx >= 350 && rx <= 362 && ry >= 165 && ry <= 174) {
+              isClickable = true;
+              isSpinnerDownHovered = true;
+            }
+            else if (rx >= 128 && rx <= 140 && ry >= 258 && ry <= 270) {
+              isClickable = true;
+              isCheckboxHovered = true;
+            }
+            else if (rx >= 212 && rx <= 222 && ry >= 259 && ry <= 269) {
+              isClickable = true;
+              isRadioGdiHovered = true;
+            }
+            else if (rx >= 292 && rx <= 302 && ry >= 259 && ry <= 269) {
+              isClickable = true;
+              isRadioDibHovered = true;
+            }
+            else if (rx >= 160 && rx <= 240 && ry >= 284 && ry <= 300) {
+              isClickable = true;
+              isControlsSliderHovered = true;
+            }
+          }
+ 
+          if (isClickable) {
+            canvas.style.cursor = 'pointer';
+          } else if (ry >= 0 && ry <= 28) {
+            canvas.style.cursor = 'move';
+          } else {
+            canvas.style.cursor = 'default';
+          }
+        } else if (!win.visible) {
+          const btnW = 160;
+          const btnH = 40;
+          const btnX = (canvas.width / appState.zoom - btnW) / 2;
+          const btnY = (canvas.height / appState.zoom - btnH) / 2;
+          if (mx >= btnX && mx <= btnX + btnW && my >= btnY && my <= btnY + btnH) {
+            canvas.style.cursor = 'pointer';
+            isLauncherHovered = true;
+          } else {
+            canvas.style.cursor = 'default';
+          }
+        } else {
+          canvas.style.cursor = 'default';
+        }
+      }
+ 
+      // Check if any hover state changed, if so render
+      let hoverChanged = false;
+      if (appState.closeHovered !== isCloseHovered) {
+        appState.closeHovered = isCloseHovered;
+        hoverChanged = true;
+      }
+      if (appState.shaderPauseHovered !== isShaderPauseHovered) {
+        appState.shaderPauseHovered = isShaderPauseHovered;
+        hoverChanged = true;
+      }
+      if (appState.configResetHovered !== isConfigResetHovered) {
+        appState.configResetHovered = isConfigResetHovered;
+        hoverChanged = true;
+      }
+      if (appState.launcherHovered !== isLauncherHovered) {
+        appState.launcherHovered = isLauncherHovered;
+        hoverChanged = true;
+      }
+      if (appState.tabPaintHovered !== isTabPaintHovered) {
+        appState.tabPaintHovered = isTabPaintHovered;
+        hoverChanged = true;
+      }
+      if (appState.tabShaderHovered !== isTabShaderHovered) {
+        appState.tabShaderHovered = isTabShaderHovered;
+        hoverChanged = true;
+      }
+      if (appState.tabConfigHovered !== isTabConfigHovered) {
+        appState.tabConfigHovered = isTabConfigHovered;
+        hoverChanged = true;
+      }
+      if (appState.tabControlsHovered !== isTabControlsHovered) {
+        appState.tabControlsHovered = isTabControlsHovered;
+        hoverChanged = true;
+      }
+      if (appState.comboboxHovered !== isComboboxHovered) {
+        appState.comboboxHovered = isComboboxHovered;
+        hoverChanged = true;
+      }
+      if (appState.sliderHovered !== isSliderHovered) {
+        appState.sliderHovered = isSliderHovered;
+        hoverChanged = true;
+      }
+      if (appState.controls.btnNormalHovered !== isBtnNormalHovered) {
+        appState.controls.btnNormalHovered = isBtnNormalHovered;
+        hoverChanged = true;
+      }
+      if (appState.controls.btnConfirmHovered !== isBtnConfirmHovered) {
+        appState.controls.btnConfirmHovered = isBtnConfirmHovered;
+        hoverChanged = true;
+      }
+      if (appState.controls.listHoveredIndex !== isListHoveredIndex) {
+        appState.controls.listHoveredIndex = isListHoveredIndex;
+        hoverChanged = true;
+      }
+      if (appState.controls.spinnerUpHovered !== isSpinnerUpHovered) {
+        appState.controls.spinnerUpHovered = isSpinnerUpHovered;
+        hoverChanged = true;
+      }
+      if (appState.controls.spinnerDownHovered !== isSpinnerDownHovered) {
+        appState.controls.spinnerDownHovered = isSpinnerDownHovered;
+        hoverChanged = true;
+      }
+      if (appState.scrollbarHovered !== isScrollbarHovered) {
+        appState.scrollbarHovered = isScrollbarHovered;
+        hoverChanged = true;
+      }
+      if (appState.controls.checkboxHovered !== isCheckboxHovered) {
+        appState.controls.checkboxHovered = isCheckboxHovered;
+        hoverChanged = true;
+      }
+      if (appState.controls.radioGdiHovered !== isRadioGdiHovered) {
+        appState.controls.radioGdiHovered = isRadioGdiHovered;
+        hoverChanged = true;
+      }
+      if (appState.controls.radioDibHovered !== isRadioDibHovered) {
+        appState.controls.radioDibHovered = isRadioDibHovered;
+        hoverChanged = true;
+      }
+      if (appState.controls.sliderHovered !== isControlsSliderHovered) {
+        appState.controls.sliderHovered = isControlsSliderHovered;
+        hoverChanged = true;
+      }
+ 
+      if (hoverChanged) {
+        requestRender();
+      }
+ 
+      if (appState.dragMode === 'move-window') {
+        const dx = mx - appState.dragStart.x;
+        const dy = my - appState.dragStart.y;
+        
+        win.x = Math.max(0, Math.min(canvas.width / appState.zoom - win.w, appState.dragOffset.x + dx));
+        win.y = Math.max(0, Math.min(canvas.height / appState.zoom - win.h, appState.dragOffset.y + dy));
+        
+        requestRender();
+      }
+      else if (appState.dragMode === 'drag-slider') {
+        const pct = Math.max(0, Math.min(1, (mx - (win.x + 270)) / 110));
+        const newSpeed = 0.5 + pct * 1.5;
+        appState.config.shaderSpeed = Math.round(newSpeed * 10) / 10;
+        requestRender();
+      }
+      else if (appState.dragMode === 'drag-list-scrollbar') {
+        const dy = my - appState.dragStart.y;
+        const scrollDelta = Math.round((dy / 60) * 110);
+        appState.controls.listScrollTop = Math.max(0, Math.min(110, appState.dragOffset.y + scrollDelta));
+        requestRender();
+      }
+      else if (appState.dragMode === 'controls-slider') {
+        const pct = Math.max(0, Math.min(1, (mx - (win.x + 160)) / 72));
+        appState.controls.progressVal = Math.round(pct * 100);
+        appState.controls.statusText = `设置进度: ${appState.controls.progressVal}%`;
+        requestRender();
+      }
+    };
+ 
+    window.onmouseup = () => {
+      if (appState.dragMode === 'move-window' ||
+          appState.dragMode === 'drag-slider' ||
+          appState.dragMode === 'drag-list-scrollbar' ||
+          appState.dragMode === 'controls-slider') {
+        saveAppState();
+      }
+      appState.dragMode = null;
+    };
+
+    canvas.addEventListener('wheel', (e) => {
+      if (appState.activeTab === 'controls' && appState.window.visible) {
+        const mouse = getCanvasMouseCoords(e);
+        const win = appState.window;
+        const rx = mouse.x - win.x;
+        const ry = mouse.y - win.y;
+        if (rx >= 128 && rx <= 278 && ry >= 140 && ry <= 230) {
+          const dir = e.deltaY > 0 ? 1 : -1;
+          appState.controls.listScrollTop = Math.max(0, Math.min(110, appState.controls.listScrollTop + dir * 20));
+          requestRender();
+          saveAppState();
+          e.preventDefault();
+        }
+      }
+    }, { passive: false });
+ 
+    window.onkeydown = (e) => {
+      if (appState.config.editFocused) {
+        if (e.key === 'Backspace') {
+          appState.config.customTitle = appState.config.customTitle.slice(0, -1);
+          e.preventDefault();
+        } else if (e.key.length === 1) {
+          if (appState.config.customTitle.length < 32) {
+            appState.config.customTitle += e.key;
+          }
+          e.preventDefault();
+        } else if (e.key === 'Escape' || e.key === 'Enter') {
+          appState.config.editFocused = false;
+          e.preventDefault();
+        }
+        requestRender();
+        saveAppState();
+      }
+    };
+ 
+    // Plasma Animation Loop
+    let lastAnimTime = 0;
+    function animationLoop(timestamp) {
+      if (appState.shader.running && appState.activeTab === 'shader' && appState.window.visible) {
+        const speed = appState.config.shaderSpeed || 1.0;
+        const fps = appState.config.fpsLimit;
+        
+        let shouldUpdate = false;
+        if (fps === '30 FPS') {
+          if (!timestamp) timestamp = performance.now();
+          const elapsed = timestamp - lastAnimTime;
+          if (elapsed >= 33.3) {
+            lastAnimTime = timestamp - (elapsed % 33.3);
+            shouldUpdate = true;
+          }
+        } else if (fps === '60 FPS') {
+          if (!timestamp) timestamp = performance.now();
+          const elapsed = timestamp - lastAnimTime;
+          if (elapsed >= 16.6) {
+            lastAnimTime = timestamp - (elapsed % 16.6);
+            shouldUpdate = true;
+          }
+        } else {
+          shouldUpdate = true;
+        }
+
+        if (shouldUpdate) {
+          appState.shader.time += 0.04 * speed;
+          appState.shader.progress = (appState.shader.progress + 0.3 * speed) % 100;
+          requestRender();
+        }
+      }
+      requestAnimationFrame(animationLoop);
+    }
+    requestAnimationFrame(animationLoop);
+ 
+    // Load App
+    document.addEventListener('DOMContentLoaded', () => {
+      loadAppState();
+      applyThemeToHost();
+      applyIdeMode(appState.ideMode);
+      resizeCanvas();
+      requestRender();
+
+      // Theme Mode Toggle
+      const themeBtn = document.getElementById('theme-mode-btn');
+      if (themeBtn) {
+        themeBtn.onclick = () => {
+          const nextMode = appState.ideMode === 'light' ? 'dark' : 'light';
+          applyIdeMode(nextMode);
+          requestRender();
+          saveAppState();
+        };
+      }
+
+      requestAnimationFrame(() => {
+        resizeCanvas();
+        requestRender();
+      });
+    });
+ 
+    window.onload = () => {
+      loadAppState();
+      applyThemeToHost();
+      applyIdeMode(appState.ideMode);
+      resizeCanvas();
+      requestRender();
+    };
+ 
+    window.addEventListener('resize', () => {
+      resizeCanvas();
+      requestRender();
+    });
+  </script>
+</body>
+</html>

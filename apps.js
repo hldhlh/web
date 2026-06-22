@@ -18,7 +18,8 @@ export async function getAppDirectories() {
     { name: "蔬菜盘点程序", path: "vegcheck/index.html" },
     { name: "情景故事", path: "course/index.html" },
     { name: "我的头像", path: "avatar/index.html" },
-    { name: "实时记账", path: "ledger/index.html" }
+    { name: "实时记账", path: "ledger/index.html" },
+    { name: "Win32 GUI DIB 预览器", path: "gui-design-demo/index.html" }
   ];
 }
 

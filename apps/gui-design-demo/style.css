@@ -1,0 +1,270 @@
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&display=swap');
+
+/* Clean Win32 C++ IDE theme for Workspace Previewer */
+:root {
+  --ide-bg: #08080a;
+  --ide-workspace-bg: #141416;
+  --ide-canvas-area-bg: #222227;
+  --ide-border: rgba(255, 255, 255, 0.08);
+  --ide-header-bg: rgba(20, 20, 24, 0.72);
+  --ide-text: #f5f5f7;
+  --ide-text-secondary: #86868b;
+  --ide-accent: #00bfa5;
+  --ide-accent-light: #4ef2d2;
+}
+
+html.light-mode {
+  --ide-bg: #eef1f6;
+  --ide-workspace-bg: #f5f5f7;
+  --ide-canvas-area-bg: #e4e4e9;
+  --ide-border: rgba(0, 0, 0, 0.08);
+  --ide-header-bg: rgba(255, 255, 255, 0.72);
+  --ide-text: #1d1d1f;
+  --ide-text-secondary: #6e6e73;
+}
+
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  background: var(--ide-bg);
+  color: var(--ide-text);
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Main Container Layout */
+.app-container {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Center Canvas area (Retro Skinned Layout) */
+.workspace {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--ide-workspace-bg);
+  overflow: hidden;
+  position: relative;
+}
+
+/* Toolbar */
+.toolbar {
+  height: 44px;
+  background: var(--ide-header-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  z-index: 5;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+}
+
+.toolbar-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ide-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: -0.01em;
+}
+
+.toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: none;
+  color: var(--ide-text-secondary);
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  border-radius: 5px;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ide-text);
+}
+
+.toolbar-btn.active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+
+.canvas-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: var(--ide-canvas-area-bg);
+}
+
+/* DIB Container */
+.dib-canvas-container {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+canvas#dibCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: -webkit-crisp-edges;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: none;
+  font-smooth: never;
+  cursor: default;
+}
+
+/* Zoom info label overlay */
+.zoom-indicator {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(20, 20, 24, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--ide-accent-light);
+  padding: 4px 8px;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.68rem;
+  pointer-events: none;
+  z-index: 2;
+  border: none;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.back-to-dashboard {
+  background: rgba(255, 255, 255, 0.04);
+  border: none;
+  color: var(--ide-text-secondary);
+  padding: 4px 10px;
+  text-decoration: none;
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 5px;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.back-to-dashboard:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ide-text);
+}
+
+/* HTML Text Layer for Non-Antialiased Fonts */
+#dib-html-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+  z-index: 2;
+  transform-origin: 0 0;
+}
+
+.pixel-text {
+  position: absolute;
+  font-family: 'NSimSun', '新宋体', SimSun, monospace;
+  font-size: 16px;
+  line-height: 16px;
+  font-weight: 400;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: none;
+  font-smooth: never;
+  white-space: nowrap;
+}
+
+#window-html-container,
+#launcher-html-container {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Light Mode Overrides for UI Elements */
+html.light-mode .toolbar-btn {
+  background: rgba(0, 0, 0, 0.04);
+}
+html.light-mode .toolbar-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+html.light-mode .toolbar-btn.active {
+  background: rgba(0, 0, 0, 0.12);
+  color: var(--ide-text);
+}
+html.light-mode .back-to-dashboard {
+  background: rgba(0, 0, 0, 0.04);
+}
+html.light-mode .back-to-dashboard:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+html.light-mode .zoom-indicator {
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  color: var(--ide-accent);
+}
+html.light-mode ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}
+html.light-mode ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+
