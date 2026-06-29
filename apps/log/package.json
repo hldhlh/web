@@ -1,0 +1,16 @@
+{
+  "name": "log",
+  "version": "1.0.0",
+  "description": "- ✅ **实时同步** - 任何数据库更新立即反映在界面上 - ✅ **智能重试** - 网络问题时自动重连，无需手动刷新 - ✅ **移动端优化** - 针对手机端网络不稳定进行专门优化 - ✅ **状态指示** - 清晰显示连接状态和操作结果 - ✅ **离线友好** - 网络恢复时自动重连实时订阅 - 🆕 **全球CDN优化** - 多源CDN备选，确保全球可访问性",
+  "main": "script.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.108.2"
+  }
+}
