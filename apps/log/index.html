@@ -22,7 +22,8 @@
 
                     const s = document.createElement('script');
                     s.src = url;
-                    const t = setTimeout(() => { s.remove(); fail('timeout'); }, 10000);
+                    s.async = true;
+                    const t = setTimeout(() => { s.remove(); fail('timeout'); }, 5000);
                     s.onload = () => { clearTimeout(t); ok(); };
                     s.onerror = () => { clearTimeout(t); s.remove(); fail('error'); };
                     document.head.appendChild(s);
@@ -67,7 +68,10 @@
             }
         };
 
-        document.addEventListener('DOMContentLoaded', () => load.init());
+        document.addEventListener('DOMContentLoaded', () => {
+            const later = window.requestAnimationFrame || window.setTimeout;
+            later(() => load.init(), 0);
+        });
     </script>
 </head>
 
@@ -82,7 +86,7 @@
         </div>
         <form id="logForm" class="form-container">
             <div id="logContent" class="form-content" contenteditable="true"
-                placeholder="随手记录点什么... (Ctrl+S 保存/更新, 直接粘贴图片)"></div>
+                placeholder="随手记录点什么..."></div>
             <div class="form-actions">
                 <button type="button" id="cancelBtn" class="btn btn-cancel hidden">取消</button>
                 <button type="submit" id="submitBtn" class="btn btn-primary">保存</button>
@@ -90,6 +94,11 @@
         </form>
         <div id="timeline" class="timeline-container">
         </div>
+        <nav id="pagination" class="pagination hidden" aria-label="日志分页">
+            <button type="button" id="prevPageBtn" class="page-nav">上一页</button>
+            <div id="pageTabs" class="page-tabs"></div>
+            <button type="button" id="nextPageBtn" class="page-nav">下一页</button>
+        </nav>
         <div id="emptyState" class="empty-state hidden">暂无日志</div>
         <div id="errorState" class="error-wrapper hidden">
             <p>连接失败，请检查网络</p>

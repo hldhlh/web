@@ -1,144 +1,74 @@
-# 日志应用 - 实时订阅功能
+# 日志应用
 
-## 🚀 功能特性
+一个纯静态的日志页面，直接通过 Supabase JS CDN 访问 `public.logs`，支持新增、编辑、删除、缓存和 Realtime 同步。
 
-- ✅ **实时同步** - 任何数据库更新立即反映在界面上
-- ✅ **智能重试** - 网络问题时自动重连，无需手动刷新
-- ✅ **移动端优化** - 针对手机端网络不稳定进行专门优化
-- ✅ **状态指示** - 清晰显示连接状态和操作结果
-- ✅ **离线友好** - 网络恢复时自动重连实时订阅
-- 🆕 **全球CDN优化** - 多源CDN备选，确保全球可访问性
+## 当前架构
 
-## 📡 实时订阅配置
+- 入口文件：`index.html`
+- 主逻辑：`script.js`
+- 样式：`styles.css`
+- 数据库：Supabase `public.logs`
+- 运行方式：静态文件托管即可，不需要构建步骤
+- 访问策略：性能优先，暂时不启用 RLS，不使用 `user_id`
+- 初始化策略：先启动本地 UI 和缓存渲染，再在后台加载 Supabase、拉取远端数据和建立 Realtime
 
-### 1. Supabase 后台设置
+## 数据表
 
-确保在 Supabase 项目中：
-- 开启实时订阅功能
-- `logs` 表启用 Row Level Security (RLS)
-- 匿名用户有适当的读取权限
-
-### 2. SQL 权限设置
+当前应用只依赖 `public.logs`：
 
 ```sql
--- 启用实时订阅
-ALTER PUBLICATION supabase_realtime ADD TABLE logs;
-
--- 设置行级安全策略
-CREATE POLICY "允许匿名用户读取日志" ON logs
-FOR SELECT USING (true);
-
-CREATE POLICY "允许匿名用户插入日志" ON logs
-FOR INSERT WITH CHECK (true);
-
-CREATE POLICY "允许匿名用户更新日志" ON logs
-FOR UPDATE USING (true);
-
-CREATE POLICY "允许匿名用户删除日志" ON logs
-FOR DELETE USING (true);
+id uuid primary key default gen_random_uuid(),
+content text not null,
+created_at timestamptz default now(),
+updated_at timestamptz default now()
 ```
 
-## 🌍 全球CDN优化
+数据库中已有 `update_logs_updated_at` 触发器，会在更新时自动维护 `updated_at`。
 
-### 样式和CDN配置
+## Supabase 配置
 
-**样式系统:**
-- 使用纯CSS自定义样式 (styles.css)
-- 响应式设计支持移动端
-- 暗色模式自适应
-- 无外部样式库依赖
+Realtime 需要把 `logs` 加入 publication：
 
-**Supabase JS CDN备选:**
-- cdn.jsdelivr.net (主要)
-- unpkg.com (备选) 
-- cdnjs.cloudflare.com (备选)
-- fastly.jsdelivr.net (全球加速)
-- cdn.skypack.dev (现代ESM)
-
-### 智能CDN选择
-
-- **地理优化** - 根据时区自动优化CDN顺序
-- **自动切换** - 失败时自动尝试备选CDN
-- **快速加载** - 仅加载必需的Supabase库，样式使用本地CSS
-- **加载验证** - 确保资源真正可用后才初始化应用
-
-### CDN加载流程
-
-1. **检测地理位置** - 基于时区优化CDN顺序
-2. **加载Supabase** - 尝试加载数据库连接库
-3. **失败重试** - 单个CDN失败时自动切换
-4. **功能验证** - 验证库真正可用
-5. **应用初始化** - 资源就绪后启动应用
-
-## 🔧 调试工具
-
-在浏览器控制台中运行以下命令：
-
-```javascript
-// 查看实时订阅状态
-debugRealtime()
-
-// 检查CDN加载状态
-debugCDN()
-
-// 手动重新连接
-window.logManager.setupRealtime()
-
-// 检查网络状态
-console.log('网络状态:', connectionManager.isOnline)
-
-// 手动初始化应用（如果自动初始化失败）
-initializeApp()
+```sql
+ALTER PUBLICATION supabase_realtime ADD TABLE public.logs;
 ```
 
-## 📱 移动端优化
+当前选择是最高性能匿名访问，因此不启用 RLS，也不按用户隔离数据。对应代价是：任何拿到 anon key 且能访问 API 的客户端，都可以按数据库授权读取或修改 `logs`。这是当前产品取舍，不是疏漏。
 
-- **心跳间隔**: 30秒（桌面端为默认值）
-- **重试策略**: 指数退避，最大30秒间隔
-- **连接超时**: 15秒，防止长时间等待
-- **网络恢复**: 延迟1秒重连，确保网络稳定
+如果后续要改成私有日志，再启用 RLS、添加 Auth 和 `user_id`，并为 `SELECT/INSERT/UPDATE/DELETE` 分别设计 policy。
 
-## 🚨 常见问题
+## 本地开发
 
-### CDN加载问题
-1. **页面空白或样式错乱**
-   - 运行 `debugCDN()` 检查CDN加载状态
-   - 查看控制台是否有CDN加载错误
-   - 手动刷新页面重新加载CDN
+直接打开 `index.html` 可以运行。也可以在项目目录启动静态服务：
 
-2. **功能不可用**
-   - 检查 `window.supabase` 是否可用
-   - 运行 `debugRealtime()` 查看应用状态
-   - 如果自动初始化失败，运行 `initializeApp()`
+```bash
+python3 -m http.server 8000
+```
 
-3. **特定地区访问慢**
-   - 应用会自动根据地理位置优化CDN顺序
-   - 亚洲地区优先使用 bootcdn 和 fastly
-   - 欧洲地区优先使用 cdnjs 和 jsdelivr
+然后访问：
 
-### 实时同步不工作
-1. 检查控制台是否有错误信息
-2. 运行 `debugRealtime()` 查看连接状态
-3. 确认 Supabase 项目实时订阅权限
-4. 检查网络连接状态
+```text
+http://localhost:8000/apps/log/
+```
 
-### 手机端连接不稳定
-- 应用已自动优化移动端参数
-- 网络恢复时会自动重连
-- 观察右上角状态指示器
+## 测试
 
-### 权限问题
-- 确保匿名用户有 logs 表的读写权限
-- 检查 RLS 策略是否正确配置
+测试不连接真实 Supabase，不读取或写入生产数据。测试通过 Node 的 `vm` 加载 `script.js`，用 mock DOM 和 mock Supabase client 验证主要调用链。
 
-### 网络环境限制
-- 如果某些CDN被屏蔽，应用会自动切换到可用源
-- 支持多种CDN提供商确保全球可访问
-- 移动端网络切换时自动重连
+```bash
+cd apps/log
+npm test
+```
 
-## 📊 状态指示器
+语法检查：
 
-- 🟢 **绿色圆点** + "实时同步" = 连接正常
-- ⚪ **灰色圆点** + "同步断开" = 连接断开
+```bash
+npm run check
+```
 
-状态指示器会在页面右上角显示，连接成功后10秒自动隐藏。
+## 已知技术债
+
+- 当前为性能优先：保存、删除会先更新本地 UI，再后台同步数据库；如果数据库脚本未加载或网络离线，操作会保存在 `localStorage` 的待同步队列里。
+- `content` 当前存 HTML，渲染时会插入 DOM；如果允许不可信写入，需要增加 HTML allowlist 清理。
+- 粘贴图片会以内联 base64 写进 `content`，大图片会拖慢首屏读取、Realtime payload 和 localStorage 缓存。后续更适合迁到 Supabase Storage。
+- 首屏现在全量读取 `logs`，数据继续增长后应改为分页，并给 `created_at desc` 加索引。

@@ -2,6 +2,10 @@
 const SUPABASE_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
 const CACHE_KEY = 'logs_cache';
+const PENDING_KEY = 'logs_pending_ops';
+const PAGE_SIZE = 20;
+const CACHE_LIMIT = 40;
+const PREVIEW_CHARS = 800;
 
 let dbClient = null; // 改名以避免与全局库变量名冲突
 let isAppInitialized = false;
@@ -27,8 +31,8 @@ const network = {
     init() {
         window.addEventListener('online', () => {
             this.online = true;
-            status.online();
-            if (window.logManager) window.logManager.setupRealtime();
+            if (!dbClient && window.supabase && window.supabase.createClient) initApp();
+            else if (window.logManager) window.logManager.connect(dbClient);
         });
         window.addEventListener('offline', () => {
             this.online = false;
@@ -62,23 +66,21 @@ function initSupabase() {
 }
 
 function initApp() {
-    if (isAppInitialized) return;
+    startApp();
 
     dbClient = initSupabase();
     if (!dbClient) {
-        status.update('offline', '数据库加载失败');
-        const errEl = document.getElementById('errorState');
-        const loadEl = document.getElementById('loadingLogs');
-        if (errEl) errEl.classList.remove('hidden');
-        if (loadEl) loadEl.classList.add('hidden');
+        status.update('offline', '本地可用');
         return;
     }
 
-    if (typeof LogManager !== 'undefined') {
-        window.logManager = new LogManager();
-        isAppInitialized = true;
-        status.online();
-    }
+    if (window.logManager) window.logManager.connect(dbClient);
+}
+
+function startApp() {
+    if (isAppInitialized || typeof LogManager === 'undefined') return;
+    window.logManager = new LogManager();
+    isAppInitialized = true;
 }
 
 // 监听 CDN 加载信号
@@ -89,38 +91,39 @@ window.addEventListener('cdnReady', function () {
 
 window.addEventListener('cdnError', function () {
     console.error('收到 cdnError 信号');
-    status.update('offline', '服务加载失败');
-    const errEl = document.getElementById('errorState');
-    const loadEl = document.getElementById('loadingLogs');
-    if (errEl) errEl.classList.remove('hidden');
-    if (loadEl) loadEl.classList.add('hidden');
+    startApp();
+    status.update('offline', '本地可用');
 });
 
 // 日志管理
 class LogManager {
     constructor() {
         this.logs = [];
+        this.pendingOps = [];
         this.editingId = null;
         this.channel = null;
         this.isSubmitting = false;
         this.isDeleting = false;
+        this.isConnected = false;
+        this.isSyncing = false;
+        this.isLoadingLogs = false;
+        this.hasMore = false;
+        this.oldestRemoteCreatedAt = null;
+        this.currentPage = 1;
+        this.totalLogs = 0;
+        this.totalPages = 1;
+        this.deletedLocalIds = new Set();
         this.init();
     }
 
-    async init() {
+    init() {
         this.bindEvents();
         this.loadCache();
+        this.loadPending();
         this.render();
+        status.update(navigator.onLine ? 'loading' : 'offline', navigator.onLine ? '本地就绪' : '离线模式');
 
-        try {
-            await this.loadLogs();
-            this.render();
-        } catch (e) {
-            console.error('Load logs error:', e);
-            status.update('offline', '加载失败');
-        }
-
-        if (dbClient) this.setupRealtime();
+        if (dbClient) this.connect(dbClient);
     }
 
     loadCache() {
@@ -131,7 +134,46 @@ class LogManager {
     }
 
     saveCache() {
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify(this.logs)); } catch (e) { }
+        try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify(this.logs.slice(0, CACHE_LIMIT).map(log => this.compactForCache(log))));
+        } catch (e) { }
+    }
+
+    compactForCache(log) {
+        if (this.isLocalId(log.id)) return log;
+        if (!log.content || log.content.length <= PREVIEW_CHARS) return log;
+        return Object.assign({}, log, {
+            content: log.content.slice(0, PREVIEW_CHARS),
+            isPreview: true,
+            fullLoaded: false
+        });
+    }
+
+    loadPending() {
+        try {
+            const data = localStorage.getItem(PENDING_KEY);
+            if (data) this.pendingOps = JSON.parse(data);
+        } catch (e) {
+            this.pendingOps = [];
+        }
+    }
+
+    savePending() {
+        try { localStorage.setItem(PENDING_KEY, JSON.stringify(this.pendingOps)); } catch (e) { }
+    }
+
+    connect(client) {
+        if (!client || !navigator.onLine) {
+            this.isConnected = false;
+            status.offline();
+            return;
+        }
+
+        dbClient = client;
+        this.isConnected = true;
+        status.loading('后台同步');
+        this.setupRealtime();
+        this.loadLogs(true).finally(() => this.flushPending());
     }
 
     bindEvents() {
@@ -146,6 +188,12 @@ class LogManager {
 
         const confirmDel = document.getElementById('confirmDelete');
         if (confirmDel) confirmDel.addEventListener('click', () => this.doDelete());
+
+        const prevPageBtn = document.getElementById('prevPageBtn');
+        if (prevPageBtn) prevPageBtn.addEventListener('click', () => this.goToPage(this.currentPage - 1));
+
+        const nextPageBtn = document.getElementById('nextPageBtn');
+        if (nextPageBtn) nextPageBtn.addEventListener('click', () => this.goToPage(this.currentPage + 1));
 
         const modal = document.getElementById('deleteModal');
         if (modal) modal.addEventListener('click', e => {
@@ -206,6 +254,132 @@ class LogManager {
         reader.readAsDataURL(blob);
     }
 
+    makeLocalId() {
+        return 'local-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+    }
+
+    isLocalId(id) {
+        return typeof id === 'string' && id.indexOf('local-') === 0;
+    }
+
+    makeOp(type, payload) {
+        return Object.assign({ opId: 'op-' + Date.now() + '-' + Math.random().toString(36).slice(2), type }, payload);
+    }
+
+    queueOp(op) {
+        if (op.type === 'insert') {
+            const existing = this.pendingOps.findIndex(item => item.type === 'insert' && item.localId === op.localId);
+            if (existing !== -1) this.pendingOps[existing] = op;
+            else this.pendingOps.push(op);
+        } else if (op.type === 'update') {
+            if (this.isLocalId(op.id)) {
+                const insertOp = this.pendingOps.find(item => item.type === 'insert' && item.localId === op.id);
+                if (insertOp) insertOp.content = op.content;
+            } else {
+                this.pendingOps = this.pendingOps.filter(item => !(item.type === 'update' && item.id === op.id));
+                this.pendingOps.push(op);
+            }
+        } else if (op.type === 'delete') {
+            if (this.isLocalId(op.id)) {
+                this.pendingOps = this.pendingOps.filter(item => item.localId !== op.id && item.id !== op.id);
+            } else {
+                this.pendingOps = this.pendingOps.filter(item => !(item.id === op.id && item.type === 'update'));
+                this.pendingOps.push(op);
+            }
+        }
+        this.savePending();
+    }
+
+    removeQueuedOp(op) {
+        this.pendingOps = this.pendingOps.filter(item => item.opId !== op.opId);
+        this.savePending();
+    }
+
+    async syncOp(op, fromQueue) {
+        if (!dbClient || !navigator.onLine) {
+            if (!fromQueue) this.queueOp(op);
+            status.update('offline', '待同步');
+            return;
+        }
+
+        try {
+            const data = await this.executeOp(op);
+            if (fromQueue) this.removeQueuedOp(op);
+            this.applyRemoteResult(op, data);
+            status.online();
+        } catch (err) {
+            console.error('Sync op error:', err);
+            if (!fromQueue) this.queueOp(op);
+            status.update('offline', '待同步');
+        }
+    }
+
+    async executeOp(op) {
+        if (op.type === 'insert') {
+            const res = await network.retry(() => dbClient.from('logs').insert([{ content: op.content }]).select());
+            return res.data;
+        }
+
+        if (op.type === 'update') {
+            if (this.isLocalId(op.id)) return null;
+            const res = await network.retry(() => dbClient.from('logs').update({ content: op.content }).eq('id', op.id).select());
+            return res.data;
+        }
+
+        if (op.type === 'delete') {
+            if (this.isLocalId(op.id)) return null;
+            await network.retry(() => dbClient.from('logs').delete().eq('id', op.id));
+            return null;
+        }
+    }
+
+    applyRemoteResult(op, data) {
+        if (op.type === 'insert' && data && data[0]) {
+            const remote = data[0];
+            const localIndex = this.logs.findIndex(l => l.id === op.localId);
+            const remoteIndex = this.logs.findIndex(l => l.id === remote.id);
+
+            if (this.deletedLocalIds.has(op.localId)) {
+                if (localIndex !== -1) this.logs.splice(localIndex, 1);
+                this.deletedLocalIds.delete(op.localId);
+                this.syncOp(this.makeOp('delete', { id: remote.id }), false);
+                this.saveCache();
+                this.render();
+                return;
+            }
+
+            if (remoteIndex !== -1 && localIndex !== -1) {
+                this.logs.splice(localIndex, 1);
+            } else if (localIndex !== -1) {
+                this.logs[localIndex] = remote;
+            } else if (remoteIndex === -1) {
+                this.logs.unshift(remote);
+            }
+        } else if (op.type === 'update' && data && data[0]) {
+            const i = this.logs.findIndex(l => l.id === op.id);
+            if (i !== -1) this.logs[i] = data[0];
+        }
+
+        this.saveCache();
+        this.render();
+    }
+
+    async flushPending() {
+        if (this.isSyncing || !this.pendingOps.length || !dbClient || !navigator.onLine) return;
+        this.isSyncing = true;
+        status.loading('后台同步');
+
+        const ops = [...this.pendingOps];
+        for (const op of ops) {
+            if (!this.pendingOps.some(item => item.opId === op.opId)) continue;
+            await this.syncOp(op, true);
+        }
+
+        this.isSyncing = false;
+        if (this.pendingOps.length) status.update('offline', '待同步');
+        else status.online();
+    }
+
     async submit(e) {
         if (e && e.preventDefault) e.preventDefault();
         const div = document.getElementById('logContent');
@@ -215,37 +389,32 @@ class LogManager {
         // 简单清理空标签
         if (content === '<br>' || content === '') return;
 
-        if (!dbClient || this.isSubmitting) return;
+        if (this.isSubmitting) return;
 
-        this.setSubmitting(true);
-        try {
-            let data = null;
-            if (this.editingId) {
-                const res = await network.retry(() => dbClient.from('logs').update({ content: content, updated_at: new Date() }).eq('id', this.editingId).select());
-                data = res.data;
-                if (data && data[0]) {
-                    const i = this.logs.findIndex(l => l.id === this.editingId);
-                    if (i !== -1) this.logs[i] = data[0];
-                }
-            } else {
-                const res = await network.retry(() => dbClient.from('logs').insert([{ content: content }]).select());
-                data = res.data;
-                // 不再手动 unshift，交由 setupRealtime 的 INSERT 监听处理，防止重复
+        if (this.editingId) {
+            const id = this.editingId;
+            const i = this.logs.findIndex(l => l.id === id);
+            if (i !== -1) {
+                this.logs[i] = Object.assign({}, this.logs[i], { content: content, updated_at: new Date().toISOString() });
             }
-
-            if (data) {
-                this.saveCache();
-                this.render();
-            }
-
             this.resetForm();
-            status.online();
-        } catch (err) {
-            console.error('Submit error:', err);
-            status.update('offline', '保存失败');
-        } finally {
-            this.setSubmitting(false);
+            this.saveCache();
+            this.render();
+            const op = this.makeOp('update', { id, content });
+            this.syncOp(op, false);
+            return;
         }
+
+        const now = new Date().toISOString();
+        const localId = this.makeLocalId();
+        const log = { id: localId, content, created_at: now, updated_at: now };
+        this.logs.unshift(log);
+        this.resetForm();
+        this.saveCache();
+        this.render();
+
+        const op = this.makeOp('insert', { localId, content });
+        this.syncOp(op, false);
     }
 
     setSubmitting(loading) {
@@ -273,48 +442,168 @@ class LogManager {
         if (cancelBtn) cancelBtn.disabled = loading;
     }
 
-    async loadLogs() {
-        if (!dbClient) return;
+    async loadLogs(silent) {
+        return this.loadPage(1, silent);
+    }
 
-        const result = await network.retry(() =>
-            dbClient.from('logs').select('*').order('created_at', { ascending: false })
-        );
-        const data = result.data;
-        if (data) {
-            this.logs = data;
-            this.saveCache();
+    async loadPage(page, silent) {
+        if (!dbClient || this.isLoadingLogs) return;
+        this.isLoadingLogs = true;
+        this.updatePagination();
+
+        try {
+            const targetPage = Math.max(1, page || 1);
+            const result = await network.retry(() => this.selectLogsPage(targetPage));
+            const data = Array.isArray(result.data) ? result.data.map(row => this.normalizeListRow(row)) : [];
+            if (data) {
+                const localLogs = targetPage === 1 ? this.logs.filter(log => this.isLocalId(log.id)) : [];
+                const localIds = new Set(localLogs.map(log => log.id));
+                this.logs = localLogs.concat(data.filter(log => !localIds.has(log.id)));
+                this.oldestRemoteCreatedAt = data.length ? data[data.length - 1].created_at : null;
+                this.currentPage = targetPage;
+                this.totalLogs = Number.isFinite(result.count) ? result.count : Math.max(this.totalLogs, (targetPage - 1) * PAGE_SIZE + data.length);
+                this.totalPages = Math.max(1, Math.ceil(this.totalLogs / PAGE_SIZE));
+                this.hasMore = this.currentPage < this.totalPages;
+                if (targetPage === 1) this.saveCache();
+                this.render();
+            }
+            if (!this.pendingOps.length) status.online();
+        } catch (e) {
+            console.error('Load logs error:', e);
+            if (!silent) status.update('offline', '加载失败');
+            else status.update('offline', '本地可用');
+        } finally {
+            this.isLoadingLogs = false;
+            this.updatePagination();
         }
     }
 
+    selectLogsPage(page) {
+        const from = (Math.max(1, page || 1) - 1) * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+
+        return dbClient
+            .from('logs_list')
+            .select('id,content_preview,content_size,created_at,updated_at', { count: 'exact' })
+            .order('created_at', { ascending: false })
+            .range(from, to);
+    }
+
+    normalizeListRow(row) {
+        if (Object.prototype.hasOwnProperty.call(row, 'content_preview')) {
+            const size = Number(row.content_size || 0);
+            return {
+                id: row.id,
+                content: row.content_preview || '',
+                contentSize: size,
+                isPreview: size > PREVIEW_CHARS,
+                fullLoaded: size <= PREVIEW_CHARS,
+                created_at: row.created_at,
+                updated_at: row.updated_at
+            };
+        }
+        return row;
+    }
+
+    async loadMoreLogs() {
+        return this.goToPage(this.currentPage + 1);
+    }
+
+    async goToPage(page) {
+        const targetPage = Math.max(1, Math.min(page, this.totalPages || 1));
+        if (targetPage === this.currentPage || this.isLoadingLogs) return;
+        return this.loadPage(targetPage, false);
+    }
+
+    async fetchFullLog(id) {
+        if (!dbClient || this.isLocalId(id)) return this.logs.find(l => l.id === id) || null;
+        const result = await network.retry(() =>
+            dbClient
+                .from('logs')
+                .select('content,updated_at')
+                .eq('id', id)
+                .limit(1)
+        );
+        const full = result && Array.isArray(result.data) ? result.data[0] : null;
+        if (!full) return null;
+
+        const log = this.logs.find(l => l.id === id);
+        if (!log) return null;
+        log.content = full.content || '';
+        log.updated_at = full.updated_at || log.updated_at;
+        log.isPreview = false;
+        log.fullLoaded = true;
+        return log;
+    }
+
+    async ensureFullLog(id) {
+        const log = this.logs.find(l => l.id === id);
+        if (!log) return null;
+        if (!log.isPreview) return log;
+
+        status.loading('加载完整内容');
+        try {
+            const full = await this.fetchFullLog(id);
+            if (!this.pendingOps.length) status.online();
+            return full;
+        } catch (e) {
+            console.error('Fetch full log error:', e);
+            status.update('offline', '加载失败');
+            return null;
+        }
+    }
+
+    async expand(id) {
+        const log = await this.ensureFullLog(id);
+        if (!log) return;
+        this.saveCache();
+        this.render();
+    }
+
+    applyRealtimeChange(p) {
+        if (p.eventType === 'INSERT' && p.new) {
+            const exists = this.logs.some(l => l.id === p.new.id);
+            this.totalLogs += exists ? 0 : 1;
+            this.totalPages = Math.max(1, Math.ceil(this.totalLogs / PAGE_SIZE));
+            this.hasMore = this.currentPage < this.totalPages;
+            if (!exists && this.currentPage === 1) {
+                this.logs.unshift(this.normalizeFullRowForList(p.new));
+                if (this.logs.length > PAGE_SIZE) this.logs.pop();
+            }
+        } else if (p.eventType === 'UPDATE' && p.new) {
+            const i = this.logs.findIndex(l => l.id === p.new.id);
+            if (i !== -1) this.logs[i] = this.normalizeFullRowForList(p.new);
+        } else if (p.eventType === 'DELETE' && p.old) {
+            this.totalLogs = Math.max(0, this.totalLogs - 1);
+            this.totalPages = Math.max(1, Math.ceil(this.totalLogs / PAGE_SIZE));
+            this.hasMore = this.currentPage < this.totalPages;
+            this.logs = this.logs.filter(l => l.id !== p.old.id);
+        }
+
+        this.saveCache();
+        this.render();
+    }
+
     setupRealtime() {
-        if (!dbClient) return;
+        if (!dbClient || !navigator.onLine) return;
         if (this.channel) dbClient.removeChannel(this.channel);
 
-        const self = this;
         this.channel = dbClient
             .channel('logs')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'logs' }, p => {
-                if (p.eventType === 'INSERT' && p.new) {
-                    const exists = self.logs.some(l => l.id === p.new.id);
-                    if (!exists) self.logs.unshift(p.new);
-                } else if (p.eventType === 'UPDATE' && p.new) {
-                    const i = self.logs.findIndex(l => l.id === p.new.id);
-                    if (i !== -1) self.logs[i] = p.new;
-                } else if (p.eventType === 'DELETE' && p.old) {
-                    self.logs = self.logs.filter(l => l.id !== p.old.id);
-                }
-                self.saveCache();
-                self.render();
+                this.applyRealtimeChange(p);
             })
-            .subscribe(function (status) {
-                if (status === 'SUBSCRIBED') {
-                    console.log('Realtime subscribed');
+            .subscribe(syncStatus => {
+                if (syncStatus === 'SUBSCRIBED') {
+                    if (!this.pendingOps.length) status.online();
+                } else if (syncStatus === 'CHANNEL_ERROR' || syncStatus === 'TIMED_OUT' || syncStatus === 'CLOSED') {
+                    status.update('offline', '本地可用');
                 }
             });
     }
 
-    edit(id) {
-        const log = this.logs.find(l => l.id === id);
+    async edit(id) {
+        const log = await this.ensureFullLog(id);
         if (!log) return;
         const div = document.getElementById('logContent');
         const btn = document.getElementById('submitBtn');
@@ -365,19 +654,17 @@ class LogManager {
     }
 
     async doDelete() {
-        if (!this.deleteId || !dbClient || this.isDeleting) return;
+        if (!this.deleteId || this.isDeleting) return;
 
-        this.setDeleting(true);
-        try {
-            await network.retry(() => dbClient.from('logs').delete().eq('id', this.deleteId));
-            this.hideModal();
-            status.online();
-        } catch (err) {
-            console.error('Delete error:', err);
-            status.update('offline', '删除失败');
-        } finally {
-            this.setDeleting(false);
-        }
+        const id = this.deleteId;
+        if (this.isLocalId(id)) this.deletedLocalIds.add(id);
+        this.logs = this.logs.filter(l => l.id !== id);
+        this.hideModal();
+        this.saveCache();
+        this.render();
+
+        const op = this.makeOp('delete', { id });
+        this.syncOp(op, false);
     }
 
     setDeleting(loading) {
@@ -399,6 +686,125 @@ class LogManager {
         if (cancelBtn) cancelBtn.disabled = loading;
     }
 
+    updateLoadMore() {
+        this.updatePagination();
+    }
+
+    updatePagination() {
+        const pagination = document.getElementById('pagination');
+        const tabs = document.getElementById('pageTabs');
+        const prev = document.getElementById('prevPageBtn');
+        const next = document.getElementById('nextPageBtn');
+        if (!pagination || !tabs || !prev || !next) return;
+
+        const shouldShow = this.totalPages > 1;
+        if (shouldShow) pagination.classList.remove('hidden');
+        else pagination.classList.add('hidden');
+
+        prev.disabled = this.isLoadingLogs || this.currentPage <= 1;
+        next.disabled = this.isLoadingLogs || this.currentPage >= this.totalPages;
+        tabs.innerHTML = this.buildPageTabs();
+    }
+
+    buildPageTabs() {
+        const pages = this.visiblePages();
+        return pages.map(page => {
+            if (page === 'gap') return '<span class="page-gap">...</span>';
+            const active = page === this.currentPage ? ' active' : '';
+            const disabled = this.isLoadingLogs || page === this.currentPage ? ' disabled' : '';
+            return `<button type="button" onclick="logManager.goToPage(${page})" class="page-tab${active}"${disabled}>${page}</button>`;
+        }).join('');
+    }
+
+    visiblePages() {
+        const total = this.totalPages || 1;
+        const current = this.currentPage || 1;
+        if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+
+        const pages = [1];
+        const start = Math.max(2, current - 1);
+        const end = Math.min(total - 1, current + 1);
+        if (start > 2) pages.push('gap');
+        for (let page = start; page <= end; page++) pages.push(page);
+        if (end < total - 1) pages.push('gap');
+        pages.push(total);
+        return pages;
+    }
+
+    buildLogHtml(log) {
+        const t = this.formatTime(log.created_at);
+        const edited = log.updated_at && log.updated_at !== log.created_at;
+        const tooltip = this.buildTooltip(log.created_at, log.updated_at);
+
+        let contentHtml = log.isPreview ? this.renderPreviewContent(log) : (log.content || '');
+        if (!log.isPreview && log.content && log.content.includes('|||IMG|||')) {
+            contentHtml = this.convertOldFormat(log.content);
+        }
+        const expandBtn = log.isPreview ? `<button onclick="logManager.expand('${log.id}')" class="timeline-action">展开</button>` : '';
+
+        return `
+            <div class="timeline-item">
+                <div class="timeline-dot" data-tooltip="${tooltip}"></div>
+                <div class="timeline-content">
+                    <div class="timeline-header">
+                        <div style="flex:1" class="timeline-body">${contentHtml}</div>
+                        <div class="timeline-actions">
+                            ${expandBtn}
+                            <button onclick="logManager.edit('${log.id}')" class="timeline-action">编辑</button>
+                            <button onclick="logManager.showModal('${log.id}')" class="timeline-action">删除</button>
+                        </div>
+                    </div>
+                    <div class="timeline-meta">${t}${edited ? ' · 已编辑' : ''}</div>
+                </div>
+            </div>`;
+    }
+
+    renderPreviewContent(log) {
+        const text = this.cleanPreviewText(log.content || '');
+        const size = log.contentSize ? Math.ceil(log.contentSize / 1024) + 'KB' : '较大';
+        const body = text ? this.escape(text) : '内容较大';
+        return `${body}<div class="preview-note">预览内容 · 完整日志约 ${size}</div>`;
+    }
+
+    cleanPreviewText(content) {
+        return content
+            .replace(/\|\|\|IMG\|\|\|[\s\S]*$/g, '\n[图片]')
+            .replace(/<img\b[^>]*>/gi, '[图片]')
+            .replace(/<br\s*\/?>/gi, '\n')
+            .replace(/<\/(div|p|li|h[1-6])>/gi, '\n')
+            .replace(/<[^>]+>/g, '')
+            .replace(/data:image\/[^\s"'<>]+/gi, '[图片数据]')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+    }
+
+    normalizeFullRowForList(row) {
+        const content = row.content || '';
+        const size = content.length;
+        if (size <= PREVIEW_CHARS) return row;
+        return Object.assign({}, row, {
+            content: content.slice(0, PREVIEW_CHARS),
+            contentSize: size,
+            isPreview: true,
+            fullLoaded: false
+        });
+    }
+
+    appendLogs(logs) {
+        if (!logs.length) {
+            this.updateLoadMore();
+            return;
+        }
+
+        const timeline = document.getElementById('timeline');
+        const empty = document.getElementById('emptyState');
+        if (empty) empty.classList.add('hidden');
+        if (timeline) {
+            timeline.insertAdjacentHTML('beforeend', logs.map(log => this.buildLogHtml(log)).join(''));
+        }
+        this.updateLoadMore();
+    }
+
     render() {
         const timeline = document.getElementById('timeline');
         const empty = document.getElementById('emptyState');
@@ -409,50 +815,20 @@ class LogManager {
                 items.forEach(item => item.remove());
             }
             if (empty) empty.classList.remove('hidden');
+            this.updateLoadMore();
             return;
         }
 
         if (empty) empty.classList.add('hidden');
         if (timeline) {
-            const html = this.logs.map(log => {
-                const t = this.formatTime(log.created_at);
-                const edited = log.updated_at && log.updated_at !== log.created_at;
-                const tooltip = this.buildTooltip(log.created_at, log.updated_at);
-
-                // 内容处理：兼容旧格式，或者直接显示新格式
-                let contentHtml = log.content;
-                if (log.content.includes('|||IMG|||')) {
-                    contentHtml = this.convertOldFormat(log.content);
-                }
-
-                // 给图片添加点击放大功能
-                // 由于 contentHtml 现在是字符串，我们可以用简单的正则或者DOM解析来做，
-                // 或者在 click 事件委托里做图片放大（更优雅）。
-                // 这里先只负责输出 HTML。
-
-                return `
-                    <div class="timeline-item">
-                        <div class="timeline-dot" data-tooltip="${tooltip}"></div>
-                        <div class="timeline-content">
-                            <div class="timeline-header">
-                                <div style="flex:1" class="timeline-body">
-                                    ${contentHtml}
-                                </div>
-                                <div class="timeline-actions">
-                                    <button onclick="logManager.edit('${log.id}')" class="timeline-action">编辑</button>
-                                    <button onclick="logManager.showModal('${log.id}')" class="timeline-action">删除</button>
-                                </div>
-                            </div>
-                            <div class="timeline-meta">${t}${edited ? ' · 已编辑' : ''}</div>
-                        </div>
-                    </div>`;
-            }).join('');
+            const html = this.logs.map(log => this.buildLogHtml(log)).join('');
 
             // 保留 loader，只更新日志内容
             const items = timeline.querySelectorAll('.timeline-item');
             items.forEach(item => item.remove());
             timeline.insertAdjacentHTML('beforeend', html);
         }
+        this.updateLoadMore();
     }
 
     convertOldFormat(content) {
@@ -515,23 +891,16 @@ class LogManager {
     }
 }
 
-// 自动检测与重试
+// 先启动本地 UI，数据库连接由 CDN ready 事件后台接入
 document.addEventListener('DOMContentLoaded', function () {
-    setTimeout(function () {
-        if (!isAppInitialized) {
-            console.log('尝试降级初始化...');
-            if (window.supabase && window.supabase.createClient) {
-                initApp();
-            } else {
-                setTimeout(function () {
-                    if (!isAppInitialized && window.supabase && window.supabase.createClient) {
-                        initApp();
-                    }
-                }, 2000);
-            }
-        }
-    }, 800);
+    startApp();
+    if (window.supabase && window.supabase.createClient) initApp();
 });
+
+if (typeof document.readyState === 'string' && document.readyState !== 'loading') {
+    startApp();
+    if (window.supabase && window.supabase.createClient) initApp();
+}
 
 // 退出时清理
 window.addEventListener('beforeunload', function () {

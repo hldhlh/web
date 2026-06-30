@@ -11,6 +11,7 @@ body {
     color: #000;
     min-height: 100vh;
     line-height: 1.6;
+    overflow-x: hidden;
 }
 
 .container {
@@ -33,7 +34,7 @@ body {
 
 .form-content {
     width: 100%;
-    min-height: 100px;
+    min-height: 88px;
     padding: 0.75rem 0;
     border: none;
     border-bottom: 1px solid #000;
@@ -43,6 +44,7 @@ body {
     outline: none;
     white-space: pre-wrap;
     word-break: break-word;
+    overflow-wrap: anywhere;
 }
 
 .form-content:focus {
@@ -52,6 +54,9 @@ body {
 .form-content:empty::before {
     content: attr(placeholder);
     color: #999;
+    display: block;
+    max-width: 100%;
+    line-height: 1.5;
 }
 
 .form-content img {
@@ -72,13 +77,14 @@ body {
 .btn {
     font-size: 0.75rem;
     padding: 0.5rem 1.25rem;
+    min-height: 36px;
     border: 1px solid #000;
     cursor: pointer;
     background: #fff;
     color: #000;
     font-family: inherit;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0;
 }
 
 .btn:hover {
@@ -278,20 +284,40 @@ body {
     justify-content: space-between;
     align-items: flex-start;
     gap: 1rem;
+    min-width: 0;
 }
 
+.timeline-body,
 .timeline-text {
     font-size: 0.9rem;
     white-space: pre-wrap;
     flex: 1;
+    min-width: 0;
     line-height: 1.7;
     color: #1a1a1a;
+    overflow-wrap: anywhere;
+}
+
+.timeline-body p {
+    margin: 0 0 0.75rem;
+}
+
+.timeline-body p:last-child {
+    margin-bottom: 0;
+}
+
+.preview-note {
+    margin-top: 0.5rem;
+    color: #999;
+    font-size: 0.72rem;
+    line-height: 1.5;
 }
 
 /* 操作按钮 */
 .timeline-actions {
     display: flex;
     gap: 0.5rem;
+    flex-shrink: 0;
     opacity: 0;
     transform: translateX(4px);
     transition: all 0.15s ease;
@@ -309,10 +335,11 @@ body {
     border: none;
     cursor: pointer;
     text-transform: uppercase;
-    letter-spacing: 0.02em;
+    letter-spacing: 0;
     padding: 0.25rem 0.5rem;
     border-radius: 3px;
     transition: all 0.15s ease;
+    white-space: nowrap;
 }
 
 .timeline-action:hover {
@@ -320,12 +347,75 @@ body {
     background: #f5f5f5;
 }
 
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 2rem 0 0;
+    max-width: 100%;
+}
+
+.page-tabs {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.page-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.page-tab,
+.page-nav {
+    border: 0;
+    background: transparent;
+    color: #666;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.75rem;
+    letter-spacing: 0;
+    padding: 0.5rem 0.75rem;
+    min-width: 34px;
+    white-space: nowrap;
+}
+
+.page-tab:hover,
+.page-nav:hover {
+    color: #000;
+    background: #f5f5f5;
+}
+
+.page-tab.active {
+    color: #fff;
+    background: #000;
+}
+
+.page-tab:disabled,
+.page-nav:disabled {
+    cursor: default;
+    opacity: 0.45;
+}
+
+.page-tab.active:disabled {
+    opacity: 1;
+}
+
+.page-gap {
+    color: #aaa;
+    font-size: 0.75rem;
+    padding: 0.5rem 0.25rem;
+}
+
 /* 时间元信息 */
 .timeline-meta {
     font-size: 0.7rem;
     color: #999;
     margin-top: 0.5rem;
-    letter-spacing: 0.01em;
+    letter-spacing: 0;
 }
 
 /* 空状态 */
@@ -369,7 +459,8 @@ body {
 .header-row {
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
+    align-items: center;
+    gap: 1rem;
     margin-bottom: 2rem;
 }
 
@@ -381,6 +472,7 @@ body {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    flex: 0 0 auto;
     font-size: 0.7rem;
     color: #999;
     padding: 0.25rem 0.6rem;
@@ -446,13 +538,51 @@ body {
         padding: 1.5rem 1rem;
     }
 
+    .header-row {
+        margin-bottom: 2.25rem;
+    }
+
+    .form-container {
+        margin-bottom: 4rem;
+    }
+
+    .form-content {
+        min-height: 76px;
+        font-size: 0.85rem;
+    }
+
+    .form-actions {
+        margin-top: 0.75rem;
+    }
+
+    .btn {
+        padding: 0.45rem 1rem;
+        min-width: 68px;
+    }
+
+    .timeline-header {
+        gap: 0.75rem;
+    }
+
     .timeline-actions {
-        opacity: 0.6;
-        /* 移动端默认可见一些，方便点击 */
+        opacity: 1;
+        transform: none;
     }
 
     .status-indicator {
         transform: scale(0.9);
+        transform-origin: right center;
+    }
+
+    .pagination {
+        justify-content: flex-start;
+        overflow-x: auto;
+        padding-top: 1.5rem;
+    }
+
+    .page-tab,
+    .page-nav {
+        padding: 0.45rem 0.65rem;
     }
 }
 
