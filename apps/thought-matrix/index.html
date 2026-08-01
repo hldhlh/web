@@ -6,7 +6,6 @@
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>思维矩阵</title>
-    <script src="https://cdn.staticfile.org/tailwindcss/2.2.19/tailwind.min.js"></script>
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;400&family=Noto+Sans+SC:wght@200;400&display=swap"
         rel="stylesheet">
@@ -669,10 +668,177 @@
         .fab-button:hover svg {
             opacity: 1;
         }
+
+        /* Self-contained destructive-action dialog; it must not depend on a CDN. */
+        .confirm-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 20000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+            background: rgba(0, 0, 0, 0.62);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 0.25s ease, visibility 0s linear 0.25s;
+        }
+
+        .confirm-modal.is-open {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            transition-delay: 0s;
+        }
+
+        .confirm-card {
+            width: min(100%, 384px);
+            box-sizing: border-box;
+            padding: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            background: rgba(15, 23, 42, 0.94);
+            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            text-align: center;
+            transform: scale(0.96) translateY(8px);
+            transition: transform 0.25s cubic-bezier(0.2, 1, 0.3, 1);
+        }
+
+        .confirm-modal.is-open .confirm-card {
+            transform: scale(1) translateY(0);
+        }
+
+        .confirm-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            border: 1px solid rgba(244, 63, 94, 0.2);
+            border-radius: 50%;
+            background: rgba(244, 63, 94, 0.1);
+            color: #fb7185;
+        }
+
+        .confirm-icon svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .confirm-title {
+            margin: 0 0 8px;
+            color: #f1f5f9;
+            font-size: 1.125rem;
+            font-weight: 600;
+            line-height: 1.5;
+        }
+
+        .confirm-description {
+            margin: 0 0 16px;
+            color: #94a3b8;
+            font-size: 0.875rem;
+            line-height: 1.65;
+        }
+
+        .confirm-field {
+            margin-bottom: 20px;
+        }
+
+        .confirm-input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px 16px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            outline: none;
+            background: rgba(2, 6, 23, 0.68);
+            color: #f1f5f9;
+            font: inherit;
+            font-size: 1.125rem;
+            letter-spacing: 0.25em;
+            text-align: center;
+            user-select: text;
+            -webkit-user-select: text;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .confirm-input:focus {
+            border-color: #818cf8;
+            box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.14);
+        }
+
+        .confirm-error {
+            min-height: 18px;
+            margin-top: 8px;
+            color: #fb7185;
+            font-size: 0.75rem;
+            line-height: 18px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .confirm-error.is-visible {
+            opacity: 1;
+        }
+
+        .confirm-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .confirm-button {
+            flex: 1;
+            min-height: 46px;
+            padding: 10px 16px;
+            border: 1px solid transparent;
+            border-radius: 12px;
+            color: #e2e8f0;
+            font: inherit;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+        }
+
+        .confirm-button:active {
+            transform: scale(0.98);
+        }
+
+        .confirm-button.secondary {
+            border-color: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .confirm-button.secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .confirm-button.primary {
+            background: #6366f1;
+            color: #fff;
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.22);
+        }
+
+        .confirm-button.primary:hover {
+            background: #4f46e5;
+        }
+
+        @media (max-width: 480px) {
+            .confirm-card {
+                padding: 20px;
+            }
+        }
     </style>
 </head>
 
-<body class="antialiased select-none">
+<body>
     <div id="viewport">
         <div id="grid" class="infinite-grid"></div>
         <div id="content" class="content-layer">
@@ -843,23 +1009,17 @@
                     titleEl.textContent = title;
                     descEl.textContent = message;
                     input.value = '';
-                    errorEl.classList.add('opacity-0');
-                    errorEl.classList.remove('opacity-100');
+                    errorEl.classList.remove('is-visible');
                     
-                    modal.classList.remove('pointer-events-none', 'opacity-0');
-                    modal.classList.add('opacity-100');
-                    const container = modal.querySelector('.modal-card-container');
-                    container.classList.remove('scale-95');
-                    container.classList.add('scale-100');
+                    modal.classList.add('is-open');
+                    modal.setAttribute('aria-hidden', 'false');
                     
                     // 延迟 focus 保证浏览器能调起键盘并聚焦
                     setTimeout(() => input.focus(), 150);
 
                     const cleanup = () => {
-                        modal.classList.add('pointer-events-none', 'opacity-0');
-                        modal.classList.remove('opacity-100');
-                        container.classList.remove('scale-100');
-                        container.classList.add('scale-95');
+                        modal.classList.remove('is-open');
+                        modal.setAttribute('aria-hidden', 'true');
                         confirmBtn.onclick = null;
                         cancelBtn.onclick = null;
                         input.onkeydown = null;
@@ -870,8 +1030,7 @@
                             cleanup();
                             resolve(true);
                         } else {
-                            errorEl.classList.remove('opacity-0');
-                            errorEl.classList.add('opacity-100');
+                            errorEl.classList.add('is-visible');
                             input.select();
                             input.focus();
                         }
@@ -2364,7 +2523,11 @@
             });
 
             window.addEventListener('keydown', async e => {
-                if ((e.key === 'Delete' || e.key === 'Backspace') && State.interaction.selectedTags.length > 0 && document.activeElement !== DOM.input) {
+                const activeElement = document.activeElement;
+                const isTyping = activeElement === DOM.input ||
+                    activeElement?.matches('input, textarea, [contenteditable="true"]');
+                const confirmIsOpen = document.getElementById('pwdConfirmModal').classList.contains('is-open');
+                if ((e.key === 'Delete' || e.key === 'Backspace') && State.interaction.selectedTags.length > 0 && !isTyping && !confirmIsOpen) {
                     e.preventDefault();
                     const tags = [...State.interaction.selectedTags];
                     const title = tags.length === 1 ? '删除节点' : '批量删除节点';
@@ -2711,26 +2874,27 @@
     </script>
 
     <!-- 简约密码确认对话框 -->
-    <div id="pwdConfirmModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 opacity-0 pointer-events-none transition-opacity duration-300" style="backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);">
-        <div class="modal-card-container bg-slate-900 border border-white border-opacity-10 rounded-2xl p-6 shadow-2xl max-w-sm w-full mx-4 transform scale-95 transition-transform duration-300" style="background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
-            <div class="text-center">
-                <div class="w-12 h-12 bg-rose-500 bg-opacity-10 text-rose-400 rounded-full flex items-center justify-center mx-auto mb-4 border border-rose-500 border-opacity-20">
-                    <svg class="w-6 h-6 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                        <line x1="12" y1="9" x2="12" y2="13"></line>
-                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                    </svg>
-                </div>
-                <h3 class="text-lg font-semibold text-slate-100 mb-2" id="pwdModalTitle">确认操作</h3>
-                <p class="text-sm text-slate-400 mb-4" id="pwdModalDesc">此操作需要安全验证：</p>
-                <div class="mb-5 relative">
-                    <input type="password" id="pwdModalInput" class="w-full bg-slate-950 border border-white border-opacity-10 text-slate-100 rounded-xl px-4 py-3 text-center text-lg tracking-widest focus:outline-none focus:border-indigo-500 transition-colors" placeholder="••••••" autocomplete="off" style="background: rgba(2, 6, 23, 0.6);">
-                    <div id="pwdModalError" class="text-rose-500 text-xs mt-2 opacity-0 transition-opacity duration-200">密码错误，请重试</div>
-                </div>
-                <div class="flex gap-3">
-                    <button type="button" id="pwdModalCancel" class="flex-1 py-3 bg-white bg-opacity-5 hover:bg-opacity-10 text-slate-300 rounded-xl font-medium transition-all border border-white border-opacity-10">取消</button>
-                    <button type="button" id="pwdModalConfirm" class="flex-1 py-3 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-medium transition-all shadow-lg shadow-indigo-500/20">确定</button>
-                </div>
+    <div id="pwdConfirmModal" class="confirm-modal" role="dialog" aria-modal="true" aria-hidden="true"
+        aria-labelledby="pwdModalTitle" aria-describedby="pwdModalDesc">
+        <div class="confirm-card">
+            <div class="confirm-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+            </div>
+            <h3 class="confirm-title" id="pwdModalTitle">确认操作</h3>
+            <p class="confirm-description" id="pwdModalDesc">此操作需要安全验证：</p>
+            <div class="confirm-field">
+                <input type="password" id="pwdModalInput" class="confirm-input" aria-label="管理员密码"
+                    placeholder="••••••" autocomplete="off">
+                <div id="pwdModalError" class="confirm-error" role="alert">密码错误，请重试</div>
+            </div>
+            <div class="confirm-actions">
+                <button type="button" id="pwdModalCancel" class="confirm-button secondary">取消</button>
+                <button type="button" id="pwdModalConfirm" class="confirm-button primary">确定</button>
             </div>
         </div>
     </div>
