@@ -1,4 +1,4 @@
-const CACHE_NAME = 'web-shell-2026-08-19-v1';
+const CACHE_NAME = 'web-shell-2026-08-19-v3';
 const SHELL = [
   './',
   './index.html',
@@ -14,7 +14,10 @@ const SHELL = [
   './apps/log/icon.svg',
   './apps/course/icon.svg',
   './apps/ledger/icon.svg',
-  './apps/gui-design-demo/icon.svg'
+  './apps/gui-design-demo/icon.svg',
+  './apps/jlhcdh/index.html',
+  './apps/vendor/supabase.min.js',
+  './apps/network.js'
 ];
 
 self.addEventListener('install', (event) => {

@@ -12,10 +12,15 @@
     // { name: '海外边缘网关', origin: 'https://api-global.example.com' }
   ].concat(Array.isArray(window.APP_NETWORK_ENDPOINTS) ? window.APP_NETWORK_ENDPOINTS : []);
 
-  const CACHE_KEY = 'app-network-best-v1';
+  const CACHE_KEY = 'app-network-best-v2';
   const CACHE_TTL = 6 * 60 * 60 * 1000;
+  const READ_TIMEOUT = 6500;
+  const RETRY_TIMEOUT = 10000;
+  const HEDGE_DELAY = 320;
+  const FAILURE_COOLDOWN = 30 * 1000;
   const nativeFetch = window.fetch.bind(window);
   let benchmarking = false;
+  const unhealthyUntil = new Map();
 
   const normalize = (value) => String(value || '').replace(/\/+$/, '');
   const nodes = Array.from(new Map(ENDPOINTS.map((node) => {
@@ -34,6 +39,20 @@
   }
 
   let currentOrigin = readCachedOrigin();
+
+  function addConnectionHint(origin) {
+    if (!document?.head) return;
+    ['dns-prefetch', 'preconnect'].forEach((rel) => {
+      if (document.head.querySelector(`link[rel="${rel}"][href="${origin}"]`)) return;
+      const link = document.createElement('link');
+      link.rel = rel;
+      link.href = origin;
+      if (rel === 'preconnect') link.crossOrigin = 'anonymous';
+      document.head.appendChild(link);
+    });
+  }
+
+  nodes.forEach((node) => addConnectionHint(node.origin));
 
   function remember(origin, latency) {
     currentOrigin = origin;
@@ -56,6 +75,43 @@
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout);
     return promiseFactory(controller.signal).finally(() => clearTimeout(timer));
+  }
+
+  function fetchWithTimeout(input, init = {}, timeout = READ_TIMEOUT) {
+    return withTimeout((timeoutSignal) => {
+      const originalSignal = init.signal;
+      if (!originalSignal) return nativeFetch(input, { ...init, signal: timeoutSignal });
+      if (originalSignal.aborted) return Promise.reject(originalSignal.reason || new DOMException('Aborted', 'AbortError'));
+
+      const controller = new AbortController();
+      const abortFromOriginal = () => controller.abort(originalSignal.reason);
+      const abortFromTimeout = () => controller.abort(timeoutSignal.reason);
+      originalSignal.addEventListener('abort', abortFromOriginal, { once: true });
+      timeoutSignal.addEventListener('abort', abortFromTimeout, { once: true });
+      return nativeFetch(input, { ...init, signal: controller.signal }).finally(() => {
+        originalSignal.removeEventListener('abort', abortFromOriginal);
+        timeoutSignal.removeEventListener('abort', abortFromTimeout);
+      });
+    }, timeout);
+  }
+
+  function isRetryableResponse(response) {
+    return [408, 425, 429, 502, 503, 504].includes(response.status);
+  }
+
+  function delay(ms, signal) {
+    return new Promise((resolve, reject) => {
+      if (signal?.aborted) return reject(signal.reason || new DOMException('Aborted', 'AbortError'));
+      const onAbort = () => {
+        clearTimeout(timer);
+        reject(signal.reason || new DOMException('Aborted', 'AbortError'));
+      };
+      const timer = setTimeout(() => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve();
+      }, ms);
+      signal?.addEventListener('abort', onAbort, { once: true });
+    });
   }
 
   async function probe(node) {
@@ -84,29 +140,74 @@
     }
   }
 
+  function addEndpoints(extraEndpoints = []) {
+    extraEndpoints.forEach((endpoint) => {
+      const origin = normalize(endpoint?.origin);
+      if (!/^https:\/\//.test(origin) || nodes.some((node) => node.origin === origin)) return;
+      nodes.push({ name: endpoint.name || origin, origin });
+      addConnectionHint(origin);
+    });
+    return benchmark();
+  }
+
+  function getOrderedOrigins() {
+    const now = Date.now();
+    const ordered = [currentOrigin, ...nodes.map((node) => node.origin).filter((origin) => origin !== currentOrigin)];
+    const healthy = ordered.filter((origin) => (unhealthyUntil.get(origin) || 0) <= now);
+    return healthy.length ? healthy : ordered;
+  }
+
+  function raceRead(input, init, origins) {
+    return new Promise((resolve, reject) => {
+      let failures = 0;
+      let settled = false;
+      let lastError;
+
+      origins.forEach((origin, index) => {
+        (async () => {
+          try {
+            // 缓存最优节点立即发出；只有超过阈值仍未返回才启动下一条线路。
+            if (index > 0) await delay(HEDGE_DELAY * index, init.signal);
+            if (settled) return;
+            const response = await fetchWithTimeout(replaceOrigin(input, origin), init);
+            if (isRetryableResponse(response)) throw new Error(`HTTP ${response.status}`);
+            if (settled) return;
+            settled = true;
+            unhealthyUntil.delete(origin);
+            if (origin !== currentOrigin) remember(origin, null);
+            resolve(response);
+          } catch (error) {
+            if (settled) return;
+            lastError = error;
+            failures++;
+            if (error?.name !== 'AbortError') unhealthyUntil.set(origin, Date.now() + FAILURE_COOLDOWN);
+            if (failures === origins.length) reject(lastError || new Error('All backend routes failed'));
+          }
+        })();
+      });
+    });
+  }
+
   function enhanceOptions(options = {}) {
     const existingFetch = options.global?.fetch;
-    if (existingFetch || nodes.length < 2) return options;
+    if (existingFetch) return options;
 
     const routeFetch = async (input, init = {}) => {
       const method = String(init.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
-      const ordered = [currentOrigin, ...nodes.map((node) => node.origin).filter((origin) => origin !== currentOrigin)];
-      let lastError;
+      const readable = method === 'GET' || method === 'HEAD';
 
-      for (let index = 0; index < ordered.length; index++) {
-        try {
-          const response = await nativeFetch(replaceOrigin(input, ordered[index]), init);
-          const retryableStatus = [502, 503, 504].includes(response.status);
-          if (!retryableStatus || !['GET', 'HEAD'].includes(method) || index === ordered.length - 1) {
-            if (response.ok && ordered[index] !== currentOrigin) remember(ordered[index], null);
-            return response;
-          }
-        } catch (error) {
-          lastError = error;
-          if (!['GET', 'HEAD'].includes(method) || index === ordered.length - 1) throw error;
-        }
+      // 写操作绝不并发、超时中断或自动重放，避免请求已入库却被误判失败而重复下单。
+      if (!readable) return nativeFetch(replaceOrigin(input, currentOrigin), init);
+
+      const origins = getOrderedOrigins();
+      try {
+        return await raceRead(input, init, origins);
+      } catch (firstError) {
+        // 单节点也提供一次短退避重试，多节点则由竞速请求自然完成容灾。
+        if (origins.length > 1 || init.signal?.aborted) throw firstError;
+        await delay(160, init.signal);
+        return fetchWithTimeout(replaceOrigin(input, origins[0]), init, RETRY_TIMEOUT);
       }
-      throw lastError || new Error('All backend routes failed');
     };
 
     return { ...options, global: { ...(options.global || {}), fetch: routeFetch } };
@@ -126,6 +227,7 @@
     get origin() { return currentOrigin; },
     get endpoints() { return nodes.map((node) => ({ ...node })); },
     benchmark,
+    addEndpoints,
     patchSupabase,
     rewriteUrl(url) { return replaceOrigin(url, currentOrigin); }
   };

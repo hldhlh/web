@@ -6,19 +6,13 @@
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>今岭每日订货表</title>
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="../vendor/fontawesome/css/all.min.css">
-    <!-- Supabase SDK -->
-    <script src="../vendor/supabase.min.js"></script>
-    <script src="../network.js"></script>
-    <!-- Pinyin Pro -->
-    <script src="../vendor/pinyin-pro.min.js"></script>
-    <!-- Flatpickr -->
-    <link rel="stylesheet" href="../vendor/flatpickr/flatpickr.min.css">
-    <script src="../vendor/flatpickr/flatpickr.min.js"></script>
-    <script src="../vendor/flatpickr/zh.js"></script>
-    <!-- html2canvas for export -->
-    <script src="../vendor/html2canvas.min.js"></script>
+    <!-- 首屏只预加载核心 SDK；图标、日期、拼音和导出能力均不阻塞页面解析 -->
+    <link rel="dns-prefetch" href="//fmxddvjgkykuqwmasigo.supabase.co">
+    <link rel="preconnect" href="https://fmxddvjgkykuqwmasigo.supabase.co" crossorigin>
+    <link rel="preload" href="../vendor/supabase.min.js" as="script">
+    <link rel="stylesheet" href="../vendor/fontawesome/css/all.min.css" media="print"
+        onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="../vendor/fontawesome/css/all.min.css"></noscript>
     <style>
         /* 全局变量与 Apple 风格重塑 */
         :root {
@@ -804,6 +798,9 @@
             align-items: center;
             box-shadow: var(--shadow);
             transition: transform 0.2s;
+            /* 长列表只布局和绘制视口附近卡片，移动端进入页面明显更轻。 */
+            content-visibility: auto;
+            contain-intrinsic-size: auto 92px;
         }
 
         .history-badge {
@@ -1596,6 +1593,8 @@
         </div>
     </div>
 
+    <script src="../vendor/supabase.min.js"></script>
+    <script src="../network.js"></script>
     <script>
         const SB_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
         const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
@@ -1627,8 +1626,66 @@
             isAuthorized: false, // 管理操作授权状态
             pollingFallbackActive: false, // 轮询降级状态
             predictions: {}, // 基于历史订货的低调参考量
-            predictionDate: ''
+            predictionDate: '',
+            historyDatesLoadedAt: 0,
+            historyDatesPromise: null
         };
+
+        const CACHE_KEYS = {
+            products: 'jlhcdh-products-v2',
+            cart: 'jlhcdh-cart-v2'
+        };
+        const loadedAssets = new Map();
+
+        function loadScript(src, globalName) {
+            if (globalName && window[globalName]) return Promise.resolve(window[globalName]);
+            if (loadedAssets.has(src)) return loadedAssets.get(src);
+            const promise = new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.async = true;
+                script.onload = () => resolve(globalName ? window[globalName] : true);
+                script.onerror = () => reject(new Error(`资源加载失败: ${src}`));
+                document.head.appendChild(script);
+            });
+            loadedAssets.set(src, promise);
+            return promise;
+        }
+
+        function loadStylesheet(href) {
+            if (document.querySelector(`link[href="${href}"]`)) return;
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = href;
+            document.head.appendChild(link);
+        }
+
+        function runAfterFirstPaint(task, timeout = 1200) {
+            const schedule = window.requestIdleCallback || ((callback) => setTimeout(callback, 0));
+            schedule(() => Promise.resolve(task()).catch(error => console.warn('后台任务失败:', error)), { timeout });
+        }
+
+        function readCache(key, maxAge) {
+            try {
+                const cached = JSON.parse(localStorage.getItem(key) || 'null');
+                if (cached && Date.now() - cached.savedAt <= maxAge) return cached.value;
+            } catch (_) { }
+            return null;
+        }
+
+        function writeCache(key, value) {
+            try {
+                localStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), value }));
+            } catch (_) { }
+        }
+
+        function restoreStartupCache() {
+            const products = readCache(CACHE_KEYS.products, 24 * 60 * 60 * 1000);
+            const cart = readCache(`${CACHE_KEYS.cart}:${state.currentDate}`, 5 * 60 * 1000);
+            if (Array.isArray(products) && products.length) state.products = products;
+            if (cart && typeof cart === 'object') state.orders = cart;
+            return Boolean(state.products.length);
+        }
 
         // 密码保护
         const ADMIN_PASSWORD = '123456';
@@ -1700,16 +1757,35 @@
         }
 
         async function init() {
-            setGlobalSyncStatus('connecting'); // 初始状态：正在连接
+            setGlobalSyncStatus('connecting');
+            document.getElementById('dateInputIndex').value = state.currentDate;
+            document.getElementById('dateInput').value = state.currentDate;
 
-            await fetchProducts();
-            await fetchCart();
-            await fetchOrderPredictions();
-            renderLocations();
-            renderTags();
-            renderProducts();
+            // 命中本地缓存时立即画出可操作界面，后台请求只负责校准数据。
+            if (restoreStartupCache()) renderProducts();
+
+            document.getElementById('searchInput').oninput = e => { state.searchQuery = e.target.value.trim(); renderProducts(); };
+            document.getElementById('adminSearchInput').oninput = e => { state.adminSearch = e.target.value.trim(); renderAdminTable(); };
+            document.getElementById('adminLocFilter').onchange = e => { state.adminLoc = e.target.value; renderAdminTable(); };
+            document.getElementById('sortBtn').onclick = () => {
+                state.sortBy = state.sortBy === 'location' ? 'tags' : 'location';
+                showToast(`已按${state.sortBy === 'location' ? '定位' : '标签'}排序`);
+                renderProducts();
+            };
+            document.getElementById('openAddModal').onclick = () => { document.getElementById('editModal').classList.add('visible'); };
+            document.getElementById('productForm').onsubmit = handleAdd;
+
+            // 商品、当天订货和实时连接同时启动，互不串行等待。
+            const coreDataPromise = Promise.all([fetchProducts(), fetchCart()]);
             setupRealtime();
-            setupStatusIndicatorClick(); // 添加状态指示灯点击事件
+            setupStatusIndicatorClick();
+            await coreDataPromise;
+            renderProducts();
+
+            // 首屏可操作后再加载日期控件、历史预测和拼音库。
+            runAfterFirstPaint(initDatePickers, 500);
+            runAfterFirstPaint(fetchOrderPredictions, 1500);
+            runAfterFirstPaint(hydrateMissingPinyin, 2500);
 
             // --- 中国区网络专项优化：页面唤醒同步 ---
             // 当用户切回系统或手机点亮屏幕时，立即强制刷一次数据，防止实时连接在后台断掉
@@ -1717,27 +1793,39 @@
                 if (document.visibilityState === 'visible') {
                     console.log('🔦 页面可见性恢复，正在执行强制同步...');
                     showReceiving();
-                    await fetchCart();
                     if (document.getElementById('ordersPage').classList.contains('active')) {
+                        await fetchCart();
                         fetchDayData();
                     } else if (document.getElementById('indexPage').classList.contains('active')) {
-                        await fetchProducts();
-                        await fetchOrderPredictions();
+                        await Promise.all([fetchProducts(), fetchCart()]);
                         renderProducts();
                     }
-                    await refreshCalendarMarkers();
+                    runAfterFirstPaint(fetchOrderPredictions, 800);
+                    runAfterFirstPaint(() => refreshCalendarMarkers(true), 1200);
                 }
             });
+        }
+
+        async function initDatePickers() {
+            if (state.fpIndex || state.fpOrders) return;
+            loadStylesheet('../vendor/flatpickr/flatpickr.min.css');
+            await loadScript('../vendor/flatpickr/flatpickr.min.js', 'flatpickr');
+            await loadScript('../vendor/flatpickr/zh.js');
 
             const onDateChange = async (selectedDates, dateStr) => {
+                if (!dateStr || dateStr === state.currentDate) return;
                 state.currentDate = dateStr;
                 // 更新所有日期输入框的值
                 if (state.fpIndex) state.fpIndex.setDate(dateStr, false);
                 if (state.fpOrders) state.fpOrders.setDate(dateStr, false);
 
-                await fetchCart();
-                await fetchOrderPredictions();
+                state.predictions = {};
+                const cachedCart = readCache(`${CACHE_KEYS.cart}:${dateStr}`, 5 * 60 * 1000);
+                state.orders = cachedCart && typeof cachedCart === 'object' ? cachedCart : {};
                 renderProducts();
+                await fetchCart();
+                renderProducts();
+                runAfterFirstPaint(fetchOrderPredictions, 500);
                 if (document.getElementById('ordersPage').classList.contains('active')) {
                     fetchDayData();
                 }
@@ -1788,21 +1876,10 @@
             state.fpIndex = flatpickr("#dateInputIndex", fpConfig);
             state.fpOrders = flatpickr("#dateInput", fpConfig);
 
-            // 初始获取有数据的日期并标记
-            updateHasDataMarkers(state.fpIndex);
-            updateHasDataMarkers(state.fpOrders);
-
-            document.getElementById('searchInput').oninput = e => { state.searchQuery = e.target.value.trim(); renderProducts(); };
-            document.getElementById('adminSearchInput').oninput = e => { state.adminSearch = e.target.value.trim(); renderAdminTable(); };
-            document.getElementById('adminLocFilter').onchange = e => { state.adminLoc = e.target.value; renderAdminTable(); };
-            document.getElementById('sortBtn').onclick = () => {
-                state.sortBy = state.sortBy === 'location' ? 'tags' : 'location';
-                showToast(`已按${state.sortBy === 'location' ? '定位' : '标签'}排序`);
-                renderProducts();
-            };
-
-            document.getElementById('openAddModal').onclick = () => { document.getElementById('editModal').classList.add('visible'); };
-            document.getElementById('productForm').onsubmit = handleAdd;
+            // 两个实例共享一次历史日期请求，避免启动时重复扫描数据表。
+            await fetchHistoryDates();
+            state.fpIndex.redraw();
+            state.fpOrders.redraw();
         }
 
         let analyticsMode = 7;
@@ -1925,39 +2002,57 @@
         async function fetchProducts() {
             startSync();
             try {
-                const { data, error } = await sb.from('jlhcdh_products_view').select('*').eq('is_deleted', false).order('location');
-                if (data) {
+                const { data, error } = await sb.from('jlhcdh_products_view')
+                    .select('id,name,location,unit,tags,is_deleted,last_purchased_date')
+                    .eq('is_deleted', false)
+                    .order('location');
+                if (data && !error) {
                     state.products = data.map(p => ({
                         ...p,
                         pinyin: p.pinyin || (window.pinyinPro ? window.pinyinPro.pinyin(p.name, { pattern: 'first', toneType: 'none' }).replace(/\s/g, '') : '')
                     }));
+                    writeCache(CACHE_KEYS.products, state.products);
                 }
                 endSync(!!error);
             } catch (e) { endSync(true); }
         }
+
+        async function hydrateMissingPinyin() {
+            const missing = state.products.filter(product => !product.pinyin && product.name);
+            if (!missing.length) return;
+            await loadScript('../vendor/pinyin-pro.min.js', 'pinyinPro');
+            missing.forEach(product => {
+                product.pinyin = window.pinyinPro.pinyin(product.name, { pattern: 'first', toneType: 'none' }).replace(/\s/g, '');
+            });
+            writeCache(CACHE_KEYS.products, state.products);
+            if (state.searchQuery) renderProducts();
+        }
+
         async function fetchCart() {
             startSync();
+            const requestedDate = state.currentDate;
+            const nextOrders = {};
             try {
-                state.orders = {};
                 let errorOccurred = false;
 
                 // 首先尝试从购物车表按日期加载
                 const { data: cartData, error: cartError } = await sb.from('jlhcdh_cart')
-                    .select('*')
-                    .eq('order_date', state.currentDate);
+                    .select('product_id,quantity,is_purchased')
+                    .eq('order_date', requestedDate);
 
                 if (cartData && cartData.length > 0) {
-                    cartData.forEach(i => state.orders[i.product_id] = { qty: parseFloat(i.quantity), purchased: i.is_purchased });
+                    cartData.forEach(i => nextOrders[i.product_id] = { qty: parseFloat(i.quantity), purchased: i.is_purchased });
                     errorOccurred = !!cartError;
                 } else {
                     // 购物车中无该日期数据，尝试从历史订单表加载
-                    const start = `${state.currentDate}T00:00:00+08:00`;
-                    const end = `${state.currentDate}T23:59:59+08:00`;
+                    const start = `${requestedDate}T00:00:00+08:00`;
+                    const end = `${requestedDate}T23:59:59+08:00`;
                     const { data, error } = await sb.from('jlhcdh_orders')
-                        .select('*')
+                        .select('order_data')
                         .gte('created_at', start)
                         .lte('created_at', end)
-                        .order('created_at', { ascending: false });
+                        .order('created_at', { ascending: false })
+                        .limit(1);
 
                     const rec = data?.find(r => r.order_data);
                     if (rec) {
@@ -1965,10 +2060,15 @@
                         const items = Array.isArray(raw) ? raw : (raw.order_data || []);
                         items.forEach(i => {
                             const pid = i.id || i.product_id;
-                            if (pid) state.orders[pid] = { qty: parseFloat(i.qty || i.quantity || 0), purchased: !!i.is_purchased };
+                            if (pid) nextOrders[pid] = { qty: parseFloat(i.qty || i.quantity || 0), purchased: !!i.is_purchased };
                         });
                     }
                     errorOccurred = !!error;
+                }
+                // 切换日期期间可能有旧请求晚返回，绝不能覆盖新日期。
+                if (requestedDate === state.currentDate && !errorOccurred) {
+                    state.orders = nextOrders;
+                    writeCache(`${CACHE_KEYS.cart}:${requestedDate}`, nextOrders);
                 }
                 updateFooter();
                 endSync(errorOccurred);
@@ -2017,7 +2117,9 @@
         }
 
         async function fetchOrderPredictions() {
-            const targetDate = parseDateOnly(state.currentDate);
+            const requestedDate = state.currentDate;
+            if (state.predictionDate === requestedDate) return;
+            const targetDate = parseDateOnly(requestedDate);
             const startDate = addDays(targetDate, -365);
             const endDate = addDays(targetDate, -1);
             const startStr = formatDateOnly(startDate);
@@ -2032,7 +2134,7 @@
                 const pid = parseInt(productId);
                 const value = parseFloat(qty);
                 if (!pid || !date || !Number.isFinite(value) || value <= 0) return;
-                if (date >= state.currentDate) return;
+                if (date >= requestedDate) return;
                 const key = `${date}:${pid}`;
                 if (preferExisting && cartKeys.has(key)) return;
                 if (historyKeys.has(key)) return;
@@ -2043,19 +2145,24 @@
             };
 
             try {
-                const { data: cartRows, error: cartError } = await sb.from('jlhcdh_cart')
-                    .select('product_id,quantity,order_date')
-                    .gte('order_date', startStr)
-                    .lte('order_date', endStr);
+                // 新旧两套历史来源彼此独立，并行读取；此任务不再阻塞首屏。
+                const [cartResult, legacyResult] = await Promise.all([
+                    sb.from('jlhcdh_cart')
+                        .select('product_id,quantity,order_date')
+                        .gte('order_date', startStr)
+                        .lte('order_date', endStr),
+                    sb.from('jlhcdh_orders')
+                        .select('created_at,order_data')
+                        .gte('created_at', `${startStr}T00:00:00+08:00`)
+                        .lte('created_at', `${endStr}T23:59:59+08:00`)
+                        .order('created_at', { ascending: false })
+                ]);
+                const { data: cartRows, error: cartError } = cartResult;
                 if (cartError) throw cartError;
 
                 (cartRows || []).forEach(row => addHistory(row.product_id, row.order_date, row.quantity, false));
 
-                const { data: legacyRows } = await sb.from('jlhcdh_orders')
-                    .select('created_at,order_data')
-                    .gte('created_at', `${startStr}T00:00:00+08:00`)
-                    .lte('created_at', `${endStr}T23:59:59+08:00`)
-                    .order('created_at', { ascending: false });
+                const { data: legacyRows } = legacyResult;
 
                 (legacyRows || []).forEach(row => {
                     const date = getLocalDateFromIso(row.created_at);
@@ -2102,14 +2209,16 @@
                     if (qty > 0) predictions[pid] = { qty, level };
                 });
 
+                if (state.currentDate !== requestedDate) return;
                 state.predictions = predictions;
-                state.predictionDate = state.currentDate;
+                state.predictionDate = requestedDate;
                 console.log('建议预测完成:', Object.keys(predictions).length, predictions);
                 applyPredictionHintsToDOM();
             } catch (e) {
                 console.warn('预测建议读取失败:', e);
+                if (state.currentDate !== requestedDate) return;
                 state.predictions = {};
-                state.predictionDate = state.currentDate;
+                state.predictionDate = requestedDate;
                 applyPredictionHintsToDOM();
             }
         }
@@ -2144,36 +2253,37 @@
             });
         }
 
-        async function fetchHistoryDates() {
-            try {
-                // 从历史订单表获取近 30 天有数据的日期
-                const { data: ordersData } = await sb.from('jlhcdh_orders')
-                    .select('created_at')
-                    .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+        function fetchHistoryDates(force = false) {
+            const oneMinute = 60 * 1000;
+            if (!force && Date.now() - state.historyDatesLoadedAt < oneMinute) return Promise.resolve();
+            if (state.historyDatesPromise) return state.historyDatesPromise;
 
-                if (ordersData) {
-                    ordersData.forEach(item => {
-                        // 将 UTC 时间转换为本地日期 (UTC+8)
-                        const utcDate = new Date(item.created_at);
-                        const localDate = new Date(utcDate.getTime() + 8 * 60 * 60 * 1000);
-                        const y = localDate.getUTCFullYear();
-                        const m = String(localDate.getUTCMonth() + 1).padStart(2, '0');
-                        const d = String(localDate.getUTCDate()).padStart(2, '0');
-                        const date = `${y}-${m}-${d}`;
-                        state.hasDataDates.add(date);
-                    });
-                }
+            state.historyDatesPromise = (async () => {
+                try {
+                    const cutoff = addDays(new Date(), -30);
+                    const cutoffDate = formatDateOnly(cutoff);
+                    const [ordersResult, cartResult] = await Promise.all([
+                        sb.from('jlhcdh_orders')
+                            .select('created_at')
+                            .gte('created_at', `${cutoffDate}T00:00:00+08:00`),
+                        sb.from('jlhcdh_cart')
+                            .select('order_date')
+                            .gte('order_date', cutoffDate)
+                    ]);
 
-                // 从购物车表获取所有有数据的日期
-                const { data: cartDates } = await sb.from('jlhcdh_cart')
-                    .select('order_date');
-                if (cartDates) {
-                    const uniqueDates = [...new Set(cartDates.map(c => c.order_date))];
-                    uniqueDates.forEach(date => {
-                        if (date) state.hasDataDates.add(date);
+                    state.hasDataDates.clear();
+                    (ordersResult.data || []).forEach(item => state.hasDataDates.add(getLocalDateFromIso(item.created_at)));
+                    (cartResult.data || []).forEach(item => {
+                        if (item.order_date) state.hasDataDates.add(item.order_date);
                     });
+                    state.historyDatesLoadedAt = Date.now();
+                } catch (e) {
+                    console.error('Failed to fetch history dates', e);
+                } finally {
+                    state.historyDatesPromise = null;
                 }
-            } catch (e) { console.error('Failed to fetch history dates', e); }
+            })();
+            return state.historyDatesPromise;
         }
 
         async function checkTodayLock() { }
@@ -3369,6 +3479,7 @@
 
         // --- HTTP 轮询备用方案（保护中国区网络阻断） ---
         let pollingInterval = null;
+        let pollingTick = 0;
         window.startPollingFallback = function () {
             if (pollingInterval) return;
             state.pollingFallbackActive = true;
@@ -3385,14 +3496,20 @@
                 showReceiving();
                 try {
                     await fetchCart();
+                    pollingTick++;
                     if (document.getElementById('ordersPage').classList.contains('active')) {
                         fetchDayData();
                     } else if (document.getElementById('indexPage').classList.contains('active')) {
-                        await fetchProducts();
-                        await fetchOrderPredictions();
                         renderProducts();
                     }
-                    await refreshCalendarMarkers();
+
+                    // 商品与日历属于低频变化数据，每分钟校准一次即可。
+                    // 历史预测对同一天是稳定结果，不再每 8 秒扫描全年记录。
+                    if (pollingTick % 8 === 0) {
+                        await fetchProducts();
+                        renderProducts();
+                        await refreshCalendarMarkers(true);
+                    }
                 } catch (e) {
                     console.error('HTTP轮询同步失败', e);
                 }
@@ -3431,14 +3548,11 @@
             // 重新建立订阅
             setupRealtime();
 
-            // 同时刷新所有数据
-            await fetchProducts();
-            await fetchCart();
-            await fetchOrderPredictions();
-            await refreshCalendarMarkers();
+            // 核心数据并行刷新，其余数据继续放在后台。
+            await Promise.all([fetchProducts(), fetchCart()]);
             renderProducts();
-            renderLocations();
-            renderTags();
+            runAfterFirstPaint(fetchOrderPredictions, 500);
+            runAfterFirstPaint(() => refreshCalendarMarkers(true), 800);
         }
 
         // 给状态指示灯添加点击事件（点击重连）
@@ -3456,8 +3570,8 @@
         }
 
         // 刷新日历标记的辅助函数
-        async function refreshCalendarMarkers() {
-            await fetchHistoryDates();
+        async function refreshCalendarMarkers(force = false) {
+            await fetchHistoryDates(force);
             if (state.fpIndex) state.fpIndex.redraw();
             if (state.fpOrders) state.fpOrders.redraw();
             // 在状态栏旁边显示一个小提示
@@ -3646,6 +3760,13 @@
             }
 
             showToast('正在生成图片...');
+            try {
+                await loadScript('../vendor/html2canvas.min.js', 'html2canvas');
+            } catch (e) {
+                console.error('导出组件加载失败:', e);
+                showToast('导出组件加载失败');
+                return;
+            }
 
             // 准备导出内容
             const exportPreview = document.getElementById('exportPreview');
