@@ -7,8 +7,9 @@
     <title>今岭笔记</title>
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
-    <script src="pinyin-pro.min.js"></script>
-    <script src="supabase.min.js"></script>
+    <script src="../vendor/pinyin-pro.min.js"></script>
+    <script src="../vendor/supabase.min.js"></script>
+    <script src="../network.js"></script>
     <style>
         :root {
             --bg: #000c18;
@@ -917,6 +918,21 @@
                 };
             }
 
+            function areListSnapshotsEqual(first, second) {
+                if (first === second) return true;
+                if (!Array.isArray(first) || !Array.isArray(second) || first.length !== second.length) return false;
+
+                return first.every((item, index) => {
+                    const other = second[index];
+                    return other
+                        && String(item.id) === String(other.id)
+                        && (item.tag || '') === (other.tag || '')
+                        && (item.title || '') === (other.title || '')
+                        && (item.created_at || '') === (other.created_at || '')
+                        && (item.updated_at || '') === (other.updated_at || '');
+                });
+            }
+
             function rememberItemDetail(item) {
                 if (item && item.id && typeof item.info === 'string') {
                     itemDetails.set(String(item.id), item);
@@ -1095,13 +1111,18 @@
 
                     if (error) throw error;
 
-                    // 更新数据和缓存
-                    db = (data || []).map(createListItem);
+                    // 数据没有变化时保留现有 DOM，避免缓存首屏被无意义地重建。
+                    const nextDb = (data || []).map(createListItem);
+                    const listChanged = !areListSnapshotsEqual(db, nextDb);
+                    db = nextDb;
                     updateLocalCache();
 
-                    // 重新渲染（保持搜索状态）
-                    filterAndRender();
-                    console.log('✓ 数据已更新');
+                    if (listChanged) {
+                        filterAndRender();
+                        console.log('✓ 数据已更新');
+                    } else {
+                        console.log('✓ 数据已是最新，无需重绘');
+                    }
                 } catch (e) {
                     console.warn('后台数据加载失败:', e.message);
                     // 如果没有缓存且加载失败，显示错误
@@ -1174,9 +1195,11 @@
 
                 if (error) throw error;
 
-                db = (data || []).map(createListItem);
+                const nextDb = (data || []).map(createListItem);
+                const listChanged = !areListSnapshotsEqual(db, nextDb);
+                db = nextDb;
                 updateLocalCache();
-                filterAndRender();
+                if (listChanged) filterAndRender();
             }
 
             async function reconnectRealtime() {
@@ -1957,6 +1980,11 @@
             }
 
             function render(list, showDate = false, searchKeyword = '') {
+                const expandedItemIds = new Set(
+                    Array.from(DOM.results.querySelectorAll('.list-item.expanded'))
+                        .map(element => String(element.dataset.itemId))
+                );
+                DOM.results.querySelectorAll('.list-item').forEach(cleanupWebapps);
                 DOM.results.innerHTML = '';
 
                 if (!list.length) {
@@ -1965,6 +1993,7 @@
                 }
 
                 const fragment = document.createDocumentFragment();
+                const itemsToRestore = [];
 
                 list.forEach(item => {
                     const listItem = document.createElement('div');
@@ -2010,9 +2039,14 @@
                     listItem.appendChild(header);
                     listItem.appendChild(content);
                     fragment.appendChild(listItem);
+
+                    if (expandedItemIds.has(String(item.id))) {
+                        itemsToRestore.push(listItem);
+                    }
                 });
 
                 DOM.results.appendChild(fragment);
+                itemsToRestore.forEach(expandItem);
             }
 
             function renderItemContent(listItemElement, item, searchKeyword = '') {
@@ -2039,15 +2073,7 @@
                 content.appendChild(editButton);
             }
 
-            async function toggleExpand(el) {
-                const wasExpanded = el.classList.contains('expanded');
-
-                if (wasExpanded) {
-                    el.classList.remove('expanded');
-                    cleanupWebapps(el);
-                    return;
-                }
-
+            async function expandItem(el) {
                 el.classList.add('expanded');
                 const content = el.querySelector('.content');
                 const itemId = el.dataset.itemId;
@@ -2059,17 +2085,27 @@
                     } else {
                         if (content) content.innerHTML = '<div style="color:var(--muted);padding:8px 0;">正在加载内容...</div>';
                         const detail = await fetchItemDetail(itemId);
-                        if (!el.classList.contains('expanded')) return;
+                        if (!el.isConnected || !el.classList.contains('expanded')) return;
                         renderItemContent(el, detail, DOM.input.value.trim());
                     }
 
-                    executeWebapps(el);
+                    if (el.isConnected && el.classList.contains('expanded')) executeWebapps(el);
                 } catch (error) {
                     console.warn('内容加载失败:', error);
-                    if (content) {
+                    if (el.isConnected && content) {
                         content.innerHTML = `<div style="color:var(--danger);padding:8px 0;">内容加载失败：${error.message}</div>`;
                     }
                 }
+            }
+
+            function toggleExpand(el) {
+                if (el.classList.contains('expanded')) {
+                    el.classList.remove('expanded');
+                    cleanupWebapps(el);
+                    return;
+                }
+
+                expandItem(el);
             }
 
             // ==================== 密码弹窗控制 ====================

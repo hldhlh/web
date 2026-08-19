@@ -6,9 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>日志</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="../vendor/supabase.min.js"></script>
+    <script src="../network.js"></script>
     <script>
         // 移除 esm.sh 以避免 ESM 模块错误，仅保留稳定的 UMD 源
         const CDN = [
+            '../vendor/supabase.min.js',
             'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
             'https://fastly.jsdelivr.net/npm/@supabase/supabase-js@2',
             'https://unpkg.com/@supabase/supabase-js@2'

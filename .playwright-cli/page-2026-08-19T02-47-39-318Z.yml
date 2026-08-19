@@ -1,0 +1,4 @@
+- generic [ref=e3]:
+  - button "正在重新连接..." [ref=e4] [cursor=pointer]
+  - textbox "> 输入关键词或简拼..." [active] [ref=e6]
+  - generic "Add New Entry" [ref=e7] [cursor=pointer]: "[ + ]"

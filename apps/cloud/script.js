@@ -908,6 +908,7 @@ function getFileType(filename) {
 
 // Upload Handling
 async function uploadFile(file) {
+    await window.ensureCloudOptionalLibraries?.();
     // Capture current folder ID at the START of the upload to ensure consistency
     const targetFolderId = currentFolderId;
     console.log('Starting upload for file:', file.name, 'to folder:', targetFolderId);
@@ -1342,6 +1343,7 @@ async function handleFolderDownloadToDirectory(folder, filesToDownload, foldersT
 
 // ZIP 下载（作为备用方案）
 async function handleFolderDownloadAsZip(folder, filesToDownload) {
+    await window.ensureCloudOptionalLibraries?.();
     const folderName = folder.name;
     const zipFileName = `${folderName}.zip`;
 

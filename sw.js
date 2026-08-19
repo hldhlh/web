@@ -1,0 +1,53 @@
+const CACHE_NAME = 'web-shell-2026-08-19-v1';
+const SHELL = [
+  './',
+  './index.html',
+  './favicon.svg',
+  './apps.js',
+  './apps/calendar/icon.svg',
+  './apps/todo/icon.svg',
+  './apps/image-converter/icon.svg',
+  './apps/thought-matrix/icon.svg',
+  './apps/cloud/icon.svg',
+  './apps/eatwhat/icon.svg',
+  './apps/vista/icon.svg',
+  './apps/log/icon.svg',
+  './apps/course/icon.svg',
+  './apps/ledger/icon.svg',
+  './apps/gui-design-demo/icon.svg'
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL)));
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then(() => self.clients.claim())
+  );
+});
+
+function canCache(request) {
+  if (request.method !== 'GET' || request.headers.has('range')) return false;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return false;
+  return !/\.(?:mp4|mov|mp3|zip|pptx?|xlsx?|xls|csv)$/i.test(url.pathname);
+}
+
+async function staleWhileRevalidate(request) {
+  const cache = await caches.open(CACHE_NAME);
+  const cached = await cache.match(request, { ignoreSearch: true });
+  const network = fetch(request).then((response) => {
+    if (response.ok && response.type === 'basic') cache.put(request, response.clone());
+    return response;
+  }).catch(() => cached);
+  return cached || network;
+}
+
+self.addEventListener('fetch', (event) => {
+  if (!canCache(event.request)) return;
+  event.respondWith(staleWhileRevalidate(event.request));
+});

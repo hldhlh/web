@@ -4,7 +4,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta id="theme-color" name="theme-color" content="#ffffff">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="apple-touch-icon" href="./favicon.svg">
   <title>应用导航</title>
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem('app-theme') || 'light';
+  </script>
   <style>
     * {
       margin: 0;
@@ -18,7 +24,7 @@
       --app-surface: rgba(255, 255, 255, 0.82);
       --text-primary: #1d1d1f;
       --text-secondary: #86868b;
-      --transition-speed: 0.6s;
+      --transition-speed: 0.25s;
     }
 
     [data-theme=dark] {
@@ -71,14 +77,12 @@
     @keyframes pageEnter {
       from {
         opacity: 0;
-        transform: scale(1.05) translateY(20px);
-        filter: blur(10px);
+        transform: translateY(8px);
       }
 
       to {
         opacity: 1;
-        transform: scale(1) translateY(0);
-        filter: blur(0);
+        transform: translateY(0);
       }
     }
 
@@ -87,9 +91,7 @@
       display: flex;
       flex-direction: column;
       overflow-y: auto;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      animation: pageEnter 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation: pageEnter 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
     .status-bar {
@@ -142,6 +144,20 @@
       height: 100%;
       display: block;
       object-fit: contain;
+    }
+
+    .app-icon-fallback {
+      width: 100%;
+      height: 100%;
+      border-radius: 20px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: linear-gradient(145deg, #2997ff, #0066cc);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+      font-size: 1.35rem;
+      font-weight: 750;
+      letter-spacing: -0.04em;
     }
 
     .app-name {
@@ -208,6 +224,14 @@
         height: 60px;
       }
     }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
   </style>
 </head>
 
@@ -229,7 +253,7 @@
     <div class="app-icons-wrapper" id="app-container"></div>
   </div>
 
-  <button id="clear-cache-btn" class="clear-cache-btn" title="强制刷新图标">
+  <button id="clear-cache-btn" class="clear-cache-btn" title="清除离线缓存">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
       stroke-linecap="round" stroke-linejoin="round">
       <path
@@ -248,7 +272,9 @@
       },
       setTheme(t) {
         localStorage.setItem('app-theme', t);
+        document.documentElement.setAttribute('data-theme', t);
         document.body.setAttribute('data-theme', t);
+        document.getElementById('theme-color').content = t === 'dark' ? '#000000' : '#ffffff';
         this.updateBGLayers(t);
       },
       toggle() {
@@ -429,75 +455,63 @@
       }, 200);
     };
 
-    async function loadApps() {
+    function loadApps() {
       const container = document.getElementById('app-container');
-      const apps = await getAppDirectories();
+      const apps = getAppDirectories();
       const frag = document.createDocumentFragment();
 
-      // 并行处理所有 App
-      await Promise.all(apps.map(async (app) => {
+      apps.forEach((app) => {
         const dir = getDirFromPath(app.path);
-
-        // 1. 优先读取本地缓存
-        let icon = iconCache.get(dir);
-        let isCached = !!icon;
-
-        // 2. 如果没有缓存，则进行请求
-        if (!icon) {
-          icon = await fetchAndCacheIcon(dir);
-        }
-
         const el = document.createElement('a');
-        el.href = `./apps/${app.path}?t=${Date.now()}`;
+        el.href = `./apps/${app.path}`;
         el.className = 'app-icon';
         el.title = app.name;
-        el.setAttribute('data-dir', dir); // 标记以便更新
+        el.setAttribute('data-dir', dir);
 
-        let inner = '';
+        let inner;
         let appDisplayName = app.name;
-
-        // 特殊处理 'calendar' 的显示名称，增加日期前缀
         if (dir === 'calendar') {
           const now = new Date();
           const month = now.getMonth() + 1;
           const day = now.getDate();
+          const week = ['日', '一', '二', '三', '四', '五', '六'][now.getDay()];
           appDisplayName = `${month}月${day}日 · ${app.name}`;
-        }
-
-        if (icon) {
-          inner = icon.type === 'svg' ? icon.content : `<img src="${icon.content}" alt="${app.name}">`;
+          inner = `<svg viewBox="0 0 100 100" role="img" aria-label="${appDisplayName}">
+            <rect x="5" y="5" width="90" height="90" rx="18" fill="#f4f4f5" stroke="#d1d1d6"/>
+            <path d="M23 5h54a18 18 0 0 1 18 18v10H5V23A18 18 0 0 1 23 5Z" fill="#ff3b30"/>
+            <text x="50" y="26" font-family="system-ui,sans-serif" font-size="14" font-weight="800" fill="white" text-anchor="middle">周${week}</text>
+            <text x="50" y="78" font-family="system-ui,sans-serif" font-size="44" font-weight="800" fill="#1d1d1f" text-anchor="middle">${day}</text>
+          </svg>`;
+        } else if (app.icon) {
+          inner = `<img src="./apps/${app.icon}" width="72" height="72" alt="" decoding="async">`;
         } else {
-          inner = `<div style="width:100%;height:100%;background:#0a84ff;border-radius:20px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:24px">${app.name.charAt(0)}</div>`;
+          inner = `<div class="app-icon-fallback" aria-hidden="true">${app.fallback || app.name.charAt(0)}</div>`;
         }
 
         el.innerHTML = `<div class="app-icon-image">${inner}</div><div class="app-name">${appDisplayName}</div>`;
-
-        // 按原本顺序是不保证的，因为 Promise.all 是并行的。
-        // 但为了保持 apps.js 的顺序，我们需要按 index 排序，或者简单的 for loop.
-        // 为了简单且保持顺序，我们不直接 apply frag，而是收集 els
-        return { el, index: apps.indexOf(app), dir, icon };
-      })).then(results => {
-        // 按原始顺序排序
-        results.sort((a, b) => a.index - b.index).forEach(item => {
-          frag.appendChild(item.el);
-
-          // 3. 如果是读取的缓存，触发静默更新检查
-          if (item.icon) {
-            revalidateIcon(item.dir, item.icon.hash, item.icon.url);
-          }
-        });
-        container.innerHTML = '';
-        container.appendChild(frag);
-        sessionStorage.removeItem('force_clear_cache');
+        frag.appendChild(el);
       });
+      container.replaceChildren(frag);
     }
 
     document.addEventListener('DOMContentLoaded', () => {
       Theme.init();
       loadApps();
       document.getElementById('theme-toggle').onclick = () => Theme.toggle();
-      document.getElementById('clear-cache-btn').onclick = () => iconCache.clear();
+      document.getElementById('clear-cache-btn').onclick = async () => {
+        Object.keys(localStorage).forEach((key) => {
+          if (key.startsWith(CACHE_PREFIX)) localStorage.removeItem(key);
+        });
+        if ('caches' in window) {
+          await Promise.all((await caches.keys()).map((key) => caches.delete(key)));
+        }
+        location.reload();
+      };
     });
+
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}), { once: true });
+    }
   </script>
 </body>
 
