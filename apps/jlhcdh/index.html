@@ -9,6 +9,73 @@
     <!-- 首屏只预加载核心 SDK；图标、日期、拼音和导出能力均不阻塞页面解析 -->
     <link rel="dns-prefetch" href="//fmxddvjgkykuqwmasigo.supabase.co">
     <link rel="preconnect" href="https://fmxddvjgkykuqwmasigo.supabase.co" crossorigin>
+    <script>
+        // 冷启动预取：在 HTML/CSS/SDK 解析期间就并行建立数据库连接并读取首屏数据。
+        window.JLHCDH_CONFIG = {
+            url: 'https://fmxddvjgkykuqwmasigo.supabase.co',
+            key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo'
+        };
+        window.JLHCDH_BOOTSTRAP = (() => {
+            const config = window.JLHCDH_CONFIG;
+            const now = new Date();
+            const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            let origin = config.url;
+            try {
+                const cached = JSON.parse(localStorage.getItem('app-network-best-v2') || 'null');
+                if (cached && Date.now() - cached.savedAt < 6 * 60 * 60 * 1000 && /^https:\/\//.test(cached.origin)) {
+                    origin = cached.origin;
+                }
+            } catch (_) { }
+
+            const headers = {
+                apikey: config.key,
+                Authorization: `Bearer ${config.key}`,
+                Accept: 'application/json'
+            };
+            const request = (table, params, priority = 'auto') => {
+                const url = new URL(`${origin}/rest/v1/${table}`);
+                Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), 6500);
+                return fetch(url, {
+                    headers,
+                    mode: 'cors',
+                    credentials: 'omit',
+                    cache: 'no-store',
+                    priority,
+                    signal: controller.signal
+                }).then(response => {
+                    if (!response.ok) throw new Error(`冷启动请求失败: HTTP ${response.status}`);
+                    return response.json();
+                }).then(
+                    data => ({ data, error: null }),
+                    error => ({ data: null, error })
+                ).finally(() => clearTimeout(timer));
+            };
+            const start = `${date}T00:00:00+08:00`;
+            const end = `${date}T23:59:59+08:00`;
+            return {
+                date,
+                used: new Set(),
+                products: request('jlhcdh_products', {
+                    select: 'id,name,location,unit,tags,is_deleted',
+                    is_deleted: 'eq.false',
+                    order: 'location.asc'
+                }, 'high'),
+                cart: request('jlhcdh_cart', {
+                    select: 'product_id,quantity,is_purchased',
+                    order_date: `eq.${date}`
+                }),
+                legacy: request('jlhcdh_orders', {
+                    select: 'order_data',
+                    created_at: `gte.${start}`,
+                    and: `(created_at.lte.${end})`,
+                    order: 'created_at.desc',
+                    limit: '1'
+                }, 'low')
+            };
+        })();
+    </script>
     <link rel="preload" href="../vendor/supabase.min.js" as="script">
     <link rel="stylesheet" href="../vendor/fontawesome/css/all.min.css" media="print"
         onload="this.media='all'">
@@ -1596,8 +1663,8 @@
     <script src="../vendor/supabase.min.js"></script>
     <script src="../network.js"></script>
     <script>
-        const SB_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
-        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
+        const SB_URL = window.JLHCDH_CONFIG.url;
+        const SB_KEY = window.JLHCDH_CONFIG.key;
         const sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: false } });
 
         const state = {
@@ -1685,6 +1752,22 @@
             if (Array.isArray(products) && products.length) state.products = products;
             if (cart && typeof cart === 'object') state.orders = cart;
             return Boolean(state.products.length);
+        }
+
+        function consumeBootstrap(key, date) {
+            const bootstrap = window.JLHCDH_BOOTSTRAP;
+            if (!bootstrap || bootstrap.date !== date || bootstrap.used.has(key)) return null;
+            bootstrap.used.add(key);
+            return bootstrap[key] || null;
+        }
+
+        async function bootstrapOrFetch(key, date, fallback) {
+            const prefetched = consumeBootstrap(key, date);
+            if (prefetched) {
+                const result = await prefetched;
+                if (!result.error) return result;
+            }
+            return fallback();
         }
 
         // 密码保护
@@ -1775,11 +1858,12 @@
             document.getElementById('openAddModal').onclick = () => { document.getElementById('editModal').classList.add('visible'); };
             document.getElementById('productForm').onsubmit = handleAdd;
 
-            // 商品、当天订货和实时连接同时启动，互不串行等待。
-            const coreDataPromise = Promise.all([fetchProducts(), fetchCart()]);
+            // 商品、当天订货和实时连接同时启动；任一数据先返回就先更新界面。
+            const productsPromise = fetchProducts().then(() => renderProducts());
+            const cartPromise = fetchCart().then(() => renderProducts());
             setupRealtime();
             setupStatusIndicatorClick();
-            await coreDataPromise;
+            await Promise.allSettled([productsPromise, cartPromise]);
             renderProducts();
 
             // 首屏可操作后再加载日期控件、历史预测和拼音库。
@@ -1797,8 +1881,10 @@
                         await fetchCart();
                         fetchDayData();
                     } else if (document.getElementById('indexPage').classList.contains('active')) {
-                        await Promise.all([fetchProducts(), fetchCart()]);
-                        renderProducts();
+                        await Promise.allSettled([
+                            fetchProducts().then(() => renderProducts()),
+                            fetchCart().then(() => renderProducts())
+                        ]);
                     }
                     runAfterFirstPaint(fetchOrderPredictions, 800);
                     runAfterFirstPaint(() => refreshCalendarMarkers(true), 1200);
@@ -2002,14 +2088,18 @@
         async function fetchProducts() {
             startSync();
             try {
-                const { data, error } = await sb.from('jlhcdh_products_view')
-                    .select('id,name,location,unit,tags,is_deleted,last_purchased_date')
-                    .eq('is_deleted', false)
-                    .order('location');
+                const { data, error } = await bootstrapOrFetch('products', state.currentDate, () =>
+                    sb.from('jlhcdh_products')
+                        .select('id,name,location,unit,tags,is_deleted')
+                        .eq('is_deleted', false)
+                        .order('location')
+                );
                 if (data && !error) {
+                    const existingProducts = new Map(state.products.map(product => [product.id, product]));
                     state.products = data.map(p => ({
                         ...p,
-                        pinyin: p.pinyin || (window.pinyinPro ? window.pinyinPro.pinyin(p.name, { pattern: 'first', toneType: 'none' }).replace(/\s/g, '') : '')
+                        last_purchased_date: p.last_purchased_date || existingProducts.get(p.id)?.last_purchased_date || '',
+                        pinyin: p.pinyin || existingProducts.get(p.id)?.pinyin || (window.pinyinPro ? window.pinyinPro.pinyin(p.name, { pattern: 'first', toneType: 'none' }).replace(/\s/g, '') : '')
                     }));
                     writeCache(CACHE_KEYS.products, state.products);
                 }
@@ -2033,28 +2123,33 @@
             const requestedDate = state.currentDate;
             const nextOrders = {};
             try {
-                let errorOccurred = false;
+                const start = `${requestedDate}T00:00:00+08:00`;
+                const end = `${requestedDate}T23:59:59+08:00`;
 
-                // 首先尝试从购物车表按日期加载
-                const { data: cartData, error: cartError } = await sb.from('jlhcdh_cart')
-                    .select('product_id,quantity,is_purchased')
-                    .eq('order_date', requestedDate);
+                // 当天购物车与旧订单兼容数据并行读取，避免空购物车再多等一次网络往返。
+                const [cartResult, legacyResult] = await Promise.all([
+                    bootstrapOrFetch('cart', requestedDate, () =>
+                        sb.from('jlhcdh_cart')
+                            .select('product_id,quantity,is_purchased')
+                            .eq('order_date', requestedDate)
+                    ),
+                    bootstrapOrFetch('legacy', requestedDate, () =>
+                        sb.from('jlhcdh_orders')
+                            .select('order_data')
+                            .gte('created_at', start)
+                            .lte('created_at', end)
+                            .order('created_at', { ascending: false })
+                            .limit(1)
+                    )
+                ]);
+                const { data: cartData, error: cartError } = cartResult;
+                let errorOccurred = false;
 
                 if (cartData && cartData.length > 0) {
                     cartData.forEach(i => nextOrders[i.product_id] = { qty: parseFloat(i.quantity), purchased: i.is_purchased });
                     errorOccurred = !!cartError;
                 } else {
-                    // 购物车中无该日期数据，尝试从历史订单表加载
-                    const start = `${requestedDate}T00:00:00+08:00`;
-                    const end = `${requestedDate}T23:59:59+08:00`;
-                    const { data, error } = await sb.from('jlhcdh_orders')
-                        .select('order_data')
-                        .gte('created_at', start)
-                        .lte('created_at', end)
-                        .order('created_at', { ascending: false })
-                        .limit(1);
-
-                    const rec = data?.find(r => r.order_data);
+                    const rec = legacyResult.data?.find(r => r.order_data);
                     if (rec) {
                         const raw = rec.order_data;
                         const items = Array.isArray(raw) ? raw : (raw.order_data || []);
@@ -2063,7 +2158,7 @@
                             if (pid) nextOrders[pid] = { qty: parseFloat(i.qty || i.quantity || 0), purchased: !!i.is_purchased };
                         });
                     }
-                    errorOccurred = !!error;
+                    errorOccurred = !!legacyResult.error || (!!cartError && !rec);
                 }
                 // 切换日期期间可能有旧请求晚返回，绝不能覆盖新日期。
                 if (requestedDate === state.currentDate && !errorOccurred) {
@@ -2178,6 +2273,10 @@
                 const predictions = {};
                 Object.entries(history).forEach(([pid, rows]) => {
                     rows.sort((a, b) => b.date.localeCompare(a.date));
+                    const product = state.products.find(item => item.id == pid);
+                    if (product && rows[0]?.date && (!product.last_purchased_date || rows[0].date > product.last_purchased_date)) {
+                        product.last_purchased_date = rows[0].date;
+                    }
                     const sameWeekday = rows.filter(r => r.weekday === targetWeekday).map(r => r.qty);
                     const recent = rows.filter(r => r.date >= recentStart).map(r => r.qty);
                     const all = rows.map(r => r.qty);
@@ -2212,6 +2311,7 @@
                 if (state.currentDate !== requestedDate) return;
                 state.predictions = predictions;
                 state.predictionDate = requestedDate;
+                writeCache(CACHE_KEYS.products, state.products);
                 console.log('建议预测完成:', Object.keys(predictions).length, predictions);
                 applyPredictionHintsToDOM();
             } catch (e) {
@@ -3549,8 +3649,10 @@
             setupRealtime();
 
             // 核心数据并行刷新，其余数据继续放在后台。
-            await Promise.all([fetchProducts(), fetchCart()]);
-            renderProducts();
+            await Promise.allSettled([
+                fetchProducts().then(() => renderProducts()),
+                fetchCart().then(() => renderProducts())
+            ]);
             runAfterFirstPaint(fetchOrderPredictions, 500);
             runAfterFirstPaint(() => refreshCalendarMarkers(true), 800);
         }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'web-shell-2026-08-19-v3';
+const CACHE_NAME = 'web-shell-2026-08-19-v4';
 const SHELL = [
   './',
   './index.html',
