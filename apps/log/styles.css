@@ -189,6 +189,8 @@ body {
 .timeline-item {
     position: relative;
     padding: 0 0 2.5rem var(--content-gap);
+    content-visibility: auto;
+    contain-intrinsic-size: auto 110px;
 }
 
 .timeline-item:last-child {

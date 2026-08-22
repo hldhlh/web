@@ -1,6 +1,6 @@
 // Supabase配置
-const SUPABASE_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
+const SUPABASE_URL = window.LOG_CONFIG?.url || 'https://fmxddvjgkykuqwmasigo.supabase.co';
+const SUPABASE_ANON_KEY = window.LOG_CONFIG?.key || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
 const CACHE_KEY = 'logs_cache';
 const PENDING_KEY = 'logs_pending_ops';
 const PAGE_SIZE = 20;
@@ -36,6 +36,7 @@ const network = {
         });
         window.addEventListener('offline', () => {
             this.online = false;
+            if (window.logManager) window.logManager.isConnected = false;
             status.offline();
         });
     },
@@ -67,6 +68,9 @@ function initSupabase() {
 
 function initApp() {
     startApp();
+
+    // DOMContentLoaded、CDN ready 和网络恢复都可能触发初始化，只创建一个客户端。
+    if (dbClient) return;
 
     dbClient = initSupabase();
     if (!dbClient) {
@@ -170,10 +174,13 @@ class LogManager {
         }
 
         dbClient = client;
+        if (this.isConnected) return;
         this.isConnected = true;
         status.loading('后台同步');
         this.setupRealtime();
-        this.loadLogs(true).finally(() => this.flushPending());
+        // 首屏读取和离线操作补传互不依赖，直接并行。
+        this.loadLogs(true);
+        this.flushPending();
     }
 
     bindEvents() {
@@ -454,6 +461,7 @@ class LogManager {
         try {
             const targetPage = Math.max(1, page || 1);
             const result = await network.retry(() => this.selectLogsPage(targetPage));
+            if (result && result.error) throw result.error;
             const data = Array.isArray(result.data) ? result.data.map(row => this.normalizeListRow(row)) : [];
             if (data) {
                 const localLogs = targetPage === 1 ? this.logs.filter(log => this.isLocalId(log.id)) : [];
@@ -467,6 +475,15 @@ class LogManager {
                 if (targetPage === 1) this.saveCache();
                 this.render();
             }
+            if (result && result.countPromise) {
+                result.countPromise.then(count => {
+                    if (!Number.isFinite(count)) return;
+                    this.totalLogs = count;
+                    this.totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
+                    this.hasMore = this.currentPage < this.totalPages;
+                    this.updatePagination();
+                });
+            }
             if (!this.pendingOps.length) status.online();
         } catch (e) {
             console.error('Load logs error:', e);
@@ -479,6 +496,19 @@ class LogManager {
     }
 
     selectLogsPage(page) {
+        const bootstrap = window.LOG_BOOTSTRAP;
+        if (page === 1 && bootstrap && !bootstrap.used) {
+            bootstrap.used = true;
+            return bootstrap.page.then(result => {
+                if (result && !result.error) return Object.assign({}, result, { countPromise: bootstrap.count });
+                return this.selectLogsPageFromClient(page);
+            });
+        }
+
+        return this.selectLogsPageFromClient(page);
+    }
+
+    selectLogsPageFromClient(page) {
         const from = (Math.max(1, page || 1) - 1) * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
 

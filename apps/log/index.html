@@ -5,9 +5,67 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>日志</title>
+    <link rel="dns-prefetch" href="//fmxddvjgkykuqwmasigo.supabase.co">
+    <link rel="preconnect" href="https://fmxddvjgkykuqwmasigo.supabase.co" crossorigin>
+    <script>
+        // 冷启动预取：不等待 SDK，在 HTML/CSS 解析期间直接读取首屏。
+        window.LOG_CONFIG = {
+            url: 'https://fmxddvjgkykuqwmasigo.supabase.co',
+            key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo'
+        };
+        window.LOG_BOOTSTRAP = (() => {
+            const config = window.LOG_CONFIG;
+            let origin = config.url;
+            try {
+                const cached = JSON.parse(localStorage.getItem('app-network-best-v2') || 'null');
+                if (cached && Date.now() - cached.savedAt < 6 * 60 * 60 * 1000 && /^https:\/\//.test(cached.origin)) {
+                    origin = cached.origin;
+                }
+            } catch (_) { }
+
+            const headers = {
+                apikey: config.key,
+                Authorization: `Bearer ${config.key}`,
+                Accept: 'application/json'
+            };
+            const request = (method, params, priority) => {
+                const url = new URL(`${origin}/rest/v1/logs_list`);
+                Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), 6500);
+                return fetch(url, {
+                    method,
+                    headers: Object.assign({}, headers, method === 'HEAD' ? { Prefer: 'count=exact' } : {}),
+                    mode: 'cors',
+                    credentials: 'omit',
+                    cache: 'no-store',
+                    priority,
+                    signal: controller.signal
+                }).then(async response => {
+                    if (!response.ok) throw new Error(`冷启动请求失败: HTTP ${response.status}`);
+                    const total = Number((response.headers.get('content-range') || '').split('/')[1]);
+                    return { data: method === 'HEAD' ? [] : await response.json(), count: Number.isFinite(total) ? total : null, error: null };
+                }, error => ({ data: null, count: null, error }))
+                    .catch(error => ({ data: null, count: null, error }))
+                    .finally(() => clearTimeout(timer));
+            };
+
+            return {
+                used: false,
+                page: request('GET', {
+                    select: 'id,content_preview,content_size,created_at,updated_at',
+                    order: 'created_at.desc',
+                    limit: '20'
+                }, 'high'),
+                // 精确总数不阻塞日志列表显示。
+                count: request('HEAD', { select: 'id' }, 'low').then(result => result.error ? null : result.count)
+            };
+        })();
+    </script>
     <link rel="stylesheet" href="styles.css">
-    <script src="../vendor/supabase.min.js"></script>
-    <script src="../network.js"></script>
+    <link rel="preload" href="../vendor/supabase.min.js" as="script">
+    <script src="../vendor/supabase.min.js" defer></script>
+    <script src="../network.js" defer></script>
     <script>
         // 移除 esm.sh 以避免 ESM 模块错误，仅保留稳定的 UMD 源
         const CDN = [
@@ -71,10 +129,7 @@
             }
         };
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const later = window.requestAnimationFrame || window.setTimeout;
-            later(() => load.init(), 0);
-        });
+        document.addEventListener('DOMContentLoaded', () => load.init());
     </script>
 </head>
 
@@ -117,7 +172,7 @@
             </div>
         </div>
     </div>
-    <script src="script.js"></script>
+    <script src="script.js" defer></script>
 </body>
 
 </html>

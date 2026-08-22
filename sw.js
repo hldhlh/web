@@ -1,4 +1,4 @@
-const CACHE_NAME = 'web-shell-2026-08-19-v4';
+const CACHE_NAME = 'web-shell-2026-08-22-v5';
 const SHELL = [
   './',
   './index.html',
@@ -16,6 +16,9 @@ const SHELL = [
   './apps/ledger/icon.svg',
   './apps/gui-design-demo/icon.svg',
   './apps/jlhcdh/index.html',
+  './apps/log/index.html',
+  './apps/log/styles.css',
+  './apps/log/script.js',
   './apps/vendor/supabase.min.js',
   './apps/network.js'
 ];

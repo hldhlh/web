@@ -10,7 +10,9 @@
 - 数据库：Supabase `public.logs`
 - 运行方式：静态文件托管即可，不需要构建步骤
 - 访问策略：性能优先，暂时不启用 RLS，不使用 `user_id`
-- 初始化策略：先启动本地 UI 和缓存渲染，再在后台加载 Supabase、拉取远端数据和建立 Realtime
+- 初始化策略：先启动本地 UI 和缓存渲染；HTML 解析阶段直接预取首屏，SDK、Realtime 和待同步操作在后台并行启动
+- 首屏策略：列表数据与精确总数拆成两个请求，总数统计不阻塞内容显示
+- 网络策略：复用 `apps/network.js` 的最优节点记忆、连接预热、只读容灾和超时重试
 
 ## 数据表
 
@@ -71,4 +73,4 @@ npm run check
 - 当前为性能优先：保存、删除会先更新本地 UI，再后台同步数据库；如果数据库脚本未加载或网络离线，操作会保存在 `localStorage` 的待同步队列里。
 - `content` 当前存 HTML，渲染时会插入 DOM；如果允许不可信写入，需要增加 HTML allowlist 清理。
 - 粘贴图片会以内联 base64 写进 `content`，大图片会拖慢首屏读取、Realtime payload 和 localStorage 缓存。后续更适合迁到 Supabase Storage。
-- 首屏现在全量读取 `logs`，数据继续增长后应改为分页，并给 `created_at desc` 加索引。
+- 列表已按 20 条分页并只传 800 字符预览；数据量很大时仍建议给 `created_at desc` 增加索引。

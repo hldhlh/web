@@ -79,7 +79,7 @@ class FakeElement {
     }
 }
 
-function createHarness() {
+function createHarness(options = {}) {
     const elements = new Map();
 
     function element(id) {
@@ -153,6 +153,7 @@ function createHarness() {
     };
 
     sandbox.window = sandbox;
+    if (options.bootstrap) sandbox.LOG_BOOTSTRAP = options.bootstrap;
     sandbox.addEventListener = (type, handler) => {
         windowListeners[type] = handler;
     };
@@ -387,6 +388,28 @@ test('loads logs from the mock client without touching the network', async () =>
     assert.equal(client.calls.orders[0].options.ascending, false);
     assert.deepEqual(client.calls.selects[0].range, { from: 0, to: harness.PAGE_SIZE - 1 });
     assert.equal(client.calls.subscriptions[0].filter.table, 'logs');
+});
+
+test('uses the cold-start bootstrap before issuing an SDK list query', async () => {
+    const rows = makeLogs(1);
+    const bootstrap = {
+        used: false,
+        page: Promise.resolve({ data: rows, count: null, error: null }),
+        count: Promise.resolve(41)
+    };
+    const harness = createHarness({ bootstrap });
+    const client = createMockClient([]);
+
+    harness.setClient(client);
+    const manager = new harness.LogManager();
+    await settle();
+    await settle();
+
+    assert.equal(bootstrap.used, true);
+    assert.equal(client.calls.selects.length, 0);
+    assert.equal(manager.logs[0].id, rows[0].id);
+    assert.equal(manager.totalLogs, 41);
+    assert.equal(manager.totalPages, 3);
 });
 
 test('initial remote load requests the first tab page', async () => {
