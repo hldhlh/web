@@ -1,55 +1,15 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <!-- 1. 背景渐变 -->
-    <linearGradient id="nightBase" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#1E1C31" />
-      <stop offset="100%" style="stop-color:#020617" />
+    <linearGradient id="cloud-background" x1="18" y1="14" x2="82" y2="88" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#334155"/>
+      <stop offset="1" stop-color="#0F172A"/>
     </linearGradient>
-
-    <!-- 2. 【核心修复】全局滤镜。filterUnits="userSpaceOnUse" 彻底消除矩形切边 -->
-    <filter id="pureDiffusion" filterUnits="userSpaceOnUse" x="0" y="0" width="100" height="100" color-interpolation-filters="sRGB">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="glaze" />
-      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="rim" />
-      <feMerge>
-        <feMergeNode in="glaze" />
-        <feMergeNode in="rim" />
-        <feMergeNode in="SourceGraphic" />
-      </feMerge>
-    </filter>
-
-    <!-- 3. 动态材质 -->
-    <radialGradient id="weavingLight" cx="45%" cy="35%" r="75%">
-      <stop offset="0%" style="stop-color:white">
-        <animate attributeName="stop-color" values="white;#F0F9FF;white" dur="8s" repeatCount="indefinite" />
-      </stop>
-      <stop offset="40%" style="stop-color:#E0E7FF;stop-opacity:0.95" />
-      <stop offset="100%" style="stop-color:#818CF8;stop-opacity:0.8" />
-    </radialGradient>
   </defs>
 
-  <!-- 4. 基础容器 -->
-  <rect x="8" y="8" width="84" height="84" rx="28" fill="url(#nightBase)" />
+  <rect x="10" y="10" width="80" height="80" rx="22" fill="url(#cloud-background)"/>
 
-  <!-- 5. 环境光 -->
-  <circle cx="50" cy="50" r="28" fill="#6366F1" filter="url(#pureDiffusion)" opacity="0.3">
-    <animate attributeName="opacity" values="0.15;0.45;0.15" dur="10s" repeatCount="indefinite" />
-  </circle>
-
-  <!-- 6. 【核心修复】使用叠加式动画 additive="sum" 确保居中不失效 -->
-  <g filter="url(#pureDiffusion)">
-    <g transform="translate(27.5, 32)">
-      <path d="M5 25 A8 8 0 0 1 12 10 A14 14 0 0 1 36 12 A10 10 0 0 1 40 25 Z" fill="url(#weavingLight)" />
-      <path d="M12 10 A14 14 0 0 1 36 12" fill="none" stroke="white" stroke-width="0.8" stroke-linecap="round" opacity="0.5" />
-      
-      <!-- 动画设定为 additive="sum" 以累加到父级的 translate -->
-      <animateTransform attributeName="transform" type="translate" values="0 0; 1 -2; -1 1; 0 0" dur="12s" repeatCount="indefinite" additive="sum" />
-    </g>
+  <g transform="translate(14 14) scale(3)" fill="none" stroke="#fff" stroke-width="1.6"
+    stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
   </g>
-
-  <!-- 7. 极致锁边与核心 -->
-  <rect x="8" y="8" width="84" height="84" rx="28" fill="none" stroke="white" stroke-width="1" stroke-opacity="0.1" />
-  <circle cx="50" cy="50" r="1.5" fill="white">
-    <animate attributeName="opacity" values="0.4;1;0.4" dur="5s" repeatCount="indefinite" />
-  </circle>
 </svg>
