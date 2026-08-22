@@ -5,9 +5,53 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>记账</title>
-  <!-- Supabase JS Library -->
-  <script src="../vendor/supabase.min.js"></script>
-  <script src="../network.js"></script>
+  <link rel="dns-prefetch" href="//fmxddvjgkykuqwmasigo.supabase.co">
+  <link rel="preconnect" href="https://fmxddvjgkykuqwmasigo.supabase.co" crossorigin>
+  <script>
+    // 冷启动预取：不等待 SDK，HTML 开始解析时就读取账单。
+    window.LEDGER_CONFIG = {
+      url: 'https://fmxddvjgkykuqwmasigo.supabase.co',
+      key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo'
+    };
+    window.LEDGER_BOOTSTRAP = (() => {
+      const config = window.LEDGER_CONFIG;
+      let origin = config.url;
+      try {
+        const cached = JSON.parse(localStorage.getItem('app-network-best-v2') || 'null');
+        if (cached && Date.now() - cached.savedAt < 6 * 60 * 60 * 1000 && /^https:\/\//.test(cached.origin)) {
+          origin = cached.origin;
+        }
+      } catch (_) { }
+
+      const url = new URL(`${origin}/rest/v1/ledger_transactions`);
+      url.searchParams.set('select', 'id,type,amount,date,description,category,created_at');
+      url.searchParams.set('order', 'date.desc,created_at.desc');
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 6500);
+      const request = fetch(url, {
+        headers: {
+          apikey: config.key,
+          Authorization: `Bearer ${config.key}`,
+          Accept: 'application/json'
+        },
+        mode: 'cors',
+        credentials: 'omit',
+        cache: 'no-store',
+        priority: 'high',
+        signal: controller.signal
+      }).then(async response => {
+        if (!response.ok) throw new Error(`冷启动请求失败: HTTP ${response.status}`);
+        return { data: await response.json(), error: null };
+      }, error => ({ data: null, error }))
+        .catch(error => ({ data: null, error }))
+        .finally(() => clearTimeout(timer));
+
+      return { used: false, transactions: request };
+    })();
+  </script>
+  <link rel="preload" href="../vendor/supabase.min.js" as="script">
+  <script src="../vendor/supabase.min.js" defer></script>
+  <script src="../network.js" defer></script>
   <style>
     :root {
       --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -671,6 +715,8 @@
     }
 
     .date-group {
+      content-visibility: auto;
+      contain-intrinsic-size: auto 180px;
       display: flex;
       flex-direction: column;
       gap: 0.6rem;
@@ -1107,9 +1153,11 @@
   <!-- Realtime Script Logic -->
   <script type="module">
     // Supabase Configuration
-    const supabaseUrl = 'https://fmxddvjgkykuqwmasigo.supabase.co';
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
+    const supabaseUrl = window.LEDGER_CONFIG.url;
+    const supabaseKey = window.LEDGER_CONFIG.key;
+    window.APP_NETWORK?.patchSupabase();
     const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+    const TRANSACTIONS_CACHE_KEY = 'ledger_transactions_cache_v2';
 
     // App State
     let transactions = [];
@@ -1117,6 +1165,23 @@
     let selectedType = 'expense'; // 'expense', 'income'
     let selectedCategory = '';
     let editingTransactionId = null; // null for add mode, UUID for edit mode
+
+    function restoreTransactionsCache() {
+      try {
+        const cached = JSON.parse(localStorage.getItem(TRANSACTIONS_CACHE_KEY) || 'null');
+        if (!cached || !Array.isArray(cached.data) || Date.now() - cached.savedAt > 7 * 24 * 60 * 60 * 1000) return false;
+        transactions = cached.data;
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function saveTransactionsCache() {
+      try {
+        localStorage.setItem(TRANSACTIONS_CACHE_KEY, JSON.stringify({ data: transactions, savedAt: Date.now() }));
+      } catch (_) { }
+    }
 
     // Categories Configuration (Clean Line Icons)
     const categoriesConfig = {
@@ -1820,19 +1885,29 @@
 
     // Database Actions: Fetch & Subscribe
     async function loadData() {
-      const { data, error } = await supabase
-        .from('ledger_transactions')
-        .select('*')
-        .order('date', { ascending: false })
-        .order('created_at', { ascending: false });
+      const bootstrap = window.LEDGER_BOOTSTRAP;
+      let result;
+      if (bootstrap && !bootstrap.used) {
+        bootstrap.used = true;
+        result = await bootstrap.transactions;
+      }
+      if (!result || result.error) {
+        result = await supabase
+          .from('ledger_transactions')
+          .select('id,type,amount,date,description,category,created_at')
+          .order('date', { ascending: false })
+          .order('created_at', { ascending: false });
+      }
+      const { data, error } = result;
 
       if (error) {
         console.error('Error fetching ledger_transactions:', error);
-        showToast('账本数据加载失败', 'error');
+        if (!transactions.length) showToast('账本数据加载失败', 'error');
         return;
       }
 
-      transactions = data;
+      transactions = Array.isArray(data) ? data : [];
+      saveTransactionsCache();
       renderApp();
     }
 
@@ -1850,7 +1925,7 @@
             const { eventType, new: newRec, old: oldRec } = payload;
 
             if (eventType === 'INSERT') {
-              transactions.unshift(newRec);
+              if (!transactions.some(tx => tx.id === newRec.id)) transactions.unshift(newRec);
               transactions.sort((a, b) => {
                 const dateCompare = new Date(b.date) - new Date(a.date);
                 if (dateCompare !== 0) return dateCompare;
@@ -1864,6 +1939,7 @@
                 el.classList.add('deleting');
                 setTimeout(() => {
                   transactions = transactions.filter(t => t.id !== oldRec.id);
+                  saveTransactionsCache();
                   renderApp();
                 }, 300);
                 return;
@@ -1880,6 +1956,7 @@
               });
             }
 
+            saveTransactionsCache();
             renderApp();
           }
         )
@@ -1889,8 +1966,9 @@
     // App Startup
     document.addEventListener('DOMContentLoaded', () => {
       initTheme();
-      loadData();
+      if (restoreTransactionsCache()) renderApp();
       subscribeRealtime();
+      loadData();
     });
   </script>
 </body>

@@ -14,7 +14,6 @@ export function getAppDirectories() {
     { name: "SVG", path: "svg/index.html", fallback: "S" },
     { name: "日志", path: "log/index.html", icon: "log/icon.svg", fallback: "志" },
     { name: "蔬菜盘点程序", path: "vegcheck/index.html", fallback: "蔬" },
-    { name: "情景故事", path: "course/index.html", icon: "course/icon.svg", fallback: "课" },
     { name: "我的头像", path: "avatar/index.html", fallback: "我" },
     { name: "实时记账", path: "ledger/index.html", icon: "ledger/icon.svg", fallback: "账" },
     { name: "Win32 GUI DIB 预览器", path: "gui-design-demo/index.html", icon: "gui-design-demo/icon.svg", fallback: "GUI" }

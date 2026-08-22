@@ -1,4 +1,4 @@
-const CACHE_NAME = 'web-shell-2026-08-22-v6';
+const CACHE_NAME = 'web-shell-2026-08-22-v8';
 const SHELL = [
   './',
   './index.html',
@@ -12,7 +12,6 @@ const SHELL = [
   './apps/eatwhat/icon.svg',
   './apps/vista/icon.svg',
   './apps/log/icon.svg',
-  './apps/course/icon.svg',
   './apps/ledger/icon.svg',
   './apps/gui-design-demo/icon.svg',
   './apps/jlhcdh/index.html',
@@ -22,6 +21,7 @@ const SHELL = [
   './apps/cloud/index.html',
   './apps/cloud/style.css',
   './apps/cloud/script.js',
+  './apps/ledger/index.html',
   './apps/vendor/supabase.min.js',
   './apps/network.js'
 ];

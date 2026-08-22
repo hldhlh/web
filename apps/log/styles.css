@@ -536,21 +536,28 @@ body {
 
 /* 移动端优化 */
 @media (max-width: 640px) {
+    :root {
+        /* 手机端让时间轴退到边缘，把横向空间还给正文。 */
+        --timeline-left: 0px;
+        --content-gap: 20px;
+    }
+
     .container {
-        padding: 1.5rem 1rem;
+        padding: max(1rem, env(safe-area-inset-top)) max(0.875rem, env(safe-area-inset-right)) max(1.5rem, env(safe-area-inset-bottom)) max(0.875rem, env(safe-area-inset-left));
     }
 
     .header-row {
-        margin-bottom: 2.25rem;
+        margin-bottom: 1.25rem;
     }
 
     .form-container {
-        margin-bottom: 4rem;
+        margin-bottom: 2.25rem;
     }
 
     .form-content {
-        min-height: 76px;
-        font-size: 0.85rem;
+        min-height: 64px;
+        padding-top: 0.5rem;
+        font-size: 0.9rem;
     }
 
     .form-actions {
@@ -562,13 +569,49 @@ body {
         min-width: 68px;
     }
 
+    .timeline-content {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "body body"
+            "meta actions";
+        column-gap: 0.5rem;
+        align-items: center;
+    }
+
+    /* 正文独占首行；操作按钮与时间合并为一条紧凑的底栏。 */
     .timeline-header {
-        gap: 0.75rem;
+        display: contents;
+    }
+
+    .timeline-body,
+    .timeline-text {
+        grid-area: body;
+        width: 100%;
+        font-size: 0.95rem;
+        line-height: 1.65;
     }
 
     .timeline-actions {
+        grid-area: actions;
         opacity: 1;
         transform: none;
+        gap: 0;
+        justify-self: end;
+    }
+
+    .timeline-action {
+        min-height: 32px;
+        padding: 0.3rem 0.45rem;
+    }
+
+    .timeline-meta {
+        grid-area: meta;
+        margin-top: 0;
+    }
+
+    .timeline-item {
+        padding-bottom: 2rem;
     }
 
     .status-indicator {
