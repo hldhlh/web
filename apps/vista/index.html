@@ -5,7 +5,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="./icon.svg" type="image/svg+xml">
-    <link rel="preconnect" href="https://picsum.photos">
+    <link rel="dns-prefetch" href="//picsum.photos">
+    <link rel="dns-prefetch" href="//fastly.picsum.photos">
+    <link rel="dns-prefetch" href="//fmxddvjgkykuqwmasigo.supabase.co">
+    <link rel="preconnect" href="https://picsum.photos" crossorigin>
+    <link rel="preconnect" href="https://fastly.picsum.photos" crossorigin>
+    <link rel="preconnect" href="https://fmxddvjgkykuqwmasigo.supabase.co" crossorigin>
+    <link rel="preload" href="../vendor/supabase.min.js" as="script">
+    <link rel="preload" href="../network.js" as="script">
     <title>阅图 - 发现视觉之美</title>
     <style>
         :root {
@@ -181,6 +188,8 @@
             opacity: 0;
             transform: translateY(20px);
             animation: itemFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            content-visibility: auto;
+            contain-intrinsic-size: auto 420px;
         }
 
         @keyframes itemFadeIn {
@@ -214,11 +223,17 @@
             width: 100%;
             height: auto;
             display: block;
+            background: color-mix(in srgb, var(--card-bg), var(--text-sub) 10%);
             transition: transform 0.6s cubic-bezier(0.2, 0, 0.2, 1);
         }
 
         .photo-item:hover img {
             transform: scale(1.04);
+        }
+
+        .photo-item:focus-visible {
+            outline: 3px solid var(--primary-color);
+            outline-offset: 3px;
         }
 
         .photo-overlay {
@@ -340,6 +355,16 @@
             transition: width 0.3s ease;
         }
 
+        .progress-bar.loading {
+            width: 35%;
+            animation: progressSweep 1.2s ease-in-out infinite;
+        }
+
+        @keyframes progressSweep {
+            0% { transform: translateX(-120%); }
+            100% { transform: translateX(360%); }
+        }
+
         .preview-loader {
             position: absolute;
             display: none;
@@ -371,6 +396,36 @@
             color: var(--text-sub);
             font-size: 14px;
             font-weight: 500;
+        }
+
+        @media (max-width: 640px) {
+            .header {
+                height: 60px;
+                padding: 0 16px;
+            }
+
+            .btn-back {
+                font-size: 0;
+            }
+
+            .btn-toggle-fav,
+            .btn-refresh {
+                padding: 8px 11px;
+            }
+
+            .gallery-container {
+                margin-top: 76px;
+                padding: 0 12px;
+            }
+
+            .gallery-grid,
+            .gallery-column {
+                gap: 12px;
+            }
+
+            .photo-item {
+                border-radius: 12px;
+            }
         }
     </style>
     <script src="../vendor/supabase.min.js"></script>
@@ -419,7 +474,8 @@
     </div>
 
     <script>
-        let isLoading = false, viewMode = 'all';
+        let isLoading = false, viewMode = 'all', currentColumnCount = 0;
+        let columnHeights = [], feedPhotos = [], photoPool = [];
         const galleryGrid = document.getElementById('galleryGrid'), refreshBtn = document.getElementById('refreshBtn'),
             toggleFavBtn = document.getElementById('toggleFavBtn'), lightbox = document.getElementById('lightbox'),
             lightboxImg = document.getElementById('lightbox-img'), progressBar = document.getElementById('progressBar'),
@@ -445,13 +501,32 @@
 
         const SUPABASE_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
+        window.APP_NETWORK?.patchSupabase();
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         let realtimeChannel = null, userId = 'u_ag0saf7d8mjh9oo4j', favorites = [];
-        const CACHE_KEY = 'vista_photo_cache';
-        let photoCache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
+        let realtimeSyncTimer = null, lightboxLoadToken = 0;
+        const CACHE_KEY = 'vista_photo_cache_v2';
+        const FEED_CACHE_KEY = 'vista_feed_v2';
+        const CATALOG_CACHE_KEY = 'vista_catalog_v1';
+        const FAVORITES_KEY = 'photo-favorites';
+        const FALLBACK_IDS = ['103', '116', '141', '155', '162', '166', '353', '392', '437', '500', '523', '532', '602', '666', '777', '782', '823', '862'];
+
+        function readLocalJSON(key, fallback) {
+            try { return JSON.parse(localStorage.getItem(key) || '') || fallback; }
+            catch (_) { return fallback; }
+        }
+
+        let photoCache = readLocalJSON(CACHE_KEY, {});
+        favorites = readLocalJSON(FAVORITES_KEY, []);
 
         function generateHash(s) { let h = 0; for (let i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i), h &= h; return Math.abs(h).toString(36); }
-        function saveCache() { const keys = Object.keys(photoCache); if (keys.length > 500) delete photoCache[keys[0]]; localStorage.setItem(CACHE_KEY, JSON.stringify(photoCache)); }
+        function saveCache() {
+            try {
+                const keys = Object.keys(photoCache);
+                while (keys.length > 300) delete photoCache[keys.shift()];
+                localStorage.setItem(CACHE_KEY, JSON.stringify(photoCache));
+            } catch (_) { }
+        }
         function parsePhotoUrl(url) {
             const m = url.match(/\/id\/(\d+)\/(\d+)\/(\d+)/);
             if (m) return { url, title: `视觉艺术 #${m[1]}`, author: `Artist ${m[1]}`, aspectRatio: m[2] / m[3] };
@@ -460,15 +535,71 @@
         function getCachedPhoto(url) {
             const h = generateHash(url);
             if (photoCache[h]) return photoCache[h];
-            const p = parsePhotoUrl(url); photoCache[h] = p; saveCache(); return p;
+            const p = parsePhotoUrl(url); photoCache[h] = p; return p;
+        }
+
+        function buildPhoto(record, index = 0) {
+            const id = String(record.id);
+            const rawRatio = Number(record.width) / Number(record.height);
+            const aspectRatio = Number.isFinite(rawRatio) ? Math.max(0.72, Math.min(rawRatio, 1.5)) : 0.82 + ((Number(id) + index * 7) % 54) / 100;
+            const width = 720;
+            const height = Math.round(width / aspectRatio);
+            return getCachedPhoto(`https://picsum.photos/id/${id}/${width}/${height}.webp`);
+        }
+
+        function shuffled(items) {
+            const result = items.slice();
+            for (let i = result.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [result[i], result[j]] = [result[j], result[i]];
+            }
+            return result;
+        }
+
+        function restoreFeed() {
+            const cached = readLocalJSON(FEED_CACHE_KEY, null);
+            if (!cached || !Array.isArray(cached.data) || Date.now() - cached.savedAt > 24 * 60 * 60 * 1000) return false;
+            feedPhotos = cached.data.filter(p => p && typeof p.url === 'string').slice(0, 40);
+            return feedPhotos.length > 0;
+        }
+
+        function saveFeed() {
+            try { localStorage.setItem(FEED_CACHE_KEY, JSON.stringify({ data: feedPhotos.slice(-40), savedAt: Date.now() })); }
+            catch (_) { }
+        }
+
+        async function loadPhotoCatalog() {
+            const cached = readLocalJSON(CATALOG_CACHE_KEY, null);
+            if (cached && Array.isArray(cached.data) && Date.now() - cached.savedAt < 7 * 24 * 60 * 60 * 1000) {
+                photoPool = cached.data;
+                return;
+            }
+            try {
+                const response = await fetch('https://picsum.photos/v2/list?page=1&limit=100', { cache: 'force-cache' });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                photoPool = data.filter(item => item?.id && item?.width && item?.height);
+                localStorage.setItem(CATALOG_CACHE_KEY, JSON.stringify({ data: photoPool, savedAt: Date.now() }));
+            } catch (_) {
+                photoPool = FALLBACK_IDS.map(id => ({ id }));
+            }
         }
 
         async function syncFavorites() {
             try {
-                const { data, error } = await _supabase.from('vista_favorites').select('url').eq('user_id', userId).order('created_at', { ascending: false });
+                const { data, error } = await _supabase.from('vista_favorites').select('url').eq('user_id', userId).order('created_at', { ascending: false }).limit(500);
                 if (error) throw error;
-                if (data) { favorites = data.map(i => getCachedPhoto(i.url)); statusText.innerText = `同步成功 (${favorites.length})`; statusDot.classList.add('online'); }
-            } catch (err) { statusText.innerText = '云端连接失败'; statusDot.classList.remove('online'); favorites = JSON.parse(localStorage.getItem('photo-favorites') || '[]'); }
+                if (data) {
+                    favorites = data.map(i => getCachedPhoto(i.url));
+                    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+                    saveCache();
+                    statusText.innerText = `已同步 (${favorites.length})`;
+                    statusDot.classList.add('online');
+                }
+            } catch (err) {
+                statusText.innerText = favorites.length ? `本地收藏 (${favorites.length})` : '云端暂不可用';
+                statusDot.classList.remove('online');
+            }
         }
 
         async function addToCloud(p) { try { await _supabase.from('vista_favorites').upsert({ user_id: userId, url: p.url }, { onConflict: 'user_id,url' }); } catch (e) { } }
@@ -477,7 +608,11 @@
         function subscribeToRealtime() {
             if (realtimeChannel) _supabase.removeChannel(realtimeChannel);
             realtimeChannel = _supabase.channel('public:vista_favorites').on('postgres_changes', { event: '*', schema: 'public', table: 'vista_favorites', filter: `user_id=eq.${userId}` }, () => {
-                const timer = setTimeout(async () => { await syncFavorites(); if (viewMode === 'favorites') { initColumns(); renderPhotos(favorites); } else updateHeartIcons(); }, 300);
+                clearTimeout(realtimeSyncTimer);
+                realtimeSyncTimer = setTimeout(async () => {
+                    await syncFavorites();
+                    if (viewMode === 'favorites') rebuildGallery(); else updateHeartIcons();
+                }, 350);
             }).subscribe();
         }
 
@@ -492,6 +627,8 @@
             galleryGrid.innerHTML = '';
             const w = window.innerWidth, count = w < 500 ? 1 : w < 800 ? 2 : w < 1200 ? 3 : 4;
             for (let i = 0; i < count; i++) { const col = document.createElement('div'); col.className = 'gallery-column'; col.id = `col-${i}`; galleryGrid.appendChild(col); }
+            currentColumnCount = count;
+            columnHeights = Array(count).fill(0);
             return count;
         }
 
@@ -505,82 +642,158 @@
         }
 
         window.onresize = debounce(() => {
-            const oldCols = document.querySelectorAll('.gallery-column').length;
-            const newCols = initColumns();
-            if (oldCols !== newCols && galleryGrid.hasChildNodes()) {
-                if (viewMode === 'all') { galleryGrid.innerHTML = ''; initColumns(); fetchRandomPhotos(20); }
-                else { galleryGrid.innerHTML = ''; initColumns(); renderPhotos(favorites); }
-            }
+            const w = window.innerWidth, nextCount = w < 500 ? 1 : w < 800 ? 2 : w < 1200 ? 3 : 4;
+            if (nextCount !== currentColumnCount) rebuildGallery();
         }, 300);
-        function getShortestColumn() {
+        function getShortestColumn(photo) {
             let cols = Array.from(document.querySelectorAll('.gallery-column'));
             if (cols.length === 0) { initColumns(); cols = Array.from(document.querySelectorAll('.gallery-column')); }
-            return cols.reduce((p, c) => p.offsetHeight <= c.offsetHeight ? p : c);
+            let index = 0;
+            for (let i = 1; i < columnHeights.length; i++) if (columnHeights[i] < columnHeights[index]) index = i;
+            columnHeights[index] += 1 / Math.max(photo.aspectRatio || 1, 0.1) + 0.08;
+            return cols[index];
         }
 
-        async function toggleFavorite(p, btn, e) {
+        function toggleFavorite(p, btn, e) {
             e.stopPropagation(); const idx = favorites.findIndex(f => f.url === p.url);
-            if (idx > -1) { favorites.splice(idx, 1); btn.classList.remove('active'); if (viewMode === 'favorites') btn.closest('.photo-item').remove(); await removeFromCloud(p.url); }
-            else { favorites.unshift(p); btn.classList.add('active'); await addToCloud(p); }
-            localStorage.setItem('photo-favorites', JSON.stringify(favorites));
+            if (idx > -1) {
+                favorites.splice(idx, 1); btn.classList.remove('active');
+                if (viewMode === 'favorites') btn.closest('.photo-item').remove();
+                void removeFromCloud(p.url);
+            } else {
+                favorites.unshift(p); btn.classList.add('active');
+                void addToCloud(p);
+            }
+            localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+            statusText.innerText = `本地已保存 (${favorites.length})`;
         }
 
-        async function fetchRandomPhotos(n = 15) {
-            if (isLoading) return; isLoading = true; document.getElementById('loading').style.opacity = '1';
-            const photos = []; for (let i = 0; i < n; i++) {
-                const id = 100 + Math.floor(Math.random() * 800), w = 500 + Math.floor(Math.random() * 200), h = 400 + Math.floor(Math.random() * 300);
-                // 使用 WebP 格式减少体积
-                photos.push(getCachedPhoto(`https://picsum.photos/id/${id}/${w}/${h}.webp`));
+        function fetchRandomPhotos(n = 12, reset = false) {
+            if (isLoading) return;
+            isLoading = true;
+            const loading = document.getElementById('loading');
+            loading.style.opacity = '1';
+
+            if (reset) feedPhotos = [];
+            const source = photoPool.length ? photoPool : FALLBACK_IDS.map(id => ({ id }));
+            const used = new Set(feedPhotos.map(p => parsePhotoUrl(p.url).title.replace('视觉艺术 #', '')));
+            const available = shuffled(source).filter(item => !used.has(String(item.id)));
+            const photos = available.slice(0, n).map(buildPhoto);
+
+            if (photos.length) {
+                feedPhotos.push(...photos);
+                saveCache();
+                saveFeed();
+                renderPhotos(photos);
+                loading.textContent = '继续向下探索';
+            } else {
+                loading.textContent = photoPool.length ? '已浏览本批全部图片' : '正在准备更多图片…';
             }
-            renderPhotos(photos); isLoading = false; document.getElementById('loading').style.opacity = '0.3';
+            loading.style.opacity = '0.45';
+            isLoading = false;
         }
 
         function renderPhotos(data) {
+            const existingCount = document.querySelectorAll('.photo-item').length;
             data.forEach((p, i) => {
                 const isFav = favorites.some(f => f.url === p.url), item = document.createElement('div');
-                item.className = 'photo-item'; item.style.animationDelay = `${i * 0.05}s`;
+                item.className = 'photo-item'; item.style.animationDelay = `${Math.min(i * 0.035, 0.2)}s`;
+                const isPriority = existingCount + i < 4;
                 // 增加 aspect-ratio 占位，防止 CLS
                 item.innerHTML = `
                     <div class="photo-inner">
-                        <div class="btn-favorite ${isFav ? 'active' : ''}" onclick="toggleFavorite(${JSON.stringify(p).replace(/"/g, '&quot;')}, this, event)">
+                        <button class="btn-favorite ${isFav ? 'active' : ''}" type="button" aria-label="${isFav ? '取消收藏' : '收藏'}">
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
-                        </div>
-                        <img src="${p.url}" alt="${p.title}" style="aspect-ratio: ${p.aspectRatio};" loading="lazy" onload="this.style.opacity='1'" onerror="this.parentElement.parentElement.remove()">
+                        </button>
+                        <img src="${p.url}" alt="${p.title}" style="aspect-ratio: ${p.aspectRatio};" loading="${isPriority ? 'eager' : 'lazy'}" fetchpriority="${isPriority ? 'high' : 'auto'}" decoding="async">
                         <div class="photo-overlay"><div class="photo-info"><h2>${p.title}</h2><p>@${p.author}</p></div></div>
                     </div>`;
-                item.onclick = () => {
-                    const highRes = p.url.replace(/\/\d+\/\d+$/, '/1200/1600');
-                    lightboxImg.classList.remove('loaded'); progressTrack.style.display = 'block'; progressBar.style.width = '0%';
+                const favoriteButton = item.querySelector('.btn-favorite');
+                favoriteButton.addEventListener('click', event => toggleFavorite(p, favoriteButton, event));
+                item.querySelector('img').addEventListener('error', () => item.remove(), { once: true });
+                const openPreview = () => {
+                    const token = ++lightboxLoadToken;
+                    const fullHeight = Math.max(900, Math.round(1600 / Math.max(p.aspectRatio || 1, 0.1)));
+                    const highRes = p.url.replace(/\/\d+\/\d+(?:\.webp)?(?:\?.*)?$/, `/1600/${fullHeight}.webp`);
+                    resetLightbox();
+                    lightboxImg.src = p.url;
+                    lightboxImg.classList.add('loaded');
+                    progressTrack.style.display = 'block';
+                    progressBar.classList.add('loading');
+                    progressBar.style.width = '';
                     previewLoader.style.display = 'flex'; lightbox.style.display = 'flex';
-                    let pct = 0; const itv = setInterval(() => { pct += Math.random() * 15; if (pct >= 90) { clearInterval(itv); pct = 90; } progressBar.style.width = pct + '%'; }, 200);
-                    lightboxImg.src = highRes; lightboxImg.onload = () => { 
-                        clearInterval(itv); progressBar.style.width = '100%'; 
-                        setTimeout(() => { 
-                            progressTrack.style.display = 'none'; 
-                            previewLoader.style.display = 'none'; 
-                            lightboxImg.classList.add('loaded'); 
-                            resetLightbox();
-                        }, 300); 
+                    document.body.style.overflow = 'hidden';
+
+                    const fullImage = new Image();
+                    fullImage.decoding = 'async';
+                    fullImage.src = highRes;
+                    fullImage.onload = async () => {
+                        try { await fullImage.decode(); } catch (_) { }
+                        if (token !== lightboxLoadToken) return;
+                        lightboxImg.src = highRes;
+                        progressBar.classList.remove('loading');
+                        progressBar.style.width = '100%';
+                        previewLoader.style.display = 'none';
+                        setTimeout(() => { if (token === lightboxLoadToken) progressTrack.style.display = 'none'; }, 220);
+                    };
+                    fullImage.onerror = () => {
+                        if (token !== lightboxLoadToken) return;
+                        progressTrack.style.display = 'none';
+                        previewLoader.style.display = 'none';
                     };
                 };
-                getShortestColumn().appendChild(item);
+                item.tabIndex = 0;
+                item.setAttribute('role', 'button');
+                item.setAttribute('aria-label', `查看大图：${p.title}`);
+                item.addEventListener('click', openPreview);
+                item.addEventListener('keydown', event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        openPreview();
+                    }
+                });
+                getShortestColumn(p).appendChild(item);
             });
         }
 
-        refreshBtn.onclick = () => { if (viewMode === 'all') { initColumns(); fetchRandomPhotos(20); } };
+        function rebuildGallery() {
+            initColumns();
+            renderPhotos(viewMode === 'all' ? feedPhotos : favorites);
+        }
+
+        refreshBtn.onclick = () => {
+            if (viewMode !== 'all') return;
+            initColumns();
+            fetchRandomPhotos(12, true);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
         toggleFavBtn.onclick = () => {
             viewMode = viewMode === 'all' ? 'favorites' : 'all'; toggleFavBtn.classList.toggle('active');
             document.querySelector('.title-area h1').innerText = viewMode === 'all' ? '发现' : '我的收藏';
             refreshBtn.style.display = viewMode === 'all' ? 'block' : 'none';
-            initColumns(); if (viewMode === 'all') fetchRandomPhotos(20); else renderPhotos(favorites);
+            rebuildGallery();
         };
-        window.onscroll = debounce(() => { if (viewMode === 'all' && (window.innerHeight + window.scrollY) >= document.body.offsetHeight - 800) fetchRandomPhotos(10); }, 200);
-        lightbox.onclick = (e) => { 
-            if (e.target === lightbox) {
-                lightbox.style.display = 'none'; 
-                setTimeout(() => { lightboxImg.src = ''; lightboxImg.classList.remove('loaded'); }, 300); 
-            }
-        };
+
+        const loadMoreObserver = new IntersectionObserver(entries => {
+            if (entries.some(entry => entry.isIntersecting) && viewMode === 'all') fetchRandomPhotos(8);
+        }, { rootMargin: '300px 0px' });
+        loadMoreObserver.observe(document.getElementById('loading'));
+
+        function closeLightbox() {
+            lightboxLoadToken++;
+            lightbox.style.display = 'none';
+            document.body.style.overflow = '';
+            progressBar.classList.remove('loading');
+            setTimeout(() => {
+                if (lightbox.style.display === 'none') {
+                    lightboxImg.src = '';
+                    lightboxImg.classList.remove('loaded');
+                }
+            }, 220);
+        }
+
+        lightbox.onclick = e => { if (e.target === lightbox) closeLightbox(); };
+        window.addEventListener('keydown', e => { if (e.key === 'Escape' && lightbox.style.display === 'flex') closeLightbox(); });
 
         lightbox.addEventListener('wheel', e => {
             e.preventDefault();
@@ -639,21 +852,21 @@
             lightboxImg.style.cursor = 'zoom-out';
         });
 
-        // 并行启动：先渲染内容，后台同步数据，不再阻塞首屏
-        (async () => {
-            // 1. 先尝试从本地缓存恢复收藏列表（如果有），这样能立刻显示正确的红心状态
-            if (favorites.length === 0) {
-                const localFav = localStorage.getItem('photo-favorites');
-                if (localFav) favorites = JSON.parse(localFav);
-            }
+        // 首屏只依赖本地状态；图片目录、云收藏与实时连接全部后台启动。
+        initColumns();
+        if (restoreFeed()) renderPhotos(feedPhotos);
+        else fetchRandomPhotos(12);
 
-            // 2. 立即开始加载图片，不等待云同步
-            fetchRandomPhotos(20);
-
-            // 3. 后台启动云同步和实时订阅
+        setTimeout(() => {
             syncFavorites().then(() => updateHeartIcons());
             subscribeToRealtime();
-        })();
+        }, 0);
+
+        const prepareCatalog = () => loadPhotoCatalog().then(() => {
+            const loading = document.getElementById('loading');
+            if (loading.textContent.includes('准备更多')) loading.textContent = '继续向下探索';
+        });
+        window.addEventListener('load', () => setTimeout(prepareCatalog, 500), { once: true });
     </script>
 </body>
 

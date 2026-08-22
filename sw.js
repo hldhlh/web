@@ -12,6 +12,7 @@ const SHELL = [
   './apps/cloud/icon.svg',
   './apps/eatwhat/icon.svg',
   './apps/vista/icon.svg',
+  './apps/vista/index.html',
   './apps/log/icon.svg',
   './apps/avatar/icon.svg',
   './apps/ledger/icon.svg',
