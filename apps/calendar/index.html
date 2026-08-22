@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>物语日历 · Minimal</title>
+  <title>节假日</title>
   <script>
     try {
       const savedTheme = localStorage.getItem('wy-calendar-theme');
@@ -19,32 +19,32 @@
 
 <body>
   <div class="bg"></div>
-  <div class="page-wrap">
-    <main class="info-card timeline-shell" id="timeline" aria-label="时间线">
-      <div class="info-top tl-head">
-        <div class="info-label">时间线</div>
+  <main class="calendar-app" aria-label="节假日日历">
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">日</span>
+        <div>
+          <p class="eyebrow">节假日</p>
+          <p class="brand-note">中国法定节假日与调休</p>
+        </div>
       </div>
-      <ul class="tl-list" id="tlList" aria-label="时间线"></ul>
-    </main>
 
-    <main class="calendar-shell" aria-label="物语日历">
-      <header class="cal-header">
-        <div class="left">
-          <button class="icon-btn" id="prevBtn" aria-label="上个月" title="上个月">⟨</button>
-          <button class="icon-btn" id="nextBtn" aria-label="下个月" title="下个月">⟩</button>
-        </div>
-        <h1 class="title">
-          <span id="yearLabel">2025</span>
-          <span class="dot">·</span>
-          <span id="monthLabel">11月</span>
-        </h1>
-        <div class="right">
-          <button class="pill-btn" id="todayBtn" aria-label="回到今天">今天</button>
-          <button class="icon-btn" id="themeToggle" aria-label="主题切换" title="主题切换">🌓</button>
-        </div>
-      </header>
+      <div class="header-actions">
+        <button class="pill-btn" id="todayBtn" aria-label="回到今天">今天</button>
+        <button class="icon-btn" id="themeToggle" aria-label="主题切换" title="主题切换">🌓</button>
+      </div>
+    </header>
 
-      <div class="cal-content">
+    <div class="workspace">
+      <section class="calendar-panel" aria-label="月历">
+        <div class="month-bar">
+          <button class="icon-btn nav-btn" id="prevBtn" aria-label="上个月" title="上个月">‹</button>
+          <h1 class="title" aria-live="polite">
+            <span id="yearLabel">2026</span>年 <span id="monthLabel">8月</span>
+          </h1>
+          <button class="icon-btn nav-btn" id="nextBtn" aria-label="下个月" title="下个月">›</button>
+        </div>
+
         <section class="cal-grid" aria-label="日期网格">
           <div class="weekday" aria-hidden="true">一</div>
           <div class="weekday" aria-hidden="true">二</div>
@@ -53,60 +53,34 @@
           <div class="weekday" aria-hidden="true">五</div>
           <div class="weekday weekend" aria-hidden="true">六</div>
           <div class="weekday weekend" aria-hidden="true">日</div>
-
-          <!-- days will be injected here by JS -->
           <div id="days" class="days" role="grid" aria-live="polite"></div>
         </section>
-      </div>
-
-      <!--
-      <aside class="info-card floating" id="todoCard" aria-live="polite">
-        <div class="info-top">
-          <div id="todoTitle" class="info-label" aria-hidden="true">日期</div>
-          <div class="info-row">
-            <div id="todoDate" class="info-main">——</div>
-            <span id="todoStatus" class="badge">暂无代办</span>
-          </div>
+        <div class="legend" aria-label="图例">
+          <span><i class="legend-dot holiday-dot"></i>放假</span>
+          <span><i class="legend-dot workday-dot"></i>补班</span>
+          <span><i class="legend-ring"></i>今天</span>
         </div>
+      </section>
 
+      <aside class="detail-panel" id="todoCard" aria-live="polite" aria-label="所选日期详情">
+        <div class="detail-top">
+          <div id="todoTitle" class="info-label">今天</div>
+          <span id="todoStatus" class="badge">无事项</span>
+        </div>
+        <div id="todoDate" class="info-main">——</div>
+        <div id="holidayInfo" class="holiday-info">普通工作日</div>
+
+        <div class="detail-divider"></div>
+        <label class="section-label" for="todoInput">当日事项</label>
         <div class="todo-input">
-          <input id="todoInput" type="text" placeholder="新增代办" aria-label="新增代办事项" />
-          <button class="icon-btn" id="todoAdd" title="添加">+</button>
+          <input id="todoInput" type="text" placeholder="添加事项…" aria-label="新增代办事项" />
+          <button class="icon-btn add-btn" id="todoAdd" title="添加事项" aria-label="添加事项">+</button>
         </div>
 
         <ul class="todo-list" id="todoList" aria-label="代办事项列表"></ul>
-
       </aside>
-      -->
-
-
-    </main>
-
-    <main class="info-card todo-shell" id="todoCard" aria-live="polite" aria-label="日期代办">
-      <div class="info-top">
-        <div id="todoTitle" class="info-label" aria-hidden="true">日期</div>
-        <div class="info-row">
-          <div>
-            <div id="todoDate" class="info-main">——</div>
-            <div id="holidayInfo" class="holiday-info">&nbsp;</div>
-            <div class="dual-time" aria-label="北京与乌鲁木齐时间">
-              <div class="time-chip"><span class="time-city">北京</span><span id="beijingTime" class="time-value">--:--</span></div>
-              <div class="time-chip"><span class="time-city">乌鲁木齐</span><span id="urumqiTime" class="time-value">--:--</span></div>
-            </div>
-          </div>
-          <span id="todoStatus" class="badge">暂无代办</span>
-        </div>
-      </div>
-
-      <div class="todo-input">
-        <input id="todoInput" type="text" placeholder="新增代办" aria-label="新增代办事项" />
-        <button class="icon-btn" id="todoAdd" title="添加">+</button>
-      </div>
-
-      <ul class="todo-list" id="todoList" aria-label="代办事项列表"></ul>
-
-    </main>
-  </div>
+    </div>
+  </main>
 </body>
 
 </html>

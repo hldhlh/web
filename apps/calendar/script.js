@@ -404,7 +404,8 @@
     }
 
     if (isSameDate(date, today)) btn.classList.add('today');
-    if (isSameDate(date, selected)) btn.classList.add('selected');
+    const isSelected = isSameDate(date, selected);
+    if (isSelected) btn.classList.add('selected');
 
     if (hasTodo(date)) {
       const dot = document.createElement('i');
@@ -417,6 +418,7 @@
 
     btn.dataset.date = isoDate(date);
     btn.setAttribute('role', 'gridcell');
+    btn.setAttribute('aria-selected', String(isSelected));
     const wIndex = (date.getDay() + 6) % 7;
     btn.title = `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${weekdayFull[wIndex]}`;
     btn.setAttribute('aria-label', btn.title);
@@ -549,44 +551,37 @@
   }
   function updateTodoCard() {
     const isToday = isSameDate(selected, today);
-    // migrate legacy boolean flag to list on view
     const key = isoDate(selected);
-    todoTitle.textContent = isToday ? '今日提示' : '日期提示';
-    todoDate.textContent = `${selected.getFullYear()}年${selected.getMonth() + 1}月${selected.getDate()}日 ${weekdayName(selected)}`;
+    todoTitle.textContent = isToday ? '今天' : '所选日期';
+    todoDate.textContent = `${selected.getFullYear()}年${selected.getMonth() + 1}月${selected.getDate()}日 · ${weekdayName(selected)}`;
     const holiday = getHolidayForDate(selected);
-    const info = getHolidayInfoForDateStr(key);
     if (holidayInfo) {
       const parts = [];
       if (holiday) {
-        parts.push(holiday.isWorkday
-          ? `特殊日：${holiday.localName || '补班'}`
-          : `特殊日：${holiday.localName || holiday.name || '节假日'}`);
+        if (holiday.isWorkday) {
+          holidayInfo.dataset.kind = 'workday';
+          parts.push(`${holiday.localName || '补班'} · 调休上班`);
+        } else {
+          holidayInfo.dataset.kind = 'holiday';
+          parts.push(`${holiday.localName || holiday.name || '节假日'} · 放假`);
+        }
+      } else if (selected.getDay() === 0 || selected.getDay() === 6) {
+        holidayInfo.dataset.kind = 'weekend';
+        parts.push('周末 · 休息日');
+      } else {
+        holidayInfo.dataset.kind = 'normal';
+        parts.push('普通工作日');
       }
       if (holiday && holiday.note) parts.push(holiday.note);
-      if (info && info.type && info.type.name && !/^周[一二三四五六日天]$/.test(info.type.name)) {
-        parts.push(info.type.name);
-      }
-      holidayInfo.textContent = parts.join(' · ') || ' ';
-
-      // If detailed info not cached, fetch it once
-      if (!info) {
-        ensureHolidayInfo(key).then(() => {
-          // Re-update only the holiday info line to avoid re-rendering entire card
-          const freshInfo = getHolidayInfoForDateStr(key);
-          if (freshInfo && freshInfo.type && freshInfo.type.name && !/^周[一二三四五六日天]$/.test(freshInfo.type.name)) {
-             if (!parts.includes(freshInfo.type.name)) {
-               parts.push(freshInfo.type.name);
-               holidayInfo.textContent = parts.join(' · ');
-             }
-          }
-        });
-      }
+      holidayInfo.textContent = parts.join(' · ');
     }
     const arr = listTodos(selected);
     const total = arr.length;
     const done = arr.filter(x => x.done).length;
     const undone = total - done;
-    todoStatus.textContent = total ? `${total} 条 · 未 ${undone}` : '无代办';
+    todoStatus.textContent = total
+      ? (undone ? `${undone} 项待办` : `${total} 项已完成`)
+      : '无事项';
 
     // Build list UI
     todoList.innerHTML = '';

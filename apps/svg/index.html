@@ -463,7 +463,7 @@
         if ('IntersectionObserver' in window) {
             loadObserver = new IntersectionObserver((entries) => {
                 if (entries.some(entry => entry.isIntersecting)) renderNextBatch();
-            }, { rootMargin: '600px 0px' });
+            }, { rootMargin: '200px 0px' });
             loadObserver.observe(loadSentinel);
         } else {
             // Older browsers still receive the complete gallery without blocking first paint.
