@@ -346,6 +346,35 @@
 
     const getDirFromPath = (p) => { if (!p) return ''; const i = p.indexOf('/'); return i === -1 ? p : p.slice(0, i); };
 
+    // 首页日历只展示对当天有用的状态；2026 年日期依据国务院办公厅放假安排。
+    const HOME_HOLIDAY_RANGES = [
+      ['2026-01-01', '2026-01-03', '元旦'],
+      ['2026-02-15', '2026-02-23', '春节'],
+      ['2026-04-04', '2026-04-06', '清明节'],
+      ['2026-05-01', '2026-05-05', '劳动节'],
+      ['2026-06-19', '2026-06-21', '端午节'],
+      ['2026-09-25', '2026-09-27', '中秋节'],
+      ['2026-10-01', '2026-10-07', '国庆节']
+    ];
+    const HOME_ADJUSTED_WORKDAYS = new Set([
+      '2026-01-04', '2026-02-14', '2026-02-28',
+      '2026-05-09', '2026-09-20', '2026-10-10'
+    ]);
+
+    function localISODate(date) {
+      const pad = value => String(value).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    }
+
+    function calendarDayStatus(date) {
+      const key = localISODate(date);
+      if (HOME_ADJUSTED_WORKDAYS.has(key)) return { label: '补班', detail: '调休工作日' };
+      const holiday = HOME_HOLIDAY_RANGES.find(([start, end]) => key >= start && key <= end);
+      if (holiday) return { label: holiday[2], detail: '法定节假日' };
+      if (date.getDay() === 0 || date.getDay() === 6) return { label: '周末', detail: '周末休息日' };
+      return { label: '工作日', detail: '普通工作日' };
+    }
+
     // 获取并处理图标数据
     const fetchIconData = async (dir, url) => {
       try {
@@ -487,8 +516,12 @@
           const month = now.getMonth() + 1;
           const day = now.getDate();
           const week = ['日', '一', '二', '三', '四', '五', '六'][now.getDay()];
-          appDisplayName = `${month}月${day}日 · ${app.name}`;
-          inner = `<svg viewBox="0 0 100 100" role="img" aria-label="${appDisplayName}">
+          const status = calendarDayStatus(now);
+          appDisplayName = `${month}月${day}日 · ${status.label}`;
+          const calendarDescription = `${month}月${day}日周${week} · ${status.detail}`;
+          el.title = `${app.name} · ${calendarDescription}`;
+          el.setAttribute('aria-label', `${app.name}，${calendarDescription}`);
+          inner = `<svg viewBox="0 0 100 100" role="img" aria-label="${calendarDescription}">
             <rect x="5" y="5" width="90" height="90" rx="18" fill="#f4f4f5" stroke="#d1d1d6"/>
             <path d="M23 5h54a18 18 0 0 1 18 18v10H5V23A18 18 0 0 1 23 5Z" fill="#ff3b30"/>
             <text x="50" y="26" font-family="system-ui,sans-serif" font-size="14" font-weight="800" fill="white" text-anchor="middle">周${week}</text>

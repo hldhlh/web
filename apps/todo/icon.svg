@@ -1,16 +1,21 @@
 <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="todo-grad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#BD8DFF" />
-      <stop offset="100%" style="stop-color:#5E5CE6" />
+    <linearGradient id="todo-gradient" x1="18" y1="14" x2="82" y2="88" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A78BFA"/>
+      <stop offset="1" stop-color="#5B5CE2"/>
     </linearGradient>
   </defs>
-  <rect x="10" y="10" width="80" height="80" rx="20" fill="url(#todo-grad)" />
-  <circle cx="35" cy="40" r="6" stroke="white" stroke-width="4" fill="none" />
-  <path d="M52 40 L75 40" stroke="white" stroke-width="4" stroke-linecap="round" />
-  <circle cx="35" cy="55" r="6" stroke="white" stroke-width="4" fill="none" />
-  <path d="M52 55 L75 55" stroke="white" stroke-width="4" stroke-linecap="round" />
-  <circle cx="35" cy="70" r="6" stroke="white" stroke-width="4" fill="none" />
-  <path d="M52 70 L75 70" stroke="white" stroke-width="4" stroke-linecap="round" />
-  <path d="M30 25 L70 25" stroke="white" stroke-width="2" stroke-opacity="0.5" />
+
+  <rect x="10" y="10" width="80" height="80" rx="22" fill="url(#todo-gradient)"/>
+
+  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m27 34 4 4 7-8" stroke-width="4"/>
+    <path d="M47 35h26" stroke-width="4"/>
+
+    <circle cx="32" cy="52" r="4" stroke-width="3" opacity=".82"/>
+    <path d="M47 52h26" stroke-width="4" opacity=".82"/>
+
+    <circle cx="32" cy="69" r="4" stroke-width="3" opacity=".62"/>
+    <path d="M47 69h20" stroke-width="4" opacity=".62"/>
+  </g>
 </svg>
