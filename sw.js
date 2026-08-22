@@ -1,4 +1,5 @@
-const CACHE_NAME = 'web-shell-2026-08-22-v8';
+// 部署时由 scripts/generate-build-meta.mjs 替换为当前 Git 提交版本。
+const CACHE_NAME = 'web-shell-__BUILD_VERSION__';
 const SHELL = [
   './',
   './index.html',
@@ -12,6 +13,7 @@ const SHELL = [
   './apps/eatwhat/icon.svg',
   './apps/vista/icon.svg',
   './apps/log/icon.svg',
+  './apps/avatar/icon.svg',
   './apps/ledger/icon.svg',
   './apps/gui-design-demo/icon.svg',
   './apps/jlhcdh/index.html',
@@ -43,6 +45,7 @@ function canCache(request) {
   if (request.method !== 'GET' || request.headers.has('range')) return false;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return false;
+  if (url.pathname.endsWith('/version.json')) return false;
   return !/\.(?:mp4|mov|mp3|zip|pptx?|xlsx?|xls|csv)$/i.test(url.pathname);
 }
 
