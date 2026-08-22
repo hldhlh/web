@@ -620,14 +620,38 @@ body {
     }
 
     .pagination {
-        justify-content: flex-start;
+        width: 100%;
+        justify-content: safe center;
+        gap: 0.25rem;
         overflow-x: auto;
-        padding-top: 1.5rem;
+        padding: 1.5rem 0.125rem 0.25rem;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .pagination::-webkit-scrollbar {
+        display: none;
+    }
+
+    .page-tabs {
+        flex: 0 0 auto;
+        gap: 0.125rem;
+        overflow: visible;
     }
 
     .page-tab,
     .page-nav {
-        padding: 0.45rem 0.65rem;
+        min-height: 40px;
+        padding: 0.5rem 0.625rem;
+        border-radius: 8px;
+    }
+
+    .page-tab {
+        min-width: 40px;
+    }
+
+    .page-gap {
+        padding-inline: 0.125rem;
     }
 }
 

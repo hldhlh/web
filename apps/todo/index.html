@@ -4,9 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>极简待办</title>
+    <link rel="dns-prefetch" href="//fmxddvjgkykuqwmasigo.supabase.co">
+    <link rel="preconnect" href="https://fmxddvjgkykuqwmasigo.supabase.co" crossorigin>
     <link rel="stylesheet" href="tailwind.min.css">
-    <script src="../vendor/supabase.min.js"></script>
-    <script src="../network.js"></script>
+    <script src="../vendor/supabase.min.js" defer></script>
+    <script src="../network.js" defer></script>
     <style>
         /* 优化移动端触控样式 */
         input[type="checkbox"] {
@@ -37,7 +39,7 @@
             background-color: rgba(0,0,0,0.05);
         }
     </style>
-    <script>
+    <script type="module">
         document.addEventListener('DOMContentLoaded', () => {
             const supabaseUrl = 'https://fmxddvjgkykuqwmasigo.supabase.co';
             const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
@@ -45,6 +47,38 @@
 
             let selectedGroupId = null;
             let isSidebarVisible = window.innerWidth > 768;
+            const todoCacheKey = 'todo-initial-view-v1';
+            const todoCacheTtl = 15 * 60 * 1000;
+            let suppressTaskFetch = false;
+
+            function readTodoCache() {
+                try {
+                    const cached = JSON.parse(localStorage.getItem(todoCacheKey) || 'null');
+                    return cached && Date.now() - cached.savedAt < todoCacheTtl ? cached : null;
+                } catch (_) {
+                    return null;
+                }
+            }
+
+            function updateTodoCache(values) {
+                try {
+                    const cached = JSON.parse(localStorage.getItem(todoCacheKey) || '{}');
+                    const tasksByGroup = values.tasksByGroup
+                        ? { ...(cached.tasksByGroup || {}), ...values.tasksByGroup }
+                        : cached.tasksByGroup;
+                    localStorage.setItem(todoCacheKey, JSON.stringify({
+                        ...cached,
+                        ...values,
+                        ...(tasksByGroup ? { tasksByGroup } : {}),
+                        savedAt: Date.now()
+                    }));
+                } catch (_) { }
+            }
+
+            // 只注册一个全局监听，避免每条任务和分组各自监听 document。
+            document.addEventListener('click', () => {
+                document.querySelectorAll('.task-menu, .group-menu').forEach(menu => menu.classList.add('hidden'));
+            });
 
             // 移动端菜单切换
             function toggleSidebar() {
@@ -83,10 +117,10 @@
                 isSidebarVisible = false;
             }
 
-            async function fetchTaskGroups() {
+            async function fetchTaskGroups(shouldFetchTasks = true) {
                 const { data, error } = await supabaseClient
                     .from('task_groups')
-                    .select('*');
+                    .select('id,name,created_at');
 
                 if (error) {
                     console.error('Error fetching task groups:', error);
@@ -95,6 +129,8 @@
 
                 const groupsContainer = document.getElementById('group-container');
                 groupsContainer.innerHTML = ''; // Clear existing content
+                const preferredIndex = data.findIndex(group => String(group.id) === String(selectedGroupId));
+                const autoSelectIndex = preferredIndex >= 0 ? preferredIndex : 0;
 
                 data.forEach((group, index) => {
                     const groupElement = document.createElement('div');
@@ -116,7 +152,7 @@
                     
                     // 创建菜单
                     const menuDiv = document.createElement('div');
-                    menuDiv.className = 'absolute right-8 top-0 bg-white rounded-lg shadow-md z-50 min-w-[180px] hidden md:w-auto md:min-w-[180px] w-[90%] left-[5%] md:left-auto';
+                    menuDiv.className = 'group-menu absolute right-8 top-0 bg-white rounded-lg shadow-md z-50 min-w-[180px] hidden md:w-auto md:min-w-[180px] w-[90%] left-[5%] md:left-auto';
                     menuDiv.innerHTML = `
                         <div class="py-3 px-4 cursor-pointer flex items-center gap-2 hover:bg-gray-100 touch-feedback">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -173,11 +209,6 @@
                             menuDiv.style.left = `${buttonRect.right + 5}px`;
                             menuDiv.style.right = 'auto';
                         }
-                    });
-                    
-                    // 点击页面其他区域关闭菜单
-                    document.addEventListener('click', () => {
-                        menuDiv.classList.add('hidden');
                     });
                     
                     // 阻止菜单内点击事件冒泡
@@ -383,6 +414,7 @@
                         groupElement.classList.remove('bg-white', 'text-gray-800', 'hover:bg-gray-200');
                         groupElement.classList.add('bg-blue-200', 'text-blue-800', 'font-medium');
                         selectedGroupId = group.id;
+                        updateTodoCache({ selectedGroupId: group.id, selectedGroupName: group.name });
                         
                         // 更新任务标题显示分组名称
                         const taskHeader = document.querySelector('#main-content .text-xl.font-semibold');
@@ -396,29 +428,40 @@
                         }
                         
                         // 加载该分组的任务
-                        fetchTasksForGroup(group.id);
+                        if (!suppressTaskFetch) fetchTasksForGroup(group.id);
                     });
                     
                     groupsContainer.appendChild(groupElement);
                     
-                    // 自动选择第一个分组
-                    if (index === 0) {
+                    // 优先恢复上次选择；缓存有效时任务请求已并行发出。
+                    if (index === autoSelectIndex) {
+                        suppressTaskFetch = !shouldFetchTasks && preferredIndex >= 0;
                         groupElement.click();
+                        suppressTaskFetch = false;
                     }
                 });
             }
             
-            async function fetchTasksForGroup(groupId) {
-                // 查询属于选中分组的任务
-                const { data, error } = await supabaseClient
-                    .from('todos')
-                    .select('*')
-                    .eq('group_id', groupId)
-                    .order('created_at', { ascending: false });
-                
-                if (error) {
-                    console.error('Error fetching tasks:', error);
-                    return;
+            async function fetchTasksForGroup(groupId, cachedTasks = null) {
+                let data = cachedTasks;
+
+                if (cachedTasks === null) {
+                    // 首屏只请求渲染所需字段，减少响应体积。
+                    const result = await supabaseClient
+                        .from('todos')
+                        .select('id,group_id,task,is_completed,created_at,completed_at')
+                        .eq('group_id', groupId)
+                        .order('created_at', { ascending: false });
+
+                    if (result.error) {
+                        console.error('Error fetching tasks:', result.error);
+                        return;
+                    }
+
+                    // 用户已切换分组时丢弃过期响应，避免慢请求覆盖新列表。
+                    if (String(groupId) !== String(selectedGroupId)) return;
+                    data = result.data;
+                    updateTodoCache({ selectedGroupId: groupId, tasksByGroup: { [groupId]: data } });
                 }
                 
                 // 获取任务列表元素
@@ -539,11 +582,6 @@
                             menu.style.borderRadius = '1rem 1rem 0 0';
                             menu.style.zIndex = '100';
                         }
-                    });
-                    
-                    // 点击页面其他区域关闭菜单
-                    document.addEventListener('click', () => {
-                        menu.classList.add('hidden');
                     });
                     
                     // 阻止菜单内点击事件冒泡
@@ -844,8 +882,19 @@
                 });
             }
             
-            // 初始化
-            fetchTaskGroups();
+            // 先恢复最近视图，再并行刷新分组和任务，避免每次进入都串行等待两次网络请求。
+            const cachedView = readTodoCache();
+            const cachedTasks = cachedView?.tasksByGroup?.[cachedView?.selectedGroupId];
+            if (cachedView?.selectedGroupId && Array.isArray(cachedTasks)) {
+                selectedGroupId = cachedView.selectedGroupId;
+                const taskHeader = document.querySelector('#main-content .text-xl.font-semibold');
+                if (taskHeader) taskHeader.textContent = cachedView.selectedGroupName || '';
+                fetchTasksForGroup(selectedGroupId, cachedTasks);
+                fetchTaskGroups(false);
+                fetchTasksForGroup(selectedGroupId);
+            } else {
+                fetchTaskGroups();
+            }
             
             // 添加按钮点击事件
             document.getElementById('add-task-btn').addEventListener('click', addNewTask);

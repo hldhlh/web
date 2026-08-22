@@ -1,21 +1,25 @@
-<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="ledger-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#06B6D4" />
-      <stop offset="100%" style="stop-color:#10B981" />
-    </linearGradient>
-  </defs>
-  <rect x="10" y="10" width="80" height="80" rx="22" fill="url(#ledger-grad)" />
-  
-  <!-- Card sticking out from wallet -->
-  <path d="M36 38 V28 C36 26.3 37.3 25 39 25 H61 C62.7 25 64 26.3 64 28 V38" fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.7" />
-  
-  <!-- Wallet body -->
-  <rect x="26" y="38" width="48" height="34" rx="6" fill="none" stroke="white" stroke-width="4" stroke-linejoin="round" />
-  
-  <!-- Wallet clasp -->
-  <path d="M50 48 H74 V62 H50 Z" fill="none" stroke="white" stroke-width="4" stroke-linejoin="round" />
-  
-  <!-- Small button on clasp -->
-  <circle cx="64" cy="55" r="2.5" fill="white" />
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>实时记账</title>
+  <desc>深色圆角方形内包含极简账本和实时数据脉冲</desc>
+
+  <!-- App tile -->
+  <rect x="7" y="7" width="86" height="86" rx="24" fill="#0F172A"/>
+
+  <!-- Ledger sheet -->
+  <rect x="22" y="18" width="56" height="64" rx="9" fill="#FFFFFF"/>
+  <path d="M35 18V82" stroke="#0F172A" stroke-width="3"/>
+
+  <!-- Binding details -->
+  <path d="M27.5 31H35M27.5 43H35M27.5 55H35M27.5 67H35" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Account rows -->
+  <path d="M43 31H67M43 41H61" stroke="#0F172A" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Live transaction pulse -->
+  <path d="M42 62H48L52.5 52L58 70L63 59H70" stroke="#10B981" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="70" cy="59" r="3.5" fill="#10B981"/>
+
+  <!-- Subtle edge definition -->
+  <rect x="7.75" y="7.75" width="84.5" height="84.5" rx="23.25" stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="1.5"/>
 </svg>

@@ -16,15 +16,11 @@
   const nextBtn = $('#nextBtn');
   const todayBtn = $('#todayBtn');
   const themeToggle = $('#themeToggle');
-  // Timeline elements (read-only)
-  const tlList = $('#tlList');
   // Info card elements
   const todoCard = $('#todoCard');
   const todoTitle = $('#todoTitle');
   const todoDate = $('#todoDate');
   const holidayInfo = $('#holidayInfo');
-  const beijingTime = $('#beijingTime');
-  const urumqiTime = $('#urumqiTime');
   const todoStatus = $('#todoStatus');
   const todoInput = $('#todoInput');
   const todoAdd = $('#todoAdd');
@@ -48,12 +44,87 @@
   function pad2(n) { return String(n).padStart(2, '0'); }
   function isoDate(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
 
-  // Holiday store (remote API, aggregated)
+  // Holiday store: render verified local data immediately, then refresh from remote APIs.
   const holidayCache = new Map();
-  const holidayInfoCache = new Map();
+  const holidayRequests = new Map();
+  const HOLIDAY_REQUEST_TIMEOUT = 4500;
+
+  // 国务院办公厅《2026年部分节假日安排的通知》（国办发明电〔2025〕7号）
+  const localHolidayData = {
+    2026: {
+      '2026-01-01': { name: '元旦', isHoliday: true },
+      '2026-01-02': { name: '元旦', isHoliday: true },
+      '2026-01-03': { name: '元旦', isHoliday: true },
+      '2026-01-04': { name: '补班', isWorkday: true, note: '为元旦调休' },
+      '2026-02-14': { name: '补班', isWorkday: true, note: '为春节调休' },
+      '2026-02-15': { name: '春节', isHoliday: true },
+      '2026-02-16': { name: '春节', isHoliday: true },
+      '2026-02-17': { name: '春节', isHoliday: true },
+      '2026-02-18': { name: '春节', isHoliday: true },
+      '2026-02-19': { name: '春节', isHoliday: true },
+      '2026-02-20': { name: '春节', isHoliday: true },
+      '2026-02-21': { name: '春节', isHoliday: true },
+      '2026-02-22': { name: '春节', isHoliday: true },
+      '2026-02-23': { name: '春节', isHoliday: true },
+      '2026-02-28': { name: '补班', isWorkday: true, note: '为春节调休' },
+      '2026-04-04': { name: '清明节', isHoliday: true },
+      '2026-04-05': { name: '清明节', isHoliday: true },
+      '2026-04-06': { name: '清明节', isHoliday: true },
+      '2026-05-01': { name: '劳动节', isHoliday: true },
+      '2026-05-02': { name: '劳动节', isHoliday: true },
+      '2026-05-03': { name: '劳动节', isHoliday: true },
+      '2026-05-04': { name: '劳动节', isHoliday: true },
+      '2026-05-05': { name: '劳动节', isHoliday: true },
+      '2026-05-09': { name: '补班', isWorkday: true, note: '为劳动节调休' },
+      '2026-06-19': { name: '端午节', isHoliday: true },
+      '2026-06-20': { name: '端午节', isHoliday: true },
+      '2026-06-21': { name: '端午节', isHoliday: true },
+      '2026-09-20': { name: '补班', isWorkday: true, note: '为国庆节调休' },
+      '2026-09-25': { name: '中秋节', isHoliday: true },
+      '2026-09-26': { name: '中秋节', isHoliday: true },
+      '2026-09-27': { name: '中秋节', isHoliday: true },
+      '2026-10-01': { name: '国庆节', isHoliday: true },
+      '2026-10-02': { name: '国庆节', isHoliday: true },
+      '2026-10-03': { name: '国庆节', isHoliday: true },
+      '2026-10-04': { name: '国庆节', isHoliday: true },
+      '2026-10-05': { name: '国庆节', isHoliday: true },
+      '2026-10-06': { name: '国庆节', isHoliday: true },
+      '2026-10-07': { name: '国庆节', isHoliday: true },
+      '2026-10-10': { name: '补班', isWorkday: true, note: '为国庆节调休' }
+    }
+  };
+
+  function seedLocalHolidayYear(year) {
+    if (holidayCache.has(year)) return holidayCache.get(year);
+    const map = new Map();
+    const source = localHolidayData[year] || {};
+    Object.entries(source).forEach(([date, item]) => {
+      map.set(date, {
+        date,
+        localName: item.name,
+        name: item.name,
+        isHoliday: !!item.isHoliday,
+        isWorkday: !!item.isWorkday,
+        source: 'local',
+        note: item.note || ''
+      });
+    });
+    holidayCache.set(year, map);
+    return map;
+  }
+
+  async function fetchWithTimeout(url) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), HOLIDAY_REQUEST_TIMEOUT);
+    try {
+      return await fetch(url, { signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
   async function fetchTimorYear(year) {
-    const r = await fetch(`https://timor.tech/api/holiday/year/${year}`);
+    const r = await fetchWithTimeout(`https://timor.tech/api/holiday/year/${year}`);
     if (!r.ok) throw new Error(`timor year ${r.status}`);
     const data = await r.json();
     const raw = data && data.holiday ? data.holiday : {};
@@ -75,7 +146,7 @@
   }
 
   async function fetchNagerYear(year) {
-    const r = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/CN`);
+    const r = await fetchWithTimeout(`https://date.nager.at/api/v3/PublicHolidays/${year}/CN`);
     if (!r.ok) throw new Error(`nager ${r.status}`);
     const list = await r.json();
     const map = new Map();
@@ -95,121 +166,49 @@
   }
 
   async function ensureHolidayYear(year) {
-    if (holidayCache.has(year)) return holidayCache.get(year);
+    if (holidayRequests.has(year)) return holidayRequests.get(year);
+    const merged = seedLocalHolidayYear(year);
     const promise = (async () => {
-      const merged = new Map();
-      try {
-        const timorMap = await fetchTimorYear(year);
-        timorMap.forEach((value, key) => merged.set(key, value));
-      } catch (err) {
-        console.warn('Timor year fetch failed:', err);
-      }
-      try {
-        const nagerMap = await fetchNagerYear(year);
-        nagerMap.forEach((value, key) => {
+      const [timorResult, nagerResult] = await Promise.allSettled([
+        fetchTimorYear(year),
+        fetchNagerYear(year)
+      ]);
+
+      // Nager only provides public holidays, so it fills gaps without replacing
+      // the verified local adjusted-workday data.
+      if (nagerResult.status === 'fulfilled') {
+        nagerResult.value.forEach((value, key) => {
           if (!merged.has(key)) merged.set(key, value);
         });
-      } catch (err) {
-        console.warn('Nager year fetch failed:', err);
+      } else {
+        console.warn('Nager year fetch failed:', nagerResult.reason);
       }
 
-      // 2026 Local Fallback for China (including adjusted working days - '补班')
-      if (year === 2026) {
-        const fallback2026 = {
-          '2026-01-01': { name: '元旦', isHoliday: true, isWorkday: false },
-          '2026-02-08': { name: '补班', isHoliday: false, isWorkday: true, note: '为春节调休' },
-          '2026-02-15': { name: '春节', isHoliday: true, isWorkday: false },
-          '2026-02-16': { name: '春节', isHoliday: true, isWorkday: false },
-          '2026-02-17': { name: '春节', isHoliday: true, isWorkday: false },
-          '2026-02-18': { name: '春节', isHoliday: true, isWorkday: false },
-          '2026-02-19': { name: '春节', isHoliday: true, isWorkday: false },
-          '2026-02-20': { name: '春节', isHoliday: true, isWorkday: false },
-          '2026-02-21': { name: '春节', isHoliday: true, isWorkday: false },
-          '2026-02-22': { name: '春节', isHoliday: true, isWorkday: false },
-          '2026-02-28': { name: '补班', isHoliday: false, isWorkday: true, note: '为春节调休' },
-          '2026-04-04': { name: '清明节', isHoliday: true, isWorkday: false },
-          '2026-04-05': { name: '清明节', isHoliday: true, isWorkday: false },
-          '2026-04-06': { name: '清明节', isHoliday: true, isWorkday: false },
-          '2026-04-26': { name: '补班', isHoliday: false, isWorkday: true, note: '为劳动节调休' },
-          '2026-05-01': { name: '劳动节', isHoliday: true, isWorkday: false },
-          '2026-05-02': { name: '劳动节', isHoliday: true, isWorkday: false },
-          '2026-05-03': { name: '劳动节', isHoliday: true, isWorkday: false },
-          '2026-05-04': { name: '劳动节', isHoliday: true, isWorkday: false },
-          '2026-05-05': { name: '劳动节', isHoliday: true, isWorkday: false },
-          '2026-05-10': { name: '补班', isHoliday: false, isWorkday: true, note: '为劳动节调休' },
-          '2026-06-19': { name: '端午节', isHoliday: true, isWorkday: false },
-          '2026-06-20': { name: '端午节', isHoliday: true, isWorkday: false },
-          '2026-06-21': { name: '端午节', isHoliday: true, isWorkday: false },
-          '2026-09-25': { name: '中秋节', isHoliday: true, isWorkday: false },
-          '2026-09-26': { name: '中秋节', isHoliday: true, isWorkday: false },
-          '2026-09-27': { name: '中秋节', isHoliday: true, isWorkday: false },
-          '2026-10-01': { name: '国庆节', isHoliday: true, isWorkday: false },
-          '2026-10-02': { name: '国庆节', isHoliday: true, isWorkday: false },
-          '2026-10-03': { name: '国庆节', isHoliday: true, isWorkday: false },
-          '2026-10-04': { name: '国庆节', isHoliday: true, isWorkday: false },
-          '2026-10-05': { name: '国庆节', isHoliday: true, isWorkday: false },
-          '2026-10-06': { name: '国庆节', isHoliday: true, isWorkday: false },
-          '2026-10-07': { name: '国庆节', isHoliday: true, isWorkday: false },
-          '2026-10-10': { name: '补班', isHoliday: false, isWorkday: true, note: '为国庆节调休' }
-        };
-        Object.keys(fallback2026).forEach(k => {
-          if (!merged.has(k) || merged.get(k).source === 'nager') {
-            const data = fallback2026[k];
-            merged.set(k, {
-              date: k,
-              localName: data.name,
-              name: data.name,
-              isHoliday: data.isHoliday,
-              isWorkday: data.isWorkday,
-              source: 'local',
-              note: data.note || ''
-            });
+      // Timor includes adjusted working days and fills dates not covered by the
+      // verified local schedule. Official local dates remain authoritative.
+      if (timorResult.status === 'fulfilled') {
+        timorResult.value.forEach((value, key) => {
+          if (!merged.has(key) || merged.get(key).source !== 'local') {
+            merged.set(key, value);
           }
         });
+      } else {
+        console.warn('Timor year fetch failed:', timorResult.reason);
       }
 
-      holidayCache.set(year, merged);
       return merged;
     })().catch(err => {
       console.warn('Holiday aggregate failed:', err);
-      const empty = new Map();
-      holidayCache.set(year, empty);
-      return empty;
+      return merged;
     });
-    holidayCache.set(year, promise);
-    return promise;
-  }
-
-  async function ensureHolidayInfo(dateStr) {
-    if (holidayInfoCache.has(dateStr)) return holidayInfoCache.get(dateStr);
-    const promise = fetch(`https://timor.tech/api/holiday/info/${dateStr}`)
-      .then(r => {
-        if (!r.ok) throw new Error(`timor info ${r.status}`);
-        return r.json();
-      })
-      .then(data => {
-        holidayInfoCache.set(dateStr, data || null);
-        return data || null;
-      })
-      .catch(err => {
-        console.warn('Holiday info fetch failed:', err);
-        holidayInfoCache.set(dateStr, null);
-        return null;
-      });
-    holidayInfoCache.set(dateStr, promise);
+    holidayRequests.set(year, promise);
     return promise;
   }
 
   function getHolidayForDate(d) {
     const maybe = holidayCache.get(d.getFullYear());
-    if (!maybe || typeof maybe.then === 'function') return null;
+    if (!maybe) return null;
     return maybe.get(isoDate(d)) || null;
-  }
-
-  function getHolidayInfoForDateStr(dateStr) {
-    const maybe = holidayInfoCache.get(dateStr);
-    if (!maybe || typeof maybe.then === 'function') return null;
-    return maybe;
   }
 
   // Todo store (Using Supabase)
@@ -442,13 +441,17 @@
   }
 
   function render() {
+    // Seed verified local dates before building the grid so holiday labels are
+    // visible on the very first paint, even when external APIs are unavailable.
+    seedLocalHolidayYear(view.y);
     setHeader(view.y, view.m);
     buildGrid(view.y, view.m);
     updateTodoCard();
-    updateTimeline();
-    const currentYearState = holidayCache.get(view.y);
-    if (!currentYearState || typeof currentYearState.then === 'function') {
-      ensureHolidayYear(view.y).then(() => render());
+    if (!holidayRequests.has(view.y)) {
+      const requestedYear = view.y;
+      ensureHolidayYear(requestedYear).then(() => {
+        if (view.y === requestedYear) render();
+      });
     }
   }
 
@@ -504,26 +507,6 @@
     applyTheme(saved || 'auto');
   }
 
-  function updateDualTime() {
-    const now = new Date();
-    // Beijing time
-    const beijingStr = now.toLocaleTimeString('zh-CN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
-    // Urumqi time (Beijing Time - 2 hours)
-    const urumqiDate = new Date(now.getTime() - 2 * 60 * 60 * 1000);
-    const urumqiStr = urumqiDate.toLocaleTimeString('zh-CN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
-
-    if (beijingTime) beijingTime.textContent = beijingStr;
-    if (urumqiTime) urumqiTime.textContent = urumqiStr;
-  }
-
   themeToggle.addEventListener('click', () => {
     const root = document.documentElement;
     const selected = root.getAttribute('data-theme');
@@ -539,8 +522,7 @@
 
   // Init
   initTheme();
-  updateDualTime();
-  setInterval(updateDualTime, 30000);
+  render();
   fetchTodos();
   migrateLocalData();
 
@@ -551,7 +533,6 @@
   }
   function updateTodoCard() {
     const isToday = isSameDate(selected, today);
-    const key = isoDate(selected);
     todoTitle.textContent = isToday ? '今天' : '所选日期';
     todoDate.textContent = `${selected.getFullYear()}年${selected.getMonth() + 1}月${selected.getDate()}日 · ${weekdayName(selected)}`;
     const holiday = getHolidayForDate(selected);
@@ -560,7 +541,7 @@
       if (holiday) {
         if (holiday.isWorkday) {
           holidayInfo.dataset.kind = 'workday';
-          parts.push(`${holiday.localName || '补班'} · 调休上班`);
+          parts.push(`${holiday.localName || '补班'} · 上班`);
         } else {
           holidayInfo.dataset.kind = 'holiday';
           parts.push(`${holiday.localName || holiday.name || '节假日'} · 放假`);
@@ -572,7 +553,6 @@
         holidayInfo.dataset.kind = 'normal';
         parts.push('普通工作日');
       }
-      if (holiday && holiday.note) parts.push(holiday.note);
       holidayInfo.textContent = parts.join(' · ');
     }
     const arr = listTodos(selected);
@@ -642,44 +622,4 @@
     }
   });
 
-  // Timeline rendering
-  function parseISODate(iso) {
-    const [y, m, d] = iso.split('-').map(Number);
-    return new Date(y, m - 1, d);
-  }
-  function updateTimeline() {
-    if (!tlList) return;
-    tlList.innerHTML = '';
-    const keys = Object.keys(todos).filter(k => Array.isArray(todos[k]) && todos[k].length > 0);
-    // Sort desc by date
-    keys.sort((a, b) => (a < b ? 1 : -1));
-    for (const k of keys) {
-      const arr = todos[k];
-      const date = parseISODate(k);
-      const group = document.createElement('li');
-      group.className = 'tl-group';
-
-      const title = document.createElement('div');
-      title.className = 'tl-date-title';
-      const idx = (date.getDay() + 6) % 7; // Monday-first
-      const label = `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${weekdayFull[idx]}`;
-      title.textContent = label;
-
-      // Minimal: no badges or extra prompts
-      group.appendChild(title);
-
-      const ul = document.createElement('ul');
-      ul.className = 'tl-items';
-      for (const it of arr) {
-        const li = document.createElement('li');
-        li.className = 'tl-entry' + (it.done ? ' done' : '');
-        const text = document.createElement('div'); text.className = 'tl-text'; text.textContent = it.text;
-        li.appendChild(text);
-        ul.appendChild(li);
-      }
-      group.appendChild(ul);
-      tlList.appendChild(group);
-    }
-  }
-  // Read-only timeline: no interactions bound
 })();

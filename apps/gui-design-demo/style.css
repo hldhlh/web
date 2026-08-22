@@ -36,7 +36,9 @@ body {
   color: var(--ide-text);
   display: flex;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
+  overscroll-behavior: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -68,6 +70,7 @@ body {
 /* Center Canvas area (Retro Skinned Layout) */
 .workspace {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   background: var(--ide-workspace-bg);
@@ -86,6 +89,7 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 0 20px;
+  position: relative;
   z-index: 5;
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
 }
@@ -98,6 +102,28 @@ body {
   align-items: center;
   gap: 8px;
   letter-spacing: -0.01em;
+  flex: 1;
+  min-width: 0;
+}
+
+.toolbar-title svg { flex: 0 0 auto; }
+
+.toolbar-title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-status {
+  flex: 0 0 auto;
+  margin-left: 8px;
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  color: var(--ide-text-secondary);
+  background: rgba(0, 0, 0, 0.25);
+  font: 400 0.68rem/1.2 'Fira Code', monospace;
+  letter-spacing: 0.02em;
 }
 
 .toolbar-controls {
@@ -105,6 +131,16 @@ body {
   align-items: center;
   gap: 8px;
 }
+
+.toolbar-label {
+  color: var(--ide-text-secondary);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.zoom-label { margin-left: 8px; }
+
+.toolbar-btn.mobile-menu-btn { display: none; }
 
 .toolbar-btn {
   background: rgba(255, 255, 255, 0.04);
@@ -163,6 +199,7 @@ canvas#dibCanvas {
   -moz-osx-font-smoothing: none;
   font-smooth: never;
   cursor: default;
+  touch-action: none;
 }
 
 /* Zoom info label overlay */
@@ -267,4 +304,51 @@ html.light-mode ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.25);
 }
 
+@media (max-width: 720px) {
+  .toolbar {
+    flex: 0 0 52px;
+    height: 52px;
+    padding: 0 10px;
+  }
 
+  .toolbar-title { gap: 7px; }
+  .toolbar-title-text { font-size: 0.74rem; }
+  .canvas-status { display: none; }
+
+  .toolbar-btn.mobile-menu-btn {
+    display: inline-flex;
+    min-height: 38px;
+    padding: 7px 10px;
+    color: var(--ide-text);
+  }
+
+  .toolbar-controls {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 10px;
+    left: 10px;
+    z-index: 30;
+    display: none;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid var(--ide-border);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--ide-workspace-bg) 94%, transparent);
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.34);
+    backdrop-filter: blur(20px) saturate(170%);
+    -webkit-backdrop-filter: blur(20px) saturate(170%);
+    flex-wrap: wrap;
+  }
+
+  .toolbar-controls.is-open { display: flex; }
+
+  .toolbar-controls .toolbar-btn,
+  .toolbar-controls .back-to-dashboard {
+    min-height: 38px;
+    padding: 7px 11px;
+  }
+
+  .zoom-label { margin-left: 4px; }
+  .back-to-dashboard { margin-left: auto; }
+  .zoom-indicator { top: 10px; left: 10px; }
+}

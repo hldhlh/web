@@ -6,6 +6,10 @@
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>思维矩阵</title>
+    <link rel="dns-prefetch" href="//fmxddvjgkykuqwmasigo.supabase.co">
+    <link rel="preconnect" href="https://fmxddvjgkykuqwmasigo.supabase.co" crossorigin>
+    <script src="../vendor/supabase.min.js" defer></script>
+    <script src="../network.js" defer></script>
     <style>
         :root {
             --primary: #818cf8;
@@ -984,13 +988,34 @@
         </div>
     </div>
 
-    <script src="../vendor/supabase.min.js"></script>
-    <script src="../network.js"></script>
-    <script>
+    <script type="module">
         const SUPABASE_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
-        const _client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const _client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const realtimeChannel = _client.channel('canvas_changes');
+        const CANVAS_CACHE_KEY = 'thought-matrix-snapshot-v1';
+        const CANVAS_CACHE_TTL = 10 * 60 * 1000;
+        let hasSubscribedOnce = false;
+
+        function readCanvasCache() {
+            try {
+                const cached = JSON.parse(localStorage.getItem(CANVAS_CACHE_KEY) || 'null');
+                return cached
+                    && Array.isArray(cached.nodes)
+                    && Array.isArray(cached.conns)
+                    && Date.now() - cached.savedAt < CANVAS_CACHE_TTL
+                    ? cached
+                    : null;
+            } catch (_) {
+                return null;
+            }
+        }
+
+        function writeCanvasCache(snapshot) {
+            try {
+                localStorage.setItem(CANVAS_CACHE_KEY, JSON.stringify({ ...snapshot, savedAt: Date.now() }));
+            } catch (_) { }
+        }
 
         // ========== 自定义极简密码确认弹窗 ==========
         const CustomConfirm = {
@@ -1109,8 +1134,12 @@
             async reconcile() {
                 this.set('syncing');
                 try {
-                    const { data: nodes } = await _client.from('canvas_nodes').select('*');
-                    const { data: conns } = await _client.from('canvas_connections').select('*');
+                    const [nodesResult, connsResult] = await Promise.all([
+                        _client.from('canvas_nodes').select('id,text,x,y,color,bold,italic'),
+                        _client.from('canvas_connections').select('id,from_id,to_id,label,color')
+                    ]);
+                    const nodes = nodesResult.data;
+                    const conns = connsResult.data;
 
                     if (nodes) {
                         const nodeIds = new Set(nodes.map(n => n.id));
@@ -1164,7 +1193,7 @@
             }
         };
 
-        function updateMatrix() {
+        function updateMatrix(shouldPersist = true) {
             const { x, y, scale } = State.transform;
             DOM.content.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
 
@@ -1185,7 +1214,7 @@
             Toolbar.updatePosition();
             Menu.updatePosition();
 
-            saveViewState();
+            if (shouldPersist) saveViewState();
         }
 
         function saveViewState() {
@@ -2121,22 +2150,97 @@
             }, 10);
         }
 
+        async function loadCanvasSnapshot() {
+            let nodesResult;
+            let connsResult;
+            let viewResult;
+            try {
+                [nodesResult, connsResult, viewResult] = await Promise.all([
+                    _client.from('canvas_nodes').select('id,text,x,y,color,bold,italic'),
+                    _client.from('canvas_connections').select('id,from_id,to_id,label,color'),
+                    _client.from('canvas_state').select('x,y,scale').eq('id', 1).single()
+                ]);
+            } catch (error) {
+                console.error('Canvas snapshot failed:', error);
+                return null;
+            }
+
+            if (nodesResult.error || connsResult.error) {
+                console.error('Canvas snapshot failed:', nodesResult.error || connsResult.error);
+                return null;
+            }
+
+            return {
+                nodes: nodesResult.data || [],
+                conns: connsResult.data || [],
+                viewState: viewResult.data || null
+            };
+        }
+
+        async function applyCanvasSnapshot(snapshot, reconcile = false) {
+            if (!snapshot) return;
+            const nodes = snapshot.nodes || [];
+
+            if (reconcile) {
+                const nodeIds = new Set(nodes.map(node => String(node.id)));
+                DOM.content.querySelectorAll('.tag').forEach(node => {
+                    if (!nodeIds.has(String(node.id)) && State.interaction.contextEntity !== node) node.remove();
+                });
+            }
+
+            const creations = [];
+            nodes.forEach(data => {
+                const node = document.getElementById(data.id);
+                if (!node) {
+                    creations.push(Tag.create(data.text, data.x, data.y, data.id, data.color, data.bold, data.italic));
+                    return;
+                }
+
+                if (State.interaction.contextEntity === node) return;
+                const span = node.querySelector('span');
+                span.textContent = data.text || '';
+                node.style.left = `${data.x}px`;
+                node.style.top = `${data.y}px`;
+                node.dataset.x = data.x;
+                node.dataset.y = data.y;
+                ['orange', 'blue', 'purple', 'green', 'grey', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9']
+                    .forEach(color => node.classList.remove(`color-${color}`));
+                if (data.color) node.classList.add(`color-${data.color}`);
+                span.style.fontWeight = data.bold ? 'bold' : 'normal';
+                span.style.fontStyle = data.italic ? 'italic' : 'normal';
+            });
+            await Promise.all(creations);
+
+            if (snapshot.viewState) {
+                State.transform = {
+                    x: snapshot.viewState.x,
+                    y: snapshot.viewState.y,
+                    scale: snapshot.viewState.scale
+                };
+            }
+            State.connections = snapshot.conns || [];
+            updateMatrix(false);
+            LineManager.render();
+        }
+
         async function bootstrap() {
             Selection.init();
 
-            // Load initial data
-            const { data: nodes } = await _client.from('canvas_nodes').select('*');
-            const { data: conns } = await _client.from('canvas_connections').select('*');
-            const { data: viewState } = await _client.from('canvas_state').select('*').eq('id', 1).single();
+            // 缓存画布先渲染；三张表并行刷新，避免串行网络等待。
+            const cachedSnapshot = readCanvasCache();
+            const freshSnapshotPromise = loadCanvasSnapshot();
 
-            if (nodes) {
-                for (const n of nodes) {
-                    await Tag.create(n.text, n.x, n.y, n.id, n.color, n.bold, n.italic);
-                }
-            }
-            if (conns) { State.connections = conns; LineManager.render(); }
-            if (viewState) {
-                State.transform = { x: viewState.x, y: viewState.y, scale: viewState.scale };
+            if (cachedSnapshot) {
+                await applyCanvasSnapshot(cachedSnapshot);
+                freshSnapshotPromise.then(async snapshot => {
+                    if (!snapshot) return;
+                    await applyCanvasSnapshot(snapshot, true);
+                    writeCanvasCache(snapshot);
+                }).catch(error => console.error('Canvas refresh failed:', error));
+            } else {
+                const snapshot = await freshSnapshotPromise;
+                await applyCanvasSnapshot(snapshot);
+                if (snapshot) writeCanvasCache(snapshot);
             }
 
             // Check for node focus in URL
@@ -2192,7 +2296,7 @@
                 }
             };
 
-            updateMatrix();
+            updateMatrix(false);
 
             // Realtime setup
             realtimeChannel
@@ -2337,7 +2441,9 @@
                 .subscribe((status) => {
                     if (status === 'SUBSCRIBED') {
                         console.log('Realtime subscribed/reconnected');
-                        SyncManager.reconcile();
+                        // 初次订阅紧跟首屏快照，无需重复拉取；仅在重连后校准。
+                        if (hasSubscribedOnce) SyncManager.reconcile();
+                        hasSubscribedOnce = true;
                     }
                 });
 

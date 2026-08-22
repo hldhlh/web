@@ -1,48 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <!-- 活力橙黄渐变 -->
-    <linearGradient id="foodGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FF9500" />
-      <stop offset="100%" style="stop-color:#FF5E00" />
-    </linearGradient>
-    
-    <!-- 内部玻璃质感 -->
-    <linearGradient id="bowlGlass" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:white;stop-opacity:0.4" />
-      <stop offset="100%" style="stop-color:white;stop-opacity:0.1" />
-    </linearGradient>
+<svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>吃什么</title>
+  <desc>深色圆角方形内包含极简分餐盘与餐具</desc>
 
-    <!-- 柔和光暗滤镜 -->
-    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="6" />
-    </filter>
-  </defs>
+  <!-- App tile -->
+  <rect x="7" y="7" width="86" height="86" rx="24" fill="#171717"/>
 
-  <!-- 1. 基础圆角容器 -->
-  <rect x="8" y="8" width="84" height="84" rx="28" fill="url(#foodGrad)" />
+  <!-- Fork -->
+  <path d="M19 24V36M24 24V36M29 24V36M19 33C19 37 21 39 24 39C27 39 29 37 29 33M24 39V76" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
 
-  <!-- 2. 微光背景扩散 -->
-  <circle cx="50" cy="50" r="35" fill="#FFCC00" filter="url(#softGlow)" opacity="0.3">
-    <animate attributeName="r" values="30;38;30" dur="5s" repeatCount="indefinite" />
-  </circle>
+  <!-- Divided plate -->
+  <circle cx="51" cy="50" r="25" fill="#FFFFFF"/>
+  <path d="M51 50V25M51 50L30.5 64.5M51 50L71.5 64.5" stroke="#171717" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="51" cy="50" r="3.5" fill="#F97316"/>
 
-  <!-- 3. 食物/碗符号：极简线条 -->
-  <g transform="translate(25, 28) scale(1.1)">
-    <!-- 碗身 -->
-    <path d="M5 20 A20 20 0 0 0 45 20 H5 Z" fill="url(#bowlGlass)" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-    <!-- 蒸汽 -->
-    <path d="M15 12 Q18 8, 15 4" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.8">
-        <animate attributeName="opacity" values="0.2;1;0.2" dur="2s" repeatCount="indefinite" />
-    </path>
-    <path d="M25 10 Q28 6, 25 2" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.8">
-        <animate attributeName="opacity" values="0.2;1;0.2" dur="2.2s" repeatCount="indefinite" />
-    </path>
-    <path d="M35 12 Q38 8, 35 4" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.8">
-        <animate attributeName="opacity" values="0.2;1;0.2" dur="2.4s" repeatCount="indefinite" />
-    </path>
-  </g>
+  <!-- Knife -->
+  <path d="M79 23C75.5 28 74 34.5 74 42V52H81V76C81 77.7 82.3 79 84 79V23H79Z" fill="#FFFFFF"/>
 
-  <!-- 4. 精细边框锁定 -->
-  <rect x="8" y="8" width="84" height="84" rx="28" fill="none" stroke="white" stroke-width="1.2" stroke-opacity="0.15" />
+  <!-- Subtle edge definition -->
+  <rect x="7.75" y="7.75" width="84.5" height="84.5" rx="23.25" stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="1.5"/>
 </svg>
