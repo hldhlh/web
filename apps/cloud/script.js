@@ -1,123 +1,12 @@
-// Supabase Configuration - 智能连接管理
+// Supabase Configuration
 const SUPABASE_CONFIG = {
-    // 主节点配置
-    primaryUrl: 'https://fmxddvjgkykuqwmasigo.supabase.co',
-    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo',
-
-    // 如果有备用代理节点可以添加在这里
-    // 例如: Cloudflare Worker 代理, Vercel Edge Function 代理等
-    proxyUrls: [
-        // 'https://your-cf-worker.workers.dev/supabase',
-        // 'https://your-vercel-proxy.vercel.app/api/supabase',
-    ],
-
-    // 连接配置
-    timeout: 15000,          // 请求超时 15秒
-    retryCount: 3,           // 最大重试次数
-    retryDelay: 1000,        // 重试延迟 1秒
-    healthCheckInterval: 30000, // 健康检查间隔 30秒
+    primaryUrl: window.CLOUD_CONFIG?.url || 'https://fmxddvjgkykuqwmasigo.supabase.co',
+    key: window.CLOUD_CONFIG?.key || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo'
 };
 
 // 当前使用的 URL
-let currentSupabaseUrl = SUPABASE_CONFIG.primaryUrl;
-const supabaseUrl = currentSupabaseUrl;
+const supabaseUrl = SUPABASE_CONFIG.primaryUrl;
 const supabaseKey = SUPABASE_CONFIG.key;
-
-// 连接状态监测
-const ConnectionMonitor = {
-    isOnline: true,
-    lastSuccessTime: Date.now(),
-    failCount: 0,
-    latencyHistory: [],
-
-    // 记录成功请求
-    recordSuccess(latency) {
-        this.isOnline = true;
-        this.lastSuccessTime = Date.now();
-        this.failCount = 0;
-        this.latencyHistory.push({ time: Date.now(), latency, success: true });
-        if (this.latencyHistory.length > 50) this.latencyHistory.shift();
-    },
-
-    // 记录失败请求
-    recordFailure(error) {
-        this.failCount++;
-        this.latencyHistory.push({ time: Date.now(), latency: null, success: false, error: error?.message });
-        if (this.latencyHistory.length > 50) this.latencyHistory.shift();
-
-        // 连续失败3次认为离线
-        if (this.failCount >= 3) {
-            this.isOnline = false;
-            console.warn('[Supabase] 连接可能已中断');
-        }
-    },
-
-    // 获取平均延迟
-    getAvgLatency() {
-        const successful = this.latencyHistory.filter(h => h.success && h.latency);
-        if (successful.length === 0) return null;
-        return Math.round(successful.reduce((a, b) => a + b.latency, 0) / successful.length);
-    },
-
-    // 获取连接状态报告
-    getStatus() {
-        return {
-            isOnline: this.isOnline,
-            failCount: this.failCount,
-            avgLatency: this.getAvgLatency(),
-            lastSuccess: this.lastSuccessTime ? new Date(this.lastSuccessTime).toLocaleTimeString() : 'Never'
-        };
-    }
-};
-
-// 创建带有自定义 fetch 的 Supabase 客户端
-const customFetch = async (url, options = {}) => {
-    let lastError = null;
-
-    // 重试逻辑
-    for (let attempt = 0; attempt <= SUPABASE_CONFIG.retryCount; attempt++) {
-        // 每次尝试创建新的 AbortController
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), SUPABASE_CONFIG.timeout);
-        const startTime = performance.now();
-
-        try {
-            // 合并 signal - 如果 options 中已有 signal，需要处理
-            const fetchOptions = {
-                ...options,
-                signal: controller.signal
-            };
-
-            const response = await fetch(url, fetchOptions);
-
-            clearTimeout(timeoutId);
-
-            const latency = Math.round(performance.now() - startTime);
-            ConnectionMonitor.recordSuccess(latency);
-
-            return response;
-        } catch (error) {
-            clearTimeout(timeoutId);
-            lastError = error;
-
-            // 如果是用户主动取消（不是超时），直接抛出
-            if (error.name === 'AbortError' && !controller.signal.aborted) {
-                throw error;
-            }
-
-            ConnectionMonitor.recordFailure(error);
-
-            // 如果还有重试机会，等待后重试
-            if (attempt < SUPABASE_CONFIG.retryCount) {
-                const delay = SUPABASE_CONFIG.retryDelay * Math.pow(2, attempt); // 指数退避
-                console.log(`[Supabase] 请求失败，${delay}ms 后重试 (${attempt + 1}/${SUPABASE_CONFIG.retryCount})`);
-                await new Promise(r => setTimeout(r, delay));
-            }
-        }
-    }
-
-    throw lastError;
-};
 
 // 创建 Supabase 客户端 - 优化配置
 const client = supabase.createClient(supabaseUrl, supabaseKey, {
@@ -127,8 +16,7 @@ const client = supabase.createClient(supabaseUrl, supabaseKey, {
     global: {
         headers: {
             'x-client-info': 'cloud-space/1.0'
-        },
-        fetch: customFetch  // 使用自定义 fetch
+        }
     },
     realtime: {
         params: {
@@ -137,32 +25,24 @@ const client = supabase.createClient(supabaseUrl, supabaseKey, {
     }
 });
 
-// 暴露连接状态监测器供调试
-window.SupabaseConnectionMonitor = ConnectionMonitor;
-
-// 定期健康检查
-setInterval(async () => {
-    if (document.hidden) return; // 页面不可见时跳过
-
-    try {
-        const startTime = performance.now();
-        await client.from('files').select('id').limit(1);
-        const latency = Math.round(performance.now() - startTime);
-        ConnectionMonitor.recordSuccess(latency);
-    } catch (error) {
-        ConnectionMonitor.recordFailure(error);
+// 暴露当前线路，便于调试国内外节点选择。
+window.SupabaseConnectionMonitor = {
+    getStatus() {
+        return { isOnline: navigator.onLine, origin: window.APP_NETWORK?.origin || supabaseUrl };
     }
-}, SUPABASE_CONFIG.healthCheckInterval);
+};
 
 // 数据库缓存管理器
 const DBCache = {
     _cache: new Map(),
     _timestamps: new Map(),
     TTL: 30000, // 缓存有效期 30 秒
+    STORAGE_KEY: 'cloud_metadata_cache_v2',
 
     set(key, data) {
         this._cache.set(key, data);
         this._timestamps.set(key, Date.now());
+        this.persist();
     },
 
     get(key) {
@@ -183,6 +63,36 @@ const DBCache = {
             this._cache.clear();
             this._timestamps.clear();
         }
+        this.persist();
+    },
+
+    peek(key) {
+        return this._cache.get(key) || null;
+    },
+
+    restore() {
+        try {
+            const saved = JSON.parse(localStorage.getItem(this.STORAGE_KEY) || 'null');
+            if (!saved || Date.now() - saved.savedAt > 7 * 24 * 60 * 60 * 1000) return;
+            if (Array.isArray(saved.files)) {
+                this._cache.set('files_all', saved.files);
+                this._timestamps.set('files_all', saved.savedAt);
+            }
+            if (saved.storage) {
+                this._cache.set('storage_info', saved.storage);
+                this._timestamps.set('storage_info', saved.savedAt);
+            }
+        } catch (_) { }
+    },
+
+    persist() {
+        try {
+            localStorage.setItem(this.STORAGE_KEY, JSON.stringify({
+                files: this._cache.get('files_all') || null,
+                storage: this._cache.get('storage_info') || null,
+                savedAt: Date.now()
+            }));
+        } catch (_) { }
     },
 
     // 预热缓存
@@ -203,6 +113,7 @@ const DBCache = {
         return null;
     }
 };
+DBCache.restore();
 
 // 请求去重和批处理
 const RequestBatcher = {
@@ -502,14 +413,21 @@ const manager = new TaskManager();
 async function init() {
     const start = performance.now();
 
-    // 并行初始化 - 同时获取文件和存储信息
-    await Promise.all([
-        fetchFiles(),
-        updateStorageInfo()
-    ]);
+    // 交互与缓存先就绪，网络刷新、容量统计和 Realtime 在后台并行。
+    setupEventListeners();
+    const cachedFiles = DBCache.peek('files_all');
+    if (cachedFiles) {
+        files = cachedFiles;
+        renderFiles();
+    }
+    const cachedStorage = DBCache.peek('storage_info');
+    if (cachedStorage) renderStorageUI(cachedStorage);
 
     setupRealtimeSubscription();
-    setupEventListeners();
+    await Promise.allSettled([
+        fetchFiles(true),
+        updateStorageInfo(true)
+    ]);
 
     console.log(`[App] 就绪 (${(performance.now() - start).toFixed(0)}ms)`);
 }
@@ -528,10 +446,19 @@ async function fetchFiles(forceRefresh = false) {
 
     // 使用请求去重，避免重复请求
     return RequestBatcher.dedupe('fetchFiles', async () => {
-        const { data, error } = await client
-            .from('files')
-            .select('*')
-            .order('created_at', { ascending: false });
+        const bootstrap = window.CLOUD_BOOTSTRAP;
+        let result;
+        if (bootstrap && !bootstrap.used) {
+            bootstrap.used = true;
+            result = await bootstrap.files;
+        }
+        if (!result || result.error) {
+            result = await client
+                .from('files')
+                .select('id,name,type,size,url,is_deleted,is_shared,parent_id,created_at')
+                .order('created_at', { ascending: false });
+        }
+        const { data, error } = result;
 
         if (error) {
             console.error('[DB] 获取文件失败:', error.message);
@@ -908,7 +835,7 @@ function getFileType(filename) {
 
 // Upload Handling
 async function uploadFile(file) {
-    await window.ensureCloudOptionalLibraries?.();
+    await window.ensureCloudLibrary?.('tus');
     // Capture current folder ID at the START of the upload to ensure consistency
     const targetFolderId = currentFolderId;
     console.log('Starting upload for file:', file.name, 'to folder:', targetFolderId);
@@ -930,11 +857,11 @@ async function uploadFile(file) {
     const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`;
 
     // Configure TUS Upload
-    const projectId = supabaseUrl.split('//')[1].split('.')[0];
     const bucketName = 'cloud-files';
+    const uploadOrigin = window.APP_NETWORK?.origin || supabaseUrl;
 
     const upload = new tus.Upload(file, {
-        endpoint: `https://${projectId}.supabase.co/storage/v1/upload/resumable`,
+        endpoint: `${uploadOrigin}/storage/v1/upload/resumable`,
         retryDelays: [0, 3000, 5000, 10000, 20000],
         headers: {
             authorization: `Bearer ${supabaseKey}`,
@@ -1043,6 +970,10 @@ async function handleFileUpload(event) {
 }
 
 // Download Handling
+function routeFileUrl(url) {
+    return window.APP_NETWORK?.rewriteUrl(url) || url;
+}
+
 async function handleDownload() {
     if (!selectedFile) return;
     contextMenu.style.display = 'none';
@@ -1059,7 +990,7 @@ async function handleDownload() {
 async function handleFileDownload(file) {
     showToast('已添加到传输列表');
 
-    const fileUrl = file.url;
+    const fileUrl = routeFileUrl(file.url);
     const fileName = file.name;
     const fileSizeStr = file.size;
 
@@ -1273,7 +1204,7 @@ async function handleFolderDownloadToDirectory(folder, filesToDownload, foldersT
 
                     try {
                         // 下载文件
-                        const response = await fetch(file.url);
+                        const response = await fetch(routeFileUrl(file.url));
                         if (!response.ok) {
                             console.warn(`跳过文件 ${file.name}: 下载失败`);
                             continue;
@@ -1343,7 +1274,7 @@ async function handleFolderDownloadToDirectory(folder, filesToDownload, foldersT
 
 // ZIP 下载（作为备用方案）
 async function handleFolderDownloadAsZip(folder, filesToDownload) {
-    await window.ensureCloudOptionalLibraries?.();
+    await window.ensureCloudLibrary?.('jszip');
     const folderName = folder.name;
     const zipFileName = `${folderName}.zip`;
 
@@ -1365,7 +1296,7 @@ async function handleFolderDownloadAsZip(folder, filesToDownload) {
                 manager.updateProgress(taskId, basePercent.toFixed(0), `下载: ${shortName}`);
 
                 try {
-                    const response = await fetch(file.url);
+                    const response = await fetch(routeFileUrl(file.url));
                     if (!response.ok) continue;
 
                     const blob = await response.blob();
@@ -1929,7 +1860,7 @@ function loadPreviewImage() {
     imagePreview.translateY = 0;
 
     // 加载图片
-    imagePreview.image.src = file.url;
+    imagePreview.image.src = routeFileUrl(file.url);
     imagePreview.fileName.textContent = file.name;
     imagePreview.fileSize.textContent = file.size;
     imagePreview.imageIndex.textContent = `${imagePreview.currentIndex + 1} / ${imagePreview.imageFiles.length}`;
@@ -2012,7 +1943,7 @@ async function downloadCurrentImage() {
     if (!file) return;
 
     try {
-        const response = await fetch(file.url);
+        const response = await fetch(routeFileUrl(file.url));
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');

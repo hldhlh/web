@@ -246,6 +246,8 @@ svg {
 }
 
 .file-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 150px;
     border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 16px;

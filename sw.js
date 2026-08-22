@@ -1,4 +1,4 @@
-const CACHE_NAME = 'web-shell-2026-08-22-v5';
+const CACHE_NAME = 'web-shell-2026-08-22-v6';
 const SHELL = [
   './',
   './index.html',
@@ -19,6 +19,9 @@ const SHELL = [
   './apps/log/index.html',
   './apps/log/styles.css',
   './apps/log/script.js',
+  './apps/cloud/index.html',
+  './apps/cloud/style.css',
+  './apps/cloud/script.js',
   './apps/vendor/supabase.min.js',
   './apps/network.js'
 ];

@@ -11,8 +11,53 @@
 
     <link rel="preconnect" href="https://fmxddvjgkykuqwmasigo.supabase.co" crossorigin>
 
+    <script>
+        // 冷启动预取：不等待 Supabase SDK，在 HTML 解析阶段直接读取文件元数据。
+        window.CLOUD_CONFIG = {
+            url: 'https://fmxddvjgkykuqwmasigo.supabase.co',
+            key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo'
+        };
+        window.CLOUD_BOOTSTRAP = (() => {
+            const config = window.CLOUD_CONFIG;
+            let origin = config.url;
+            try {
+                const cached = JSON.parse(localStorage.getItem('app-network-best-v2') || 'null');
+                if (cached && Date.now() - cached.savedAt < 6 * 60 * 60 * 1000 && /^https:\/\//.test(cached.origin)) {
+                    origin = cached.origin;
+                }
+            } catch (_) { }
+
+            const url = new URL(`${origin}/rest/v1/files`);
+            url.searchParams.set('select', 'id,name,type,size,url,is_deleted,is_shared,parent_id,created_at');
+            url.searchParams.set('order', 'created_at.desc');
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 6500);
+            const request = fetch(url, {
+                headers: {
+                    apikey: config.key,
+                    Authorization: `Bearer ${config.key}`,
+                    Accept: 'application/json'
+                },
+                mode: 'cors',
+                credentials: 'omit',
+                cache: 'no-store',
+                priority: 'high',
+                signal: controller.signal
+            }).then(async response => {
+                if (!response.ok) throw new Error(`冷启动请求失败: HTTP ${response.status}`);
+                return { data: await response.json(), error: null };
+            }, error => ({ data: null, error }))
+                .catch(error => ({ data: null, error }))
+                .finally(() => clearTimeout(timer));
+
+            return { used: false, files: request };
+        })();
+    </script>
+
     <link rel="stylesheet" href="style.css">
-    <script src="../network.js"></script>
+    <link rel="preload" href="../vendor/supabase.min.js" as="script">
+    <link rel="preload" href="script.js" as="script">
+    <script src="../network.js" defer></script>
 </head>
 
 <body>
@@ -305,9 +350,7 @@
                 'https://unpkg.com/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js',
                 // 国内 CDN 源
                 'https://registry.npmmirror.com/@supabase/supabase-js/2.45.0/files/dist/umd/supabase.min.js',
-                'https://cdn.bootcdn.net/ajax/libs/supabase/2.45.0/umd/supabase.min.js',
-                // ESM 备用
-                'https://esm.sh/@supabase/supabase-js@2?bundle'
+                'https://cdn.bootcdn.net/ajax/libs/supabase/2.45.0/umd/supabase.min.js'
             ],
             tus: [
                 '../vendor/cloud/tus.min.js',
@@ -763,15 +806,16 @@
                 await sequentialLoad(CDN_CONFIG.supabase, 'Supabase SDK');
                 window.APP_NETWORK?.patchSupabase();
 
-                // 上传与打包组件在空闲时预取，也可在首次使用时立即加载。
-                window.ensureCloudOptionalLibraries = () => {
-                    if (!window.cloudOptionalLibrariesReady) {
-                        window.cloudOptionalLibrariesReady = Promise.all([
-                            sequentialLoad(CDN_CONFIG.tus, 'Tus Client'),
-                            sequentialLoad(CDN_CONFIG.jszip, 'JSZip')
-                        ]);
+                // 上传和打包组件分别按需加载，避免首屏争抢带宽。
+                const optionalLibraries = {};
+                window.ensureCloudLibrary = (name) => {
+                    if (!optionalLibraries[name]) {
+                        const config = name === 'tus'
+                            ? { urls: CDN_CONFIG.tus, label: 'Tus Client' }
+                            : { urls: CDN_CONFIG.jszip, label: 'JSZip' };
+                        optionalLibraries[name] = sequentialLoad(config.urls, config.label);
                     }
-                    return window.cloudOptionalLibrariesReady;
+                    return optionalLibraries[name];
                 };
 
                 // 加载主应用脚本
@@ -782,11 +826,6 @@
                 if (loadingEl) {
                     loadingEl.style.opacity = '0';
                     setTimeout(() => loadingEl.remove(), 300);
-                }
-
-                const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                if (!connection?.saveData && !['slow-2g', '2g'].includes(connection?.effectiveType)) {
-                    setTimeout(() => window.ensureCloudOptionalLibraries(), 3000);
                 }
 
             } catch (error) {
