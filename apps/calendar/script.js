@@ -484,15 +484,18 @@
 
   // Theme toggle
   const THEME_KEY = 'wy-calendar-theme';
+  const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
   function applyTheme(theme) {
     const root = document.documentElement;
-    if (theme === 'dark') {
-      root.setAttribute('data-theme', 'dark');
-    } else if (theme === 'light') {
-      root.removeAttribute('data-theme'); // rely on light vars
-    } else {
-      root.removeAttribute('data-theme');
-    }
+    if (theme === 'dark' || theme === 'light') root.setAttribute('data-theme', theme);
+    else root.removeAttribute('data-theme');
+
+    const isDark = theme === 'dark' || (theme !== 'light' && systemTheme.matches);
+    const target = isDark ? '浅色' : '深色';
+    themeToggle.textContent = isDark ? '☀︎' : '☾';
+    themeToggle.setAttribute('aria-label', `切换到${target}主题`);
+    themeToggle.title = `切换到${target}主题`;
+    themeToggle.setAttribute('aria-pressed', String(isDark));
   }
   function initTheme() {
     const saved = localStorage.getItem(THEME_KEY);
@@ -521,10 +524,15 @@
 
   themeToggle.addEventListener('click', () => {
     const root = document.documentElement;
-    const hasDark = root.getAttribute('data-theme') === 'dark';
-    const next = hasDark ? 'light' : 'dark';
+    const selected = root.getAttribute('data-theme');
+    const isDark = selected ? selected === 'dark' : systemTheme.matches;
+    const next = isDark ? 'light' : 'dark';
     localStorage.setItem(THEME_KEY, next);
     applyTheme(next);
+  });
+
+  systemTheme.addEventListener?.('change', () => {
+    if (!localStorage.getItem(THEME_KEY)) applyTheme('auto');
   });
 
   // Init

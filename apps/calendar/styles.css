@@ -15,6 +15,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    color-scheme: dark;
     --bg: #0f1113;
     --surface: #15181bcc;
     --border: #23262a;
@@ -29,6 +30,7 @@
 
 /* JS 可强制主题 */
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg: #0f1113;
   --surface: #15181bcc;
   --border: #23262a;
@@ -38,6 +40,20 @@
   --accent-ink: #ffd7e1;
   --today: #8cd2c7;
   --shadow: 0 10px 30px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.3);
+}
+
+/* 必须显式覆盖系统深色偏好，否则选择浅色后仍会被上面的媒体查询覆盖。 */
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f7f5f2;
+  --surface: #ffffffcc;
+  --border: #e9e4de;
+  --text: #232323;
+  --muted: #8f8b85;
+  --accent: #e08aa3;
+  --accent-ink: #8b3a55;
+  --today: #7fb0a6;
+  --shadow: 0 10px 30px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06);
 }
 
 * { box-sizing: border-box; }

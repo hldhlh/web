@@ -1,0 +1,178 @@
+- generic [ref=e2]:
+  - main "时间线" [ref=e3]:
+    - list "时间线" [ref=e43]:
+      - listitem [ref=e183]:
+        - generic [ref=e184]: 2026年1月2日 周五
+        - list [ref=e185]:
+          - listitem [ref=e186]:
+            - generic [ref=e187]: 告诫拍照电表开关
+      - listitem [ref=e188]:
+        - generic [ref=e189]: 2026年1月1日 周四
+        - list [ref=e190]:
+          - listitem [ref=e191]:
+            - generic [ref=e192]: 备选方案招聘
+          - listitem [ref=e193]:
+            - generic [ref=e194]: 联系洗碗阿姨确认工作内容
+      - listitem [ref=e195]:
+        - generic [ref=e196]: 2025年12月31日 周三
+        - list [ref=e197]:
+          - listitem [ref=e198]:
+            - generic [ref=e199]: 登录3店的快驴
+          - listitem [ref=e200]:
+            - generic [ref=e201]: 早上10:00和下午4:00群发送文案配图，记得+@所有人，为此需要加入缦云群店总
+          - listitem [ref=e202]:
+            - generic [ref=e203]: 晚上23:30-23:59 发送跨年朋友圈
+          - listitem [ref=e204]:
+            - generic [ref=e205]: 登录缦云外卖平台课堂学完考完
+          - listitem [ref=e206]:
+            - generic [ref=e207]: 吃药
+          - listitem [ref=e208]:
+            - generic [ref=e209]: 加入缦云酒水报货群
+          - listitem [ref=e210]:
+            - generic [ref=e211]: 明天超哥过来一起帮着你往下看
+          - listitem [ref=e212]:
+            - generic [ref=e213]: 晚上23：30-23：59 发送跨年朋友圈
+          - listitem [ref=e214]:
+            - generic [ref=e215]: 明天超哥过来一起帮着你看下
+          - listitem [ref=e216]:
+            - generic [ref=e217]: 早上10：00和下午4：00群发送文案配图，记得+@所有人，为此需要加入缦云群店总
+          - listitem [ref=e218]:
+            - generic [ref=e219]: 登录3店的快驴
+          - listitem [ref=e220]:
+            - generic [ref=e221]: 吃药
+          - listitem [ref=e222]:
+            - generic [ref=e223]: 加入缦云酒水报货群
+          - listitem [ref=e224]:
+            - generic [ref=e225]: 登录缦云外卖平台课堂学完考完
+      - listitem [ref=e226]:
+        - generic [ref=e227]: 2025年12月30日 周二
+        - list [ref=e228]:
+          - listitem [ref=e229]:
+            - generic [ref=e230]: 学习外卖平台教程
+          - listitem [ref=e231]:
+            - generic [ref=e232]: 制作明天跨年的文案和图片
+          - listitem [ref=e233]:
+            - generic [ref=e234]: 制作明天跨年的文案和图片
+          - listitem [ref=e235]:
+            - generic [ref=e236]: 学习外卖平台教程
+  - main "物语日历" [ref=e6]:
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - button "上个月" [ref=e9] [cursor=pointer]: ⟨
+        - button "下个月" [ref=e10] [cursor=pointer]: ⟩
+      - heading "2026 · 8月" [level=1] [ref=e98]
+      - generic [ref=e12]:
+        - button "回到今天" [ref=e13] [cursor=pointer]: 今天
+        - button "切换到浅色主题" [active] [pressed] [ref=e237] [cursor=pointer]: ☀︎
+    - region "日期网格" [ref=e16]:
+      - generic [ref=e17]: 一
+      - generic [ref=e18]: 二
+      - generic [ref=e19]: 三
+      - generic [ref=e20]: 四
+      - generic [ref=e21]: 五
+      - generic [ref=e22]: 六
+      - generic [ref=e23]: 日
+      - grid [ref=e24]:
+        - gridcell "2026年7月27日 周一" [ref=e238] [cursor=pointer]:
+          - generic [ref=e239]: "27"
+        - gridcell "2026年7月28日 周二" [ref=e240] [cursor=pointer]:
+          - generic [ref=e241]: "28"
+        - gridcell "2026年7月29日 周三" [ref=e242] [cursor=pointer]:
+          - generic [ref=e243]: "29"
+        - gridcell "2026年7月30日 周四" [ref=e244] [cursor=pointer]:
+          - generic [ref=e245]: "30"
+        - gridcell "2026年7月31日 周五" [ref=e246] [cursor=pointer]:
+          - generic [ref=e247]: "31"
+        - gridcell "2026年8月1日 周六" [ref=e248] [cursor=pointer]:
+          - generic [ref=e249]: "1"
+        - gridcell "2026年8月2日 周日" [ref=e250] [cursor=pointer]:
+          - generic [ref=e251]: "2"
+        - gridcell "2026年8月3日 周一" [ref=e252] [cursor=pointer]:
+          - generic [ref=e253]: "3"
+        - gridcell "2026年8月4日 周二" [ref=e254] [cursor=pointer]:
+          - generic [ref=e255]: "4"
+        - gridcell "2026年8月5日 周三" [ref=e256] [cursor=pointer]:
+          - generic [ref=e257]: "5"
+        - gridcell "2026年8月6日 周四" [ref=e258] [cursor=pointer]:
+          - generic [ref=e259]: "6"
+        - gridcell "2026年8月7日 周五" [ref=e260] [cursor=pointer]:
+          - generic [ref=e261]: "7"
+        - gridcell "2026年8月8日 周六" [ref=e262] [cursor=pointer]:
+          - generic [ref=e263]: "8"
+        - gridcell "2026年8月9日 周日" [ref=e264] [cursor=pointer]:
+          - generic [ref=e265]: "9"
+        - gridcell "2026年8月10日 周一" [ref=e266] [cursor=pointer]:
+          - generic [ref=e267]: "10"
+        - gridcell "2026年8月11日 周二" [ref=e268] [cursor=pointer]:
+          - generic [ref=e269]: "11"
+        - gridcell "2026年8月12日 周三" [ref=e270] [cursor=pointer]:
+          - generic [ref=e271]: "12"
+        - gridcell "2026年8月13日 周四" [ref=e272] [cursor=pointer]:
+          - generic [ref=e273]: "13"
+        - gridcell "2026年8月14日 周五" [ref=e274] [cursor=pointer]:
+          - generic [ref=e275]: "14"
+        - gridcell "2026年8月15日 周六" [ref=e276] [cursor=pointer]:
+          - generic [ref=e277]: "15"
+        - gridcell "2026年8月16日 周日" [ref=e278] [cursor=pointer]:
+          - generic [ref=e279]: "16"
+        - gridcell "2026年8月17日 周一" [ref=e280] [cursor=pointer]:
+          - generic [ref=e281]: "17"
+        - gridcell "2026年8月18日 周二" [ref=e282] [cursor=pointer]:
+          - generic [ref=e283]: "18"
+        - gridcell "2026年8月19日 周三" [ref=e284] [cursor=pointer]:
+          - generic [ref=e285]: "19"
+        - gridcell "2026年8月20日 周四" [ref=e286] [cursor=pointer]:
+          - generic [ref=e287]: "20"
+        - gridcell "2026年8月21日 周五" [ref=e288] [cursor=pointer]:
+          - generic [ref=e289]: "21"
+        - gridcell "2026年8月22日 周六" [ref=e290] [cursor=pointer]:
+          - generic [ref=e291]: "22"
+        - gridcell "2026年8月23日 周日" [ref=e292] [cursor=pointer]:
+          - generic [ref=e293]: "23"
+        - gridcell "2026年8月24日 周一" [ref=e294] [cursor=pointer]:
+          - generic [ref=e295]: "24"
+        - gridcell "2026年8月25日 周二" [ref=e296] [cursor=pointer]:
+          - generic [ref=e297]: "25"
+        - gridcell "2026年8月26日 周三" [ref=e298] [cursor=pointer]:
+          - generic [ref=e299]: "26"
+        - gridcell "2026年8月27日 周四" [ref=e300] [cursor=pointer]:
+          - generic [ref=e301]: "27"
+        - gridcell "2026年8月28日 周五" [ref=e302] [cursor=pointer]:
+          - generic [ref=e303]: "28"
+        - gridcell "2026年8月29日 周六" [ref=e304] [cursor=pointer]:
+          - generic [ref=e305]: "29"
+        - gridcell "2026年8月30日 周日" [ref=e306] [cursor=pointer]:
+          - generic [ref=e307]: "30"
+        - gridcell "2026年8月31日 周一" [ref=e308] [cursor=pointer]:
+          - generic [ref=e309]: "31"
+        - gridcell "2026年9月1日 周二" [ref=e310] [cursor=pointer]:
+          - generic [ref=e311]: "1"
+        - gridcell "2026年9月2日 周三" [ref=e312] [cursor=pointer]:
+          - generic [ref=e313]: "2"
+        - gridcell "2026年9月3日 周四" [ref=e314] [cursor=pointer]:
+          - generic [ref=e315]: "3"
+        - gridcell "2026年9月4日 周五" [ref=e316] [cursor=pointer]:
+          - generic [ref=e317]: "4"
+        - gridcell "2026年9月5日 周六" [ref=e318] [cursor=pointer]:
+          - generic [ref=e319]: "5"
+        - gridcell "2026年9月6日 周日" [ref=e320] [cursor=pointer]:
+          - generic [ref=e321]: "6"
+  - main "日期代办" [ref=e25]:
+    - generic [ref=e26]:
+      - generic [ref=e27]: 今日提示
+      - generic [ref=e28]:
+        - generic [ref=e29]:
+          - generic [ref=e30]: 2026年8月22日 周六
+          - generic "北京与乌鲁木齐时间" [ref=e32]:
+            - generic [ref=e33]:
+              - generic [ref=e34]: 北京
+              - generic [ref=e35]: 13:55
+            - generic [ref=e36]:
+              - generic [ref=e37]: 乌鲁木齐
+              - generic [ref=e38]: 11:55
+        - generic [ref=e39]: 无代办
+    - generic [ref=e40]:
+      - textbox "新增代办事项" [ref=e41]:
+        - /placeholder: 新增代办
+      - button "+" [ref=e42] [cursor=pointer]
+    - list "代办事项列表"
