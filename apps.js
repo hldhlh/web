@@ -9,7 +9,6 @@ export function getAppDirectories() {
     { name: "今岭笔记", path: "jlbj/index.html", fallback: "笔" },
     { name: "今岭流水可视化", path: "jlksh/index.html", fallback: "流" },
     { name: "今岭后厨订货", path: "jlhcdh/index.html", fallback: "订" },
-    { name: "PPT", path: "ppt/index.html", fallback: "P" },
     { name: "阅图", path: "vista/index.html", icon: "vista/icon.svg", fallback: "阅" },
     { name: "SVG", path: "svg/index.html", fallback: "S" },
     { name: "日志", path: "log/index.html", icon: "log/icon.svg", fallback: "志" },
