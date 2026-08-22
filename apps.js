@@ -8,7 +8,6 @@ export function getAppDirectories() {
     { name: "吃什么", path: "eatwhat/index.html", icon: "eatwhat/icon.svg", fallback: "食" },
     { name: "今岭笔记", path: "jlbj/index.html", fallback: "笔" },
     { name: "今岭流水可视化", path: "jlksh/index.html", fallback: "流" },
-    { name: "今岭快驴可视化", path: "jlklksh/index.html", fallback: "快" },
     { name: "今岭快驴数据", path: "jlklsj/index.html", fallback: "数" },
     { name: "今岭后厨订货", path: "jlhcdh/index.html", fallback: "订" },
     { name: "PPT", path: "ppt/index.html", fallback: "P" },

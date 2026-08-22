@@ -67,9 +67,8 @@
     <script src="../vendor/supabase.min.js" defer></script>
     <script src="../network.js" defer></script>
     <script>
-        // 移除 esm.sh 以避免 ESM 模块错误，仅保留稳定的 UMD 源
+        // 本地 SDK 已由上方 defer 脚本优先加载；这里仅保留跨区域 CDN 兜底。
         const CDN = [
-            '../vendor/supabase.min.js',
             'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
             'https://fastly.jsdelivr.net/npm/@supabase/supabase-js@2',
             'https://unpkg.com/@supabase/supabase-js@2'
