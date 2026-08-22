@@ -517,7 +517,7 @@
           const day = now.getDate();
           const week = ['日', '一', '二', '三', '四', '五', '六'][now.getDay()];
           const status = calendarDayStatus(now);
-          appDisplayName = `${month}月${day}日 · ${status.label}`;
+          appDisplayName = app.name;
           const calendarDescription = `${month}月${day}日周${week} · ${status.detail}`;
           el.title = `${app.name} · ${calendarDescription}`;
           el.setAttribute('aria-label', `${app.name}，${calendarDescription}`);

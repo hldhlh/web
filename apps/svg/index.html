@@ -144,6 +144,8 @@
             position: relative;
             overflow: hidden;
             box-shadow: var(--card-shadow);
+            content-visibility: auto;
+            contain-intrinsic-size: auto 240px;
         }
 
         .card:hover {
@@ -190,6 +192,11 @@
             height: 100%;
             object-fit: contain;
             transition: filter 0.3s;
+        }
+
+        .load-sentinel {
+            width: 100%;
+            height: 1px;
         }
 
         .card-info {
@@ -272,6 +279,7 @@
     <div class="grid" id="gallery">
         <!-- JS will populate this -->
     </div>
+    <div class="load-sentinel" id="loadSentinel" aria-hidden="true"></div>
 
     <script src="./icons_data.js"></script>
     <script>
@@ -394,9 +402,17 @@
 
         ];
 
-        files.forEach(file => {
+        const gallery = document.getElementById('gallery');
+        const loadSentinel = document.getElementById('loadSentinel');
+        const initialBatchSize = window.matchMedia('(max-width: 600px)').matches ? 12 : 24;
+        const batchSize = 24;
+        let renderedCount = 0;
+        let loadObserver;
+
+        function createCard(file, index) {
             const card = document.createElement('div');
             card.className = 'card';
+            card.dataset.file = file;
 
             // Get data from iconsData
             const data = (typeof iconsData !== 'undefined' && iconsData[file]) ? iconsData[file] : {};
@@ -406,7 +422,9 @@
 
             card.innerHTML = `
                 <div class="icon-container">
-                    <img src="./${file}" alt="${title}" loading="lazy">
+                    <img src="./${file}" alt="${title}" width="100" height="100"
+                        loading="${index < 8 ? 'eager' : 'lazy'}"
+                        decoding="async" fetchpriority="${index < 8 ? 'high' : 'low'}">
                 </div>
                 <div class="card-info">
                     <div class="card-title" title="${desc}">${title}</div>
@@ -415,14 +433,47 @@
                 </div>
             `;
 
-            // Add click to copy path? Optional.
-            card.addEventListener('click', () => {
-                // Could act as a selection mechanic
-                console.log('Selected:', file);
-            });
+            return card;
+        }
 
-            gallery.appendChild(card);
+        function renderNextBatch(size = batchSize) {
+            const end = Math.min(renderedCount + size, files.length);
+            const fragment = document.createDocumentFragment();
+
+            for (let index = renderedCount; index < end; index += 1) {
+                fragment.appendChild(createCard(files[index], index));
+            }
+
+            gallery.appendChild(fragment);
+            renderedCount = end;
+
+            if (renderedCount === files.length) {
+                loadObserver?.disconnect();
+                loadSentinel.remove();
+            }
+        }
+
+        gallery.addEventListener('click', (event) => {
+            const card = event.target.closest('.card');
+            if (card) console.log('Selected:', card.dataset.file);
         });
+
+        renderNextBatch(initialBatchSize);
+
+        if ('IntersectionObserver' in window) {
+            loadObserver = new IntersectionObserver((entries) => {
+                if (entries.some(entry => entry.isIntersecting)) renderNextBatch();
+            }, { rootMargin: '600px 0px' });
+            loadObserver.observe(loadSentinel);
+        } else {
+            // Older browsers still receive the complete gallery without blocking first paint.
+            const renderWhenIdle = window.requestIdleCallback || ((callback) => setTimeout(callback, 16));
+            const renderRemaining = () => {
+                renderNextBatch();
+                if (renderedCount < files.length) renderWhenIdle(renderRemaining);
+            };
+            renderWhenIdle(renderRemaining);
+        }
 
     </script>
 </body>

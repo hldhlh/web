@@ -1,6 +1,6 @@
 export function getAppDirectories() {
   return [
-    { name: "日历与调休", path: "calendar/index.html", icon: "calendar/icon.svg", fallback: "日" },
+    { name: "节假日", path: "calendar/index.html", icon: "calendar/icon.svg", fallback: "日" },
     { name: "待办事项", path: "todo/index.html", icon: "todo/icon.svg", fallback: "办" },
     { name: "图片转换", path: "image-converter/index.html", icon: "image-converter/icon.svg", fallback: "图" },
     { name: "思维矩阵", path: "thought-matrix/index.html", icon: "thought-matrix/icon.svg", fallback: "思" },
