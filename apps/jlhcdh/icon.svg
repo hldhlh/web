@@ -1,0 +1,26 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">今岭后厨订货</title>
+  <desc id="desc">装有食材并带有勾选标记的橙色订货箱</desc>
+  <defs>
+    <linearGradient id="bg" x1="15" y1="11" x2="85" y2="91" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFB340"/>
+      <stop offset="1" stop-color="#F05A28"/>
+    </linearGradient>
+    <linearGradient id="box" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#FFF4D8"/>
+      <stop offset="1" stop-color="#FFD28C"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#9A2E18" flood-opacity=".3"/>
+    </filter>
+  </defs>
+  <rect x="7" y="7" width="86" height="86" rx="24" fill="url(#bg)"/>
+  <path d="M38 39c-5-8-2-17 5-22 5 8 3 16-5 22Z" fill="#E9F8B5"/>
+  <path d="M42 38c5-10 15-13 23-9-3 9-12 14-23 9Z" fill="#78C85A"/>
+  <path d="M58 40c-1-10 6-18 15-19 2 9-4 17-15 19Z" fill="#BDEB73"/>
+  <path d="M27 42h46l-5 35c-.6 4-4 7-8 7H40c-4 0-7.4-3-8-7l-5-35Z" fill="url(#box)" filter="url(#shadow)"/>
+  <path d="M23 39h54v12H23z" fill="#FFE7B5" stroke="#A94725" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M38 51v32M62 51v32" stroke="#D78947" stroke-width="2.5" opacity=".65"/>
+  <circle cx="68" cy="69" r="14" fill="#247B62" stroke="#F9FFF9" stroke-width="3"/>
+  <path d="m61 69 5 5 9-11" fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

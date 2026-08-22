@@ -1,0 +1,26 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">今岭流水可视化</title>
+  <desc id="desc">显示经营走势和数据柱状图的深色仪表盘</desc>
+  <defs>
+    <linearGradient id="bg" x1="12" y1="10" x2="88" y2="91" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#171D3E"/>
+      <stop offset="1" stop-color="#080B1E"/>
+    </linearGradient>
+    <linearGradient id="bars" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#7EF2DC"/>
+      <stop offset="1" stop-color="#20A4F3"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="7" y="7" width="86" height="86" rx="24" fill="url(#bg)"/>
+  <rect x="17" y="18" width="66" height="64" rx="12" fill="#FFFFFF" fill-opacity=".055" stroke="#FFFFFF" stroke-opacity=".12"/>
+  <path d="M27 66V54M39 66V43M51 66V50M63 66V34M75 66V40" stroke="url(#bars)" stroke-width="7" stroke-linecap="round"/>
+  <path d="m25 45 13-9 13 5 13-14 12 5" fill="none" stroke="#FFCE66" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+  <g fill="#FFF3C4">
+    <circle cx="25" cy="45" r="2.7"/><circle cx="38" cy="36" r="2.7"/><circle cx="51" cy="41" r="2.7"/><circle cx="64" cy="27" r="2.7"/><circle cx="76" cy="32" r="2.7"/>
+  </g>
+  <path d="M24 73h52" stroke="#929BCB" stroke-width="2" stroke-linecap="round" opacity=".65"/>
+</svg>

@@ -1,20 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
   <title>图片格式转换</title>
-  <desc>黑色圆角方形内包含图片画框和双向转换箭头</desc>
+  <desc>两张交叠的极简图片卡片，表示图片格式转换</desc>
 
-  <!-- Monochrome app tile -->
+  <!-- App tile -->
   <rect x="7" y="7" width="86" height="86" rx="24" fill="#111111"/>
 
-  <!-- Image frame -->
-  <rect x="22" y="20" width="56" height="43" rx="6" fill="#FFFFFF"/>
-  <circle cx="34" cy="32" r="4" fill="#111111"/>
-  <path d="M27 55L38.5 42.5L47 51L57 39L73 55H27Z" fill="#111111"/>
+  <!-- Source image -->
+  <rect x="34" y="22" width="46" height="43" rx="7" stroke="#FFFFFF" stroke-width="4"/>
 
-  <!-- Conversion: two precise opposing arrows -->
-  <path d="M27 72H68M68 72L61.5 65.5M68 72L61.5 78.5" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M73 82H32M32 82L38.5 75.5M32 82L38.5 88.5" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-
-  <!-- Subtle keyline for definition on dark surfaces -->
-  <rect x="7.75" y="7.75" width="84.5" height="84.5" rx="23.25" stroke="#FFFFFF" stroke-opacity="0.16" stroke-width="1.5"/>
+  <!-- Converted image -->
+  <rect x="20" y="34" width="48" height="44" rx="7" fill="#FFFFFF"/>
+  <circle cx="32" cy="46" r="4" fill="#111111"/>
+  <path d="M25 70L36 57.5L44 65L52 56L63 70H25Z" fill="#111111"/>
 </svg>

@@ -1,0 +1,26 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">今岭笔记</title>
+  <desc id="desc">带有笔尖和书签的蓝紫色笔记本</desc>
+  <defs>
+    <linearGradient id="bg" x1="18" y1="10" x2="82" y2="92" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6E7BFF"/>
+      <stop offset="1" stop-color="#3E36B8"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="36" y1="24" x2="70" y2="78" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E8EAFF"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#241D73" flood-opacity=".32"/>
+    </filter>
+  </defs>
+  <rect x="7" y="7" width="86" height="86" rx="24" fill="url(#bg)"/>
+  <path d="M21 25c0-5 4-9 9-9h39c6 0 10 4 10 10v52c0 4-3 7-7 7H30c-5 0-9-4-9-9V25Z" fill="#29236F" opacity=".26"/>
+  <path d="M29 21h39c5 0 9 4 9 9v47H31c-5 0-9-4-9-9V28c0-4 3-7 7-7Z" fill="url(#paper)" filter="url(#shadow)"/>
+  <path d="M32 21v56" stroke="#BCC2F7" stroke-width="3"/>
+  <path d="M43 36h23M43 46h18M43 56h22" stroke="#777FD1" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="m55 69 22-22 7 7-22 22-10 3 3-10Z" fill="#FFD05B" stroke="#36327E" stroke-width="2" stroke-linejoin="round"/>
+  <path d="m77 47 3-3c2-2 4-2 6 0l1 1c2 2 2 4 0 6l-3 3-7-7Z" fill="#FF7E86"/>
+  <path d="m52 79 3-10 7 7-10 3Z" fill="#36327E"/>
+  <path d="M60 77h19v8H60z" fill="#272265" opacity=".3"/>
+</svg>

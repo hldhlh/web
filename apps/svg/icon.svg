@@ -1,0 +1,26 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">SVG 图标库</title>
+  <desc id="desc">由路径节点和贝塞尔曲线组成的紫色矢量图标</desc>
+  <defs>
+    <linearGradient id="bg" x1="13" y1="12" x2="87" y2="89" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5B5FD7"/>
+      <stop offset="1" stop-color="#29266E"/>
+    </linearGradient>
+    <radialGradient id="orb" cx="0" cy="0" r="1" gradientTransform="translate(50 49) rotate(90) scale(31)">
+      <stop stop-color="#9EF5FF" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#9EF5FF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="7" y="7" width="86" height="86" rx="24" fill="url(#bg)"/>
+  <circle cx="50" cy="49" r="31" fill="url(#orb)"/>
+  <path d="M25 65C31 31 69 31 75 65M31 30c14 20 24 20 38 0" fill="none" stroke="#D6F8FF" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M25 65h50M31 30h38" stroke="#8BA3FF" stroke-width="2" stroke-dasharray="3 4" opacity=".8"/>
+  <g fill="#FFF" stroke="#3B3A93" stroke-width="2">
+    <rect x="20" y="60" width="10" height="10" rx="2"/>
+    <rect x="70" y="60" width="10" height="10" rx="2"/>
+    <rect x="26" y="25" width="10" height="10" rx="2"/>
+    <rect x="64" y="25" width="10" height="10" rx="2"/>
+  </g>
+  <circle cx="50" cy="45" r="5" fill="#FFCE6A" stroke="#FFF4C8" stroke-width="2"/>
+  <path d="M42 80h16" stroke="#FFF" stroke-width="3" stroke-linecap="round" opacity=".9"/>
+</svg>
