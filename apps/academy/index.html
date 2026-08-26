@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f5f7">
+  <title>今岭学堂</title>
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="dns-prefetch" href="//fmxddvjgkykuqwmasigo.supabase.co">
+  <link rel="preconnect" href="https://fmxddvjgkykuqwmasigo.supabase.co" crossorigin>
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("app-theme") || "light";
+    window.ACADEMY_CONFIG = {
+      url: "https://fmxddvjgkykuqwmasigo.supabase.co",
+      key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo",
+      table: "academy_state",
+      rowId: "shared"
+    };
+    window.ACADEMY_BOOTSTRAP = (() => {
+      const config = window.ACADEMY_CONFIG;
+      let origin = config.url;
+      try {
+        const cached = JSON.parse(localStorage.getItem("app-network-best-v2") || "null");
+        if (cached && Date.now() - cached.savedAt < 6 * 60 * 60 * 1000 && /^https:\/\//.test(cached.origin)) {
+          origin = cached.origin;
+        }
+      } catch (_) { }
+      const url = new URL(`${origin}/rest/v1/${config.table}`);
+      url.searchParams.set("select", "payload,updated_at");
+      url.searchParams.set("id", `eq.${config.rowId}`);
+      url.searchParams.set("limit", "1");
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 6500);
+      return fetch(url, {
+        headers: {
+          apikey: config.key,
+          Authorization: `Bearer ${config.key}`,
+          Accept: "application/json"
+        },
+        mode: "cors",
+        credentials: "omit",
+        cache: "no-store",
+        priority: "high",
+        signal: controller.signal
+      }).then(async (response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const rows = await response.json();
+        return { row: rows[0] || null, error: null };
+      }, (error) => ({ row: null, error })).finally(() => clearTimeout(timer));
+    })();
+  </script>
+  <link rel="stylesheet" href="./style.css">
+  <link rel="preload" href="../vendor/supabase.min.js" as="script">
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="topbar">
+      <button class="icon-btn" id="back-btn" title="返回" aria-label="返回" hidden></button>
+      <h1 id="top-title">今岭学堂</h1>
+      <span class="live" id="live-status" data-state="connecting" title="实时同步">同步中</span>
+      <button class="icon-btn" id="theme-btn" title="切换主题" aria-label="切换主题"></button>
+    </header>
+    <main class="view" id="view"></main>
+    <nav class="tabbar" aria-label="主导航">
+      <button class="tab active" data-tab="home" data-act="go" data-hash="#/home" id="tab-home">首页</button>
+      <button class="tab" data-tab="learn" data-act="go" data-hash="#/learn" id="tab-learn">课程</button>
+      <button class="tab" data-tab="exams" data-act="go" data-hash="#/exams" id="tab-exams">考试</button>
+      <button class="tab" data-tab="me" data-act="go" data-hash="#/me" id="tab-me">我的</button>
+    </nav>
+  </div>
+  <noscript>今岭学堂需要启用 JavaScript。</noscript>
+  <script src="../vendor/supabase.min.js"></script>
+  <script src="../network.js"></script>
+  <script src="./content.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

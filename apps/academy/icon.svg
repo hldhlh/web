@@ -1,0 +1,18 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">今岭学堂</title>
+  <desc id="desc">蓝圆角方块上的翻开书本与完成标记</desc>
+  <defs>
+    <linearGradient id="acad-bg" x1="16" y1="10" x2="86" y2="92" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5B8CFF"/>
+      <stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+  </defs>
+  <rect x="7" y="7" width="86" height="86" rx="24" fill="url(#acad-bg)"/>
+  <rect x="7.75" y="7.75" width="84.5" height="84.5" rx="23.25" fill="none" stroke="#fff" stroke-opacity=".16" stroke-width="1.5"/>
+  <path d="M21 70c8.5-5.5 17.5-5.5 29-1.2V30.5C38.2 26 28.8 26.2 21 31.2V70Z" fill="#fff"/>
+  <path d="M79 70c-8.5-5.5-17.5-5.5-29-1.2V30.5C61.8 26 71.2 26.2 79 31.2V70Z" fill="#EEF3FF"/>
+  <path d="M50 29.8v39.2" stroke="#1D4ED8" stroke-opacity=".22" stroke-width="2" stroke-linecap="round"/>
+  <path d="M30 42.5h12.5M30 50h9" stroke="#1D4ED8" stroke-opacity=".35" stroke-width="2.4" stroke-linecap="round"/>
+  <circle cx="67.5" cy="50.5" r="9.5" fill="#1D4ED8"/>
+  <path d="m63.6 50.6 2.6 2.6 5.4-5.6" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
