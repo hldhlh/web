@@ -908,6 +908,7 @@
     const hour = new Date().getHours();
     const hello = hour < 12 ? "早上好" : hour < 18 ? "下午好" : "晚上好";
     const date = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "short" }).format(new Date());
+    const memberName = escapeHtml(Auth.session?.name || "学员");
     const learnableLessons = DATA.lessons.filter((item) => Gate.canLesson(item));
     const learnedCount = learnableLessons.filter((item) => isDone(item.id)).length;
     const unlearnedCount = learnableLessons.length - learnedCount;
@@ -923,16 +924,47 @@
       .filter((exam) => Gate.canExam(exam) && (isUrgentTrack(exam.track) || bestScore(exam.id) < exam.pass))
       .sort((a, b) => Number(isUrgentTrack(b.track)) - Number(isUrgentTrack(a.track)));
     const importantMessages = box.notices.slice(0, 5);
-    const headline = pendingUpdates.length
-      ? `待完成 ${unlearnedCount} 课 + 运营事项 ${box.pendingExams.length || 0} 条`
+    const headline = pendingUpdates.length || importantExams.length
+      ? `今天还有 ${unlearnedCount + importantExams.length} 项学习任务`
       : box.notices.length
         ? `${box.notices.length} 条待办`
         : "今日任务已清理";
+    const tracks = [];
+    [...DATA.lessons, ...DATA.exams].forEach((item) => {
+      if (!tracks.includes(item.track)) tracks.push(item.track);
+    });
+    const trackNames = {
+      onboarding: "上岗准备",
+      required: "岗前必修",
+      basic: "基础规范",
+      service: "服务标准",
+      front: "前厅岗位",
+      kitchen: "后厨岗位",
+      advanced: "岗位进阶",
+      management: "门店管理"
+    };
+    const stages = tracks.map((track, index) => {
+      const tasks = [
+        ...DATA.lessons.filter((lesson) => lesson.track === track).map((lesson) => ({ kind: "lesson", data: lesson })),
+        ...DATA.exams.filter((exam) => exam.track === track).map((exam) => ({ kind: "exam", data: exam }))
+      ];
+      const done = tasks.filter((task) => task.kind === "lesson" ? isDone(task.data.id) : bestScore(task.data.id) >= task.data.pass).length;
+      const available = tasks.some((task) => task.kind === "lesson" ? Gate.canLesson(task.data) : Gate.canExam(task.data));
+      return {
+        track,
+        tasks,
+        done,
+        available,
+        title: trackNames[track] || `学习阶段 ${index + 1}`,
+        percent: tasks.length ? Math.round((done / tasks.length) * 100) : 0
+      };
+    });
+    const activeStage = Math.max(0, stages.findIndex((stage) => stage.available && stage.done < stage.tasks.length));
 
     view().innerHTML = `
       <div class="hello">
         <div>
-          <p>${hello} · ${date}</p>
+          <p>${memberName}${hello} · ${date}</p>
           <h2>${headline}</h2>
         </div>
         ${progressRing(completionRate())}
@@ -959,22 +991,53 @@
           <small>待处理运营通知</small>
         </button>
       </div>
-      ${pendingUpdates.length ? `<div class="sec-title"><h3>更新教学（需要学习）</h3><span>${pendingUpdates.length}条</span></div>
-      ${pendingUpdates.map((lesson) => `
-        <button class="card lesson-card ops-list" data-act="open-lesson" data-id="${lesson.id}">
-          <div class="top">
-            <span class="ops-tag">${lesson.urgency}</span>
-            <span>${lesson.minutes} 分钟</span>
-          </div>
-          <strong>${escapeHtml(lesson.title)}</strong>
-          <p class="muted">${escapeHtml(lesson.summary)}</p>
-        </button>`).join("")}
-      ` : "<p class='empty'>暂无待学习更新</p>"}
-      ${box.pendingLessons.length ? `<button class="card continue" data-act="open-lesson" data-id="${next.id}">
-        <div class="kicker">${box.urgentLessons.length ? "先处理紧急" : "继续学习"}</div>
-        <strong>${escapeHtml(next.title)}</strong>
-        <div class="meta">${TYPE_LABEL[next.type]} · ${minutesLabel(next.minutes)}</div>
-      </button>` : ""}
+      <section class="learning-plan">
+        <header class="learning-plan-head">
+          <div><span>学习路径</span><h3>任务大纲</h3></div>
+          <strong>${learnedCount} / ${learnableLessons.length}<small> 已完成课程</small></strong>
+        </header>
+        <div class="stage-tabs" aria-label="学习阶段">
+          ${stages.map((stage, index) => `
+            <button type="button" class="stage-tab ${index === activeStage ? "on" : ""} ${!stage.available ? "locked" : ""}" data-stage-target="academy-stage-${index}">
+              <i>${stage.done === stage.tasks.length && stage.tasks.length ? "✓" : !stage.available ? "×" : index + 1}</i>
+              <span>阶段${index + 1}</span>
+              <small>${stage.percent}%</small>
+            </button>`).join("")}
+        </div>
+        <div class="learning-stages">
+          ${stages.map((stage, stageIndex) => `
+            <section class="learning-stage" id="academy-stage-${stageIndex}">
+              <div class="learning-stage-head">
+                <div><span>阶段 ${String(stageIndex + 1).padStart(2, "0")}</span><h4>${escapeHtml(stage.title)}</h4><small>${stage.tasks.length} 项任务</small></div>
+                <div class="stage-score"><b>${stage.percent}%</b><span>阶段进度</span></div>
+              </div>
+              <div class="stage-progress"><i style="width:${stage.percent}%"></i></div>
+              <div class="task-list">
+                ${stage.tasks.map((task) => {
+                  const item = task.data;
+                  const isExam = task.kind === "exam";
+                  const locked = isExam ? !Gate.canExam(item) : !Gate.canLesson(item);
+                  const done = isExam ? bestScore(item.id) >= item.pass : isDone(item.id);
+                  const score = isExam ? bestScore(item.id) : -1;
+                  const action = locked ? "locked" : isExam ? "go" : "open-lesson";
+                  const attrs = isExam ? `data-hash="#/exam/${item.id}"` : `data-id="${item.id}"`;
+                  return `<button class="learning-task ${done ? "done" : ""} ${locked ? "locked" : ""}" data-act="${action}" ${attrs}>
+                    <span class="task-status">${done ? "✓" : locked ? "锁" : ""}</span>
+                    <span class="task-main">
+                      <strong>${escapeHtml(item.title)}</strong>
+                      <small><i>必修</i><i>${isExam ? "考试" : TYPE_LABEL[item.type]}</i>${isExam && score >= 0 ? `<em>${score} 分</em>` : `<em>${minutesLabel(item.minutes)}</em>`}</small>
+                    </span>
+                    <span class="task-result">${done ? (isExam ? "已通过" : "已完成") : locked ? "待授权" : isExam ? "去考试" : "去学习"}</span>
+                  </button>`;
+                }).join("")}
+              </div>
+            </section>`).join("")}
+        </div>
+        ${box.pendingLessons.length && next ? `<div class="learning-continue">
+          <div><span>${box.urgentLessons.length ? "优先学习" : "最近学习"}</span><strong>${escapeHtml(next.title)}</strong></div>
+          <button class="primary" data-act="open-lesson" data-id="${next.id}">继续学习</button>
+        </div>` : `<div class="learning-continue complete"><div><span>学习任务</span><strong>当前课程已全部完成</strong></div><b>✓</b></div>`}
+      </section>
       <div class="sec-title"><h3>重要消息</h3><span>${importantMessages.length}</span></div>
       ${importantMessages.length ? importantMessages.map((item) => `
         <button class="card notice ${item.tone === "urgent" ? "urgent" : ""}" data-act="${item.act}" ${item.id ? `data-id="${item.id}"` : ""} ${item.hash ? `data-hash="${item.hash}"` : ""}>
@@ -992,6 +1055,112 @@
           </button>`;
         }).join("") : `<div class="card notice clear"><strong>重要考试项已完成</strong><p class="muted">当前暂无关键考试待过。</p></div>`}
     `;
+    view().querySelectorAll("[data-stage-target]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const target = document.getElementById(button.dataset.stageTarget);
+        target?.scrollIntoView({ behavior: "smooth", block: "start" });
+        view().querySelectorAll(".stage-tab").forEach((item) => item.classList.toggle("on", item === button));
+      });
+    });
+  }
+
+  const CourseSearch = {
+    cache: new Map(),
+    loading: null,
+    normalize(value) {
+      return String(value || "").normalize("NFKC").toLowerCase().replace(/[\s\-_·，。！？、：；（）()]/g, "");
+    },
+    ensure() {
+      if (window.pinyinPro?.pinyin) return Promise.resolve(true);
+      if (this.loading) return this.loading;
+      this.loading = new Promise((resolve) => {
+        const existing = document.querySelector("script[data-academy-pinyin]");
+        if (existing) {
+          existing.addEventListener("load", () => resolve(Boolean(window.pinyinPro?.pinyin)), { once: true });
+          existing.addEventListener("error", () => resolve(false), { once: true });
+          return;
+        }
+        const script = document.createElement("script");
+        script.src = "../vendor/pinyin-pro.min.js";
+        script.async = true;
+        script.dataset.academyPinyin = "true";
+        script.onload = () => resolve(Boolean(window.pinyinPro?.pinyin));
+        script.onerror = () => resolve(false);
+        document.head.appendChild(script);
+      });
+      return this.loading;
+    },
+    phonetic(text) {
+      const source = String(text || "");
+      if (this.cache.has(source)) return this.cache.get(source);
+      let result = { full: "", initial: "" };
+      if (window.pinyinPro?.pinyin && source) {
+        try {
+          result = {
+            full: this.normalize(window.pinyinPro.pinyin(source, { toneType: "none", type: "array" }).join("")),
+            initial: this.normalize(window.pinyinPro.pinyin(source, { pattern: "first", toneType: "none" }))
+          };
+        } catch (_) { }
+      }
+      this.cache.set(source, result);
+      return result;
+    },
+    sequence(text, query) {
+      if (query.length < 2 || query.length > text.length) return false;
+      let cursor = 0;
+      for (const char of text) {
+        if (char === query[cursor]) cursor += 1;
+        if (cursor === query.length) return true;
+      }
+      return false;
+    },
+    fieldScore(text, query, weight) {
+      const normalized = this.normalize(text);
+      if (!normalized) return 0;
+      if (normalized === query) return 180 * weight;
+      if (normalized.startsWith(query)) return 150 * weight;
+      if (normalized.includes(query)) return 125 * weight;
+      const phonetic = this.phonetic(text);
+      if (phonetic.initial === query) return 145 * weight;
+      if (phonetic.initial.startsWith(query)) return 130 * weight;
+      if (phonetic.initial.includes(query)) return 115 * weight;
+      if (phonetic.full.startsWith(query)) return 120 * weight;
+      if (phonetic.full.includes(query)) return 105 * weight;
+      if (this.sequence(normalized, query)) return 60 * weight;
+      if (this.sequence(phonetic.initial, query)) return 52 * weight;
+      if (this.sequence(phonetic.full, query)) return 45 * weight;
+      return 0;
+    },
+    rank(lesson, keyword) {
+      const query = this.normalize(keyword);
+      if (!query) return 1;
+      const blockText = Array.isArray(lesson.blocks)
+        ? lesson.blocks.map((block) => [block.text, block.title, ...(block.items || [])].filter(Boolean).join(" ")).join(" ")
+        : "";
+      return Math.max(
+        this.fieldScore(lesson.title, query, 4),
+        this.fieldScore(lesson.summary, query, 2),
+        this.fieldScore(lesson.track, query, 1.4),
+        this.fieldScore(blockText, query, 1)
+      );
+    }
+  };
+
+  function renderCourseCards(items, keyword) {
+    if (!items.length) return `
+      <div class="course-search-empty">
+        <strong>没有找到相关课程</strong>
+        <p>换个关键词试试，例如课程名称、内容关键词或拼音首字母。</p>
+      </div>`;
+    return items.map((lesson) => {
+      const locked = !Gate.canLesson(lesson);
+      return `<button class="card lesson-card course-result" data-act="open-lesson" data-id="${lesson.id}">
+        <div class="top"><span class="tag">${locked ? "需授权" : TYPE_LABEL[lesson.type]}</span><span>${isDone(lesson.id) ? "已完成" : minutesLabel(lesson.minutes)}</span></div>
+        <strong>${escapeHtml(lesson.title)}</strong>
+        <p class="muted">${locked ? "店长授权后可学" : escapeHtml(lesson.summary)}</p>
+        ${keyword ? `<small class="course-match-hint">匹配“${escapeHtml(keyword)}”</small>` : ""}
+      </button>`;
+    }).join("");
   }
 
   function renderLearn(type) {
@@ -1001,19 +1170,45 @@
     const chips = [["all", "全部"], ["article", "图文"], ["video", "视频"]];
     const items = DATA.lessons.filter((item) => type === "all" || item.type === type);
     view().innerHTML = `
+      <div class="course-search" role="search">
+        <span class="course-search-icon" aria-hidden="true"></span>
+        <input id="course-search-input" type="search" inputmode="search" autocomplete="off" placeholder="搜索课程、内容或拼音简写" aria-label="搜索课程">
+        <button type="button" id="course-search-clear" hidden>清空</button>
+      </div>
+      <div class="course-search-meta"><span id="course-search-count">共 ${items.length} 门课程</span><small>支持中文、全拼和首字母</small></div>
       <div class="chips">
         ${chips.map(([id, label]) => `<button class="chip ${type === id ? "on" : ""}" data-act="go" data-hash="#/learn?type=${id}">${label}</button>`).join("")}
       </div>
       ${!Auth.canFull(Auth.session) ? `<p class="muted" style="margin-bottom:12px">当前是基本权限。视频和进阶课需要店长授权。</p>` : ""}
-      ${items.map((lesson) => {
-        const locked = !Gate.canLesson(lesson);
-        return `<button class="card lesson-card" data-act="open-lesson" data-id="${lesson.id}">
-          <div class="top"><span class="tag">${locked ? "需授权" : TYPE_LABEL[lesson.type]}</span><span>${isDone(lesson.id) ? "已完成" : minutesLabel(lesson.minutes)}</span></div>
-          <strong>${escapeHtml(lesson.title)}</strong>
-          <p class="muted">${locked ? "店长授权后可学" : escapeHtml(lesson.summary)}</p>
-        </button>`;
-      }).join("")}
+      <div id="course-search-results">${renderCourseCards(items, "")}</div>
     `;
+    const input = document.getElementById("course-search-input");
+    const clear = document.getElementById("course-search-clear");
+    const results = document.getElementById("course-search-results");
+    const count = document.getElementById("course-search-count");
+    const updateResults = () => {
+      const keyword = input.value.trim();
+      const matches = keyword
+        ? items.map((lesson, index) => ({ lesson, index, score: CourseSearch.rank(lesson, keyword) }))
+          .filter((item) => item.score > 0)
+          .sort((a, b) => b.score - a.score || a.index - b.index)
+          .map((item) => item.lesson)
+        : items;
+      results.innerHTML = renderCourseCards(matches, keyword);
+      count.textContent = keyword ? `找到 ${matches.length} 门课程` : `共 ${items.length} 门课程`;
+      clear.hidden = !keyword;
+    };
+    input.addEventListener("input", updateResults);
+    input.addEventListener("search", updateResults);
+    clear.addEventListener("click", () => {
+      input.value = "";
+      updateResults();
+      input.focus();
+    });
+    CourseSearch.ensure().then(() => {
+      CourseSearch.cache.clear();
+      if (state.route?.name === "learn" && input.isConnected && input.value.trim()) updateResults();
+    });
   }
 
   function renderExams() {
