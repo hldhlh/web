@@ -112,14 +112,39 @@
 
   const Live = {
     sb: null,
+    channel: null,
     skipUntil: 0,
     timer: 0,
+    poll: 0,
     rev: 0,
+    socketLive: false,
     setStatus(name, label) {
       const el = document.getElementById("live-status");
       if (!el) return;
       el.dataset.state = name;
       el.textContent = label;
+    },
+    origin() {
+      const cfg = window.ACADEMY_CONFIG;
+      try {
+        const cached = JSON.parse(localStorage.getItem("app-network-best-v2") || "null");
+        if (cached && Date.now() - cached.savedAt < 6 * 60 * 60 * 1000 && /^https:\/\//.test(cached.origin)) {
+          return cached.origin;
+        }
+      } catch (_) { }
+      return cfg.url;
+    },
+    fileUrl() {
+      const cfg = window.ACADEMY_CONFIG;
+      return `${this.origin()}/storage/v1/object/${cfg.bucket}/${cfg.object}`;
+    },
+    headers() {
+      const cfg = window.ACADEMY_CONFIG;
+      return {
+        apikey: cfg.key,
+        Authorization: `Bearer ${cfg.key}`,
+        Accept: "application/json"
+      };
     },
     unpack(payload) {
       if (!payload || typeof payload !== "object") return null;
@@ -127,10 +152,10 @@
       if (payload.completed || payload.examHistory) return payload;
       return null;
     },
-    apply(payload, updatedAt) {
+    apply(payload) {
       if (!payload || typeof payload !== "object") return false;
       if (payload.client === CLIENT_ID) return false;
-      const ts = payload.ts || Date.parse(updatedAt || "") || 0;
+      const ts = Number(payload.ts) || 0;
       if (ts && ts < this.rev) return false;
       const next = this.unpack(payload);
       if (!next) return false;
@@ -139,62 +164,93 @@
       try { localStorage.setItem(KEY, JSON.stringify(state.progress)); } catch (_) { }
       return true;
     },
+    refreshView() {
+      const stay = state.route?.name;
+      if (stay === "home" || stay === "learn" || stay === "exams" || stay === "me" || stay === "result") render();
+    },
     async pull() {
-      if (!this.sb) return false;
-      const cfg = window.ACADEMY_CONFIG;
-      const { data, error } = await this.sb.from(cfg.table).select("payload,updated_at").eq("id", cfg.rowId).maybeSingle();
-      if (error || !data) return false;
-      return this.apply(data.payload, data.updated_at);
+      const response = await fetch(`${this.fileUrl()}?t=${Date.now()}`, {
+        headers: Object.assign({ "Cache-Control": "no-cache" }, this.headers()),
+        cache: "no-store"
+      });
+      if (!response.ok) return false;
+      const payload = await response.json();
+      if (this.apply(payload)) this.refreshView();
+      return true;
+    },
+    async persist(payload) {
+      const response = await fetch(this.fileUrl(), {
+        method: "POST",
+        headers: Object.assign({
+          "Content-Type": "application/json",
+          "x-upsert": "true",
+          "cache-control": "max-age=0"
+        }, this.headers()),
+        body: JSON.stringify(payload)
+      });
+      return response.ok;
     },
     push() {
       try { localStorage.setItem(KEY, JSON.stringify(state.progress)); } catch (_) { }
       clearTimeout(this.timer);
-      this.timer = setTimeout(() => this.flush(), 60);
+      this.timer = setTimeout(() => this.flush(), 50);
     },
     async flush() {
-      if (!this.sb) return;
-      const cfg = window.ACADEMY_CONFIG;
       const payload = { client: CLIENT_ID, ts: Date.now(), data: state.progress };
-      this.skipUntil = Date.now() + 900;
+      this.skipUntil = Date.now() + 500;
       this.rev = payload.ts;
-      const { error } = await this.sb.from(cfg.table).upsert({
-        id: cfg.rowId,
-        payload,
-        updated_at: new Date(payload.ts).toISOString()
-      });
-      this.setStatus(error ? "offline" : "live", error ? "离线" : "已同步");
+      if (this.channel && this.socketLive) {
+        this.channel.send({ type: "broadcast", event: "state", payload });
+      }
+      try {
+        const ok = await this.persist(payload);
+        this.setStatus(ok || this.socketLive ? "live" : "offline", ok || this.socketLive ? "已同步" : "离线");
+      } catch (_) {
+        this.setStatus(this.socketLive ? "live" : "offline", this.socketLive ? "已同步" : "离线");
+      }
+    },
+    startPoll() {
+      if (this.poll) return;
+      this.pull().catch(() => { });
+      this.poll = setInterval(() => this.pull().catch(() => { }), 1800);
+    },
+    stopPoll() {
+      if (!this.poll) return;
+      clearInterval(this.poll);
+      this.poll = 0;
     },
     subscribe() {
-      const cfg = window.ACADEMY_CONFIG;
-      this.sb.channel("academy-live", { config: { broadcast: { self: false } } })
-        .on("postgres_changes", {
-          event: "*",
-          schema: "public",
-          table: cfg.table,
-          filter: `id=eq.${cfg.rowId}`
-        }, (msg) => {
-          if (Date.now() < this.skipUntil) return;
-          if (!msg.new) return;
-          if (this.apply(msg.new.payload, msg.new.updated_at)) {
-            this.setStatus("live", "已同步");
-            const stay = state.route?.name;
-            if (stay === "home" || stay === "learn" || stay === "exams" || stay === "me" || stay === "result") render();
-          }
-        })
-        .subscribe((status) => {
-          if (status === "SUBSCRIBED") this.setStatus("live", "已同步");
-          else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") this.setStatus("offline", "离线");
-        });
+      this.channel = this.sb.channel("academy-live", { config: { broadcast: { self: false } } });
+      this.channel.on("broadcast", { event: "state" }, ({ payload }) => {
+        if (Date.now() < this.skipUntil) return;
+        if (this.apply(payload)) {
+          this.setStatus("live", "已同步");
+          this.refreshView();
+        }
+      });
+      this.channel.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          this.socketLive = true;
+          this.setStatus("live", "已同步");
+          this.stopPoll();
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          this.socketLive = false;
+          this.startPoll();
+        }
+      });
+      setTimeout(() => {
+        if (!this.socketLive) this.startPoll();
+      }, 2200);
     },
     async connect() {
-      const cfg = window.ACADEMY_CONFIG;
       this.setStatus("connecting", "同步中");
       try {
         const boot = await window.ACADEMY_BOOTSTRAP;
-        if (boot?.row && this.apply(boot.row.payload, boot.row.updated_at)) render();
+        if (boot?.payload && this.apply(boot.payload)) render();
       } catch (_) { }
+      const cfg = window.ACADEMY_CONFIG;
       if (!window.supabase?.createClient || !cfg) {
-        this.setStatus("offline", "离线");
+        this.startPoll();
         return;
       }
       this.sb = window.supabase.createClient(cfg.url, cfg.key, {
@@ -202,7 +258,8 @@
         realtime: { params: { eventsPerSecond: 20 } }
       });
       try {
-        if (await this.pull()) render();
+        const ok = await this.pull();
+        this.setStatus(ok ? "live" : "connecting", ok ? "已同步" : "同步中");
       } catch (_) { }
       this.subscribe();
     }

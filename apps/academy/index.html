@@ -13,8 +13,8 @@
     window.ACADEMY_CONFIG = {
       url: "https://fmxddvjgkykuqwmasigo.supabase.co",
       key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo",
-      table: "academy_state",
-      rowId: "shared"
+      bucket: "cloud-files",
+      object: "academy/state.json"
     };
     window.ACADEMY_BOOTSTRAP = (() => {
       const config = window.ACADEMY_CONFIG;
@@ -25,17 +25,14 @@
           origin = cached.origin;
         }
       } catch (_) { }
-      const url = new URL(`${origin}/rest/v1/${config.table}`);
-      url.searchParams.set("select", "payload,updated_at");
-      url.searchParams.set("id", `eq.${config.rowId}`);
-      url.searchParams.set("limit", "1");
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 6500);
-      return fetch(url, {
+      return fetch(`${origin}/storage/v1/object/${config.bucket}/${config.object}?t=${Date.now()}`, {
         headers: {
           apikey: config.key,
           Authorization: `Bearer ${config.key}`,
-          Accept: "application/json"
+          Accept: "application/json",
+          "Cache-Control": "no-cache"
         },
         mode: "cors",
         credentials: "omit",
@@ -44,9 +41,8 @@
         signal: controller.signal
       }).then(async (response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const rows = await response.json();
-        return { row: rows[0] || null, error: null };
-      }, (error) => ({ row: null, error })).finally(() => clearTimeout(timer));
+        return { payload: await response.json(), error: null };
+      }, (error) => ({ payload: null, error })).finally(() => clearTimeout(timer));
     })();
   </script>
   <link rel="stylesheet" href="./style.css">
