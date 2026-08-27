@@ -10,6 +10,7 @@ export function getAppDirectories() {
     { name: "今岭流水可视化", path: "jlksh/index.html", icon: "jlksh/icon.svg", fallback: "流" },
     { name: "今岭后厨订货", path: "jlhcdh/index.html", icon: "jlhcdh/icon.svg", fallback: "订" },
     { name: "今岭学堂", path: "academy/index.html", icon: "academy/icon.svg", fallback: "学" },
+    { name: "学堂后台", path: "academy/admin.html", icon: "academy/icon.svg", fallback: "管" },
     { name: "阅图", path: "vista/index.html", icon: "vista/icon.svg", fallback: "阅" },
     { name: "SVG", path: "svg/index.html", icon: "svg/icon.svg", fallback: "S" },
     { name: "日志", path: "log/index.html", icon: "log/icon.svg", fallback: "志" },

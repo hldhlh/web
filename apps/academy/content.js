@@ -1,6 +1,6 @@
 window.ACADEMY_CONTENT = {
   tracks: [
-    { id: "onboard", title: "岗前必修", hint: "开门前必须过的线" },
+    { id: "onboard", title: "岗前必修", hint: "开门前必须过的线", urgent: true },
     { id: "html", title: "HTML 动手学", hint: "看、玩、考，一次学会结构" },
     { id: "tools", title: "门户效率", hint: "把今岭工具用到手上" }
   ],

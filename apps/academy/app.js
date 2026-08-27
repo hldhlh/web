@@ -1,6 +1,11 @@
 (() => {
   const DATA = window.ACADEMY_CONTENT;
-  const KEY = "academy-progress-v1";
+  const Auth = window.AcademyAuth;
+  const Gate = window.AcademyGate;
+
+  function progressKey() {
+    return `academy-progress-${Auth.session?.id || "anon"}`;
+  }
   const LETTERS = "ABCDEFGH";
 
   const TYPE_LABEL = { article: "图文", video: "视频", game: "互动" };
@@ -92,7 +97,7 @@
 
   function loadProgress() {
     try {
-      return Object.assign(defaults(), JSON.parse(localStorage.getItem(KEY) || "{}"));
+      return Object.assign(defaults(), JSON.parse(localStorage.getItem(progressKey()) || "{}"));
     } catch (_) {
       return defaults();
     }
@@ -136,7 +141,8 @@
     },
     fileUrl() {
       const cfg = window.ACADEMY_CONFIG;
-      return `${this.origin()}/storage/v1/object/${cfg.bucket}/${cfg.object}`;
+      const id = Auth.session?.id || "anon";
+      return `${this.origin()}/storage/v1/object/${cfg.bucket}/academy/progress/${id}.json`;
     },
     headers() {
       const cfg = window.ACADEMY_CONFIG;
@@ -161,7 +167,7 @@
       if (!next) return false;
       this.rev = ts || Date.now();
       state.progress = Object.assign(defaults(), next);
-      try { localStorage.setItem(KEY, JSON.stringify(state.progress)); } catch (_) { }
+      try { localStorage.setItem(progressKey(), JSON.stringify(state.progress)); } catch (_) { }
       return true;
     },
     refreshView() {
@@ -191,7 +197,7 @@
       return response.ok;
     },
     push() {
-      try { localStorage.setItem(KEY, JSON.stringify(state.progress)); } catch (_) { }
+      try { localStorage.setItem(progressKey(), JSON.stringify(state.progress)); } catch (_) { }
       clearTimeout(this.timer);
       this.timer = setTimeout(() => this.flush(), 50);
     },
@@ -220,7 +226,8 @@
       this.poll = 0;
     },
     subscribe() {
-      this.channel = this.sb.channel("academy-live", { config: { broadcast: { self: false } } });
+      const room = Auth.session?.id ? `academy-live-${Auth.session.id}` : "academy-live-anon";
+      this.channel = this.sb.channel(room, { config: { broadcast: { self: false } } });
       this.channel.on("broadcast", { event: "state" }, ({ payload }) => {
         if (Date.now() < this.skipUntil) return;
         if (this.apply(payload)) {
@@ -244,10 +251,12 @@
     },
     async connect() {
       this.setStatus("connecting", "同步中");
-      try {
-        const boot = await window.ACADEMY_BOOTSTRAP;
-        if (boot?.payload && this.apply(boot.payload)) render();
-      } catch (_) { }
+      this.stopPoll();
+      if (this.channel && this.sb) {
+        this.sb.removeChannel(this.channel);
+        this.channel = null;
+        this.socketLive = false;
+      }
       const cfg = window.ACADEMY_CONFIG;
       if (!window.supabase?.createClient || !cfg) {
         this.startPoll();
@@ -326,6 +335,93 @@
       if (current && !isDone(current.id)) return current;
     }
     return DATA.lessons.find((item) => !isDone(item.id)) || DATA.lessons[0];
+  }
+
+  function isUrgentTrack(trackId) {
+    return Boolean(DATA.tracks.find((track) => track.id === trackId)?.urgent);
+  }
+
+  function examPassed(exam) {
+    return bestScore(exam.id) >= exam.pass;
+  }
+
+  function inbox() {
+    const pendingLessons = DATA.lessons.filter((item) => Gate.canLesson(item) && !isDone(item.id));
+    const urgentLessons = pendingLessons.filter((item) => isUrgentTrack(item.track));
+    const pendingExams = DATA.exams.filter((exam) => Gate.canExam(exam) && !examPassed(exam));
+    const failedExams = pendingExams.filter((exam) => bestScore(exam.id) >= 0);
+    const notices = [];
+
+    if (urgentLessons.length) {
+      const first = urgentLessons[0];
+      notices.push({
+        tone: "urgent",
+        kicker: "紧急待学",
+        title: `岗前必修还剩 ${urgentLessons.length} 课`,
+        detail: `下一课：${first.title} · ${minutesLabel(first.minutes)}`,
+        act: "open-lesson",
+        id: first.id
+      });
+    }
+
+    failedExams.forEach((exam) => {
+      notices.push({
+        tone: "urgent",
+        kicker: "紧急补考",
+        title: `${exam.title} 未通过`,
+        detail: `最高 ${bestScore(exam.id)} 分，${exam.pass} 分才过关`,
+        act: "go",
+        hash: `#/exam/${exam.id}`
+      });
+    });
+
+    pendingExams.filter((exam) => isUrgentTrack(exam.track) && bestScore(exam.id) < 0).forEach((exam) => {
+      notices.push({
+        tone: "urgent",
+        kicker: "紧急待考",
+        title: `${exam.title} 还没考`,
+        detail: `${exam.questions.length} 题 · ${minutesLabel(exam.minutes)}`,
+        act: "go",
+        hash: `#/exam/${exam.id}`
+      });
+    });
+
+    const laterLessons = pendingLessons.filter((item) => !isUrgentTrack(item.track));
+    if (laterLessons.length) {
+      const first = laterLessons[0];
+      notices.push({
+        tone: "info",
+        kicker: "待学习",
+        title: `还有 ${laterLessons.length} 个教程待学`,
+        detail: `下一课：${first.title}`,
+        act: "open-lesson",
+        id: first.id
+      });
+    }
+
+    pendingExams.filter((exam) => !isUrgentTrack(exam.track) && bestScore(exam.id) < 0).forEach((exam) => {
+      notices.push({
+        tone: "info",
+        kicker: "待考试",
+        title: `${exam.title} 待完成`,
+        detail: `${exam.questions.length} 题 · ${exam.pass} 分过关`,
+        act: "go",
+        hash: `#/exam/${exam.id}`
+      });
+    });
+
+    if (state.progress.wrong.length) {
+      notices.push({
+        tone: "info",
+        kicker: "待复习",
+        title: `${state.progress.wrong.length} 道错题待看`,
+        detail: "从错题本里补上缺口",
+        act: "go",
+        hash: "#/me"
+      });
+    }
+
+    return { pendingLessons, urgentLessons, pendingExams, notices };
   }
 
   function parseHash() {
@@ -457,54 +553,103 @@
   }
 
   function renderHome() {
-    setTop("今岭学堂", false);
+    setTop("运营事务看板", false);
     setTab("home");
-    const next = nextLesson();
-    const percent = completionRate();
+    const box = inbox();
+    const next = box.urgentLessons[0] || nextLesson();
     const hour = new Date().getHours();
     const hello = hour < 12 ? "早上好" : hour < 18 ? "下午好" : "晚上好";
     const date = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "short" }).format(new Date());
+    const learnableLessons = DATA.lessons.filter((item) => Gate.canLesson(item));
+    const learnedCount = learnableLessons.filter((item) => isDone(item.id)).length;
+    const unlearnedCount = learnableLessons.length - learnedCount;
+    const pendingUpdates = learnableLessons
+      .filter((item) => !isDone(item.id))
+      .map((item) => ({
+        ...item,
+        urgency: isUrgentTrack(item.track) ? "更新优先" : "待学习"
+      }))
+      .sort((a, b) => Number(b.urgency === "更新优先") - Number(a.urgency === "更新优先"))
+      .slice(0, 5);
+    const importantExams = DATA.exams
+      .filter((exam) => Gate.canExam(exam) && (isUrgentTrack(exam.track) || bestScore(exam.id) < exam.pass))
+      .sort((a, b) => Number(isUrgentTrack(b.track)) - Number(isUrgentTrack(a.track)));
+    const importantMessages = box.notices.slice(0, 5);
+    const headline = pendingUpdates.length
+      ? `待完成 ${unlearnedCount} 课 + 运营事项 ${box.pendingExams.length || 0} 条`
+      : box.notices.length
+        ? `${box.notices.length} 条待办`
+        : "今日任务已清理";
 
     view().innerHTML = `
       <div class="hello">
         <div>
           <p>${hello} · ${date}</p>
-          <h2>先把该过的课过完</h2>
+          <h2>${headline}</h2>
         </div>
-        ${progressRing(percent)}
+        ${progressRing(completionRate())}
       </div>
-      <button class="card continue" data-act="open-lesson" data-id="${next.id}">
-        <div class="kicker">继续学习</div>
+      <div class="ops-kpi">
+        <button class="ops-card" data-act="go" data-hash="#/learn">
+          <span class="ops-tag">学习进度</span>
+          <b>${learnedCount} / ${learnableLessons.length}</b>
+          <small>已学习课程 · 还差 ${unlearnedCount} 课</small>
+        </button>
+        <button class="ops-card" data-act="go" data-hash="#/exams">
+          <span class="ops-tag">考试跟踪</span>
+          <b>${box.pendingExams.length}</b>
+          <small>待完成考试（含需补考）</small>
+        </button>
+        <button class="ops-card" data-act="go" data-hash="#/me">
+          <span class="ops-tag">待学习课程</span>
+          <b>${pendingUpdates.length}</b>
+          <small>今日有更新可学习</small>
+        </button>
+        <button class="ops-card" data-act="go" data-hash="#/me">
+          <span class="ops-tag">重要消息</span>
+          <b>${box.notices.length}</b>
+          <small>待处理运营通知</small>
+        </button>
+      </div>
+      ${pendingUpdates.length ? `<div class="sec-title"><h3>更新教学（需要学习）</h3><span>${pendingUpdates.length}条</span></div>
+      ${pendingUpdates.map((lesson) => `
+        <button class="card lesson-card ops-list" data-act="open-lesson" data-id="${lesson.id}">
+          <div class="top">
+            <span class="ops-tag">${lesson.urgency}</span>
+            <span>${lesson.minutes} 分钟</span>
+          </div>
+          <strong>${escapeHtml(lesson.title)}</strong>
+          <p class="muted">${escapeHtml(lesson.summary)}</p>
+        </button>`).join("")}
+      ` : "<p class='empty'>暂无待学习更新</p>"}
+      ${box.pendingLessons.length ? `<button class="card continue" data-act="open-lesson" data-id="${next.id}">
+        <div class="kicker">${box.urgentLessons.length ? "先处理紧急" : "继续学习"}</div>
         <strong>${escapeHtml(next.title)}</strong>
         <div class="meta">${TYPE_LABEL[next.type]} · ${minutesLabel(next.minutes)}</div>
-        <div class="bar"><i style="width:${isDone(next.id) ? 100 : 18}%"></i></div>
-      </button>
+      </button>` : ""}
+      <div class="sec-title"><h3>重要消息</h3><span>${importantMessages.length}</span></div>
+      ${importantMessages.length ? importantMessages.map((item) => `
+        <button class="card notice ${item.tone === "urgent" ? "urgent" : ""}" data-act="${item.act}" ${item.id ? `data-id="${item.id}"` : ""} ${item.hash ? `data-hash="${item.hash}"` : ""}>
+          <div class="kicker">${item.kicker}</div>
+          <strong>${escapeHtml(item.title)}</strong>
+          <p class="muted">${escapeHtml(item.detail)}</p>
+        </button>`).join("") : `<div class="card notice clear"><strong>当前无待处理消息</strong><p class="muted">新消息和考试更新会推送到这里。</p></div>`}
+      <div class="sec-title"><h3>重要考试</h3><span>${importantExams.length}</span></div>
+      ${importantExams.length ? importantExams.slice(0, 4).map((exam) => {
+          const best = bestScore(exam.id);
+          return `<button class="card lesson-card" data-act="go" data-hash="#/exam/${exam.id}">
+            <div class="top"><span class="ops-tag">${isUrgentTrack(exam.track) ? "关键考核" : "待复查"}${best >= 0 ? ` · ${best}分` : ""}</span><span>${best >= 0 ? `最高 ${best} 分` : minutesLabel(exam.minutes)}</span></div>
+            <strong>${escapeHtml(exam.title)}</strong>
+            <p class="muted">${escapeHtml(exam.summary)}</p>
+          </button>`;
+        }).join("") : `<div class="card notice clear"><strong>重要考试项已完成</strong><p class="muted">当前暂无关键考试待过。</p></div>`}
+      <div class="sec-title"><h3>学习通道</h3><span>4</span></div>
       <div class="modes">
         <button class="mode" data-act="go" data-hash="#/learn?type=article"><span class="dot">文</span>图文</button>
         <button class="mode" data-act="go" data-hash="#/learn?type=video"><span class="dot">播</span>视频</button>
         <button class="mode" data-act="go" data-hash="#/learn?type=game"><span class="dot">玩</span>互动</button>
         <button class="mode" data-act="go" data-hash="#/exams"><span class="dot">考</span>考试</button>
       </div>
-      ${DATA.tracks.map((track) => {
-        const items = lessonsIn(track.id);
-        const exam = DATA.exams.find((item) => item.track === track.id);
-        const done = items.filter((item) => isDone(item.id)).length;
-        return `<section>
-          <div class="sec-title"><h3>${track.title}</h3><span>${done}/${items.length}</span></div>
-          <div class="card track">
-            <header><span>${track.hint}</span><span class="muted">${exam ? exam.title : ""}</span></header>
-            ${items.map((lesson) => `
-              <button class="row" data-act="open-lesson" data-id="${lesson.id}">
-                <span class="badge ${isDone(lesson.id) ? "done" : ""}">${isDone(lesson.id) ? "✓" : TYPE_ICON[lesson.type]}</span>
-                <span class="body"><b>${escapeHtml(lesson.title)}</b><span class="muted">${TYPE_LABEL[lesson.type]} · ${minutesLabel(lesson.minutes)}</span></span>
-              </button>`).join("")}
-            ${exam ? `<button class="row" data-act="go" data-hash="#/exam/${exam.id}">
-              <span class="badge ${bestScore(exam.id) >= exam.pass ? "done" : ""}">${bestScore(exam.id) >= 0 ? bestScore(exam.id) : "考"}</span>
-              <span class="body"><b>${escapeHtml(exam.title)}</b><span class="muted">${exam.questions.length} 题 · ${exam.pass} 分过关</span></span>
-            </button>` : ""}
-          </div>
-        </section>`;
-      }).join("")}
     `;
   }
 
@@ -517,12 +662,15 @@
       <div class="chips">
         ${chips.map(([id, label]) => `<button class="chip ${type === id ? "on" : ""}" data-act="go" data-hash="#/learn?type=${id}">${label}</button>`).join("")}
       </div>
-      ${items.map((lesson) => `
-        <button class="card lesson-card" data-act="open-lesson" data-id="${lesson.id}">
-          <div class="top"><span class="tag">${TYPE_LABEL[lesson.type]}</span><span>${isDone(lesson.id) ? "已完成" : minutesLabel(lesson.minutes)}</span></div>
+      ${!Auth.canFull(Auth.session) ? `<p class="muted" style="margin-bottom:12px">当前是基本权限。视频、互动和进阶课需要店长授权。</p>` : ""}
+      ${items.map((lesson) => {
+        const locked = !Gate.canLesson(lesson);
+        return `<button class="card lesson-card" data-act="open-lesson" data-id="${lesson.id}">
+          <div class="top"><span class="tag">${locked ? "需授权" : TYPE_LABEL[lesson.type]}</span><span>${isDone(lesson.id) ? "已完成" : minutesLabel(lesson.minutes)}</span></div>
           <strong>${escapeHtml(lesson.title)}</strong>
-          <p class="muted">${escapeHtml(lesson.summary)}</p>
-        </button>`).join("")}
+          <p class="muted">${locked ? "店长授权后可学" : escapeHtml(lesson.summary)}</p>
+        </button>`;
+      }).join("")}
     `;
   }
 
@@ -531,10 +679,11 @@
     setTab("exams");
     view().innerHTML = DATA.exams.map((exam) => {
       const best = bestScore(exam.id);
-      return `<button class="card lesson-card" data-act="go" data-hash="#/exam/${exam.id}">
-        <div class="top"><span class="tag">${exam.questions.length} 题</span><span>${best >= 0 ? `最高 ${best} 分` : minutesLabel(exam.minutes)}</span></div>
+      const locked = !Gate.canExam(exam);
+      return `<button class="card lesson-card" data-act="${locked ? "locked" : "go"}" data-hash="#/exam/${exam.id}">
+        <div class="top"><span class="tag">${locked ? "需授权" : `${exam.questions.length} 题`}</span><span>${best >= 0 ? `最高 ${best} 分` : minutesLabel(exam.minutes)}</span></div>
         <strong>${escapeHtml(exam.title)}</strong>
-        <p class="muted">${escapeHtml(exam.summary)}</p>
+        <p class="muted">${locked ? "店长授权后可考" : escapeHtml(exam.summary)}</p>
       </button>`;
     }).join("");
   }
@@ -547,8 +696,8 @@
     view().innerHTML = `
       <div class="hello">
         <div>
-          <p>学习档案</p>
-          <h2>进度留在这台设备</h2>
+          <p>${escapeHtml(Auth.session?.name || "学员")} · ${Auth.canFull(Auth.session) ? "全部权限" : "基本权限"}</p>
+          <h2>${Auth.canFull(Auth.session) ? "可以学全部课程" : "等待店长授权全部权限"}</h2>
         </div>
         ${progressRing(completionRate())}
       </div>
@@ -564,6 +713,8 @@
           <p class="muted">${escapeHtml(item.explain)}</p>
         </button>`).join("") : `<p class="empty">还没有错题。考试里答错的会出现在这里。</p>`}
       <div class="actions">
+        ${Auth.isManager(Auth.session) ? `<a class="primary" href="./admin.html">打开店长后台</a>` : ""}
+        <button class="ghost" data-act="logout">退出账号</button>
         <button class="ghost" data-act="reset">清除本机学习记录</button>
       </div>
     `;
@@ -572,12 +723,25 @@
   function openLesson(id) {
     const lesson = lessonById(id);
     if (!lesson) return go("#/home");
+    if (!Gate.canLesson(lesson)) return renderLocked(lesson.title);
     state.progress.last = { type: "lesson", id };
     save();
     touchStreak();
     if (lesson.type === "article") return renderArticle(lesson);
     if (lesson.type === "video") return startVideo(lesson);
     return startGame(lesson);
+  }
+
+  function renderLocked(title) {
+    setTop(title || "需要授权", true);
+    view().innerHTML = `
+      <div class="card lock-card">
+        <p class="kicker">权限不足</p>
+        <strong>这份内容需要店长授权</strong>
+        <p class="muted">注册后可以看岗前图文。视频、互动、考试和进阶课，要店长在后台点「授权全部」。</p>
+        <button class="primary" data-act="go" data-hash="#/home">返回通知</button>
+      </div>
+    `;
   }
 
   function renderArticle(lesson) {
@@ -848,6 +1012,7 @@
   function startExam(id) {
     const exam = examById(id);
     if (!exam) return go("#/exams");
+    if (!Gate.canExam(exam)) return renderLocked(exam.title);
     state.exam = {
       id,
       index: 0,
@@ -991,6 +1156,7 @@
   }
 
   function onRoute() {
+    if (!Auth.session) return showGate();
     const prev = state.route;
     state.route = parseHash();
     if (prev.name === "exam" && state.route.name === "exam" && prev.id === state.route.id && state.exam) {
@@ -1005,6 +1171,10 @@
     const btn = event.target.closest("[data-act]");
     if (!btn || btn.disabled) return;
     const act = btn.dataset.act;
+    if (act === "gate-mode") {
+      gateMode = btn.dataset.mode;
+      return showGate();
+    }
     if (act === "go") return go(btn.dataset.hash);
     if (act === "open-lesson") return go(`#/lesson/${btn.dataset.id}`);
     if (act === "complete") {
@@ -1019,10 +1189,10 @@
       }
       completeLesson(btn.dataset.id);
       const items = lessonsIn(lesson.track);
-      const following = items[items.findIndex((item) => item.id === lesson.id) + 1];
+      const following = items.slice(items.findIndex((item) => item.id === lesson.id) + 1).find((item) => Gate.canLesson(item));
       if (following) return go(`#/lesson/${following.id}`);
       const exam = DATA.exams.find((item) => item.track === lesson.track);
-      if (exam && bestScore(exam.id) < exam.pass) return go(`#/exam/${exam.id}`);
+      if (exam && Gate.canExam(exam) && bestScore(exam.id) < exam.pass) return go(`#/exam/${exam.id}`);
       return go("#/home");
     }
     if (act === "video-toggle" && state.video) {
@@ -1111,6 +1281,11 @@
       if (item?.examId) return go(`#/exam/${item.examId}`);
       return;
     }
+    if (act === "locked") return renderLocked("需要授权");
+    if (act === "logout") {
+      Auth.logout();
+      return showGate();
+    }
     if (act === "reset") {
       if (!confirm("清除本机学习进度、考试记录和错题本？")) return;
       state.progress = defaults();
@@ -1150,6 +1325,7 @@
   }
 
   function onKey(event) {
+    if (!Auth.session) return;
     if (state.route.name !== "exam" || !state.exam) return;
     const q = currentQuestion();
     const max = (q.type === "judge" ? 2 : q.options.length) - 1;
@@ -1188,11 +1364,57 @@
     requestAnimationFrame(loop);
   }
 
-  function init() {
+  let gateMode = "login";
+  let gateBusy = false;
+
+  function showGate() {
+    document.querySelector(".app").classList.add("gated");
+    setTop("今岭学堂", false);
+    view().innerHTML = `
+      <form class="gate-card" id="auth-form">
+        <p class="kicker">进入学堂</p>
+        <h2>用姓名和密码进入</h2>
+        <div class="chips" style="padding-bottom:8px">
+          <button type="button" class="chip ${gateMode === "login" ? "on" : ""}" data-act="gate-mode" data-mode="login">登录</button>
+          <button type="button" class="chip ${gateMode === "register" ? "on" : ""}" data-act="gate-mode" data-mode="register">注册</button>
+        </div>
+        <label>姓名<input name="name" maxlength="16" autocomplete="username" required></label>
+        <label>密码<input name="password" type="password" minlength="4" autocomplete="${gateMode === "login" ? "current-password" : "new-password"}" required></label>
+        <p class="muted" id="auth-error">注册后可看岗前图文。全部课程要店长在后台授权。</p>
+        <button class="primary" type="submit">${gateMode === "login" ? "登录" : "注册并进入"}</button>
+      </form>
+    `;
+    document.getElementById("auth-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (gateBusy) return;
+      gateBusy = true;
+      const data = new FormData(event.target);
+      const err = document.getElementById("auth-error");
+      try {
+        if (gateMode === "register") await Auth.register(data.get("name"), data.get("password"));
+        else await Auth.login(data.get("name"), data.get("password"));
+        enterApp();
+      } catch (error) {
+        err.textContent = error.message;
+      } finally {
+        gateBusy = false;
+      }
+    });
+  }
+
+  function enterApp() {
+    document.querySelector(".app").classList.remove("gated");
+    state.progress = loadProgress();
+    Live.rev = 0;
+    onRoute();
+    Live.connect();
+  }
+
+  async function init() {
     setTheme(state.theme);
     document.getElementById("back-btn").innerHTML = svgIcon("back");
     document.getElementById("theme-btn").innerHTML = state.theme === "dark" ? svgIcon("sun") : svgIcon("moon");
-    document.getElementById("tab-home").innerHTML = `${svgIcon("home")}<span>首页</span>`;
+    document.getElementById("tab-home").innerHTML = `${svgIcon("home")}<span>运营</span>`;
     document.getElementById("tab-learn").innerHTML = `${svgIcon("learn")}<span>课程</span>`;
     document.getElementById("tab-exams").innerHTML = `${svgIcon("exam")}<span>考试</span>`;
     document.getElementById("tab-me").innerHTML = `${svgIcon("me")}<span>我的</span>`;
@@ -1207,8 +1429,13 @@
     document.getElementById("app").addEventListener("input", onInput);
     window.addEventListener("hashchange", onRoute);
     window.addEventListener("keydown", onKey);
-    onRoute();
-    Live.connect();
+    await Auth.start();
+    Auth.onChange((user) => {
+      if (!user) return showGate();
+      enterApp();
+    });
+    if (!Auth.session) showGate();
+    else enterApp();
     requestAnimationFrame(loop);
   }
 
