@@ -299,6 +299,8 @@
       examHistory: {},
       wrong: [],
       minutes: 0,
+      onlineSeconds: 0,
+      lastSeenAt: 0,
       last: null,
       streakDate: "",
       streak: 0
@@ -307,7 +309,9 @@
 
   function loadProgress() {
     try {
-      return Object.assign(defaults(), JSON.parse(localStorage.getItem(progressKey()) || "{}"));
+      const next = Object.assign(defaults(), JSON.parse(localStorage.getItem(progressKey()) || "{}"));
+      next.onlineSeconds = Math.max(Number(next.onlineSeconds) || 0, (Number(next.minutes) || 0) * 60);
+      return next;
     } catch (_) {
       return defaults();
     }
@@ -388,6 +392,7 @@
       if (!next) return false;
       this.rev = ts || Date.now();
       state.progress = Object.assign(defaults(), next);
+      state.progress.onlineSeconds = Math.max(Number(state.progress.onlineSeconds) || 0, (Number(state.progress.minutes) || 0) * 60);
       try { localStorage.setItem(progressKey(), JSON.stringify(state.progress)); } catch (_) { }
       return true;
     },
@@ -510,6 +515,85 @@
         this.setStatus("local", "本地可用");
       }
       this.subscribe();
+    }
+  };
+
+  const Presence = {
+    timer: 0,
+    userId: "",
+    lastTick: 0,
+    active: false,
+    capture(sync) {
+      if (!Auth.session || !this.userId || this.userId !== Auth.session.id) return;
+      const now = Date.now();
+      if (this.active && this.lastTick) {
+        const elapsed = Math.max(0, Math.floor((now - this.lastTick) / 1000));
+        state.progress.onlineSeconds = (Number(state.progress.onlineSeconds) || 0) + elapsed;
+        state.progress.minutes = Math.floor(state.progress.onlineSeconds / 60);
+      }
+      this.lastTick = now;
+      state.progress.lastSeenAt = now;
+      try { localStorage.setItem(progressKey(), JSON.stringify(state.progress)); } catch (_) { }
+      if (sync) Live.push();
+    },
+    start() {
+      const id = Auth.session?.id || "";
+      if (!id) return;
+      if (this.timer && this.userId === id) return;
+      this.stop();
+      this.userId = id;
+      this.lastTick = Date.now();
+      this.active = document.visibilityState !== "hidden";
+      state.progress.onlineSeconds = Math.max(Number(state.progress.onlineSeconds) || 0, (Number(state.progress.minutes) || 0) * 60);
+      state.progress.lastSeenAt = Date.now();
+      Live.push();
+      this.timer = setInterval(() => this.capture(true), 30000);
+    },
+    visibility() {
+      if (!this.timer) return;
+      this.capture(true);
+      this.active = document.visibilityState !== "hidden";
+      this.lastTick = Date.now();
+    },
+    stop() {
+      if (this.timer) this.capture(true);
+      clearInterval(this.timer);
+      this.timer = 0;
+      this.userId = "";
+      this.lastTick = 0;
+      this.active = false;
+    }
+  };
+
+  const StaffProgress = {
+    rows: new Map(),
+    loading: false,
+    loadedAt: 0,
+    async load(force) {
+      if (!Auth.isManager(Auth.session) || this.loading) return;
+      if (!force && this.loadedAt && Date.now() - this.loadedAt < 30000) return;
+      this.loading = true;
+      if (force) this.rows.clear();
+      const people = Auth.list();
+      await Promise.all(people.map(async (user) => {
+        if (user.id === Auth.session.id) return;
+        try {
+          const payload = await AcademyStore.getJSON(`academy/progress/${user.id}.json`);
+          const source = payload?.data && typeof payload.data === "object" ? payload.data : payload;
+          const progress = Object.assign(defaults(), source || {});
+          progress.onlineSeconds = Math.max(Number(progress.onlineSeconds) || 0, (Number(progress.minutes) || 0) * 60);
+          this.rows.set(user.id, {
+            progress,
+            lastSeenAt: Number(progress.lastSeenAt) || Number(payload?.ts) || 0,
+            available: Boolean(source)
+          });
+        } catch (_) {
+          this.rows.set(user.id, { progress: defaults(), lastSeenAt: 0, available: false });
+        }
+      }));
+      this.loading = false;
+      this.loadedAt = Date.now();
+      if (state.route?.name === "ops" && currentOpsRoute().section === "staff") renderOps();
     }
   };
 
@@ -1530,24 +1614,92 @@
   function renderOpsStaff() {
     const people = Auth.list().sort((a, b) => Number(a.access !== "basic") - Number(b.access !== "basic") || a.name.localeCompare(b.name, "zh"));
     const pending = people.filter((user) => user.access === "basic" && user.role !== "manager").length;
+    const memberData = people.map((user) => {
+      const cached = user.id === Auth.session.id
+        ? { progress: state.progress, lastSeenAt: Number(state.progress.lastSeenAt) || Date.now(), available: true }
+        : StaffProgress.rows.get(user.id);
+      if (!cached) return { user, loading: true };
+      const progress = cached.progress;
+      const lessonDone = DATA.lessons.filter((lesson) => Boolean(progress.completed?.[lesson.id]));
+      const examDone = DATA.exams.filter((exam) => {
+        const attempts = Array.isArray(progress.examHistory?.[exam.id]) ? progress.examHistory[exam.id] : [];
+        const best = attempts.reduce((score, attempt) => Math.max(score, Number(attempt?.score ?? attempt) || 0), 0);
+        return best >= exam.pass;
+      });
+      const total = DATA.lessons.length + DATA.exams.length;
+      const percent = total ? Math.round(((lessonDone.length + examDone.length) / total) * 100) : 0;
+      const lastSeenAt = Number(progress.lastSeenAt) || cached.lastSeenAt || 0;
+      return { user, progress, lessonDone, examDone, percent, lastSeenAt, available: cached.available };
+    });
+    const completeValues = memberData.filter((item) => !item.loading).map((item) => item.percent);
+    const average = completeValues.length ? Math.round(completeValues.reduce((sum, value) => sum + value, 0) / completeValues.length) : 0;
+    const onlineNow = memberData.filter((item) => item.lastSeenAt && Date.now() - item.lastSeenAt < 90000).length;
+    const formatDuration = (seconds) => {
+      const value = Math.max(0, Number(seconds) || 0);
+      if (value < 60) return value ? "不足 1 分钟" : "0 分钟";
+      const hours = Math.floor(value / 3600);
+      const minutes = Math.floor((value % 3600) / 60);
+      return hours ? `${hours} 小时${minutes ? ` ${minutes} 分钟` : ""}` : `${minutes} 分钟`;
+    };
+    const formatSeen = (value) => value
+      ? new Date(value).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })
+      : "尚未产生记录";
     return `
-      <div class="counts" style="grid-template-columns:repeat(2,1fr)">
+      <div class="staff-toolbar">
+        <div><strong>成员学习概览</strong><span>完成度和在线时间每 30 秒自动更新</span></div>
+        <button type="button" class="ghost" data-staff-refresh>刷新数据</button>
+      </div>
+      <div class="counts staff-counts">
         <div class="count"><b>${people.length}</b><span>注册人数</span></div>
         <div class="count ${pending ? "hot" : ""}"><b>${pending}</b><span>待授权</span></div>
+        <div class="count"><b>${onlineNow}</b><span>当前在线</span></div>
+        <div class="count"><b>${average}%</b><span>平均完成度</span></div>
       </div>
-      ${people.map((user) => `
-        <div class="card notice ${user.access === "basic" && user.role !== "manager" ? "urgent" : ""}">
-          <div class="kicker">${user.role === "manager" ? "店长" : "员工"} · ${staffAccessLabel(user)}</div>
-          <strong>${escapeHtml(user.name)}</strong>
-          <p class="muted">注册于 ${escapeHtml((user.createdAt || "").replace("T", " ").slice(0, 16))}${user.approvedBy ? ` · ${escapeHtml(user.approvedBy)} 授权` : ""}</p>
-          <div class="tools" style="margin-top:10px">
-            ${user.access !== "full" && user.access !== "blocked" ? `<button data-act="ops-staff-auth" data-id="${user.id}" data-access="full">授权全部</button>` : ""}
-            ${user.access === "full" && user.id !== Auth.session.id ? `<button data-act="ops-staff-auth" data-id="${user.id}" data-access="basic">收回全部</button>` : ""}
-            ${user.access !== "blocked" && user.id !== Auth.session.id ? `<button data-act="ops-staff-auth" data-id="${user.id}" data-access="blocked">停用</button>` : ""}
-            ${user.access === "blocked" ? `<button data-act="ops-staff-auth" data-id="${user.id}" data-access="basic">恢复基本</button>` : ""}
-          </div>
-        </div>
-      `).join("")}
+      <div class="staff-list">
+        ${memberData.map((item) => {
+          const user = item.user;
+          if (item.loading) return `
+            <article class="staff-member is-loading">
+              <div class="staff-member-head"><span class="staff-avatar">${escapeHtml(user.name.slice(0, 1))}</span><div><strong>${escapeHtml(user.name)}</strong><small>正在读取学习数据...</small></div></div>
+              <div class="staff-loading-line"></div>
+            </article>`;
+          const isOnline = item.lastSeenAt && Date.now() - item.lastSeenAt < 90000;
+          const pendingLessons = DATA.lessons.filter((lesson) => !item.progress.completed?.[lesson.id]);
+          const passedExamIds = new Set(item.examDone.map((exam) => exam.id));
+          const pendingExams = DATA.exams.filter((exam) => !passedExamIds.has(exam.id));
+          return `
+            <article class="staff-member ${user.access === "blocked" ? "is-blocked" : ""}">
+              <div class="staff-member-head">
+                <span class="staff-avatar">${escapeHtml(user.name.slice(0, 1))}</span>
+                <div class="staff-identity">
+                  <div><strong>${escapeHtml(user.name)}</strong><span class="staff-role">${user.role === "manager" ? "店长" : "员工"}</span></div>
+                  <small><i class="staff-presence ${isOnline ? "on" : ""}"></i>${isOnline ? "当前在线" : `最后在线 ${formatSeen(item.lastSeenAt)}`}</small>
+                </div>
+                <div class="staff-percent" style="--percent:${item.percent * 3.6}deg"><b>${item.percent}%</b><span>完成度</span></div>
+              </div>
+              <div class="staff-progress-track"><i style="width:${item.percent}%"></i></div>
+              <div class="staff-metrics">
+                <div><b>${item.lessonDone.length}<small> / ${DATA.lessons.length}</small></b><span>完成课程</span></div>
+                <div><b>${item.examDone.length}<small> / ${DATA.exams.length}</small></b><span>通过考试</span></div>
+                <div><b>${formatDuration(item.progress.onlineSeconds)}</b><span>累计在线学习</span></div>
+              </div>
+              <details class="staff-detail">
+                <summary>查看学习明细 <span>${pendingLessons.length + pendingExams.length ? `${pendingLessons.length + pendingExams.length} 项待完成` : "已全部完成"}</span></summary>
+                <div class="staff-detail-body">
+                  <section><strong>待学习课程</strong><p>${pendingLessons.length ? pendingLessons.map((lesson) => escapeHtml(lesson.title)).join("、") : "课程已全部完成"}</p></section>
+                  <section><strong>待通过考试</strong><p>${pendingExams.length ? pendingExams.map((exam) => escapeHtml(exam.title)).join("、") : "考试已全部通过"}</p></section>
+                  <section><strong>账号权限</strong><p>${staffAccessLabel(user)}${user.approvedBy ? ` · 由 ${escapeHtml(user.approvedBy)} 授权` : ""}</p></section>
+                  <div class="tools staff-actions">
+                    ${user.access !== "full" && user.access !== "blocked" ? `<button data-act="ops-staff-auth" data-id="${user.id}" data-access="full">开放全部学习内容</button>` : ""}
+                    ${user.access === "full" && user.id !== Auth.session.id ? `<button data-act="ops-staff-auth" data-id="${user.id}" data-access="basic">改为基础权限</button>` : ""}
+                    ${user.access !== "blocked" && user.id !== Auth.session.id ? `<button data-act="ops-staff-auth" data-id="${user.id}" data-access="blocked">停用账号</button>` : ""}
+                    ${user.access === "blocked" ? `<button data-act="ops-staff-auth" data-id="${user.id}" data-access="basic">恢复账号</button>` : ""}
+                  </div>
+                </div>
+              </details>
+            </article>`;
+        }).join("")}
+      </div>
     `;
   }
 
@@ -1618,6 +1770,14 @@
         </main>
       </div>
     `;
+    if (active === "staff") {
+      StaffProgress.load();
+      view().querySelector("[data-staff-refresh]")?.addEventListener("click", (event) => {
+        event.currentTarget.disabled = true;
+        event.currentTarget.textContent = "刷新中...";
+        StaffProgress.load(true);
+      });
+    }
   }
 
   function openLesson(id) {
@@ -2334,6 +2494,7 @@
   let gateBusy = false;
 
   function showGate() {
+    Presence.stop();
     document.querySelector(".app").classList.add("gated");
     setTop("今岭学堂", false);
     view().innerHTML = `
@@ -2373,6 +2534,7 @@
   function enterApp() {
     document.querySelector(".app").classList.remove("gated");
     state.progress = loadProgress();
+    Presence.start();
     Live.rev = 0;
     onRoute();
     Live.connect();
@@ -2417,6 +2579,8 @@
     window.addEventListener("app-network-change", () => Live.scheduleReconnect(), { passive: true });
     window.addEventListener("hashchange", onRoute);
     window.addEventListener("keydown", onKey);
+    document.addEventListener("visibilitychange", () => Presence.visibility());
+    window.addEventListener("pagehide", () => Presence.capture(true));
     Auth.onChange((user) => {
       if (!user) return showGate();
       enterApp();
