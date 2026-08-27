@@ -706,7 +706,7 @@
     if (route.name === "exam" || route.name === "result") return "#/exams";
     if (route.name === "ops") {
       if (route.mode === "add" || route.mode === "edit") return `#/ops?section=${route.section}`;
-      return "#/me";
+      return "#/home";
     }
     if (route.name === "learn" || route.name === "exams" || route.name === "me") return "#/home";
     return "#/home";
