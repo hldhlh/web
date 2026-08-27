@@ -19,19 +19,20 @@
       url: "https://fmxddvjgkykuqwmasigo.supabase.co",
       key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo",
       bucket: "cloud-files",
-      object: "academy/state.json"
+      object: "academy/state.json",
+      table: "academy_progress"
     };
   </script>
-  <link rel="stylesheet" href="./style.css?v=20260827-12">
-  <link rel="preload" href="../network.js?v=20260827-4" as="script">
-  <link rel="preload" href="./app.js?v=20260827-17" as="script">
+  <link rel="stylesheet" href="./style.css?v=20260827-16">
+  <link rel="preload" href="../network.js?v=20260827-5" as="script">
+  <link rel="preload" href="./app.js?v=20260827-22" as="script">
 </head>
 <body>
   <div class="app" id="app">
     <header class="topbar">
       <button class="icon-btn" id="back-btn" title="返回" aria-label="返回" hidden></button>
       <h1 id="top-title">今岭学堂</h1>
-      <span class="live" id="live-status" data-state="local" title="实时同步">本地可用</span>
+      <span class="live" id="live-status" data-state="connecting" title="实时同步">同步中</span>
       <button class="icon-btn" id="theme-btn" title="切换主题" aria-label="切换主题"></button>
     </header>
     <main class="view" id="view"><div class="boot-screen" aria-label="正在进入学堂"><span></span><strong>今岭学堂</strong><small>正在准备今日学习事务</small></div></main>
@@ -43,12 +44,12 @@
     </nav>
   </div>
   <noscript>今岭学堂需要启用 JavaScript。</noscript>
-  <script defer src="../network.js?v=20260827-4"></script>
-  <script defer src="./framework/store.js?v=20260827-2"></script>
-  <script defer src="./framework/auth.js?v=20260827-2"></script>
+  <script defer src="../network.js?v=20260827-5"></script>
+  <script defer src="./framework/store.js?v=20260827-4"></script>
+  <script defer src="./framework/auth.js?v=20260827-4"></script>
   <script defer src="./framework/gate.js"></script>
   <script defer src="./content.js?v=20260827-6"></script>
-  <script defer src="./app.js?v=20260827-17"></script>
+  <script defer src="./app.js?v=20260827-22"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistration().then((registration) => registration?.update()).catch(() => {});

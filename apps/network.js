@@ -246,7 +246,13 @@
     const sdk = window.supabase;
     if (!sdk?.createClient || sdk.createClient.__appNetworkPatched) return Boolean(sdk?.createClient);
     const createClient = sdk.createClient.bind(sdk);
-    const patched = (url, key, options) => createClient(replaceOrigin(url, currentOrigin), key, enhanceOptions(options));
+    const patched = (url, key, options = {}) => {
+      const directRealtime = options.appNetworkRealtimeDirect === true;
+      const clientOptions = { ...options };
+      delete clientOptions.appNetworkRealtimeDirect;
+      const targetOrigin = directRealtime ? normalize(url || PROJECT_ORIGIN) : replaceOrigin(url, currentOrigin);
+      return createClient(targetOrigin, key, enhanceOptions(clientOptions));
+    };
     patched.__appNetworkPatched = true;
     sdk.createClient = patched;
     return true;
@@ -254,6 +260,7 @@
 
   window.APP_NETWORK = {
     get origin() { return currentOrigin; },
+    get projectOrigin() { return PROJECT_ORIGIN; },
     get endpoints() { return nodes.map((node) => ({ ...node })); },
     benchmark,
     addEndpoints,

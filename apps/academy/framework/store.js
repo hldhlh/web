@@ -26,6 +26,37 @@ window.AcademyStore = (() => {
     return `${origin()}/storage/v1/object/${cfg().bucket}/${path}`;
   }
 
+  function restUrl(table, params) {
+    const url = new URL(`${origin()}/rest/v1/${table}`);
+    Object.entries(params || {}).forEach(([key, value]) => {
+      if (value != null && value !== "") url.searchParams.set(key, value);
+    });
+    return url.toString();
+  }
+
+  async function restSelect(table, params) {
+    const response = await request(restUrl(table, params), {
+      headers: headers({ "Cache-Control": "no-cache" }),
+      cache: "no-store"
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  }
+
+  async function restUpsert(table, row, onConflict) {
+    const response = await request(restUrl(table, onConflict ? { on_conflict: onConflict } : {}), {
+      method: "POST",
+      appNetworkSafeWrite: true,
+      headers: headers({
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=minimal"
+      }),
+      body: JSON.stringify(row)
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return true;
+  }
+
   async function getJSON(path) {
     const response = await request(`${objectUrl(path)}?t=${Date.now()}`, {
       headers: headers({ "Cache-Control": "no-cache" }),
@@ -53,10 +84,11 @@ window.AcademyStore = (() => {
 
   function realtimeClient() {
     if (!window.supabase?.createClient) return null;
-    const selectedOrigin = origin();
+    const selectedOrigin = window.APP_NETWORK?.projectOrigin || cfg().url;
     if (realtimeClient._sb && realtimeClient._origin === selectedOrigin) return realtimeClient._sb;
     realtimeClient._origin = selectedOrigin;
     realtimeClient._sb = window.supabase.createClient(selectedOrigin, cfg().key, {
+      appNetworkRealtimeDirect: true,
       auth: { persistSession: false, autoRefreshToken: false },
       realtime: { params: { eventsPerSecond: 20 } }
     });
@@ -74,5 +106,5 @@ window.AcademyStore = (() => {
     return ch;
   }
 
-  return { origin, headers, objectUrl, getJSON, putJSON, realtimeClient, channel };
+  return { origin, headers, objectUrl, getJSON, putJSON, restSelect, restUpsert, realtimeClient, channel };
 })();

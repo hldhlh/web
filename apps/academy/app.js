@@ -3,9 +3,6 @@
   const Auth = window.AcademyAuth;
   const Gate = window.AcademyGate;
 
-  function progressKey() {
-    return `academy-progress-${Auth.session?.id || "anon"}`;
-  }
   const LETTERS = "ABCDEFGH";
 
   const TYPE_LABEL = { article: "图文", video: "视频" };
@@ -307,27 +304,25 @@
     };
   }
 
-  function loadProgress() {
-    try {
-      const next = Object.assign(defaults(), JSON.parse(localStorage.getItem(progressKey()) || "{}"));
-      next.onlineSeconds = Math.max(Number(next.onlineSeconds) || 0, (Number(next.minutes) || 0) * 60);
-      return next;
-    } catch (_) {
-      return defaults();
-    }
+  function progressTable() {
+    return window.ACADEMY_CONFIG?.table || "academy_progress";
   }
 
-  const CLIENT_ID = (() => {
-    try {
-      const existing = localStorage.getItem("academy-client-id");
-      if (existing) return existing;
-      const id = (crypto.randomUUID && crypto.randomUUID()) || `c-${Date.now()}`;
-      localStorage.setItem("academy-client-id", id);
-      return id;
-    } catch (_) {
-      return `c-${Date.now()}`;
-    }
-  })();
+  function loadProgress() {
+    return defaults();
+  }
+
+  function normalizeProgress(raw) {
+    const next = Object.assign(defaults(), raw && typeof raw === "object" ? raw : {});
+    next.onlineSeconds = Math.max(Number(next.onlineSeconds) || 0, (Number(next.minutes) || 0) * 60);
+    next.minutes = Math.floor(next.onlineSeconds / 60);
+    next.lastSeenAt = Number(next.lastSeenAt) || 0;
+    next.streak = Number(next.streak) || 0;
+    if (!next.completed || typeof next.completed !== "object") next.completed = {};
+    if (!next.examHistory || typeof next.examHistory !== "object") next.examHistory = {};
+    if (!Array.isArray(next.wrong)) next.wrong = [];
+    return next;
+  }
 
   const Live = {
     sb: null,
@@ -338,6 +333,9 @@
     rev: 0,
     socketLive: false,
     reconnectTimer: 0,
+    reconnectAttempt: 0,
+    connecting: false,
+    hydrated: false,
     statusTimer: 0,
     setStatus(name, label) {
       const el = document.getElementById("live-status");
@@ -353,167 +351,195 @@
       this.statusTimer = setTimeout(() => {
         this.statusTimer = 0;
         const current = document.getElementById("live-status");
-        if (current?.dataset.state === "connecting") this.setStatus("local", "本地可用");
-      }, 4000);
+        if (current?.dataset.state === "connecting") {
+          this.setStatus(navigator.onLine ? "online" : "offline", navigator.onLine ? "在线同步" : "离线可用");
+          this.startPoll();
+          this.scheduleReconnect();
+        }
+      }, 6000);
     },
-    origin() {
-      return window.APP_NETWORK?.origin || window.ACADEMY_CONFIG.url;
+    realtimeOrigin() {
+      return window.APP_NETWORK?.projectOrigin || window.ACADEMY_CONFIG.url;
     },
-    request(input, init) {
-      return window.APP_NETWORK?.request
-        ? window.APP_NETWORK.request(input, init)
-        : window.fetch(input, init);
+    table() {
+      return progressTable();
     },
-    fileUrl() {
-      const cfg = window.ACADEMY_CONFIG;
-      const id = Auth.session?.id || "anon";
-      return `${this.origin()}/storage/v1/object/${cfg.bucket}/academy/progress/${id}.json`;
-    },
-    headers() {
-      const cfg = window.ACADEMY_CONFIG;
-      return {
-        apikey: cfg.key,
-        Authorization: `Bearer ${cfg.key}`,
-        Accept: "application/json"
-      };
-    },
-    unpack(payload) {
-      if (!payload || typeof payload !== "object") return null;
-      if (payload.data && typeof payload.data === "object") return payload.data;
-      if (payload.completed || payload.examHistory) return payload;
-      return null;
-    },
-    apply(payload) {
-      if (!payload || typeof payload !== "object") return false;
-      if (payload.client === CLIENT_ID) return false;
-      const ts = Number(payload.ts) || 0;
+    applyRow(row) {
+      if (!row || typeof row !== "object") return false;
+      const ts = Number(row.ts) || 0;
       if (ts && ts < this.rev) return false;
-      const next = this.unpack(payload);
+      const next = row.payload && typeof row.payload === "object" ? row.payload : null;
       if (!next) return false;
       this.rev = ts || Date.now();
-      state.progress = Object.assign(defaults(), next);
-      state.progress.onlineSeconds = Math.max(Number(state.progress.onlineSeconds) || 0, (Number(state.progress.minutes) || 0) * 60);
-      try { localStorage.setItem(progressKey(), JSON.stringify(state.progress)); } catch (_) { }
+      state.progress = normalizeProgress(next);
       return true;
+    },
+    ingestStaff(row) {
+      if (!row?.user_id) return;
+      const progress = normalizeProgress(row.payload);
+      StaffProgress.rows.set(row.user_id, {
+        progress,
+        lastSeenAt: Number(progress.lastSeenAt) || Number(row.ts) || 0,
+        available: true
+      });
+      if (state.route?.name === "ops" && currentOpsRoute().section === "staff") renderOps();
     },
     refreshView() {
       const stay = state.route?.name;
       if (stay === "home" || stay === "learn" || stay === "exams" || stay === "me" || stay === "result" || stay === "ops") render();
     },
     async pull() {
-      const response = await this.request(`${this.fileUrl()}?t=${Date.now()}`, {
-        headers: Object.assign({ "Cache-Control": "no-cache" }, this.headers()),
-        cache: "no-store"
+      const id = Auth.session?.id;
+      if (!id) return false;
+      const rows = await window.AcademyStore.restSelect(this.table(), {
+        select: "user_id,payload,ts,updated_at",
+        user_id: `eq.${id}`
       });
-      if (!response.ok) return false;
-      const payload = await response.json();
-      if (this.apply(payload)) this.refreshView();
+      const row = Array.isArray(rows) ? rows[0] : null;
+      if (!row) return true;
+      if (this.applyRow(row)) this.refreshView();
       return true;
     },
-    async persist(payload) {
-      const response = await this.request(this.fileUrl(), {
-        method: "POST",
-        appNetworkSafeWrite: true,
-        headers: Object.assign({
-          "Content-Type": "application/json",
-          "x-upsert": "true",
-          "cache-control": "max-age=0"
-        }, this.headers()),
-        body: JSON.stringify(payload)
-      });
-      return response.ok;
+    async persist(row) {
+      return window.AcademyStore.restUpsert(this.table(), row, "user_id");
     },
     push() {
-      try { localStorage.setItem(progressKey(), JSON.stringify(state.progress)); } catch (_) { }
+      if (!this.hydrated || !Auth.session?.id) return;
       clearTimeout(this.timer);
       this.timer = setTimeout(() => this.flush(), 50);
     },
     async flush() {
-      const payload = { client: CLIENT_ID, ts: Date.now(), data: state.progress };
-      this.skipUntil = Date.now() + 500;
-      this.rev = payload.ts;
-      if (this.channel && this.socketLive) {
-        this.channel.send({ type: "broadcast", event: "state", payload });
-      }
+      const id = Auth.session?.id;
+      if (!this.hydrated || !id) return;
+      const ts = Date.now();
+      this.skipUntil = ts + 800;
+      this.rev = ts;
       try {
-        const ok = await this.persist(payload);
-        this.setStatus(ok || this.socketLive ? "live" : "local", ok || this.socketLive ? "已同步" : "本地可用");
+        const ok = await this.persist({
+          user_id: id,
+          payload: state.progress,
+          ts,
+          updated_at: new Date().toISOString()
+        });
+        if (this.socketLive) this.setStatus("live", "实时在线");
+        else if (ok) this.setStatus("online", "在线同步");
+        else this.setStatus(navigator.onLine ? "connecting" : "offline", navigator.onLine ? "正在重连" : "离线可用");
       } catch (_) {
-        this.setStatus(this.socketLive ? "live" : "local", this.socketLive ? "已同步" : "本地可用");
+        this.setStatus(this.socketLive ? "live" : navigator.onLine ? "connecting" : "offline", this.socketLive ? "实时在线" : navigator.onLine ? "正在重连" : "离线可用");
+        if (!this.socketLive) this.scheduleReconnect();
       }
     },
     startPoll() {
       if (this.poll) return;
       const check = () => this.pull().then((ok) => {
-        if (!this.socketLive) this.setStatus(ok ? "live" : "local", ok ? "已同步" : "本地可用");
+        if (!this.socketLive) {
+          this.setStatus(ok ? "online" : navigator.onLine ? "connecting" : "offline", ok ? "在线同步" : navigator.onLine ? "正在重连" : "离线可用");
+          this.scheduleReconnect();
+        }
       }).catch(() => {
-        if (!this.socketLive) this.setStatus("local", "本地可用");
+        if (!this.socketLive) {
+          this.setStatus(navigator.onLine ? "connecting" : "offline", navigator.onLine ? "正在重连" : "离线可用");
+          this.scheduleReconnect();
+        }
       });
       check();
-      this.poll = setInterval(check, 8000);
+      this.poll = setInterval(check, 5000);
     },
     stopPoll() {
       if (!this.poll) return;
       clearInterval(this.poll);
       this.poll = 0;
     },
-    scheduleReconnect() {
-      if (!Auth.session) return;
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = setTimeout(() => this.connect(), 180);
+    scheduleReconnect(immediate) {
+      if (!Auth.session || this.socketLive || this.reconnectTimer) return;
+      const delay = immediate
+        ? 180
+        : Math.min(30000, 700 * (2 ** Math.min(this.reconnectAttempt, 5))) + Math.round(Math.random() * 300);
+      this.reconnectAttempt += 1;
+      this.reconnectTimer = setTimeout(() => {
+        this.reconnectTimer = 0;
+        this.connect();
+      }, delay);
     },
     subscribe() {
-      const room = Auth.session?.id ? `academy-live-${Auth.session.id}` : "academy-live-anon";
-      this.channel = this.sb.channel(room, { config: { broadcast: { self: false } } });
-      this.channel.on("broadcast", { event: "state" }, ({ payload }) => {
+      const channel = this.sb.channel("academy-progress-live");
+      this.channel = channel;
+      channel.on("postgres_changes", { event: "*", schema: "public", table: this.table() }, ({ eventType, new: row, old: prev }) => {
+        const record = row && Object.keys(row).length ? row : prev;
+        if (!record) return;
+        this.ingestStaff(record);
+        if (record.user_id !== Auth.session?.id) return;
+        if (eventType === "DELETE") {
+          state.progress = defaults();
+          this.rev = Date.now();
+          this.refreshView();
+          return;
+        }
         if (Date.now() < this.skipUntil) return;
-        if (this.apply(payload)) {
-          this.setStatus("live", "已同步");
+        if (this.applyRow(record)) {
+          this.setStatus("live", "实时在线");
           this.refreshView();
         }
       });
-      this.channel.subscribe((status) => {
+      channel.subscribe((status) => {
+        if (this.channel !== channel) return;
         if (status === "SUBSCRIBED") {
           this.socketLive = true;
-          this.setStatus("live", "已同步");
+          this.reconnectAttempt = 0;
+          clearTimeout(this.reconnectTimer);
+          this.reconnectTimer = 0;
+          this.setStatus("live", "实时在线");
           this.stopPoll();
-        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
           this.socketLive = false;
-          this.setStatus("local", "本地可用");
+          this.setStatus(navigator.onLine ? "connecting" : "offline", navigator.onLine ? "正在重连" : "离线可用");
           this.startPoll();
+          this.scheduleReconnect();
         }
       });
       setTimeout(() => {
-        if (!this.socketLive) {
-          this.setStatus("local", "本地可用");
+        if (this.channel === channel && !this.socketLive) {
+          this.setStatus(navigator.onLine ? "online" : "offline", navigator.onLine ? "在线同步" : "离线可用");
           this.startPoll();
+          this.scheduleReconnect();
         }
-      }, 2200);
+      }, 3500);
     },
     async connect() {
-      this.setStatus("local", "本地可用");
+      if (this.connecting || !Auth.session) return;
+      this.connecting = true;
+      this.hydrated = false;
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = 0;
+      this.setStatus(navigator.onLine ? "connecting" : "offline", navigator.onLine ? "正在连接" : "离线可用");
       this.stopPoll();
       if (this.channel && this.sb) {
-        this.sb.removeChannel(this.channel);
+        const oldChannel = this.channel;
         this.channel = null;
         this.socketLive = false;
+        this.sb.removeChannel(oldChannel);
+      }
+      try {
+        const ok = await this.pull();
+        this.hydrated = true;
+        this.setStatus(ok ? "connecting" : navigator.onLine ? "connecting" : "offline", ok ? "正在建立实时连接" : navigator.onLine ? "正在重连" : "离线可用");
+      } catch (_) {
+        this.hydrated = true;
+        this.setStatus(navigator.onLine ? "connecting" : "offline", navigator.onLine ? "正在重连" : "离线可用");
       }
       const cfg = window.ACADEMY_CONFIG;
       if (!window.supabase?.createClient || !cfg) {
-        this.setStatus("local", "本地可用");
+        this.connecting = false;
         this.startPoll();
+        this.scheduleReconnect();
         return;
       }
-      this.sb = window.supabase.createClient(this.origin(), cfg.key, {
+      this.sb = window.supabase.createClient(this.realtimeOrigin(), cfg.key, {
+        appNetworkRealtimeDirect: true,
         auth: { persistSession: false, autoRefreshToken: false },
         realtime: { params: { eventsPerSecond: 20 } }
       });
-      try {
-        const ok = await this.pull();
-        this.setStatus(ok ? "live" : "local", ok ? "已同步" : "本地可用");
-      } catch (_) {
-        this.setStatus("local", "本地可用");
-      }
+      this.connecting = false;
       this.subscribe();
     }
   };
@@ -533,7 +559,6 @@
       }
       this.lastTick = now;
       state.progress.lastSeenAt = now;
-      try { localStorage.setItem(progressKey(), JSON.stringify(state.progress)); } catch (_) { }
       if (sync) Live.push();
     },
     start() {
@@ -575,22 +600,31 @@
       this.loading = true;
       if (force) this.rows.clear();
       const people = Auth.list();
-      await Promise.all(people.map(async (user) => {
-        if (user.id === Auth.session.id) return;
-        try {
-          const payload = await AcademyStore.getJSON(`academy/progress/${user.id}.json`);
-          const source = payload?.data && typeof payload.data === "object" ? payload.data : payload;
-          const progress = Object.assign(defaults(), source || {});
-          progress.onlineSeconds = Math.max(Number(progress.onlineSeconds) || 0, (Number(progress.minutes) || 0) * 60);
+      try {
+        const rows = await window.AcademyStore.restSelect(progressTable(), {
+          select: "user_id,payload,ts,updated_at"
+        });
+        const byId = new Map((Array.isArray(rows) ? rows : []).map((row) => [row.user_id, row]));
+        people.forEach((user) => {
+          if (user.id === Auth.session.id) return;
+          const row = byId.get(user.id);
+          if (!row) {
+            this.rows.set(user.id, { progress: defaults(), lastSeenAt: 0, available: false });
+            return;
+          }
+          const progress = normalizeProgress(row.payload);
           this.rows.set(user.id, {
             progress,
-            lastSeenAt: Number(progress.lastSeenAt) || Number(payload?.ts) || 0,
-            available: Boolean(source)
+            lastSeenAt: Number(progress.lastSeenAt) || Number(row.ts) || 0,
+            available: true
           });
-        } catch (_) {
-          this.rows.set(user.id, { progress: defaults(), lastSeenAt: 0, available: false });
-        }
-      }));
+        });
+      } catch (_) {
+        people.forEach((user) => {
+          if (user.id === Auth.session.id) return;
+          if (!this.rows.has(user.id)) this.rows.set(user.id, { progress: defaults(), lastSeenAt: 0, available: false });
+        });
+      }
       this.loading = false;
       this.loadedAt = Date.now();
       if (state.route?.name === "ops" && currentOpsRoute().section === "staff") renderOps();
@@ -2613,7 +2647,7 @@
       return showGate();
     }
     if (act === "reset") {
-      if (!confirm("清除本机学习进度、考试记录和错题本？")) return;
+      if (!confirm("清除云端学习进度、考试记录和错题本？所有设备会一起清空。")) return;
       state.progress = defaults();
       save();
       return renderMe();
@@ -2690,37 +2724,72 @@
 
   function showGate() {
     Presence.stop();
+    const authNotice = Auth.consumeNotice?.() || "";
     document.querySelector(".app").classList.add("gated");
     setTop("今岭学堂", false);
     view().innerHTML = `
       <div class="gate">
         <form class="gate-card" id="auth-form">
-          <p class="kicker">进入学堂</p>
-          <h2>用姓名和密码进入</h2>
+          <div class="gate-intro">
+            <span class="gate-mark">JL</span>
+            <div><p class="kicker">进入学堂</p><h2>${gateMode === "login" ? "欢迎回来" : "创建学习账号"}</h2></div>
+          </div>
           <div class="chips" style="padding-bottom:8px">
             <button type="button" class="chip ${gateMode === "login" ? "on" : ""}" data-act="gate-mode" data-mode="login">登录</button>
             <button type="button" class="chip ${gateMode === "register" ? "on" : ""}" data-act="gate-mode" data-mode="register">注册</button>
           </div>
-          <label>姓名<input name="name" maxlength="16" autocomplete="username" required></label>
-          <label>密码<input name="password" type="password" minlength="4" autocomplete="${gateMode === "login" ? "current-password" : "new-password"}" required></label>
-          <p class="muted" id="auth-error">注册后可看火锅岗前图文。全部课程要店长在后台授权。</p>
-          <button class="primary" type="submit">${gateMode === "login" ? "登录" : "注册并进入"}</button>
+          <label class="gate-label"><span>姓名</span><input name="name" maxlength="16" autocomplete="username" placeholder="请输入注册时的姓名" required><small data-field-error="name"></small></label>
+          <label class="gate-label"><span>密码</span><span class="gate-password"><input name="password" type="password" minlength="4" autocomplete="${gateMode === "login" ? "current-password" : "new-password"}" placeholder="请输入密码" required><button type="button" data-password-toggle>显示</button></span><small data-field-error="password"></small></label>
+          ${authNotice ? `<div class="auth-kicked" role="alert"><i>!</i><span>${escapeHtml(authNotice)}</span></div>` : ""}
+          <p class="auth-message" id="auth-error" role="status" aria-live="polite">${gateMode === "login" ? "使用注册时的姓名和密码登录" : "注册后可学习基础课程，完整权限由店长开放"}</p>
+          <button class="primary gate-submit" id="auth-submit" type="submit"><span>${gateMode === "login" ? "登录" : "注册并进入"}</span><i aria-hidden="true"></i></button>
+          <div class="gate-success" aria-hidden="true"><i>✓</i><strong>${gateMode === "login" ? "登录成功" : "注册成功"}</strong><span>正在进入学堂</span></div>
         </form>
       </div>
     `;
-    document.getElementById("auth-form").addEventListener("submit", async (event) => {
+    const form = document.getElementById("auth-form");
+    const passwordInput = form.elements.password;
+    form.querySelector("[data-password-toggle]").addEventListener("click", (event) => {
+      const visible = passwordInput.type === "text";
+      passwordInput.type = visible ? "password" : "text";
+      event.currentTarget.textContent = visible ? "显示" : "隐藏";
+      passwordInput.focus();
+    });
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
       if (gateBusy) return;
+      document.activeElement?.blur();
       gateBusy = true;
       const data = new FormData(event.target);
       const err = document.getElementById("auth-error");
+      const submit = document.getElementById("auth-submit");
+      form.classList.remove("is-error", "is-success");
+      form.querySelectorAll("[data-field-error]").forEach((item) => { item.textContent = ""; });
+      form.querySelectorAll("input").forEach((item) => item.removeAttribute("aria-invalid"));
+      err.textContent = gateMode === "login" ? "正在核对账号信息..." : "正在创建账号...";
+      submit.disabled = true;
+      form.classList.add("is-loading");
       try {
         if (gateMode === "register") await Auth.register(data.get("name"), data.get("password"));
         else await Auth.login(data.get("name"), data.get("password"));
+        form.classList.remove("is-loading");
+        form.classList.add("is-success");
+        await new Promise((resolve) => setTimeout(resolve, 620));
         enterApp();
       } catch (error) {
+        form.classList.remove("is-loading");
+        form.classList.add("is-error");
         err.textContent = error.message;
+        const field = error.field === "password" ? "password" : error.field === "name" ? "name" : "";
+        if (field) {
+          const input = form.elements[field];
+          input.setAttribute("aria-invalid", "true");
+          form.querySelector(`[data-field-error="${field}"]`).textContent = error.message;
+          input.focus();
+          if (field === "password") input.select();
+        }
       } finally {
+        submit.disabled = false;
         gateBusy = false;
       }
     });
@@ -2728,11 +2797,11 @@
 
   function enterApp() {
     document.querySelector(".app").classList.remove("gated");
-    state.progress = loadProgress();
-    Presence.start();
+    state.progress = defaults();
     Live.rev = 0;
+    Live.hydrated = false;
     onRoute();
-    Live.connect();
+    Live.connect().finally(() => Presence.start());
   }
 
   function loadRealtimeSdk() {
@@ -2771,14 +2840,16 @@
     });
     document.getElementById("app").addEventListener("click", onClick);
     document.getElementById("app").addEventListener("input", onInput);
-    window.addEventListener("app-network-change", () => Live.scheduleReconnect(), { passive: true });
+    window.addEventListener("app-network-change", () => Live.scheduleReconnect(true), { passive: true });
+    window.addEventListener("online", () => Live.scheduleReconnect(true), { passive: true });
+    window.addEventListener("offline", () => Live.setStatus("offline", "离线可用"), { passive: true });
     window.addEventListener("hashchange", onRoute);
     window.addEventListener("keydown", onKey);
     document.addEventListener("visibilitychange", () => Presence.visibility());
     window.addEventListener("pagehide", () => Presence.capture(true));
     Auth.onChange((user) => {
       if (!user) return showGate();
-      enterApp();
+      if (!gateBusy) enterApp();
     });
     await Auth.start();
     if (!Auth.session) showGate();

@@ -14,7 +14,8 @@
       url: "https://fmxddvjgkykuqwmasigo.supabase.co",
       key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo",
       bucket: "cloud-files",
-      object: "academy/state.json"
+      object: "academy/state.json",
+      table: "academy_progress"
     };
     window.APP_NETWORK_ENDPOINTS = Array.isArray(window.ACADEMY_NETWORK_ENDPOINTS)
       ? window.ACADEMY_NETWORK_ENDPOINTS
@@ -34,7 +35,7 @@
   </div>
   <script src="../vendor/supabase.min.js"></script>
   <script src="../network.js?v=20260827-4"></script>
-  <script src="./framework/store.js?v=20260827-2"></script>
+  <script src="./framework/store.js?v=20260827-4"></script>
   <script src="./framework/auth.js?v=20260827-2"></script>
   <script src="./admin.js"></script>
 </body>

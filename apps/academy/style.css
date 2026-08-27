@@ -47,6 +47,14 @@
 
 html, body {
   min-height: 100%;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -77,6 +85,8 @@ code, pre, .mono {
 }
 
 .app {
+  width: 100%;
+  min-width: 0;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -165,6 +175,9 @@ code, pre, .mono {
 }
 
 .view {
+  width: 100%;
+  min-width: 0;
+  overflow-x: clip;
   flex: 1;
   padding: 8px 16px calc(var(--tab-h) + 20px + env(safe-area-inset-bottom));
 }
@@ -438,6 +451,15 @@ code, pre, .mono {
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
   margin: 0 0 16px;
+}
+
+.ops-kpi > *,
+.hello > *,
+.learning-plan,
+.learning-plan-head > *,
+.learning-stage,
+.learning-stage-head > * {
+  min-width: 0;
 }
 
 .ops-card {
@@ -2821,4 +2843,292 @@ button:disabled,
   color: var(--muted);
   font-size: 12px;
   line-height: 1.6;
+}
+
+.live[data-state="live"],
+.live[data-state="online"] {
+  color: var(--ok);
+  background: var(--ok-soft);
+}
+
+.live[data-state="live"]::before {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 16%, transparent);
+  animation: realtime-pulse 1.8s ease-out infinite;
+}
+
+.live[data-state="connecting"] {
+  color: #b7791f;
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.live[data-state="offline"] {
+  color: var(--muted);
+  background: var(--surface-2);
+}
+
+@keyframes realtime-pulse {
+  70%, 100% { box-shadow: 0 0 0 8px transparent; }
+}
+
+/* Login feedback and motion */
+.gate-card {
+  position: relative;
+  animation: gate-enter 420ms cubic-bezier(.2,.8,.2,1) both;
+}
+
+.gate-intro {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-bottom: 18px;
+}
+
+.gate-intro h2 {
+  margin: 2px 0 0;
+}
+
+.gate-mark {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.gate-label {
+  display: grid;
+  gap: 7px;
+  margin-top: 13px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.gate-label > input,
+.gate-password input {
+  height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  outline: 0;
+  background: var(--surface-2);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 500;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.gate-label > input {
+  width: 100%;
+  padding: 0 14px;
+}
+
+.gate-label input:focus {
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.gate-label input[aria-invalid="true"] {
+  border-color: var(--bad);
+  box-shadow: 0 0 0 4px var(--bad-soft);
+}
+
+.gate-label > small {
+  min-height: 0;
+  color: var(--bad);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.gate-label > small:not(:empty) {
+  min-height: 16px;
+  animation: field-message 180ms ease-out both;
+}
+
+.gate-password {
+  position: relative;
+  display: block;
+}
+
+.gate-password input {
+  width: 100%;
+  padding: 0 60px 0 14px;
+}
+
+.gate-password button {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  transform: translateY(-50%);
+}
+
+.auth-message {
+  min-height: 20px;
+  margin: 12px 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.is-error .auth-message {
+  color: var(--bad);
+}
+
+.gate-submit {
+  position: relative;
+  min-height: 48px;
+}
+
+.gate-submit i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  display: none;
+  margin: -9px 0 0 -9px;
+  border: 2px solid rgba(255,255,255,.38);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: gate-spin 700ms linear infinite;
+}
+
+.is-loading .gate-submit span {
+  opacity: 0;
+}
+
+.is-loading .gate-submit i {
+  display: block;
+}
+
+.gate-card.is-error {
+  animation: gate-shake 320ms ease both;
+}
+
+.gate-success {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(.98);
+  transition: opacity 180ms ease, transform 240ms ease;
+}
+
+.gate-success i {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+  border-radius: 50%;
+  background: var(--ok);
+  color: white;
+  font-size: 22px;
+  font-style: normal;
+  box-shadow: 0 0 0 10px var(--ok-soft);
+}
+
+.gate-success strong {
+  font-size: 18px;
+}
+
+.gate-success span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.gate-card.is-success .gate-success {
+  opacity: 1;
+  transform: scale(1);
+}
+
+@keyframes gate-enter {
+  from { opacity: 0; transform: translateY(14px) scale(.985); }
+}
+
+@keyframes gate-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes gate-shake {
+  20% { transform: translateX(-7px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(2px); }
+}
+
+@keyframes field-message {
+  from { opacity: 0; transform: translateY(-3px); }
+}
+
+@media (max-width: 820px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
+
+  .gate-label {
+    font-size: 13px;
+  }
+
+  .gate-label > input,
+  .gate-password input {
+    font-size: 16px;
+  }
+}
+
+.auth-kicked {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 12px 0 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-radius: 11px;
+  background: rgba(245, 158, 11, 0.1);
+  color: #a65f08;
+  font-size: 12px;
+  line-height: 1.5;
+  animation: field-message 220ms ease-out both;
+}
+
+.auth-kicked i {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #d97706;
+  color: white;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
 }
