@@ -334,11 +334,23 @@
     rev: 0,
     socketLive: false,
     reconnectTimer: 0,
+    statusTimer: 0,
     setStatus(name, label) {
       const el = document.getElementById("live-status");
       if (!el) return;
       el.dataset.state = name;
       el.textContent = label;
+      if (name !== "connecting") {
+        clearTimeout(this.statusTimer);
+        this.statusTimer = 0;
+        return;
+      }
+      if (this.statusTimer) return;
+      this.statusTimer = setTimeout(() => {
+        this.statusTimer = 0;
+        const current = document.getElementById("live-status");
+        if (current?.dataset.state === "connecting") this.setStatus("local", "本地可用");
+      }, 4000);
     },
     origin() {
       return window.APP_NETWORK?.origin || window.ACADEMY_CONFIG.url;
@@ -420,15 +432,20 @@
       }
       try {
         const ok = await this.persist(payload);
-        this.setStatus(ok || this.socketLive ? "live" : "offline", ok || this.socketLive ? "已同步" : "离线");
+        this.setStatus(ok || this.socketLive ? "live" : "local", ok || this.socketLive ? "已同步" : "本地可用");
       } catch (_) {
-        this.setStatus(this.socketLive ? "live" : "offline", this.socketLive ? "已同步" : "离线");
+        this.setStatus(this.socketLive ? "live" : "local", this.socketLive ? "已同步" : "本地可用");
       }
     },
     startPoll() {
       if (this.poll) return;
-      this.pull().catch(() => { });
-      this.poll = setInterval(() => this.pull().catch(() => { }), 1800);
+      const check = () => this.pull().then((ok) => {
+        if (!this.socketLive) this.setStatus(ok ? "live" : "local", ok ? "已同步" : "本地可用");
+      }).catch(() => {
+        if (!this.socketLive) this.setStatus("local", "本地可用");
+      });
+      check();
+      this.poll = setInterval(check, 8000);
     },
     stopPoll() {
       if (!this.poll) return;
@@ -457,15 +474,19 @@
           this.stopPoll();
         } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
           this.socketLive = false;
+          this.setStatus("local", "本地可用");
           this.startPoll();
         }
       });
       setTimeout(() => {
-        if (!this.socketLive) this.startPoll();
+        if (!this.socketLive) {
+          this.setStatus("local", "本地可用");
+          this.startPoll();
+        }
       }, 2200);
     },
     async connect() {
-      this.setStatus("connecting", "同步中");
+      this.setStatus("local", "本地可用");
       this.stopPoll();
       if (this.channel && this.sb) {
         this.sb.removeChannel(this.channel);
@@ -474,6 +495,7 @@
       }
       const cfg = window.ACADEMY_CONFIG;
       if (!window.supabase?.createClient || !cfg) {
+        this.setStatus("local", "本地可用");
         this.startPoll();
         return;
       }
@@ -483,8 +505,10 @@
       });
       try {
         const ok = await this.pull();
-        this.setStatus(ok ? "live" : "connecting", ok ? "已同步" : "同步中");
-      } catch (_) { }
+        this.setStatus(ok ? "live" : "local", ok ? "已同步" : "本地可用");
+      } catch (_) {
+        this.setStatus("local", "本地可用");
+      }
       this.subscribe();
     }
   };
@@ -883,12 +907,6 @@
             <p class="muted">${escapeHtml(exam.summary)}</p>
           </button>`;
         }).join("") : `<div class="card notice clear"><strong>重要考试项已完成</strong><p class="muted">当前暂无关键考试待过。</p></div>`}
-      <div class="sec-title"><h3>学习通道</h3><span>3</span></div>
-      <div class="modes">
-        <button class="mode" data-act="go" data-hash="#/learn?type=article"><span class="dot">文</span>图文</button>
-        <button class="mode" data-act="go" data-hash="#/learn?type=video"><span class="dot">播</span>视频</button>
-        <button class="mode" data-act="go" data-hash="#/exams"><span class="dot">考</span>考试</button>
-      </div>
     `;
   }
 

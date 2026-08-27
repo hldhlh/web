@@ -22,16 +22,16 @@
       object: "academy/state.json"
     };
   </script>
-  <link rel="stylesheet" href="./style.css?v=20260827-7">
+  <link rel="stylesheet" href="./style.css?v=20260827-9">
   <link rel="preload" href="../network.js?v=20260827-4" as="script">
-  <link rel="preload" href="./app.js?v=20260827-9" as="script">
+  <link rel="preload" href="./app.js?v=20260827-13" as="script">
 </head>
 <body>
   <div class="app" id="app">
     <header class="topbar">
       <button class="icon-btn" id="back-btn" title="返回" aria-label="返回" hidden></button>
       <h1 id="top-title">今岭学堂</h1>
-      <span class="live" id="live-status" data-state="connecting" title="实时同步">同步中</span>
+      <span class="live" id="live-status" data-state="local" title="实时同步">本地可用</span>
       <button class="icon-btn" id="theme-btn" title="切换主题" aria-label="切换主题"></button>
     </header>
     <main class="view" id="view"><div class="boot-screen" aria-label="正在进入学堂"><span></span><strong>今岭学堂</strong><small>正在准备今日学习事务</small></div></main>
@@ -48,6 +48,6 @@
   <script defer src="./framework/auth.js?v=20260827-2"></script>
   <script defer src="./framework/gate.js"></script>
   <script defer src="./content.js?v=20260827-6"></script>
-  <script defer src="./app.js?v=20260827-9"></script>
+  <script defer src="./app.js?v=20260827-13"></script>
 </body>
 </html>
