@@ -5,12 +5,17 @@
  */
 (function () {
   const PROJECT_ORIGIN = 'https://fmxddvjgkykuqwmasigo.supabase.co';
+  const sameOriginGateway = location.protocol === 'https:'
+    && location.origin !== PROJECT_ORIGIN
+    && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
+    ? [{ name: '站点边缘网关', origin: location.origin }]
+    : [];
   const ENDPOINTS = [
     { name: 'Supabase Global', origin: PROJECT_ORIGIN }
-    // Example after deployment and CORS configuration:
-    // { name: '中国大陆网关', origin: 'https://api.example.cn' },
-    // { name: '海外边缘网关', origin: 'https://api-global.example.com' }
-  ].concat(Array.isArray(window.APP_NETWORK_ENDPOINTS) ? window.APP_NETWORK_ENDPOINTS : []);
+  ].concat(
+    Array.isArray(window.APP_NETWORK_ENDPOINTS) ? window.APP_NETWORK_ENDPOINTS : [],
+    sameOriginGateway
+  );
 
   const CACHE_KEY = 'app-network-best-v2';
   const CACHE_TTL = 6 * 60 * 60 * 1000;
@@ -121,6 +126,10 @@
         method: 'GET', cache: 'no-store', mode: 'cors', signal
       }));
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const type = response.headers.get('content-type') || '';
+      if (!type.includes('json')) throw new Error('Invalid gateway response');
+      const payload = await response.json();
+      if (!payload || typeof payload !== 'object') throw new Error('Invalid gateway payload');
       return { ...node, latency: Math.round(performance.now() - startedAt) };
     } catch (_) {
       return { ...node, latency: Infinity };
@@ -188,27 +197,47 @@
     });
   }
 
+  async function routeFetch(input, init = {}) {
+    const method = String(init.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
+    const readable = method === 'GET' || method === 'HEAD';
+    const safeWrite = init.appNetworkSafeWrite === true;
+    const requestInit = { ...init };
+    delete requestInit.appNetworkSafeWrite;
+
+    if (readable) {
+      const origins = getOrderedOrigins();
+      try {
+        return await raceRead(input, requestInit, origins);
+      } catch (firstError) {
+        if (origins.length > 1 || requestInit.signal?.aborted) throw firstError;
+        await delay(160, requestInit.signal);
+        return fetchWithTimeout(replaceOrigin(input, origins[0]), requestInit, RETRY_TIMEOUT);
+      }
+    }
+
+    if (!safeWrite) return nativeFetch(replaceOrigin(input, currentOrigin), requestInit);
+
+    const origins = getOrderedOrigins();
+    let lastError;
+    for (const origin of origins) {
+      try {
+        const response = await fetchWithTimeout(replaceOrigin(input, origin), requestInit, RETRY_TIMEOUT);
+        if (isRetryableResponse(response)) throw new Error(`HTTP ${response.status}`);
+        unhealthyUntil.delete(origin);
+        if (origin !== currentOrigin) remember(origin, null);
+        return response;
+      } catch (error) {
+        if (requestInit.signal?.aborted) throw error;
+        lastError = error;
+        unhealthyUntil.set(origin, Date.now() + FAILURE_COOLDOWN);
+      }
+    }
+    throw lastError || new Error('All backend routes failed');
+  }
+
   function enhanceOptions(options = {}) {
     const existingFetch = options.global?.fetch;
     if (existingFetch) return options;
-
-    const routeFetch = async (input, init = {}) => {
-      const method = String(init.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
-      const readable = method === 'GET' || method === 'HEAD';
-
-      // 写操作绝不并发、超时中断或自动重放，避免请求已入库却被误判失败而重复下单。
-      if (!readable) return nativeFetch(replaceOrigin(input, currentOrigin), init);
-
-      const origins = getOrderedOrigins();
-      try {
-        return await raceRead(input, init, origins);
-      } catch (firstError) {
-        // 单节点也提供一次短退避重试，多节点则由竞速请求自然完成容灾。
-        if (origins.length > 1 || init.signal?.aborted) throw firstError;
-        await delay(160, init.signal);
-        return fetchWithTimeout(replaceOrigin(input, origins[0]), init, RETRY_TIMEOUT);
-      }
-    };
 
     return { ...options, global: { ...(options.global || {}), fetch: routeFetch } };
   }
@@ -228,6 +257,7 @@
     get endpoints() { return nodes.map((node) => ({ ...node })); },
     benchmark,
     addEndpoints,
+    request: routeFetch,
     patchSupabase,
     rewriteUrl(url) { return replaceOrigin(url, currentOrigin); }
   };

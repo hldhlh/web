@@ -16,8 +16,11 @@
       bucket: "cloud-files",
       object: "academy/state.json"
     };
+    window.APP_NETWORK_ENDPOINTS = Array.isArray(window.ACADEMY_NETWORK_ENDPOINTS)
+      ? window.ACADEMY_NETWORK_ENDPOINTS
+      : (Array.isArray(window.APP_NETWORK_ENDPOINTS) ? window.APP_NETWORK_ENDPOINTS : []);
   </script>
-  <link rel="stylesheet" href="./style.css?v=20260827-5">
+  <link rel="stylesheet" href="./style.css?v=20260827-6">
   <link rel="preload" href="../vendor/supabase.min.js" as="script">
 </head>
 <body>
@@ -30,9 +33,9 @@
     <main class="view" id="view"></main>
   </div>
   <script src="../vendor/supabase.min.js"></script>
-  <script src="../network.js"></script>
-  <script src="./framework/store.js"></script>
-  <script src="./framework/auth.js"></script>
+  <script src="../network.js?v=20260827-4"></script>
+  <script src="./framework/store.js?v=20260827-2"></script>
+  <script src="./framework/auth.js?v=20260827-2"></script>
   <script src="./admin.js"></script>
 </body>
 </html>

@@ -4,14 +4,13 @@ window.AcademyStore = (() => {
   }
 
   function origin() {
-    const base = cfg().url;
-    try {
-      const cached = JSON.parse(localStorage.getItem("app-network-best-v2") || "null");
-      if (cached && Date.now() - cached.savedAt < 6 * 60 * 60 * 1000 && /^https:\/\//.test(cached.origin)) {
-        return cached.origin;
-      }
-    } catch (_) { }
-    return base;
+    return window.APP_NETWORK?.origin || cfg().url;
+  }
+
+  function request(input, init) {
+    return window.APP_NETWORK?.request
+      ? window.APP_NETWORK.request(input, init)
+      : window.fetch(input, init);
   }
 
   function headers(extra) {
@@ -28,7 +27,7 @@ window.AcademyStore = (() => {
   }
 
   async function getJSON(path) {
-    const response = await fetch(`${objectUrl(path)}?t=${Date.now()}`, {
+    const response = await request(`${objectUrl(path)}?t=${Date.now()}`, {
       headers: headers({ "Cache-Control": "no-cache" }),
       cache: "no-store"
     });
@@ -38,8 +37,9 @@ window.AcademyStore = (() => {
   }
 
   async function putJSON(path, data) {
-    const response = await fetch(objectUrl(path), {
+    const response = await request(objectUrl(path), {
       method: "POST",
+      appNetworkSafeWrite: true,
       headers: headers({
         "Content-Type": "application/json",
         "x-upsert": "true",
@@ -53,8 +53,10 @@ window.AcademyStore = (() => {
 
   function realtimeClient() {
     if (!window.supabase?.createClient) return null;
-    if (realtimeClient._sb) return realtimeClient._sb;
-    realtimeClient._sb = window.supabase.createClient(cfg().url, cfg().key, {
+    const selectedOrigin = origin();
+    if (realtimeClient._sb && realtimeClient._origin === selectedOrigin) return realtimeClient._sb;
+    realtimeClient._origin = selectedOrigin;
+    realtimeClient._sb = window.supabase.createClient(selectedOrigin, cfg().key, {
       auth: { persistSession: false, autoRefreshToken: false },
       realtime: { params: { eventsPerSecond: 20 } }
     });

@@ -1,8 +1,7 @@
 window.ACADEMY_CONTENT = {
   tracks: [
     { id: "onboard", title: "岗前必修", hint: "开门前必须过的线", urgent: true },
-    { id: "html", title: "HTML 动手学", hint: "看、玩、考，一次学会结构" },
-    { id: "tools", title: "门户效率", hint: "把火锅店工具用到手上" }
+    { id: "tools", title: "门店工具", hint: "备货、笔记、流水、记账" }
   ],
 
   lessons: [
@@ -81,121 +80,6 @@ window.ACADEMY_CONTENT = {
       ]
     },
     {
-      id: "a-html-what",
-      type: "article",
-      track: "html",
-      title: "HTML 是说明书",
-      minutes: 4,
-      summary: "浏览器读的不是画面，是结构。先分清标签、属性和嵌套。",
-      blocks: [
-        { type: "lead", text: "HTML 不负责好看。它只告诉浏览器：这是标题、这是段落、这是按钮。好看是 CSS 的事。" },
-        { type: "figure", kind: "html-tree" },
-        { type: "h", text: "一份文件的最小骨架" },
-        { type: "code", text: "<!DOCTYPE html>\n<html>\n  <head>\n    <title>火锅学堂</title>\n  </head>\n  <body>\n    <h1>毛肚 130g</h1>\n    <p>圆黑盘，冰水保存。</p>\n  </body>\n</html>" },
-        { type: "p", text: "head 放标题、字符集这些给浏览器的元信息。body 放用户能看见的内容。" },
-        { type: "h", text: "标签、属性、内容" },
-        { type: "ul", items: ["标签：<p> 说明这是段落", "属性：<img alt=\"毛肚 130克 圆黑盘\"> 给标签附加信息", "内容：标签中间的文字或子标签"] },
-        { type: "h", text: "嵌套像盒子套盒子" },
-        { type: "p", text: "父标签包着子标签。p 里不要再塞 div。先写开标签，再写闭标签，最后检查有没有漏。" },
-        { type: "callout", tone: "key", title: "学的目标", text: "看到一个页面，能说出哪一块是标题、哪一块是列表、哪一块会跳转。这就够往下玩了。" }
-      ]
-    },
-    {
-      id: "g-tags",
-      type: "game",
-      track: "html",
-      title: "标签对对碰",
-      minutes: 3,
-      game: "tags",
-      summary: "看到标签立刻说出它的职责。10 题，越快越好。",
-      goal: "正确 8 题以上通关"
-    },
-    {
-      id: "v-html-page",
-      type: "video",
-      track: "html",
-      title: "从标签到页面",
-      minutes: 4,
-      summary: "看一行标签如何变成屏幕上的一块内容。",
-      scenes: [
-        { duration: 7, title: "先有结构，才有画面", caption: "浏览器从上到下读文件。它先搭骨架，再往格子里填内容。", stage: { kind: "browser", bar: "空白页", html: "<div class='ghost-page'><i></i><i></i><i></i></div>" } },
-        { duration: 8, title: "标题占一行，而且更重", caption: "h1 到 h6 是标题层级。一页里 h1 只用一次，表示这份文件的主题。", stage: { kind: "split", code: "<h1>毛肚 130g</h1>", preview: "<h1 class='live-h'>毛肚 130g</h1>" } },
-        { duration: 8, title: "段落负责把话说完", caption: "p 是段落。浏览器会自动留出段前段后的空隙，所以不要用一堆 <br> 来撑开文章。", stage: { kind: "split", code: "<p>圆黑盘，切片 8×12cm。</p>", preview: "<p class='live-p'>圆黑盘，切片 8×12cm。</p>" } },
-        { duration: 8, title: "链接带走用户", caption: "a 加 href 才会跳转。没有地址的 a 只是看起来像链接。", stage: { kind: "split", code: "<a href=\"/pots\">看锅底</a>", preview: "<a class='live-a'>看锅底</a>" } },
-        { duration: 8, title: "图片必须有替代文字", caption: "img 的 src 是地址，alt 是图片加载失败或读屏时要说的话。装饰图可以用空 alt。", stage: { kind: "split", code: "<img src=\"tripe.jpg\"\n     alt=\"毛肚 130克 圆黑盘\">", preview: "<div class='live-img'>图 · 毛肚 130g</div>" } },
-        { duration: 7, title: "按钮触发动作", caption: "提交、加入锅里用 button。跳去另一页用 a。两者不要混。", stage: { kind: "split", code: "<button>加入锅里</button>", preview: "<button class='live-btn'>加入锅里</button>" } }
-      ]
-    },
-    {
-      id: "a-tags",
-      type: "article",
-      track: "html",
-      title: "常用标签速查",
-      minutes: 3,
-      summary: "先把这 12 个标签记熟。页面上 80% 的结构都靠它们。",
-      blocks: [
-        { type: "lead", text: "不要背一百个标签。先会这 12 个，就已经能搭出课程卡、菜单和表单。" },
-        { type: "table", headers: ["标签", "职责", "记住"], rows: [
-          ["h1–h6", "标题", "一页一个 h1"],
-          ["p", "段落", "一段话一个 p"],
-          ["a", "链接", "必须有 href"],
-          ["img", "图片", "必须有 alt"],
-          ["ul / ol / li", "列表", "ul 无序，ol 有序"],
-          ["button", "动作", "提交、开关用它"],
-          ["input", "输入", "配合 label"],
-          ["div", "分区", "没有语义时再用"],
-          ["span", "行内标记", "只包几个字"],
-          ["header / main / footer", "页面分区", "比纯 div 更清楚"]
-        ]},
-        { type: "callout", tone: "key", title: "选择原则", text: "先问「这块内容是什么」，再选标签。是标题就用 h，是动作就用 button。不要所有东西都用 div。" }
-      ]
-    },
-    {
-      id: "g-card",
-      type: "game",
-      track: "html",
-      title: "拼一张卡片",
-      minutes: 4,
-      game: "card",
-      summary: "用标题、介绍、价格和按钮，拼出一张商品卡。右侧即时预览。",
-      goal: "四块结构齐全即通关"
-    },
-    {
-      id: "g-fix",
-      type: "game",
-      track: "html",
-      title: "找出坏标签",
-      minutes: 4,
-      game: "fix",
-      summary: "四段有问题的 HTML。点出坏行，再选正确修法。",
-      goal: "四处都修好即通关"
-    },
-    {
-      id: "v-css",
-      type: "video",
-      track: "html",
-      title: "CSS 如何给页面穿衣服",
-      minutes: 4,
-      summary: "结构已经有了。CSS 只做一件事：选中某块，改它的外观。",
-      scenes: [
-        { duration: 7, title: "选择器先点名", caption: "CSS 先写「选谁」，再写「改什么」。点名不准，样式就会套到别人头上。", stage: { kind: "split", code: "button {\n  background: #111;\n  color: #fff;\n}", preview: "<button class='live-btn'>加入锅里</button>" } },
-        { duration: 8, title: "盒模型是四层", caption: "从里到外：内容、内边距 padding、边框 border、外边距 margin。改宽度时四层都会占空间。", stage: { kind: "figure", name: "box" } },
-        { duration: 8, title: "padding 把字撑开", caption: "padding 是内容到边框的距离。按钮显得好按，通常是 padding 够，不是字变大了。", stage: { kind: "browser", bar: "padding", html: "<button class='live-btn pad'>加入锅里</button>" } },
-        { duration: 8, title: "margin 把块推开", caption: "margin 是盒子和邻居的距离。垂直方向上，两个相邻 margin 还会合并，所以间距看起来可能比你写的小。", stage: { kind: "browser", bar: "margin", html: "<div class='live-stack'><div class='box'>卡片 A</div><div class='box'>卡片 B</div></div>" } },
-        { duration: 7, title: "下一步去实验室", caption: "文字看懂了还不够。下一课用滑杆亲手改这四层，手感会比背定义快。", stage: { kind: "callout", kicker: "下一课", text: "盒模型实验室\n拖动即看到结果" } }
-      ]
-    },
-    {
-      id: "g-box",
-      type: "game",
-      track: "html",
-      title: "盒模型实验室",
-      minutes: 4,
-      game: "box",
-      summary: "拖动内容、内边距、边框、外边距，对齐目标尺寸。",
-      goal: "三道题都对齐即通关"
-    },
-    {
       id: "a-tools",
       type: "article",
       track: "tools",
@@ -240,34 +124,12 @@ window.ACADEMY_CONTENT = {
       ]
     },
     {
-      id: "e-html",
-      title: "HTML 基础",
-      track: "html",
-      minutes: 10,
-      pass: 80,
-      summary: "标签职责、属性、嵌套和盒模型。80 分过关。",
-      questions: [
-        { id: "h1", type: "single", stem: "HTML 主要负责什么？", options: ["让页面变好看", "描述内容结构", "连接数据库", "播放视频特效"], answer: 1, explain: "HTML 是结构。外观交给 CSS，行为交给 JavaScript。" },
-        { id: "h2", type: "single", stem: "用户能看见的内容应该写在哪里？", options: ["<!DOCTYPE>", "<head>", "<body>", "<html> 的属性里"], answer: 2, explain: "body 放可见内容，head 放标题、字符集等元信息。" },
-        { id: "h3", type: "single", stem: "表示页面主标题，优先用哪个？", options: ["<h1>", "<p>", "<b>", "<div>"], answer: 0, explain: "一页一个 h1，表示这份文件的主题。加粗不等于标题。" },
-        { id: "h4", type: "single", stem: "<img> 必须提供的信息是？", options: ["width 和 height", "src，以及有意义的 alt（装饰图可用空 alt）", "只能写 id", "必须包在 <p> 里"], answer: 1, explain: "src 决定显示什么，alt 在失败或读屏时起作用。" },
-        { id: "h5", type: "single", stem: "希望跳转到另一页，应该用？", options: ["<button>", "<span>", "<a href=\"...\">", "<div onclick>"], answer: 2, explain: "跳转用链接 a。提交、开关等动作才用 button。" },
-        { id: "h6", type: "judge", stem: "所有内容都可以用 div 包起来，语义标签没有实际作用。", answer: false, explain: "div 没有语义。标题、导航、主内容用对应标签，读屏、样式和协作都会更清楚。" },
-        { id: "h7", type: "single", stem: "下面哪一项是合法嵌套思路？", options: ["<p> 里面再放 <div>", "列表用 ul 包 li", "把 </p> 写在 <p> 前面", "按钮里再套一个 <html>"], answer: 1, explain: "ul/ol 的子级是 li。p 是段落，不能再塞块级大盒子。" },
-        { id: "h8", type: "single", stem: "CSS 盒模型从里到外是？", options: ["margin → border → padding → content", "content → padding → border → margin", "border → content → padding → margin", "padding → content → margin → border"], answer: 1, explain: "内容在最里，然后是内边距、边框、外边距。" },
-        { id: "h9", type: "single", stem: "让按钮更好按，通常先加哪一层？", options: ["margin", "padding", "再套一层 html", "把字号改成 8px"], answer: 1, explain: "padding 增大可点区域，而不必把字撑得过大。" },
-        { id: "h10", type: "single", stem: "两个块之间要留空隙，优先改？", options: ["content", "alt", "margin", "<!DOCTYPE>"], answer: 2, explain: "margin 控制盒子和邻居的距离。" },
-        { id: "h11", type: "multi", stem: "关于 <a> 和 <button>，正确的是？（多选）", options: ["跳转用 a", "提交表单用 button", "两者可以随便互换", "a 需要 href 才是真正的链接"], answer: [0, 1, 3], explain: "跳转与动作分开。没有 href 的 a 只是样子像链接。" },
-        { id: "h12", type: "judge", stem: "装饰性图片可以使用空的 alt=\"\"。", answer: true, explain: "有信息的图写清楚 alt；纯装饰可以空 alt，避免读屏重复。" }
-      ]
-    },
-    {
       id: "e-mix",
       title: "综合模拟",
       track: "tools",
       minutes: 12,
       pass: 80,
-      summary: "岗前 + HTML。按正式考试节奏计时。",
+      summary: "开市、锅底、出品、卫生、门店工具。按正式考试节奏计时。",
       questions: []
     }
   ]
@@ -277,5 +139,11 @@ window.ACADEMY_CONTENT = {
   const exams = window.ACADEMY_CONTENT.exams;
   const mix = exams.find((item) => item.id === "e-mix");
   const source = exams.filter((item) => item.id !== "e-mix");
-  mix.questions = source.flatMap((exam) => exam.questions.slice(0, 6));
+  const extra = [
+    { id: "m1", type: "single", stem: "每日补货必须从哪里下单？", options: ["微信报货", "口头跟后厨说一声", "锅底备货，按库位加车后提交", "晚上凭记忆补记"], answer: 2, explain: "一件事只进一个应用。备货走锅底备货，方便对账复查。" },
+    { id: "m2", type: "single", stem: "客诉结论、炉头故障、缺货，应该记在哪？", options: ["锅底备货", "翻台笔记", "翻台流水里改账单", "不用记"], answer: 1, explain: "翻台笔记写给明天的自己。短句，能搜到。" },
+    { id: "m3", type: "judge", stem: "翻台流水用来看高峰和异常，不在这里改账单。", answer: true, explain: "流水是观察，不是结账入口。" },
+    { id: "m4", type: "single", stem: "门店记账的原则是？", options: ["晚上凭记忆补", "发生即记，分类选对，备注写清", "和备货写在一起", "只记大额"], answer: 1, explain: "发生即记。分类选对，备注写清。" }
+  ];
+  mix.questions = source.flatMap((exam) => exam.questions).concat(extra);
 })();

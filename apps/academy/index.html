@@ -9,6 +9,11 @@
   <link rel="dns-prefetch" href="//fmxddvjgkykuqwmasigo.supabase.co">
   <link rel="preconnect" href="https://fmxddvjgkykuqwmasigo.supabase.co" crossorigin>
   <script>
+    window.APP_NETWORK_ENDPOINTS = Array.isArray(window.ACADEMY_NETWORK_ENDPOINTS)
+      ? window.ACADEMY_NETWORK_ENDPOINTS
+      : (Array.isArray(window.APP_NETWORK_ENDPOINTS) ? window.APP_NETWORK_ENDPOINTS : []);
+  </script>
+  <script>
     document.documentElement.dataset.theme = localStorage.getItem("app-theme") || "light";
     window.ACADEMY_CONFIG = {
       url: "https://fmxddvjgkykuqwmasigo.supabase.co",
@@ -16,37 +21,10 @@
       bucket: "cloud-files",
       object: "academy/state.json"
     };
-    window.ACADEMY_BOOTSTRAP = (() => {
-      const config = window.ACADEMY_CONFIG;
-      let origin = config.url;
-      try {
-        const cached = JSON.parse(localStorage.getItem("app-network-best-v2") || "null");
-        if (cached && Date.now() - cached.savedAt < 6 * 60 * 60 * 1000 && /^https:\/\//.test(cached.origin)) {
-          origin = cached.origin;
-        }
-      } catch (_) { }
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 6500);
-      return fetch(`${origin}/storage/v1/object/${config.bucket}/${config.object}?t=${Date.now()}`, {
-        headers: {
-          apikey: config.key,
-          Authorization: `Bearer ${config.key}`,
-          Accept: "application/json",
-          "Cache-Control": "no-cache"
-        },
-        mode: "cors",
-        credentials: "omit",
-        cache: "no-store",
-        priority: "high",
-        signal: controller.signal
-      }).then(async (response) => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return { payload: await response.json(), error: null };
-      }, (error) => ({ payload: null, error })).finally(() => clearTimeout(timer));
-    })();
   </script>
-  <link rel="stylesheet" href="./style.css?v=20260827-5">
-  <link rel="preload" href="../vendor/supabase.min.js" as="script">
+  <link rel="stylesheet" href="./style.css?v=20260827-7">
+  <link rel="preload" href="../network.js?v=20260827-4" as="script">
+  <link rel="preload" href="./app.js?v=20260827-9" as="script">
 </head>
 <body>
   <div class="app" id="app">
@@ -56,7 +34,7 @@
       <span class="live" id="live-status" data-state="connecting" title="实时同步">同步中</span>
       <button class="icon-btn" id="theme-btn" title="切换主题" aria-label="切换主题"></button>
     </header>
-    <main class="view" id="view"></main>
+    <main class="view" id="view"><div class="boot-screen" aria-label="正在进入学堂"><span></span><strong>今岭学堂</strong><small>正在准备今日学习事务</small></div></main>
     <nav class="tabbar" aria-label="主导航">
       <button class="tab active" data-tab="home" data-act="go" data-hash="#/home" id="tab-home">首页</button>
       <button class="tab" data-tab="learn" data-act="go" data-hash="#/learn" id="tab-learn">课程</button>
@@ -65,12 +43,11 @@
     </nav>
   </div>
   <noscript>今岭学堂需要启用 JavaScript。</noscript>
-  <script src="../vendor/supabase.min.js"></script>
-  <script src="../network.js"></script>
-  <script src="./framework/store.js"></script>
-  <script src="./framework/auth.js"></script>
-  <script src="./framework/gate.js"></script>
-  <script src="./content.js"></script>
-  <script src="./app.js?v=20260827-5"></script>
+  <script defer src="../network.js?v=20260827-4"></script>
+  <script defer src="./framework/store.js?v=20260827-2"></script>
+  <script defer src="./framework/auth.js?v=20260827-2"></script>
+  <script defer src="./framework/gate.js"></script>
+  <script defer src="./content.js?v=20260827-6"></script>
+  <script defer src="./app.js?v=20260827-9"></script>
 </body>
 </html>

@@ -8,68 +8,11 @@
   }
   const LETTERS = "ABCDEFGH";
 
-  const TYPE_LABEL = { article: "图文", video: "视频", game: "互动" };
-  const TYPE_ICON = { article: "文", video: "播", game: "玩" };
-
-  const TAG_PAIRS = [
-    { tag: "<h1>", meaning: "页面主标题" },
-    { tag: "<p>", meaning: "一段完整的话" },
-    { tag: "<a>", meaning: "跳转到别处" },
-    { tag: "<img>", meaning: "插入图片" },
-    { tag: "<button>", meaning: "触发一个动作" },
-    { tag: "<ul>", meaning: "无序列表" },
-    { tag: "<li>", meaning: "列表中的一项" },
-    { tag: "<input>", meaning: "让人填写内容" },
-    { tag: "<div>", meaning: "没有语义的分区" },
-    { tag: "<span>", meaning: "包住几个行内字" },
-    { tag: "<label>", meaning: "给输入框起名字" },
-    { tag: "<header>", meaning: "页头区域" }
-  ];
-
-  const CARD_TOOLS = [
-    { id: "h2", label: "标题 h2", html: "<h2>毛肚 130g</h2>" },
-    { id: "p", label: "介绍 p", html: "<p>圆黑盘，切片 8×12cm，冰水保存。</p>" },
-    { id: "price", label: "克数 span", html: "<div class=\"price\">130g · 圆黑盘</div>" },
-    { id: "btn", label: "按钮 button", html: "<button type=\"button\">加入锅里</button>" },
-    { id: "note", label: "备注 span", html: "<span>牛百叶 150g，同样圆黑盘。</span>" }
-  ];
-
-  const FIX_ROUNDS = [
-    {
-      title: "图片少了替代文字",
-      lines: ["<section>", "  <h2>毛肚 130g</h2>", "  <img src=\"tripe.jpg\">", "</section>"],
-      bad: 2,
-      options: ["给 img 补上 alt=\"毛肚 130克 圆黑盘\"", "把 img 改成 button", "删掉整张图就算修好"],
-      answer: 0
-    },
-    {
-      title: "链接没有去处",
-      lines: ["<nav>", "  <a>锅底</a>", "  <a href=\"/sides\">小料</a>", "</nav>"],
-      bad: 1,
-      options: ["给第一个 a 加上 href=\"/pots\"", "把 a 改成 p", "把两个链接都删掉"],
-      answer: 0
-    },
-    {
-      title: "列表结构不对",
-      lines: ["<ul>", "  <div>牛百叶 150g</div>", "  <li>笋尖 150g</li>", "</ul>"],
-      bad: 1,
-      options: ["把 div 改成 li", "在 ul 外包一层 p", "把 ul 改成 h1"],
-      answer: 0
-    },
-    {
-      title: "段落里塞了大盒子",
-      lines: ["<p>", "  今日主推", "  <div>麻辣锅 底料 300g</div>", "</p>"],
-      bad: 2,
-      options: ["把 div 拿出去，或改成 span", "再套一层 html", "把 p 改成 img"],
-      answer: 0
-    }
-  ];
-
-  const BOX_CHALLENGES = [
-    { title: "让内边距变成 16", target: { content: 140, padding: 16, border: 2, margin: 8 } },
-    { title: "边框加到 6，外边距 20", target: { content: 120, padding: 10, border: 6, margin: 20 } },
-    { title: "内容 160，其余都收紧", target: { content: 160, padding: 4, border: 1, margin: 4 } }
-  ];
+  const TYPE_LABEL = { article: "图文", video: "视频" };
+  const DROPPED_LESSON_IDS = new Set(["a-html-what", "g-tags", "v-html-page", "a-tags", "g-card", "g-fix", "v-css", "g-box"]);
+  const DROPPED_EXAM_IDS = new Set(["e-html"]);
+  const BUNDLED_LESSON_IDS = new Set(["a-day", "a-product", "v-order", "a-safety", "a-tools"]);
+  const BUNDLED_EXAM_IDS = new Set(["e-onboard", "e-mix"]);
 
   const state = {
     route: { name: "home" },
@@ -106,7 +49,7 @@
   }
 
   function normalizeLessonType(type) {
-    return ["article", "video", "game"].includes(type) ? type : "article";
+    return ["article", "video"].includes(type) ? type : "article";
   }
 
   function defaultBlocks(summary) {
@@ -145,8 +88,7 @@
       access: item.access === "basic" ? "basic" : "full",
       mediaUrl: coerceString(item.mediaUrl, ""),
       blocks: type === "article" ? blocks : [],
-      scenes: type === "video" ? scenes : [],
-      game: type === "game" ? coerceString(item.game, "card") : item.game
+      scenes: type === "video" ? scenes : []
     };
   }
 
@@ -225,20 +167,96 @@
     };
   }
 
+  function isDroppedLesson(item) {
+    if (!item) return true;
+    if (item.track === "html") return true;
+    if (item.type === "game") return true;
+    return DROPPED_LESSON_IDS.has(item.id);
+  }
+
+  function isDroppedExam(item) {
+    if (!item) return true;
+    if (item.track === "html") return true;
+    return DROPPED_EXAM_IDS.has(item.id);
+  }
+
+  function isOffTopicQuestion(question) {
+    const text = `${question?.stem || ""} ${(question?.options || []).join(" ")} ${question?.explain || ""}`;
+    return /\bHTML\b|\bCSS\b|盒模型|DOCTYPE|语义标签|标签的职责|<\/?(html|head|body|div|span|h[1-6]|p|a|img|button|ul|ol|li|input|label|header)\b/i.test(text);
+  }
+
+  function rebuildMixExam(exams) {
+    const mix = exams.find((item) => item.id === "e-mix");
+    if (!mix) return exams;
+    const source = exams.filter((item) => item.id !== "e-mix");
+    mix.summary = "开市、锅底、出品、卫生、门店工具。按正式考试节奏计时。";
+    const extras = (DATA.exams.find((item) => item.id === "e-mix")?.questions || []).filter((question) => /^m\d/.test(question.id));
+    const fromSource = source.flatMap((exam) => exam.questions || []);
+    mix.questions = fromSource.concat(extras.filter((extra) => !fromSource.some((question) => question.id === extra.id)));
+    return exams;
+  }
+
+  function stripUnrelatedCurriculum(snapshot) {
+    const lessons = snapshot.lessons.filter((item) => !isDroppedLesson(item));
+    const exams = rebuildMixExam(
+      snapshot.exams
+        .filter((item) => !isDroppedExam(item))
+        .map((exam) => ({
+          ...exam,
+          questions: (exam.questions || []).filter((question) => !isOffTopicQuestion(question))
+        }))
+    );
+    return { ...snapshot, lessons, exams };
+  }
+
   function loadOpsStore() {
     let raw = null;
     try { raw = JSON.parse(localStorage.getItem(OPS_STORAGE_KEY) || "null"); } catch (_) { }
-    const lessons = Array.isArray(raw?.lessons) ? raw.lessons.map(normalizeLesson) : DATA.lessons.map(normalizeLesson);
-    const exams = Array.isArray(raw?.exams) ? raw.exams.map(normalizeExam) : DATA.exams.map(normalizeExam);
+    const fallbackLessons = DATA.lessons.filter((item) => !isDroppedLesson(item)).map(normalizeLesson);
+    const fallbackExams = rebuildMixExam(DATA.exams.filter((item) => !isDroppedExam(item)).map(normalizeExam));
+    const overlayLessons = Array.isArray(raw?.lessons)
+      ? raw.lessons.filter((item) => !isDroppedLesson(item) && !BUNDLED_LESSON_IDS.has(item.id)).map(normalizeLesson)
+      : [];
+    const overlayExams = Array.isArray(raw?.exams)
+      ? raw.exams
+        .filter((item) => !isDroppedExam(item) && !BUNDLED_EXAM_IDS.has(item.id))
+        .map(normalizeExam)
+        .map((exam) => ({
+          ...exam,
+          questions: (exam.questions || []).filter((question) => !isOffTopicQuestion(question))
+        }))
+      : [];
     const notices = Array.isArray(raw?.notices) ? raw.notices.map(normalizeNotice) : [];
-    return { lessons, exams, notices };
+    return {
+      lessons: fallbackLessons.concat(overlayLessons),
+      exams: rebuildMixExam(fallbackExams.concat(overlayExams)),
+      notices
+    };
   }
 
   function hydrateContentStore() {
-    const snapshot = loadOpsStore();
+    const before = (() => {
+      try { return localStorage.getItem(OPS_STORAGE_KEY) || ""; } catch (_) { return ""; }
+    })();
+    const snapshot = stripUnrelatedCurriculum(loadOpsStore());
     DATA.lessons = snapshot.lessons;
     DATA.exams = snapshot.exams;
     DATA.notices = snapshot.notices;
+    if (before) {
+      const afterIds = JSON.stringify({
+        lessons: DATA.lessons.map((item) => item.id),
+        exams: DATA.exams.map((item) => item.id)
+      });
+      let beforeIds = "";
+      try {
+        const parsed = JSON.parse(before);
+        beforeIds = JSON.stringify({
+          lessons: (parsed.lessons || []).map((item) => item.id),
+          exams: (parsed.exams || []).map((item) => item.id)
+        });
+      } catch (_) { }
+      if (beforeIds !== afterIds) saveOpsStore();
+    }
   }
 
   function saveOpsStore() {
@@ -315,6 +333,7 @@
     poll: 0,
     rev: 0,
     socketLive: false,
+    reconnectTimer: 0,
     setStatus(name, label) {
       const el = document.getElementById("live-status");
       if (!el) return;
@@ -322,14 +341,12 @@
       el.textContent = label;
     },
     origin() {
-      const cfg = window.ACADEMY_CONFIG;
-      try {
-        const cached = JSON.parse(localStorage.getItem("app-network-best-v2") || "null");
-        if (cached && Date.now() - cached.savedAt < 6 * 60 * 60 * 1000 && /^https:\/\//.test(cached.origin)) {
-          return cached.origin;
-        }
-      } catch (_) { }
-      return cfg.url;
+      return window.APP_NETWORK?.origin || window.ACADEMY_CONFIG.url;
+    },
+    request(input, init) {
+      return window.APP_NETWORK?.request
+        ? window.APP_NETWORK.request(input, init)
+        : window.fetch(input, init);
     },
     fileUrl() {
       const cfg = window.ACADEMY_CONFIG;
@@ -367,7 +384,7 @@
       if (stay === "home" || stay === "learn" || stay === "exams" || stay === "me" || stay === "result" || stay === "ops") render();
     },
     async pull() {
-      const response = await fetch(`${this.fileUrl()}?t=${Date.now()}`, {
+      const response = await this.request(`${this.fileUrl()}?t=${Date.now()}`, {
         headers: Object.assign({ "Cache-Control": "no-cache" }, this.headers()),
         cache: "no-store"
       });
@@ -377,8 +394,9 @@
       return true;
     },
     async persist(payload) {
-      const response = await fetch(this.fileUrl(), {
+      const response = await this.request(this.fileUrl(), {
         method: "POST",
+        appNetworkSafeWrite: true,
         headers: Object.assign({
           "Content-Type": "application/json",
           "x-upsert": "true",
@@ -417,6 +435,11 @@
       clearInterval(this.poll);
       this.poll = 0;
     },
+    scheduleReconnect() {
+      if (!Auth.session) return;
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = setTimeout(() => this.connect(), 180);
+    },
     subscribe() {
       const room = Auth.session?.id ? `academy-live-${Auth.session.id}` : "academy-live-anon";
       this.channel = this.sb.channel(room, { config: { broadcast: { self: false } } });
@@ -454,7 +477,7 @@
         this.startPoll();
         return;
       }
-      this.sb = window.supabase.createClient(cfg.url, cfg.key, {
+      this.sb = window.supabase.createClient(this.origin(), cfg.key, {
         auth: { persistSession: false, autoRefreshToken: false },
         realtime: { params: { eventsPerSecond: 20 } }
       });
@@ -728,21 +751,11 @@
           ${i < 3 ? "<span class='muted'>→</span>" : ""}
         </div>`).join("")}</div>`;
     }
-    if (kind === "html-tree") {
-      return `<div class="figure"><pre class="pre" style="margin:0">&lt;html&gt;
-  &lt;head&gt;  给浏览器的信息
-  &lt;body&gt;  给人看的内容
-    &lt;h1&gt; 标题
-    &lt;p&gt;  段落</pre></div>`;
-    }
     if (kind === "tools") {
       return `<div class="figure" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         ${[["锅底备货", "每日补货"], ["翻台笔记", "交接短句"], ["翻台流水", "看高峰"], ["门店记账", "发生即记"]].map(([t, d]) =>
           `<div style="padding:10px;border-radius:12px;background:var(--surface-2)"><b>${t}</b><div class="muted">${d}</div></div>`).join("")}
       </div>`;
-    }
-    if (kind === "box") {
-      return `<div class="box-visual"><div class="m"><div class="b" style="border-width:6px"><div class="p"><div class="c">content</div></div></div></div></div>`;
     }
     return "";
   }
@@ -870,11 +883,10 @@
             <p class="muted">${escapeHtml(exam.summary)}</p>
           </button>`;
         }).join("") : `<div class="card notice clear"><strong>重要考试项已完成</strong><p class="muted">当前暂无关键考试待过。</p></div>`}
-      <div class="sec-title"><h3>学习通道</h3><span>4</span></div>
+      <div class="sec-title"><h3>学习通道</h3><span>3</span></div>
       <div class="modes">
         <button class="mode" data-act="go" data-hash="#/learn?type=article"><span class="dot">文</span>图文</button>
         <button class="mode" data-act="go" data-hash="#/learn?type=video"><span class="dot">播</span>视频</button>
-        <button class="mode" data-act="go" data-hash="#/learn?type=game"><span class="dot">玩</span>互动</button>
         <button class="mode" data-act="go" data-hash="#/exams"><span class="dot">考</span>考试</button>
       </div>
     `;
@@ -883,13 +895,14 @@
   function renderLearn(type) {
     setTop("课程", false);
     setTab("learn");
-    const chips = [["all", "全部"], ["article", "图文"], ["video", "视频"], ["game", "互动"]];
+    if (type !== "article" && type !== "video") type = "all";
+    const chips = [["all", "全部"], ["article", "图文"], ["video", "视频"]];
     const items = DATA.lessons.filter((item) => type === "all" || item.type === type);
     view().innerHTML = `
       <div class="chips">
         ${chips.map(([id, label]) => `<button class="chip ${type === id ? "on" : ""}" data-act="go" data-hash="#/learn?type=${id}">${label}</button>`).join("")}
       </div>
-      ${!Auth.canFull(Auth.session) ? `<p class="muted" style="margin-bottom:12px">当前是基本权限。视频、互动和进阶课需要店长授权。</p>` : ""}
+      ${!Auth.canFull(Auth.session) ? `<p class="muted" style="margin-bottom:12px">当前是基本权限。视频和进阶课需要店长授权。</p>` : ""}
       ${items.map((lesson) => {
         const locked = !Gate.canLesson(lesson);
         return `<button class="card lesson-card" data-act="open-lesson" data-id="${lesson.id}">
@@ -1027,7 +1040,6 @@
     if (kind === "ul") return { type: "ul", items: ["需要员工记住的要点"] };
     if (kind === "ol") return { type: "ol", items: ["第一步要执行的操作"] };
     if (kind === "callout") return { type: "callout", tone: "key", title: "重点提醒", text: "将重要结论用简短句先说清。再给动作步骤。" };
-    if (kind === "code") return { type: "code", text: "console.log(\"课程实操示例\");" };
     if (kind === "figure") return { type: "figure", kind: "day-flow" };
     if (kind === "table") return { type: "table", headers: ["名称", "标准"], rows: [["", ""]] };
     return null;
@@ -1040,7 +1052,6 @@
     ul: { label: "要点清单", hint: "并列展示需要记住的事项" },
     ol: { label: "操作步骤", hint: "按顺序展示员工需要执行的动作" },
     callout: { label: "重点提示", hint: "突出容易遗漏或必须记住的内容", placeholder: "填写重点提醒……" },
-    code: { label: "示例代码", hint: "适用于需要展示代码的课程", placeholder: "填写代码示例……" },
     figure: { label: "课程图示", hint: "用图形帮助员工快速理解" },
     table: { label: "数据表格", hint: "适合配方、标准和对照信息" }
   };
@@ -1088,8 +1099,6 @@
         <select data-block-field="kind">
           <option value="day-flow" ${block.kind === "day-flow" ? "selected" : ""}>门店一天流程</option>
           <option value="tools" ${block.kind === "tools" ? "selected" : ""}>门店工具箱</option>
-          <option value="html-tree" ${block.kind === "html-tree" ? "selected" : ""}>网页结构示意</option>
-          <option value="box" ${block.kind === "box" ? "selected" : ""}>盒模型示意</option>
         </select>
       </label>
       <p class="field-help">保存后会在课程中显示对应图示。</p>
@@ -1373,7 +1382,6 @@
               <select id="ops-lesson-type">
                 <option value="article" ${data.type === "article" ? "selected" : ""}>图文课程</option>
                 <option value="video" ${data.type === "video" ? "selected" : ""}>视频课程</option>
-                <option value="game" ${data.type === "game" ? "selected" : ""}>互动练习</option>
               </select>
             </label>
             <label class="editor-field"><span>学习轨道</span><select id="ops-lesson-track">${DATA.tracks.map((track) => `<option value="${track.id}" ${track.id === data.track ? "selected" : ""}>${escapeHtml(track.title)}</option>`).join("")}</select></label>
@@ -1403,7 +1411,6 @@
               <button type="button" data-act="ops-lesson-insert-block" data-block="ol"><b>+</b> 操作步骤</button>
               <button type="button" data-act="ops-lesson-insert-block" data-block="figure"><b>+</b> 课程图示</button>
               <button type="button" data-act="ops-lesson-insert-block" data-block="table"><b>+</b> 数据表格</button>
-              <button type="button" data-act="ops-lesson-insert-block" data-block="code"><b>+</b> 示例代码</button>
             </div>
           </div>
         </section>
@@ -1604,7 +1611,7 @@
     touchStreak();
     if (lesson.type === "article") return renderArticle(lesson);
     if (lesson.type === "video") return startVideo(lesson);
-    return startGame(lesson);
+    return go("#/learn");
   }
 
   function renderLocked(title) {
@@ -1613,7 +1620,7 @@
       <div class="card lock-card">
         <p class="kicker">权限不足</p>
         <strong>这份内容需要店长授权</strong>
-        <p class="muted">注册后可以看火锅岗前图文。视频、互动、考试和进阶课，要店长在后台点「授权全部」。</p>
+        <p class="muted">注册后可以看火锅岗前图文。视频、考试和进阶课，要店长在后台点「授权全部」。</p>
         <button class="primary" data-act="go" data-hash="#/home">返回通知</button>
       </div>
     `;
@@ -1722,172 +1729,6 @@
     const time = view().querySelector(".time");
     if (bar) bar.style.width = `${(state.video.t / total) * 100}%`;
     if (time) time.textContent = `${Math.floor(state.video.t)} / ${total}s`;
-  }
-
-  function startGame(lesson) {
-    if (lesson.game === "tags") {
-      state.game = { id: lesson.id, kind: "tags", n: 0, score: 0, locked: false, queue: shuffle(TAG_PAIRS).slice(0, 10) };
-    } else if (lesson.game === "card") {
-      state.game = { id: lesson.id, kind: "card", parts: [] };
-    } else if (lesson.game === "fix") {
-      state.game = { id: lesson.id, kind: "fix", round: 0, pickedLine: -1, solved: [] };
-    } else if (lesson.game === "box") {
-      state.game = { id: lesson.id, kind: "box", round: 0, values: { content: 140, padding: 8, border: 2, margin: 8 } };
-    }
-    renderGame();
-  }
-
-  function shuffle(list) {
-    const copy = list.slice();
-    for (let i = copy.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [copy[i], copy[j]] = [copy[j], copy[i]];
-    }
-    return copy;
-  }
-
-  function renderGame() {
-    const lesson = lessonById(state.game.id);
-    setTop(lesson.title, true);
-    const g = state.game;
-    if (g.kind === "tags") return renderTagGame(lesson, g);
-    if (g.kind === "card") return renderCardGame(lesson, g);
-    if (g.kind === "fix") return renderFixGame(lesson, g);
-    return renderBoxGame(lesson, g);
-  }
-
-  function renderTagGame(lesson, g) {
-    if (g.n >= g.queue.length) {
-      const pass = g.score >= 8;
-      view().innerHTML = `
-        <div class="result">
-          <div class="kicker">标签对对碰</div>
-          <div class="score">${g.score}/10</div>
-          <div class="pass" style="color:${pass ? "var(--ok)" : "var(--bad)"}">${pass ? "通关" : "再练一轮"}</div>
-          <p class="muted">看到标签，立刻反应它在页面里干什么。</p>
-        </div>
-        <button class="primary" data-act="${pass ? "complete" : "retry-game"}" data-id="${lesson.id}">${pass ? "完成本课" : "再来一次"}</button>
-      `;
-      return;
-    }
-    const current = g.queue[g.n];
-    const options = shuffle([current.meaning, ...shuffle(TAG_PAIRS.filter((item) => item.tag !== current.tag)).slice(0, 3).map((item) => item.meaning)]);
-    view().innerHTML = `
-      <div class="game-head">
-        <p class="muted">${g.n + 1}/10 · 对 ${g.score}</p>
-        <h2>${escapeHtml(lesson.goal)}</h2>
-      </div>
-      <div class="prompt">${escapeHtml(current.tag)}<small>这个标签的职责是？</small></div>
-      <div class="choices">
-        ${options.map((opt) => `<button class="choice" data-act="tag-answer" data-value="${escapeHtml(opt)}">${escapeHtml(opt)}</button>`).join("")}
-      </div>
-    `;
-  }
-
-  function renderCardGame(lesson, g) {
-    const html = g.parts.join("");
-    const has = {
-      h2: /<h2[\s>]/.test(html),
-      p: /<p[\s>]/.test(html),
-      price: /class="price"/.test(html),
-      btn: /<button[\s>]/.test(html)
-    };
-    const pass = has.h2 && has.p && has.price && has.btn;
-    view().innerHTML = `
-      <div class="game-head">
-        <p class="muted">拼一张卡片</p>
-        <h2>${escapeHtml(lesson.goal)}</h2>
-      </div>
-      <div class="builder">
-        <div>
-          <div class="tools">
-            ${CARD_TOOLS.map((tool) => `<button data-act="card-add" data-id="${tool.id}">${tool.label}</button>`).join("")}
-            <button data-act="card-undo">撤销</button>
-          </div>
-          <ul class="check">
-            <li class="${has.h2 ? "done" : ""}">${has.h2 ? "✓" : "○"} 标题</li>
-            <li class="${has.p ? "done" : ""}">${has.p ? "✓" : "○"} 介绍</li>
-            <li class="${has.price ? "done" : ""}">${has.price ? "✓" : "○"} 价格</li>
-            <li class="${has.btn ? "done" : ""}">${has.btn ? "✓" : "○"} 按钮</li>
-          </ul>
-        </div>
-        <div class="preview-card">${html || "<p class='muted'>从左侧点标签，右边实时出现结构。</p>"}</div>
-      </div>
-      <div class="actions">
-        <button class="primary" data-act="complete" data-id="${lesson.id}" ${pass ? "" : "disabled"}>${pass ? "结构齐全，完成本课" : "还差几块"}</button>
-      </div>
-    `;
-  }
-
-  function renderFixGame(lesson, g) {
-    if (g.round >= FIX_ROUNDS.length) {
-      view().innerHTML = `
-        <div class="result">
-          <div class="kicker">找出坏标签</div>
-          <div class="score">4/4</div>
-          <div class="pass" style="color:var(--ok)">四处都修好了</div>
-        </div>
-        <button class="primary" data-act="complete" data-id="${lesson.id}">完成本课</button>
-      `;
-      return;
-    }
-    const round = FIX_ROUNDS[g.round];
-    view().innerHTML = `
-      <div class="game-head">
-        <p class="muted">${g.round + 1}/4 · ${escapeHtml(round.title)}</p>
-        <h2>先点出坏掉的那一行</h2>
-      </div>
-      <div class="card" style="padding:8px;margin-bottom:12px">
-        ${round.lines.map((line, i) => `
-          <button class="code-line ${g.pickedLine === i ? "on" : ""}" data-act="fix-line" data-index="${i}">
-            <span class="n">${i + 1}</span><code>${escapeHtml(line)}</code>
-          </button>`).join("")}
-      </div>
-      ${g.pickedLine === round.bad ? `
-        <p class="muted" style="margin-bottom:8px">选一个修法</p>
-        <div class="choices">
-          ${round.options.map((opt, i) => `<button class="choice" data-act="fix-answer" data-index="${i}">${escapeHtml(opt)}</button>`).join("")}
-        </div>` : g.pickedLine >= 0 ? `<p class="empty">这行没问题。再找找嵌套、属性和列表。</p>` : ""}
-    `;
-  }
-
-  function renderBoxGame(lesson, g) {
-    if (g.round >= BOX_CHALLENGES.length) {
-      view().innerHTML = `
-        <div class="result">
-          <div class="kicker">盒模型实验室</div>
-          <div class="score">3/3</div>
-          <div class="pass" style="color:var(--ok)">尺寸已经对齐</div>
-        </div>
-        <button class="primary" data-act="complete" data-id="${lesson.id}">完成本课</button>
-      `;
-      return;
-    }
-    const challenge = BOX_CHALLENGES[g.round];
-    const v = g.values;
-    const outer = v.content + v.padding * 2 + v.border * 2 + v.margin * 2;
-    const matched = ["content", "padding", "border", "margin"].every((key) => Math.abs(v[key] - challenge.target[key]) <= 1);
-    view().innerHTML = `
-      <div class="game-head">
-        <p class="muted">${g.round + 1}/3 · ${escapeHtml(challenge.title)}</p>
-        <h2>目标 ${challenge.target.content}+${challenge.target.padding}+${challenge.target.border}+${challenge.target.margin}</h2>
-      </div>
-      <div class="lab">
-        <div class="box-visual" style="padding:${v.margin}px">
-          <div class="b" style="border-width:${v.border}px">
-            <div class="p" style="padding:${v.padding}px">
-              <div class="c" style="width:${v.content}px;margin:0 auto">${v.content} / 外沿 ${outer}</div>
-            </div>
-          </div>
-        </div>
-        <div class="sliders">
-          ${[["content", "内容", 80, 200], ["padding", "内边距", 0, 32], ["border", "边框", 0, 12], ["margin", "外边距", 0, 32]].map(([key, label, min, max]) => `
-            <label>${label}<input type="range" min="${min}" max="${max}" value="${v[key]}" data-act="box-set" data-key="${key}"><span>${v[key]}</span></label>
-          `).join("")}
-        </div>
-      </div>
-      <button class="primary" data-act="box-next" ${matched ? "" : "disabled"}>${matched ? "对齐了，下一题" : "还没对齐目标"}</button>
-    `;
   }
 
   function startExam(id) {
@@ -2341,10 +2182,6 @@
         const total = videoTotal(lesson);
         if (state.video && state.video.t < total - 0.8 && !isDone(lesson.id)) return;
       }
-      if (lesson?.type === "game" && lesson.game === "card") {
-        const html = state.game.parts.join("");
-        if (!(/<h2/.test(html) && /<p/.test(html) && /price/.test(html) && /<button/.test(html))) return;
-      }
       completeLesson(btn.dataset.id);
       const items = lessonsIn(lesson.track);
       const following = items.slice(items.findIndex((item) => item.id === lesson.id) + 1).find((item) => Gate.canLesson(item));
@@ -2380,48 +2217,6 @@
       const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
       state.video.t = ratio * videoTotal(lessonById(state.video.id));
       return renderVideo();
-    }
-    if (act === "tag-answer" && state.game?.kind === "tags" && !state.game.locked) {
-      const current = state.game.queue[state.game.n];
-      const ok = btn.dataset.value === current.meaning;
-      if (ok) state.game.score += 1;
-      state.game.locked = true;
-      btn.classList.add(ok ? "ok" : "bad");
-      setTimeout(() => {
-        state.game.n += 1;
-        state.game.locked = false;
-        renderGame();
-      }, 260);
-      return;
-    }
-    if (act === "retry-game") return startGame(lessonById(btn.dataset.id));
-    if (act === "card-add") {
-      const tool = CARD_TOOLS.find((item) => item.id === btn.dataset.id);
-      if (tool) state.game.parts.push(tool.html);
-      return renderGame();
-    }
-    if (act === "card-undo") {
-      state.game.parts.pop();
-      return renderGame();
-    }
-    if (act === "fix-line") {
-      state.game.pickedLine = Number(btn.dataset.index);
-      return renderGame();
-    }
-    if (act === "fix-answer") {
-      const round = FIX_ROUNDS[state.game.round];
-      if (Number(btn.dataset.index) === round.answer) {
-        state.game.round += 1;
-        state.game.pickedLine = -1;
-      } else {
-        btn.classList.add("bad");
-        return;
-      }
-      return renderGame();
-    }
-    if (act === "box-next") {
-      state.game.round += 1;
-      return renderGame();
     }
     if (act === "pick") return pickOption(btn.dataset.index);
     if (act === "exam-next") {
@@ -2474,34 +2269,6 @@
       }
       if (status) status.textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB`;
       if (remove) remove.hidden = false;
-      return;
-    }
-    const el = event.target.closest("[data-act='box-set']");
-    if (!el || !state.game || state.game.kind !== "box") return;
-    state.game.values[el.dataset.key] = Number(el.value);
-    const v = state.game.values;
-    const outer = v.content + v.padding * 2 + v.border * 2 + v.margin * 2;
-    const label = el.parentElement.querySelector("span");
-    if (label) label.textContent = el.value;
-    const visual = view().querySelector(".box-visual");
-    if (visual) {
-      visual.style.padding = `${v.margin}px`;
-      const border = visual.querySelector(".b");
-      const pad = visual.querySelector(".p");
-      const content = visual.querySelector(".c");
-      if (border) border.style.borderWidth = `${v.border}px`;
-      if (pad) pad.style.padding = `${v.padding}px`;
-      if (content) {
-        content.style.width = `${v.content}px`;
-        content.textContent = `${v.content} / 外沿 ${outer}`;
-      }
-    }
-    const challenge = BOX_CHALLENGES[state.game.round];
-    const matched = ["content", "padding", "border", "margin"].every((key) => Math.abs(v[key] - challenge.target[key]) <= 1);
-    const next = view().querySelector("[data-act='box-next']");
-    if (next) {
-      next.disabled = !matched;
-      next.textContent = matched ? "对齐了，下一题" : "还没对齐目标";
     }
   }
 
@@ -2593,6 +2360,25 @@
     Live.connect();
   }
 
+  function loadRealtimeSdk() {
+    const activate = () => {
+      window.APP_NETWORK?.patchSupabase();
+      Auth.connectRealtime?.();
+      Live.scheduleReconnect();
+    };
+    if (window.supabase?.createClient) {
+      activate();
+      return;
+    }
+    if (document.querySelector("script[data-academy-realtime]")) return;
+    const script = document.createElement("script");
+    script.src = "../vendor/supabase.min.js";
+    script.async = true;
+    script.dataset.academyRealtime = "true";
+    script.onload = activate;
+    document.head.appendChild(script);
+  }
+
   async function init() {
     setTheme(state.theme);
     document.getElementById("back-btn").innerHTML = svgIcon("back");
@@ -2610,15 +2396,18 @@
     });
     document.getElementById("app").addEventListener("click", onClick);
     document.getElementById("app").addEventListener("input", onInput);
+    window.addEventListener("app-network-change", () => Live.scheduleReconnect(), { passive: true });
     window.addEventListener("hashchange", onRoute);
     window.addEventListener("keydown", onKey);
-    await Auth.start();
     Auth.onChange((user) => {
       if (!user) return showGate();
       enterApp();
     });
+    await Auth.start();
     if (!Auth.session) showGate();
     else enterApp();
+    const scheduleSdk = window.requestIdleCallback || ((callback) => setTimeout(callback, 450));
+    scheduleSdk(loadRealtimeSdk, { timeout: 1800 });
     requestAnimationFrame(loop);
   }
 

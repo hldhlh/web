@@ -6,6 +6,9 @@ window.AcademyAuth = (() => {
   let rev = 0;
   let session = readSession();
   let channel = null;
+  let pullPromise = null;
+  let hasPulled = false;
+  let lastPullAt = 0;
 
   function readSession() {
     try {
@@ -59,14 +62,25 @@ window.AcademyAuth = (() => {
     return users.find((user) => user.id === id);
   }
 
-  async function pull() {
-    const data = await window.AcademyStore.getJSON(FILE);
-    if (!data || !Array.isArray(data.users)) return users;
-    if (Number(data.rev) < rev) return users;
-    users = data.users;
-    rev = Number(data.rev) || Date.now();
-    refreshSession();
-    return users;
+  async function pull(force = false) {
+    if (pullPromise) return pullPromise;
+    if (!force && hasPulled && Date.now() - lastPullAt < 30 * 1000) return users;
+    pullPromise = (async () => {
+      const data = await window.AcademyStore.getJSON(FILE);
+      hasPulled = true;
+      lastPullAt = Date.now();
+      if (!data || !Array.isArray(data.users)) return users;
+      if (Number(data.rev) < rev) return users;
+      users = data.users;
+      rev = Number(data.rev) || Date.now();
+      refreshSession();
+      return users;
+    })();
+    try {
+      return await pullPromise;
+    } finally {
+      pullPromise = null;
+    }
   }
 
   async function push() {
@@ -103,7 +117,7 @@ window.AcademyAuth = (() => {
     password = String(password || "");
     if (name.length < 2 || name.length > 16) throw new Error("姓名请用 2 到 16 个字");
     if (password.length < 4) throw new Error("密码至少 4 位");
-    await pull();
+    await pull(true);
     if (findByName(name)) throw new Error("这个姓名已经注册");
     const userSalt = salt();
     const first = users.length === 0;
@@ -143,7 +157,7 @@ window.AcademyAuth = (() => {
 
   async function setAccess(userId, access, actor) {
     if (!isManager(actor)) throw new Error("只有店长可以改权限");
-    await pull();
+    await pull(true);
     const user = findById(userId);
     if (!user) throw new Error("找不到这个人");
     if (user.role === "manager" && user.id === actor.id && access === "blocked") {
@@ -169,14 +183,19 @@ window.AcademyAuth = (() => {
     return () => listeners.delete(fn);
   }
 
-  async function start() {
-    try { await pull(); } catch (_) { }
-    refreshSession();
+  function connectRealtime() {
+    if (channel) return channel;
     channel = window.AcademyStore.channel("academy-auth", {
-      accounts: () => pull().catch(() => { })
+      accounts: () => pull(true).catch(() => { })
     });
-    setInterval(() => pull().catch(() => { }), 4000);
-    return session;
+    return channel;
+  }
+
+  function start() {
+    connectRealtime();
+    pull(true).catch(() => { });
+    setInterval(() => pull().catch(() => { }), 15000);
+    return Promise.resolve(session);
   }
 
   return {
@@ -190,6 +209,7 @@ window.AcademyAuth = (() => {
     setAccess,
     list,
     onChange,
+    connectRealtime,
     start,
     pull
   };
