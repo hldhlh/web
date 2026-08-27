@@ -241,8 +241,12 @@ window.AcademyAuth = (() => {
     password = String(password || "");
     if (!name) throw fieldError("请输入注册时使用的姓名", "name", "NAME_REQUIRED");
     if (!password) throw fieldError("请输入密码", "password", "PASSWORD_REQUIRED");
-    await pull(true);
-    const user = findByName(name);
+    await pull();
+    let user = findByName(name);
+    if (!user) {
+      await pull(true);
+      user = findByName(name);
+    }
     if (!user) throw fieldError("没有找到这个账号，请核对姓名或先注册", "name", "ACCOUNT_NOT_FOUND");
     const hashed = await hashPass(user.name, password, user.salt);
     if (hashed !== user.pass) throw fieldError("密码不正确，请重新输入", "password", "PASSWORD_INCORRECT");
@@ -299,19 +303,16 @@ window.AcademyAuth = (() => {
     return channel;
   }
 
-  async function start() {
+  function start() {
     connectRealtime();
-    try {
-      await pull(true);
-      if (session) await verifySession();
-    } catch (_) { }
+    pull(true).then(() => session ? verifySession() : null).catch(() => { });
     setInterval(() => pull().catch(() => { }), 15000);
     clearInterval(sessionCheckTimer);
     sessionCheckTimer = setInterval(() => verifySession(), 5000);
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") verifySession();
     });
-    return session;
+    return Promise.resolve(session);
   }
 
   return {

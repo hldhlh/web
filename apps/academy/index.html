@@ -24,7 +24,8 @@
     };
   </script>
   <link rel="stylesheet" href="./style.css?v=20260827-16">
-  <link rel="preload" href="../network.js?v=20260827-5" as="script">
+  <link rel="preload" href="../network.js?v=20260827-6" as="script">
+  <link rel="preload" href="../vendor/supabase.min.js" as="script">
   <link rel="preload" href="./app.js?v=20260827-22" as="script">
 </head>
 <body>
@@ -44,12 +45,13 @@
     </nav>
   </div>
   <noscript>今岭学堂需要启用 JavaScript。</noscript>
-  <script defer src="../network.js?v=20260827-5"></script>
+  <script defer src="../network.js?v=20260827-6"></script>
   <script defer src="./framework/store.js?v=20260827-4"></script>
-  <script defer src="./framework/auth.js?v=20260827-4"></script>
+  <script defer src="./framework/auth.js?v=20260827-5"></script>
   <script defer src="./framework/gate.js"></script>
   <script defer src="./content.js?v=20260827-6"></script>
-  <script defer src="./app.js?v=20260827-22"></script>
+  <script defer src="../vendor/supabase.min.js"></script>
+  <script defer src="./app.js?v=20260827-23"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistration().then((registration) => registration?.update()).catch(() => {});

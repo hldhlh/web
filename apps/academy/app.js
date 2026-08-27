@@ -22,6 +22,7 @@
   };
   const OPS_STORAGE_KEY = "academy-ops-content-v1";
   const OPS_TABS = ["lessons", "exams", "notices", "staff"];
+  let contentRevision = 0;
 
   const view = () => document.getElementById("view");
 
@@ -209,24 +210,25 @@
   function loadOpsStore() {
     let raw = null;
     try { raw = JSON.parse(localStorage.getItem(OPS_STORAGE_KEY) || "null"); } catch (_) { }
+    contentRevision = Number(raw?.rev) || 0;
     const fallbackLessons = DATA.lessons.filter((item) => !isDroppedLesson(item)).map(normalizeLesson);
     const fallbackExams = rebuildMixExam(DATA.exams.filter((item) => !isDroppedExam(item)).map(normalizeExam));
-    const overlayLessons = Array.isArray(raw?.lessons)
-      ? raw.lessons.filter((item) => !isDroppedLesson(item) && !BUNDLED_LESSON_IDS.has(item.id)).map(normalizeLesson)
-      : [];
-    const overlayExams = Array.isArray(raw?.exams)
+    const lessons = Array.isArray(raw?.lessons)
+      ? raw.lessons.filter((item) => !isDroppedLesson(item)).map(normalizeLesson)
+      : fallbackLessons;
+    const exams = Array.isArray(raw?.exams)
       ? raw.exams
-        .filter((item) => !isDroppedExam(item) && !BUNDLED_EXAM_IDS.has(item.id))
+        .filter((item) => !isDroppedExam(item))
         .map(normalizeExam)
         .map((exam) => ({
           ...exam,
           questions: (exam.questions || []).filter((question) => !isOffTopicQuestion(question))
         }))
-      : [];
+      : fallbackExams;
     const notices = Array.isArray(raw?.notices) ? raw.notices.map(normalizeNotice) : [];
     return {
-      lessons: fallbackLessons.concat(overlayLessons),
-      exams: rebuildMixExam(fallbackExams.concat(overlayExams)),
+      lessons,
+      exams: rebuildMixExam(exams),
       notices
     };
   }
@@ -258,6 +260,8 @@
 
   function saveOpsStore() {
     const payload = {
+      rev: contentRevision,
+      updatedAt: Date.now(),
       lessons: DATA.lessons,
       exams: DATA.exams,
       notices: DATA.notices
@@ -309,7 +313,13 @@
   }
 
   function loadProgress() {
-    return defaults();
+    try {
+      const id = Auth.session?.id;
+      if (!id) return defaults();
+      return normalizeProgress(JSON.parse(localStorage.getItem(`academy-progress-cache-${id}`) || "{}"));
+    } catch (_) {
+      return defaults();
+    }
   }
 
   function normalizeProgress(raw) {
@@ -372,6 +382,7 @@
       if (!next) return false;
       this.rev = ts || Date.now();
       state.progress = normalizeProgress(next);
+      try { localStorage.setItem(`academy-progress-cache-${Auth.session?.id}`, JSON.stringify(state.progress)); } catch (_) { }
       return true;
     },
     ingestStaff(row) {
@@ -421,6 +432,7 @@
           ts,
           updated_at: new Date().toISOString()
         });
+        try { localStorage.setItem(`academy-progress-cache-${id}`, JSON.stringify(state.progress)); } catch (_) { }
         if (this.socketLive) this.setStatus("live", "实时在线");
         else if (ok) this.setStatus("online", "在线同步");
         else this.setStatus(navigator.onLine ? "connecting" : "offline", navigator.onLine ? "正在重连" : "离线可用");
@@ -541,6 +553,83 @@
       });
       this.connecting = false;
       this.subscribe();
+    }
+  };
+
+  const ContentSync = {
+    path: "academy/content.json",
+    channel: null,
+    pullPromise: null,
+    poll: 0,
+    snapshot() {
+      return {
+        rev: contentRevision,
+        updatedAt: Date.now(),
+        lessons: DATA.lessons,
+        exams: DATA.exams,
+        notices: DATA.notices || []
+      };
+    },
+    apply(payload) {
+      const source = payload?.data && typeof payload.data === "object" ? payload.data : payload;
+      if (!source || !Array.isArray(source.lessons) || !Array.isArray(source.exams)) return false;
+      const rev = Number(payload?.rev || source.rev) || 0;
+      if (rev && rev <= contentRevision) return false;
+      const normalized = stripUnrelatedCurriculum({
+        lessons: source.lessons.map(normalizeLesson),
+        exams: source.exams.map(normalizeExam),
+        notices: Array.isArray(source.notices) ? source.notices.map(normalizeNotice) : []
+      });
+      DATA.lessons = normalized.lessons;
+      DATA.exams = normalized.exams;
+      DATA.notices = normalized.notices;
+      contentRevision = rev || Date.now();
+      saveOpsStore();
+      const editing = state.route?.name === "ops" && ["add", "edit"].includes(currentOpsRoute().mode);
+      if (Auth.session && !editing && state.route?.name !== "exam") render();
+      return true;
+    },
+    async pull() {
+      if (this.pullPromise) return this.pullPromise;
+      this.pullPromise = (async () => {
+        const payload = await window.AcademyStore.getJSON(this.path);
+        if (!payload) {
+          if (Auth.isManager(Auth.session)) await this.publish();
+          return false;
+        }
+        return this.apply(payload);
+      })();
+      try {
+        return await this.pullPromise;
+      } finally {
+        this.pullPromise = null;
+      }
+    },
+    async publish() {
+      contentRevision = Date.now();
+      saveOpsStore();
+      const payload = { rev: contentRevision, data: this.snapshot() };
+      await window.AcademyStore.putJSON(this.path, payload);
+      if (this.channel) {
+        this.channel.send({
+          type: "broadcast",
+          event: "content-version",
+          payload: { rev: contentRevision }
+        });
+      }
+      return true;
+    },
+    connect() {
+      if (!this.channel) {
+        this.channel = window.AcademyStore.channel("academy-content-live", {
+          "content-version": (payload) => {
+            if (Number(payload?.rev) > contentRevision) this.pull().catch(() => { });
+          }
+        });
+      }
+      this.pull().catch(() => { });
+      if (!this.poll) this.poll = setInterval(() => this.pull().catch(() => { }), 30000);
+      return this.channel;
     }
   };
 
@@ -2320,6 +2409,7 @@
       else if (source === "exams") DATA.exams = list.filter((item) => item.id !== id);
       else if (source === "notices") DATA.notices = list.filter((item) => item.id !== id);
       saveOpsStore();
+      ContentSync.publish().catch(() => alert("内容已保存在本机，但实时发布失败，请检查网络后重试。"));
       return go(`#/ops?section=${source}`);
     }
     if (act === "ops-exam-add-question") {
@@ -2514,6 +2604,12 @@
           else list.push(normalized);
           DATA.lessons = list;
           saveOpsStore();
+          try {
+            await ContentSync.publish();
+          } catch (_) {
+            alert("课程已保存在本机，但实时发布失败，请检查网络后再次保存。");
+            return;
+          }
           return go("#/ops?section=lessons");
         }
         if (section === "exams") {
@@ -2548,6 +2644,12 @@
           else list.push(normalized);
           DATA.exams = list;
           saveOpsStore();
+          try {
+            await ContentSync.publish();
+          } catch (_) {
+            alert("考试已保存在本机，但实时发布失败，请检查网络后再次保存。");
+            return;
+          }
           return go("#/ops?section=exams");
         }
         if (section === "notices") {
@@ -2572,6 +2674,12 @@
           else list.push(normalized);
           DATA.notices = list;
           saveOpsStore();
+          try {
+            await ContentSync.publish();
+          } catch (_) {
+            alert("通知已保存在本机，但实时发布失败，请检查网络后再次保存。");
+            return;
+          }
           return go("#/ops?section=notices");
         }
       })();
@@ -2797,10 +2905,11 @@
 
   function enterApp() {
     document.querySelector(".app").classList.remove("gated");
-    state.progress = defaults();
+    state.progress = loadProgress();
     Live.rev = 0;
     Live.hydrated = false;
     onRoute();
+    ContentSync.pull().catch(() => { });
     Live.connect().finally(() => Presence.start());
   }
 
@@ -2808,6 +2917,7 @@
     const activate = () => {
       window.APP_NETWORK?.patchSupabase();
       Auth.connectRealtime?.();
+      ContentSync.connect();
       Live.scheduleReconnect();
     };
     if (window.supabase?.createClient) {
@@ -2840,12 +2950,21 @@
     });
     document.getElementById("app").addEventListener("click", onClick);
     document.getElementById("app").addEventListener("input", onInput);
-    window.addEventListener("app-network-change", () => Live.scheduleReconnect(true), { passive: true });
-    window.addEventListener("online", () => Live.scheduleReconnect(true), { passive: true });
+    window.addEventListener("app-network-change", () => {
+      Live.scheduleReconnect(true);
+      ContentSync.pull().catch(() => { });
+    }, { passive: true });
+    window.addEventListener("online", () => {
+      Live.scheduleReconnect(true);
+      ContentSync.pull().catch(() => { });
+    }, { passive: true });
     window.addEventListener("offline", () => Live.setStatus("offline", "离线可用"), { passive: true });
     window.addEventListener("hashchange", onRoute);
     window.addEventListener("keydown", onKey);
-    document.addEventListener("visibilitychange", () => Presence.visibility());
+    document.addEventListener("visibilitychange", () => {
+      Presence.visibility();
+      if (document.visibilityState === "visible") ContentSync.pull().catch(() => { });
+    });
     window.addEventListener("pagehide", () => Presence.capture(true));
     Auth.onChange((user) => {
       if (!user) return showGate();
@@ -2854,8 +2973,7 @@
     await Auth.start();
     if (!Auth.session) showGate();
     else enterApp();
-    const scheduleSdk = window.requestIdleCallback || ((callback) => setTimeout(callback, 450));
-    scheduleSdk(loadRealtimeSdk, { timeout: 1800 });
+    loadRealtimeSdk();
     requestAnimationFrame(loop);
   }
 
