@@ -27,38 +27,38 @@
   ];
 
   const CARD_TOOLS = [
-    { id: "h2", label: "标题 h2", html: "<h2>生椰拿铁</h2>" },
-    { id: "p", label: "介绍 p", html: "<p>冷萃椰浆，入口先甜后香。</p>" },
-    { id: "price", label: "价格 span", html: "<div class=\"price\">¥18</div>" },
-    { id: "btn", label: "按钮 button", html: "<button type=\"button\">加入购物车</button>" },
-    { id: "note", label: "备注 span", html: "<span>含椰奶，可做热饮。</span>" }
+    { id: "h2", label: "标题 h2", html: "<h2>毛肚 130g</h2>" },
+    { id: "p", label: "介绍 p", html: "<p>圆黑盘，切片 8×12cm，冰水保存。</p>" },
+    { id: "price", label: "克数 span", html: "<div class=\"price\">130g · 圆黑盘</div>" },
+    { id: "btn", label: "按钮 button", html: "<button type=\"button\">加入锅里</button>" },
+    { id: "note", label: "备注 span", html: "<span>牛百叶 150g，同样圆黑盘。</span>" }
   ];
 
   const FIX_ROUNDS = [
     {
       title: "图片少了替代文字",
-      lines: ["<section>", "  <h2>生椰拿铁</h2>", "  <img src=\"latte.jpg\">", "</section>"],
+      lines: ["<section>", "  <h2>毛肚 130g</h2>", "  <img src=\"tripe.jpg\">", "</section>"],
       bad: 2,
-      options: ["给 img 补上 alt=\"生椰拿铁\"", "把 img 改成 button", "删掉整张图就算修好"],
+      options: ["给 img 补上 alt=\"毛肚 130克 圆黑盘\"", "把 img 改成 button", "删掉整张图就算修好"],
       answer: 0
     },
     {
       title: "链接没有去处",
-      lines: ["<nav>", "  <a>菜单</a>", "  <a href=\"/about\">关于</a>", "</nav>"],
+      lines: ["<nav>", "  <a>锅底</a>", "  <a href=\"/sides\">小料</a>", "</nav>"],
       bad: 1,
-      options: ["给第一个 a 加上 href=\"/menu\"", "把 a 改成 p", "把两个链接都删掉"],
+      options: ["给第一个 a 加上 href=\"/pots\"", "把 a 改成 p", "把两个链接都删掉"],
       answer: 0
     },
     {
       title: "列表结构不对",
-      lines: ["<ul>", "  <div>厚乳</div>", "  <li>椰浆</li>", "</ul>"],
+      lines: ["<ul>", "  <div>牛百叶 150g</div>", "  <li>笋尖 150g</li>", "</ul>"],
       bad: 1,
       options: ["把 div 改成 li", "在 ul 外包一层 p", "把 ul 改成 h1"],
       answer: 0
     },
     {
       title: "段落里塞了大盒子",
-      lines: ["<p>", "  今日主推", "  <div>生椰拿铁</div>", "</p>"],
+      lines: ["<p>", "  今日主推", "  <div>麻辣锅 底料 300g</div>", "</p>"],
       bad: 2,
       options: ["把 div 拿出去，或改成 span", "再套一层 html", "把 p 改成 img"],
       answer: 0
@@ -80,8 +80,200 @@
     game: null,
     tick: 0
   };
+  const OPS_STORAGE_KEY = "academy-ops-content-v1";
+  const OPS_TABS = ["lessons", "exams", "notices", "staff"];
 
   const view = () => document.getElementById("view");
+
+  function coerceId(prefix, value) {
+    const raw = String(value || "").trim();
+    if (raw) return raw;
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  function coerceNumber(value, fallback) {
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.max(0, n) : fallback;
+  }
+
+  function coerceString(value, fallback) {
+    const text = String(value || "").trim();
+    return text || fallback;
+  }
+
+  function normalizeTrack(track) {
+    return DATA.tracks.some((item) => item.id === track) ? track : "onboard";
+  }
+
+  function normalizeLessonType(type) {
+    return ["article", "video", "game"].includes(type) ? type : "article";
+  }
+
+  function defaultBlocks(summary) {
+    return [{ type: "lead", text: coerceString(summary, "课程内容待完善。"), }];
+  }
+
+  function defaultScenes(mediaUrl) {
+    const mediaStage = mediaUrl ? {
+      kind: "media",
+      src: mediaUrl,
+      caption: "课程视频素材",
+      text: "先看完视频并按下方章节推进按钮"
+    } : {
+      kind: "callout",
+      kicker: "待发布",
+      text: "课程场景将从后台补充"
+    };
+    return [{ duration: 120, title: "课程分段", caption: "课程内容尚未发布，请在后台补充。", stage: mediaStage }];
+  }
+
+  function normalizeLesson(item) {
+    const type = normalizeLessonType(item.type);
+    const blocks = (Array.isArray(item.blocks) && item.blocks.length)
+      ? item.blocks
+      : (type === "article" ? defaultBlocks(item.summary) : []);
+    const scenes = (Array.isArray(item.scenes) && item.scenes.length)
+      ? item.scenes
+      : (type === "video" ? defaultScenes(item.mediaUrl) : []);
+    return {
+      id: coerceId("lesson", item.id),
+      type,
+      track: normalizeTrack(item.track),
+      title: coerceString(item.title, "未命名课程"),
+      minutes: Math.max(1, Math.round(coerceNumber(item.minutes, 3))),
+      summary: coerceString(item.summary, "课程内容待完善。"),
+      access: item.access === "basic" ? "basic" : "full",
+      mediaUrl: coerceString(item.mediaUrl, ""),
+      blocks: type === "article" ? blocks : [],
+      scenes: type === "video" ? scenes : [],
+      game: type === "game" ? coerceString(item.game, "card") : item.game
+    };
+  }
+
+  function parseJSONArray(raw) {
+    try {
+      const list = JSON.parse(coerceString(raw, "[]"));
+      return Array.isArray(list) ? list : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function readLocalVideo(file) {
+    if (!file) return null;
+    if (!file.type.startsWith("video/")) {
+      alert("只能上传视频文件（mp4、mov、webm 等）。");
+      return null;
+    }
+    if (file.size > 200 * 1024 * 1024) {
+      alert("视频超过 200MB，请先压缩后再上传。");
+      return null;
+    }
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error("视频读取失败，请重新选择。"));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function normalizeQuestion(question, index) {
+    const type = ["single", "judge", "multi"].includes(question.type) ? question.type : "single";
+    const stem = coerceString(question.stem, `第 ${index + 1} 题请补充内容`);
+    const explain = coerceString(question.explain, "暂无解析。");
+    if (type === "judge") {
+      return {
+        id: coerceId("q", question.id),
+        type,
+        stem,
+        answer: typeof question.answer === "boolean" ? question.answer : true,
+        explain
+      };
+    }
+    const options = Array.isArray(question.options) && question.options.length ? question.options.map((option) => coerceString(option, "选项")) : ["是", "否"];
+    return {
+      id: coerceId("q", question.id),
+      type,
+      stem,
+      options,
+      answer: type === "multi" ? (Array.isArray(question.answer) ? question.answer : [0]) : Math.min(options.length - 1, Math.max(0, Number(question.answer) || 0)),
+      explain
+    };
+  }
+
+  function normalizeExam(item) {
+    const questions = Array.isArray(item.questions) ? item.questions.map(normalizeQuestion) : [];
+    return {
+      id: coerceId("exam", item.id),
+      title: coerceString(item.title, "未命名考试"),
+      track: normalizeTrack(item.track),
+      minutes: Math.max(1, Math.round(coerceNumber(item.minutes, 8))),
+      pass: Math.max(1, Math.min(100, Math.round(coerceNumber(item.pass, 80)))),
+      summary: coerceString(item.summary, "考试说明待补充。"),
+      questions
+    };
+  }
+
+  function normalizeNotice(item) {
+    return {
+      id: coerceId("notice", item.id),
+      tone: item.tone === "urgent" ? "urgent" : "info",
+      kicker: coerceString(item.kicker, "运营通知"),
+      title: coerceString(item.title, "新消息"),
+      detail: coerceString(item.detail || item.content, "请尽快查看。"),
+      createdAt: coerceNumber(item.createdAt, Date.now())
+    };
+  }
+
+  function loadOpsStore() {
+    let raw = null;
+    try { raw = JSON.parse(localStorage.getItem(OPS_STORAGE_KEY) || "null"); } catch (_) { }
+    const lessons = Array.isArray(raw?.lessons) ? raw.lessons.map(normalizeLesson) : DATA.lessons.map(normalizeLesson);
+    const exams = Array.isArray(raw?.exams) ? raw.exams.map(normalizeExam) : DATA.exams.map(normalizeExam);
+    const notices = Array.isArray(raw?.notices) ? raw.notices.map(normalizeNotice) : [];
+    return { lessons, exams, notices };
+  }
+
+  function hydrateContentStore() {
+    const snapshot = loadOpsStore();
+    DATA.lessons = snapshot.lessons;
+    DATA.exams = snapshot.exams;
+    DATA.notices = snapshot.notices;
+  }
+
+  function saveOpsStore() {
+    const payload = {
+      lessons: DATA.lessons,
+      exams: DATA.exams,
+      notices: DATA.notices
+    };
+    localStorage.setItem(OPS_STORAGE_KEY, JSON.stringify(payload));
+  }
+
+  function canonicalOpsSection(section) {
+    return OPS_TABS.includes(section) ? section : "lessons";
+  }
+
+  function canonicalOpsMode(mode) {
+    return mode === "add" || mode === "edit" ? mode : "list";
+  }
+
+  function opsStore(section) {
+    if (section === "lessons") return DATA.lessons;
+    if (section === "exams") return DATA.exams;
+    if (section === "notices") return DATA.notices;
+    return [];
+  }
+
+  function currentOpsRoute() {
+    return {
+      section: canonicalOpsSection(state.route?.section),
+      mode: canonicalOpsMode(state.route?.mode),
+      id: coerceString(state.route?.id, "")
+    };
+  }
+
+  hydrateContentStore();
 
   function defaults() {
     return {
@@ -172,7 +364,7 @@
     },
     refreshView() {
       const stay = state.route?.name;
-      if (stay === "home" || stay === "learn" || stay === "exams" || stay === "me" || stay === "result") render();
+      if (stay === "home" || stay === "learn" || stay === "exams" || stay === "me" || stay === "result" || stay === "ops") render();
     },
     async pull() {
       const response = await fetch(`${this.fileUrl()}?t=${Date.now()}`, {
@@ -351,6 +543,17 @@
     const pendingExams = DATA.exams.filter((exam) => Gate.canExam(exam) && !examPassed(exam));
     const failedExams = pendingExams.filter((exam) => bestScore(exam.id) >= 0);
     const notices = [];
+    const posted = (DATA.notices || []).map((notice) => ({
+      tone: notice.tone === "urgent" ? "urgent" : "info",
+      kicker: coerceString(notice.kicker, "运营通知"),
+      title: coerceString(notice.title, "新通知"),
+      detail: coerceString(notice.detail, "请尽快查看"),
+      act: "ops-message",
+      createdAt: coerceNumber(notice.createdAt, Date.now()),
+      hash: "#/ops"
+    }));
+    posted.sort((a, b) => b.createdAt - a.createdAt);
+    notices.push(...posted);
 
     if (urgentLessons.length) {
       const first = urgentLessons[0];
@@ -434,6 +637,12 @@
     if (parts[0] === "learn") return { name: "learn", type: params.type || "all" };
     if (parts[0] === "exams") return { name: "exams" };
     if (parts[0] === "me") return { name: "me" };
+    if (parts[0] === "ops") return {
+      name: "ops",
+      section: canonicalOpsSection(params.section),
+      mode: canonicalOpsMode(params.mode),
+      id: params.id
+    };
     if (parts[0] === "lesson" && parts[1]) return { name: "lesson", id: parts[1] };
     if (parts[0] === "exam" && parts[1] && parts[2] === "result") return { name: "result", id: parts[1] };
     if (parts[0] === "exam" && parts[1]) return { name: "exam", id: parts[1] };
@@ -442,6 +651,24 @@
 
   function go(hash) {
     location.hash = hash;
+  }
+
+  function parentHashForRoute(route) {
+    if (!route) return "#/home";
+    if (route.name === "lesson") return "#/learn";
+    if (route.name === "exam" || route.name === "result") return "#/exams";
+    if (route.name === "ops") {
+      if (route.mode === "add" || route.mode === "edit") return `#/ops?section=${route.section}`;
+      return "#/me";
+    }
+    if (route.name === "learn" || route.name === "exams" || route.name === "me") return "#/home";
+    return "#/home";
+  }
+
+  function goToParentPage() {
+    const target = parentHashForRoute(state.route);
+    if (location.hash === target) return;
+    go(target);
   }
 
   function setTheme(theme) {
@@ -494,7 +721,7 @@
 
   function figure(kind) {
     if (kind === "day-flow") {
-      return `<div class="figure">${["开店", "高峰", "订货", "打烊"].map((label, i) =>
+      return `<div class="figure">${["开炉", "高峰", "补货", "收档"].map((label, i) =>
         `<div style="display:flex;align-items:center;gap:10px;padding:8px 4px">
           <b style="width:22px;height:22px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-size:12px">${i + 1}</b>
           <span>${label}</span>
@@ -510,7 +737,7 @@
     }
     if (kind === "tools") {
       return `<div class="figure" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        ${[["后厨订货", "每日补货"], ["今岭笔记", "交接短句"], ["流水可视化", "看高峰"], ["实时记账", "发生即记"]].map(([t, d]) =>
+        ${[["锅底备货", "每日补货"], ["翻台笔记", "交接短句"], ["翻台流水", "看高峰"], ["门店记账", "发生即记"]].map(([t, d]) =>
           `<div style="padding:10px;border-radius:12px;background:var(--surface-2)"><b>${t}</b><div class="muted">${d}</div></div>`).join("")}
       </div>`;
     }
@@ -713,9 +940,657 @@
           <p class="muted">${escapeHtml(item.explain)}</p>
         </button>`).join("") : `<p class="empty">还没有错题。考试里答错的会出现在这里。</p>`}
       <div class="actions">
-        ${Auth.isManager(Auth.session) ? `<a class="primary" href="./admin.html">打开店长后台</a>` : ""}
+        ${Auth.isManager(Auth.session) ? `<button class="primary" data-act="go" data-hash="#/ops">运营事务管理</button>` : ""}
         <button class="ghost" data-act="logout">退出账号</button>
         <button class="ghost" data-act="reset">清除本机学习记录</button>
+      </div>
+    `;
+  }
+
+  function staffAccessLabel(user) {
+    if (user.access === "full") return "全部权限";
+    if (user.access === "blocked") return "已停用";
+    return "仅基本";
+  }
+
+  function renderOpsTabs(section) {
+    const sections = [
+      { key: "lessons", mark: "课", label: "课程内容", count: DATA.lessons.length },
+      { key: "exams", mark: "考", label: "考试题库", count: DATA.exams.length },
+      { key: "notices", mark: "讯", label: "事务通知", count: (DATA.notices || []).length },
+      { key: "staff", mark: "人", label: "员工权限", count: Auth.list().length }
+    ];
+    return `<nav class="ops-subtabs" aria-label="运营事务导航">${sections.map((item) => `
+      <button class="${section === item.key ? "on" : ""}" data-act="ops-tab" data-section="${item.key}">
+        <span class="ops-nav-mark">${item.mark}</span>
+        <span>${item.label}</span>
+        <small>${item.count}</small>
+      </button>
+    `).join("")}</nav>`;
+  }
+
+  function lessonForEditor(raw) {
+    const blocks = Array.isArray(raw?.blocks) ? raw.blocks : [];
+    return {
+      id: raw?.id || "",
+      title: coerceString(raw?.title, ""),
+      track: normalizeTrack(raw?.track),
+      type: normalizeLessonType(raw?.type),
+      minutes: Math.max(1, Math.round(coerceNumber(raw?.minutes, 3))),
+      summary: coerceString(raw?.summary, ""),
+      access: raw?.access === "basic" ? "basic" : "full",
+      mediaUrl: coerceString(raw?.mediaUrl, ""),
+      blocks: blocks.length ? blocks : defaultBlocks(coerceString(raw?.summary, "课程内容待完善。")),
+      scenes: Array.isArray(raw?.scenes) && raw.scenes.length ? raw.scenes : []
+    };
+  }
+
+  function examForEditor(raw) {
+    return {
+      id: raw?.id || "",
+      title: coerceString(raw?.title, ""),
+      track: normalizeTrack(raw?.track),
+      pass: Math.max(1, Math.min(100, Math.round(coerceNumber(raw?.pass, 80)))),
+      minutes: Math.max(1, Math.round(coerceNumber(raw?.minutes, 8))),
+      summary: coerceString(raw?.summary, ""),
+      questions: Array.isArray(raw?.questions) ? raw.questions : []
+    };
+  }
+
+  function noticeForEditor(raw) {
+    return {
+      id: raw?.id || "",
+      title: coerceString(raw?.title, ""),
+      kicker: coerceString(raw?.kicker, "运营通知"),
+      detail: coerceString(raw?.detail, ""),
+      tone: raw?.tone === "urgent" ? "urgent" : "info",
+      createdAt: coerceNumber(raw?.createdAt, Date.now())
+    };
+  }
+
+  function renderDateTimeInput(ms) {
+    const date = new Date(coerceNumber(ms, Date.now()));
+    const pad = (num) => String(num).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  function renderDateLabel(ms) {
+    const date = new Date(coerceNumber(ms, Date.now()));
+    const pad = (num) => String(num).padStart(2, "0");
+    return `${date.getMonth() + 1}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  function lessonBlockTemplates(kind) {
+    if (kind === "lead") return { type: "lead", text: "请先说清本课目标，再进入实操。" };
+    if (kind === "h") return { type: "h", text: "关键知识点" };
+    if (kind === "p") return { type: "p", text: "补充说明一段完整的话。可写执行标准、注意事项等。" };
+    if (kind === "ul") return { type: "ul", items: ["需要员工记住的要点"] };
+    if (kind === "ol") return { type: "ol", items: ["第一步要执行的操作"] };
+    if (kind === "callout") return { type: "callout", tone: "key", title: "重点提醒", text: "将重要结论用简短句先说清。再给动作步骤。" };
+    if (kind === "code") return { type: "code", text: "console.log(\"课程实操示例\");" };
+    if (kind === "figure") return { type: "figure", kind: "day-flow" };
+    if (kind === "table") return { type: "table", headers: ["名称", "标准"], rows: [["", ""]] };
+    return null;
+  }
+
+  const LESSON_BLOCK_META = {
+    lead: { label: "课程引导", hint: "先告诉员工这节课要学会什么", placeholder: "例如：完成本课后，你将掌握开炉前的检查流程。" },
+    h: { label: "小标题", hint: "为接下来的内容划分章节", placeholder: "例如：第一步，检查设备" },
+    p: { label: "正文", hint: "填写操作方法、标准或说明", placeholder: "直接填写员工需要阅读的内容……" },
+    ul: { label: "要点清单", hint: "并列展示需要记住的事项" },
+    ol: { label: "操作步骤", hint: "按顺序展示员工需要执行的动作" },
+    callout: { label: "重点提示", hint: "突出容易遗漏或必须记住的内容", placeholder: "填写重点提醒……" },
+    code: { label: "示例代码", hint: "适用于需要展示代码的课程", placeholder: "填写代码示例……" },
+    figure: { label: "课程图示", hint: "用图形帮助员工快速理解" },
+    table: { label: "数据表格", hint: "适合配方、标准和对照信息" }
+  };
+
+  function renderLessonListEditor(block) {
+    const items = Array.isArray(block.items) && block.items.length ? block.items : [""];
+    return `<div class="lesson-list-editor">${items.map((item, index) => `
+      <div class="lesson-list-row"><span>${index + 1}</span><input data-block-field="item" value="${escapeHtml(item)}" placeholder="填写一项内容"><button type="button" data-act="ops-lesson-remove-list-item" title="删除此项">×</button></div>
+    `).join("")}</div><button type="button" class="inline-add" data-act="ops-lesson-add-list-item">+ 新增一项</button>`;
+  }
+
+  function renderLessonTableEditor(block) {
+    const headers = Array.isArray(block.headers) && block.headers.length ? block.headers : ["名称", "标准"];
+    const rows = Array.isArray(block.rows) && block.rows.length ? block.rows : [["", ""]];
+    const columns = headers.length;
+    return `<div class="lesson-table-actions">
+      <span>直接填写表格内容</span>
+      <div><button type="button" data-act="ops-lesson-add-table-column">+ 增加一列</button><button type="button" data-act="ops-lesson-remove-table-column">减少一列</button></div>
+    </div>
+    <div class="lesson-table-editor" style="--table-columns:${columns}">
+      <div class="lesson-table-head">${headers.map((header) => `<input data-block-field="header" value="${escapeHtml(header)}" placeholder="列标题">`).join("")}</div>
+      <div class="lesson-table-rows">${rows.map((row) => `
+        <div class="lesson-table-row">${headers.map((_, index) => `<input data-block-field="cell" value="${escapeHtml(row[index] || "")}" placeholder="填写内容">`).join("")}<button type="button" data-act="ops-lesson-remove-table-row" title="删除此行">×</button></div>
+      `).join("")}</div>
+    </div>
+    <button type="button" class="inline-add" data-act="ops-lesson-add-table-row">+ 增加一行</button>`;
+  }
+
+  function renderLessonBlockItem(block, index) {
+    const type = LESSON_BLOCK_META[block?.type] ? block.type : "p";
+    const meta = LESSON_BLOCK_META[type];
+    const content = type === "callout" ? `
+      <div class="ops-grid">
+        <label class="editor-field"><span>提示标题</span><input data-block-field="title" value="${escapeHtml(block.title || "")}" placeholder="例如：必须确认"></label>
+        <label class="editor-field"><span>提示类型</span>
+          <select data-block-field="tone">
+            <option value="key" ${block.tone !== "warn" ? "selected" : ""}>重点</option>
+            <option value="warn" ${block.tone === "warn" ? "selected" : ""}>警告</option>
+          </select>
+        </label>
+      </div>
+      <label class="editor-field"><span>提示内容</span><textarea data-block-field="text" placeholder="${meta.placeholder}">${escapeHtml(block.text || "")}</textarea></label>
+    ` : type === "ul" || type === "ol" ? renderLessonListEditor(block) : type === "figure" ? `
+      <label class="editor-field"><span>选择图示样式</span>
+        <select data-block-field="kind">
+          <option value="day-flow" ${block.kind === "day-flow" ? "selected" : ""}>门店一天流程</option>
+          <option value="tools" ${block.kind === "tools" ? "selected" : ""}>门店工具箱</option>
+          <option value="html-tree" ${block.kind === "html-tree" ? "selected" : ""}>网页结构示意</option>
+          <option value="box" ${block.kind === "box" ? "selected" : ""}>盒模型示意</option>
+        </select>
+      </label>
+      <p class="field-help">保存后会在课程中显示对应图示。</p>
+    ` : type === "table" ? renderLessonTableEditor(block) : `
+      <label class="editor-field">
+        <span>${meta.label}内容</span>
+        <textarea data-block-field="text" placeholder="${meta.placeholder}">${escapeHtml(block.text || "")}</textarea>
+      </label>
+    `;
+    return `
+      <article class="lesson-block-card" data-block-type="${type}">
+        <header class="lesson-block-head">
+          <div><span class="block-number">${index + 1}</span><strong>${meta.label}</strong><small>${meta.hint}</small></div>
+          <div class="block-tools" aria-label="调整内容模块">
+            <button type="button" data-act="ops-lesson-move-block" data-direction="up" title="上移">↑</button>
+            <button type="button" data-act="ops-lesson-move-block" data-direction="down" title="下移">↓</button>
+            <button type="button" class="danger-text" data-act="ops-lesson-remove-block" title="删除">删除</button>
+          </div>
+        </header>
+        <div class="lesson-block-body">${content}</div>
+      </article>
+    `;
+  }
+
+  function collectLessonBlocksFromBuilder() {
+    const cards = Array.from(document.querySelectorAll("#ops-lesson-block-builder .lesson-block-card"));
+    const blocks = [];
+    for (const card of cards) {
+      const type = card.dataset.blockType;
+      if (type === "ul" || type === "ol") {
+        const items = Array.from(card.querySelectorAll("[data-block-field='item']")).map((input) => input.value.trim()).filter(Boolean);
+        blocks.push({ type, items });
+        continue;
+      }
+      if (type === "figure") {
+        blocks.push({ type, kind: card.querySelector("[data-block-field='kind']")?.value || "day-flow" });
+        continue;
+      }
+      if (type === "table") {
+        const headers = Array.from(card.querySelectorAll("[data-block-field='header']")).map((input) => input.value.trim());
+        const rows = Array.from(card.querySelectorAll(".lesson-table-row")).map((row) =>
+          Array.from(row.querySelectorAll("[data-block-field='cell']")).map((input) => input.value.trim())
+        );
+        blocks.push({ type, headers, rows });
+        continue;
+      }
+      const text = String(card.querySelector("[data-block-field='text']")?.value || "").trim();
+      if (type === "callout") {
+        blocks.push({
+          type,
+          tone: card.querySelector("[data-block-field='tone']")?.value === "warn" ? "warn" : "key",
+          title: String(card.querySelector("[data-block-field='title']")?.value || "").trim(),
+          text
+        });
+      } else {
+        blocks.push({ type, text });
+      }
+    }
+    return blocks;
+  }
+
+  function syncLessonBlocksJson() {
+    const blocks = collectLessonBlocksFromBuilder();
+    const area = document.getElementById("ops-lesson-blocks");
+    if (blocks !== null && area) area.value = JSON.stringify(blocks, null, 2);
+    return blocks;
+  }
+
+  function refreshLessonBlockNumbers() {
+    document.querySelectorAll("#ops-lesson-block-builder .lesson-block-card").forEach((card, index) => {
+      const number = card.querySelector(".block-number");
+      if (number) number.textContent = index + 1;
+    });
+  }
+
+  function refreshLessonListNumbers(card) {
+    card?.querySelectorAll(".lesson-list-row").forEach((row, index) => {
+      const number = row.querySelector("span");
+      if (number) number.textContent = index + 1;
+    });
+  }
+
+  function refreshLessonTableGrid(table) {
+    const columns = table?.querySelectorAll("[data-block-field='header']").length || 1;
+    if (table) table.style.setProperty("--table-columns", columns);
+  }
+
+  function emptyExamQuestion(index) {
+    return normalizeQuestion({
+      id: `q-${index + 1}-${Date.now()}`,
+      type: "single",
+      stem: `第 ${index + 1} 题`,
+      options: ["是", "否"],
+      answer: 0,
+      explain: "暂无解析。"
+    }, index);
+  }
+
+  function renderExamQuestionItem(question, index) {
+    const data = normalizeQuestion(question, index);
+    const questionType = data.type;
+    const options = questionType === "judge" ? [] : Array.isArray(data.options) && data.options.length ? data.options : ["是", "否"];
+    const safeStem = escapeHtml(data.stem);
+    const answerSingleOptions = options.map((option, optionIndex) =>
+      `<option value="${optionIndex}" ${optionIndex === data.answer ? "selected" : ""}>${escapeHtml(option)} (${optionIndex + 1})</option>`).join("");
+    const answerMultiOptions = options.map((option, optionIndex) =>
+      `<label class="ops-answer-item"><input type="checkbox" data-q="multi-answer" value="${optionIndex}" ${Array.isArray(data.answer) && data.answer.includes(optionIndex) ? "checked" : ""}>${escapeHtml(option)}</label>`).join("");
+    const optionItems = options.map((option) =>
+      `<div class="ops-option-row">
+        <input type="text" data-q="option" value="${escapeHtml(option)}" placeholder="选项内容">
+      </div>`).join("");
+    const answerArea = questionType === "judge" ? `
+      <label>标准答案
+        <select data-q="judge-answer">
+          <option value="true" ${data.answer === true ? "selected" : ""}>正确</option>
+          <option value="false" ${data.answer === false ? "selected" : ""}>错误</option>
+        </select>
+      </label>` : questionType === "single" ? `
+      <label>标准答案（单选）
+        <select data-q="single-answer">${answerSingleOptions}</select>
+      </label>` : `
+      <label>标准答案（多选）
+        <div class="ops-answer-box">${answerMultiOptions}</div>
+      </label>`;
+    return `
+      <div class="ops-question" data-question-index="${index}">
+        <div class="ops-question-head">
+          <strong>题目 ${index + 1}</strong>
+          <button type="button" class="ghost" data-act="ops-exam-remove-question">删除题目</button>
+        </div>
+        <label>题干<textarea data-q="stem" placeholder="请输入题干">${safeStem}</textarea></label>
+        <div class="ops-grid">
+          <label>题型
+            <select data-q="type">
+              <option value="single" ${questionType === "single" ? "selected" : ""}>单选</option>
+              <option value="multi" ${questionType === "multi" ? "selected" : ""}>多选</option>
+              <option value="judge" ${questionType === "judge" ? "selected" : ""}>判断</option>
+            </select>
+          </label>
+          ${answerArea}
+        </div>
+        <label>选项
+          <div class="ops-options" data-q="options">
+            ${optionItems}
+          </div>
+          ${questionType === "judge" ? "<div class='muted'>判断题不需要选项</div>" : "<div class='muted'>直接修改选项内容，再选择正确答案</div>"}
+        </label>
+        <label>解析<textarea data-q="explain" placeholder="题目解析">${escapeHtml(data.explain)}</textarea></label>
+      </div>
+    `;
+  }
+
+  function renderExamQuestionBuilder(questions) {
+    const list = Array.isArray(questions) && questions.length ? questions : [emptyExamQuestion(0)];
+    return `<div id="ops-exam-question-builder" class="ops-question-builder">${list.map(renderExamQuestionItem).join("")}</div>`;
+  }
+
+  function collectExamQuestionsFromBuilder() {
+    const wrapper = document.getElementById("ops-exam-question-builder");
+    if (!wrapper) return [];
+    const nodes = Array.from(wrapper.querySelectorAll(".ops-question"));
+    const result = [];
+    nodes.forEach((node, index) => {
+      const type = coerceString(node.querySelector('[data-q="type"]')?.value, "single");
+      const stem = coerceString(node.querySelector('[data-q="stem"]')?.value, `第 ${index + 1} 题请补充内容`);
+      const explain = coerceString(node.querySelector('[data-q="explain"]')?.value, "暂无解析。");
+      if (type === "judge") {
+        result.push({
+          id: `q-${index + 1}`,
+          type,
+          stem,
+          answer: node.querySelector('[data-q="judge-answer"]')?.value === "true",
+          explain
+        });
+        return;
+      }
+      const options = Array.from(node.querySelectorAll('[data-q="option"]')).map((input) => coerceString(input.value, ""));
+      const cleanOptions = options.filter(Boolean);
+      const finalOptions = cleanOptions.length ? cleanOptions : ["是", "否"];
+      if (type === "multi") {
+        const answers = Array.from(node.querySelectorAll('[data-q="multi-answer"]')).filter((box) => box.checked).map((box) => Number(box.value));
+        result.push({
+          id: `q-${index + 1}`,
+          type,
+          stem,
+          options: finalOptions,
+          answer: answers.length ? answers : [0],
+          explain
+        });
+        return;
+      }
+      const singleAnswer = Math.max(0, Math.min(finalOptions.length - 1, Number(node.querySelector('[data-q="single-answer"]')?.value || 0)));
+      result.push({
+        id: `q-${index + 1}`,
+        type,
+        stem,
+        options: finalOptions,
+        answer: singleAnswer,
+        explain
+      });
+    });
+    return result.map((question, index) => normalizeQuestion(question, index));
+  }
+
+  function parseQuestionSource(sectionItem) {
+    const source = parseJSONArray(sectionItem);
+    if (source === null) return null;
+    return source.map((question, index) => normalizeQuestion(question, index));
+  }
+
+  function parseLessonBlocks(sectionItem) {
+    const source = parseJSONArray(sectionItem);
+    if (source === null) return null;
+    return source.length ? source : [];
+  }
+
+  function parseLessonScenes(sectionItem) {
+    const source = parseJSONArray(sectionItem);
+    if (source === null) return null;
+    return source;
+  }
+
+  function renderOpsNoticeEditor(item) {
+    const data = noticeForEditor(item);
+    const timeValue = renderDateTimeInput(data.createdAt);
+    return `
+      <form class="card ops-editor" id="ops-editor">
+        <p class="kicker">${data.id ? "编辑帖子" : "新增帖子"}</p>
+        <label>标题<input id="ops-notice-title" value="${escapeHtml(data.title)}"></label>
+        <label>标签<input id="ops-notice-kicker" value="${escapeHtml(data.kicker)}"></label>
+        <label>内容<textarea id="ops-notice-detail">${escapeHtml(data.detail)}</textarea></label>
+        <label>发布时间<input id="ops-notice-createdAt" type="datetime-local" value="${timeValue}"></label>
+        <label>重要程度
+          <select id="ops-notice-tone">
+            <option value="info" ${data.tone === "info" ? "selected" : ""}>一般</option>
+            <option value="urgent" ${data.tone === "urgent" ? "selected" : ""}>重要</option>
+          </select>
+        </label>
+        <div class="actions">
+          <button class="primary" type="button" data-act="ops-save" data-section="notices" data-id="${data.id}">${data.id ? "保存帖子" : "发布帖子"}</button>
+          <button class="ghost" type="button" data-act="ops-cancel" data-section="notices">取消</button>
+        </div>
+      </form>
+    `;
+  }
+
+  function renderOpsNoticeList() {
+    const items = (DATA.notices || []).slice().sort((a, b) => b.createdAt - a.createdAt);
+    return `
+      <button class="primary" data-act="go" data-hash="#/ops?section=notices&mode=add">新建帖子</button>
+      ${items.length ? items.map((notice) => `
+        <div class="card lesson-card">
+          <div class="top"><span class="ops-tag">${notice.tone === "urgent" ? "重要" : "一般"}</span><span>${renderDateLabel(notice.createdAt)}</span></div>
+          <strong>${escapeHtml(notice.title)}</strong>
+          <p class="muted">${escapeHtml(notice.kicker)} · ${escapeHtml(notice.detail)}</p>
+          <div class="tools">
+            <button data-act="go" data-hash="#/ops?section=notices&mode=edit&id=${notice.id}">编辑</button>
+            <button data-act="ops-delete" data-section="notices" data-id="${notice.id}">删除</button>
+          </div>
+        </div>
+      `).join("") : `<p class="empty">暂无通知</p>`}
+    `;
+  }
+
+  function renderOpsLessonEditor(item) {
+    const data = lessonForEditor(item);
+    const hasMedia = Boolean(data.mediaUrl);
+    return `
+      <form class="ops-editor lesson-editor" id="ops-editor">
+        <header class="lesson-editor-title">
+          <div><p class="kicker">课程编辑</p><h2>${data.id ? "完善课程内容" : "创建一门新课程"}</h2></div>
+          <span class="editor-status">草稿自动保留在当前页面</span>
+        </header>
+
+        <section class="card editor-section">
+          <div class="editor-section-head"><span>01</span><div><h3>基本信息</h3><p>员工在课程列表中首先看到这些内容</p></div></div>
+          <label class="editor-field editor-field-main"><span>课程标题</span><input id="ops-lesson-title" value="${escapeHtml(data.title)}" placeholder="例如：火锅店开炉标准流程" autocomplete="off"></label>
+          <label class="editor-field"><span>课程简介</span><textarea id="ops-lesson-summary" placeholder="用一两句话说明这门课讲什么、学完能做什么">${escapeHtml(data.summary)}</textarea></label>
+          <div class="ops-grid">
+            <label class="editor-field"><span>课程形式</span>
+              <select id="ops-lesson-type">
+                <option value="article" ${data.type === "article" ? "selected" : ""}>图文课程</option>
+                <option value="video" ${data.type === "video" ? "selected" : ""}>视频课程</option>
+                <option value="game" ${data.type === "game" ? "selected" : ""}>互动练习</option>
+              </select>
+            </label>
+            <label class="editor-field"><span>学习轨道</span><select id="ops-lesson-track">${DATA.tracks.map((track) => `<option value="${track.id}" ${track.id === data.track ? "selected" : ""}>${escapeHtml(track.title)}</option>`).join("")}</select></label>
+            <label class="editor-field"><span>预计学习时长</span><div class="input-suffix"><input id="ops-lesson-minutes" type="number" min="1" value="${data.minutes}"><span>分钟</span></div></label>
+            <label class="editor-field"><span>可学习员工</span>
+              <select id="ops-lesson-access">
+                <option value="full" ${data.access === "full" ? "selected" : ""}>全部员工</option>
+                <option value="basic" ${data.access === "basic" ? "selected" : ""}>仅基础权限员工</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="card editor-section">
+          <div class="editor-section-head"><span>02</span><div><h3>课程正文</h3><p>按员工实际学习顺序添加内容，可随时调整顺序</p></div></div>
+          <div class="lesson-block-builder" id="ops-lesson-block-builder">
+            ${data.blocks.map((block, index) => renderLessonBlockItem(block, index)).join("")}
+          </div>
+          <div class="block-add">
+            <p>添加内容</p>
+            <div>
+              <button type="button" data-act="ops-lesson-insert-block" data-block="p"><b>+</b> 正文</button>
+              <button type="button" data-act="ops-lesson-insert-block" data-block="h"><b>+</b> 小标题</button>
+              <button type="button" data-act="ops-lesson-insert-block" data-block="callout"><b>+</b> 重点提示</button>
+              <button type="button" data-act="ops-lesson-insert-block" data-block="lead"><b>+</b> 课程引导</button>
+              <button type="button" data-act="ops-lesson-insert-block" data-block="ul"><b>+</b> 要点清单</button>
+              <button type="button" data-act="ops-lesson-insert-block" data-block="ol"><b>+</b> 操作步骤</button>
+              <button type="button" data-act="ops-lesson-insert-block" data-block="figure"><b>+</b> 课程图示</button>
+              <button type="button" data-act="ops-lesson-insert-block" data-block="table"><b>+</b> 数据表格</button>
+              <button type="button" data-act="ops-lesson-insert-block" data-block="code"><b>+</b> 示例代码</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card editor-section video-editor-section" data-video-panel ${data.type === "video" ? "" : "hidden"}>
+          <div class="editor-section-head"><span>03</span><div><h3>课程视频</h3><p>支持 MP4、MOV、WebM，建议单个文件不超过 200MB</p></div></div>
+          <label class="video-dropzone" for="ops-lesson-media">
+            <span class="video-drop-icon">↑</span>
+            <strong>${hasMedia ? "更换视频" : "选择本地视频"}</strong>
+            <small class="lesson-media-status">${hasMedia ? "当前课程已有视频，可预览或重新上传" : "点击此处选择文件"}</small>
+            <input id="ops-lesson-media" type="file" accept="video/*">
+          </label>
+          <div class="media-preview" ${hasMedia ? "" : "hidden"}>${hasMedia ? `<video src="${escapeHtml(data.mediaUrl)}" controls></video>` : ""}</div>
+          <input type="hidden" id="ops-lesson-media-url" value="${escapeHtml(data.mediaUrl)}">
+          <button type="button" class="remove-media" data-act="ops-lesson-clear-media" ${hasMedia ? "" : "hidden"}>移除当前视频</button>
+        </section>
+
+        <textarea id="ops-lesson-blocks" hidden>${escapeHtml(JSON.stringify(data.blocks))}</textarea>
+        <textarea id="ops-lesson-scenes" hidden>${escapeHtml(JSON.stringify(data.scenes))}</textarea>
+
+        <div class="editor-actions">
+          <button class="ghost" type="button" data-act="ops-cancel" data-section="lessons">取消</button>
+          <button class="primary" type="button" data-act="ops-save" data-section="lessons" data-id="${data.id}">${data.id ? "保存修改" : "发布课程"}</button>
+        </div>
+      </form>
+    `;
+  }
+
+  function renderOpsLessonList() {
+    return `
+      <button class="primary" data-act="go" data-hash="#/ops?section=lessons&mode=add">新建课程</button>
+      ${DATA.lessons.length ? DATA.lessons.map((lesson) => `
+        <div class="card lesson-card">
+          <div class="top"><span class="ops-tag">${TYPE_LABEL[lesson.type] || lesson.type}</span><span>${minutesLabel(lesson.minutes)}</span></div>
+          <strong>${escapeHtml(lesson.title)}</strong>
+          <p class="muted">${escapeHtml(lesson.summary)}</p>
+          <div class="tools">
+            <button data-act="go" data-hash="#/ops?section=lessons&mode=edit&id=${lesson.id}">编辑</button>
+            <button data-act="ops-delete" data-section="lessons" data-id="${lesson.id}">删除</button>
+          </div>
+        </div>
+      `).join("") : `<p class="empty">暂无课程</p>`}
+    `;
+  }
+
+  function renderOpsExamEditor(item) {
+    const data = examForEditor(item);
+    const questionDrafts = data.questions.length ? data.questions : [emptyExamQuestion(0)];
+    return `
+      <form class="card ops-editor" id="ops-editor">
+        <p class="kicker">${data.id ? "编辑考试" : "新增考试"}</p>
+        <label>标题<input id="ops-exam-title" value="${escapeHtml(data.title)}" placeholder="考试标题"></label>
+        <div class="ops-grid">
+          <label>轨道
+            <select id="ops-exam-track">
+              ${DATA.tracks.map((track) => `<option value="${track.id}" ${track.id === data.track ? "selected" : ""}>${escapeHtml(track.title)}</option>`).join("")}
+            </select>
+          </label>
+          <label>及格分
+            <input id="ops-exam-pass" type="number" min="1" max="100" value="${data.pass}">
+          </label>
+          <label>时长（分钟）
+            <input id="ops-exam-minutes" type="number" min="1" value="${data.minutes}">
+          </label>
+        </div>
+        <label>简介<textarea id="ops-exam-summary">${escapeHtml(data.summary)}</textarea></label>
+        <label>题目（可视化编辑）
+          <div class="actions">
+            <button type="button" class="ghost" data-act="ops-exam-add-question">新增题目</button>
+          </div>
+          ${renderExamQuestionBuilder(questionDrafts)}
+        </label>
+        <textarea id="ops-exam-questions" hidden>${escapeHtml(JSON.stringify(questionDrafts))}</textarea>
+        <div class="actions">
+          <button class="primary" type="button" data-act="ops-save" data-section="exams" data-id="${data.id}">${data.id ? "保存考试" : "发布考试"}</button>
+          <button class="ghost" type="button" data-act="ops-cancel" data-section="exams">取消</button>
+        </div>
+      </form>
+    `;
+  }
+
+  function renderOpsExamList() {
+    return `
+      <button class="primary" data-act="go" data-hash="#/ops?section=exams&mode=add">新建考试</button>
+      ${DATA.exams.length ? DATA.exams.map((exam) => `
+        <div class="card lesson-card">
+          <div class="top"><span class="ops-tag">${exam.pass}分</span><span>${minutesLabel(exam.minutes)}</span></div>
+          <strong>${escapeHtml(exam.title)}</strong>
+          <p class="muted">${escapeHtml(exam.summary)}</p>
+          <div class="tools">
+            <button data-act="go" data-hash="#/ops?section=exams&mode=edit&id=${exam.id}">编辑</button>
+            <button data-act="ops-delete" data-section="exams" data-id="${exam.id}">删除</button>
+          </div>
+        </div>
+      `).join("") : `<p class="empty">暂无考试</p>`}
+    `;
+  }
+
+  function renderOpsStaff() {
+    const people = Auth.list().sort((a, b) => Number(a.access !== "basic") - Number(b.access !== "basic") || a.name.localeCompare(b.name, "zh"));
+    const pending = people.filter((user) => user.access === "basic" && user.role !== "manager").length;
+    return `
+      <div class="counts" style="grid-template-columns:repeat(2,1fr)">
+        <div class="count"><b>${people.length}</b><span>注册人数</span></div>
+        <div class="count ${pending ? "hot" : ""}"><b>${pending}</b><span>待授权</span></div>
+      </div>
+      ${people.map((user) => `
+        <div class="card notice ${user.access === "basic" && user.role !== "manager" ? "urgent" : ""}">
+          <div class="kicker">${user.role === "manager" ? "店长" : "员工"} · ${staffAccessLabel(user)}</div>
+          <strong>${escapeHtml(user.name)}</strong>
+          <p class="muted">注册于 ${escapeHtml((user.createdAt || "").replace("T", " ").slice(0, 16))}${user.approvedBy ? ` · ${escapeHtml(user.approvedBy)} 授权` : ""}</p>
+          <div class="tools" style="margin-top:10px">
+            ${user.access !== "full" && user.access !== "blocked" ? `<button data-act="ops-staff-auth" data-id="${user.id}" data-access="full">授权全部</button>` : ""}
+            ${user.access === "full" && user.id !== Auth.session.id ? `<button data-act="ops-staff-auth" data-id="${user.id}" data-access="basic">收回全部</button>` : ""}
+            ${user.access !== "blocked" && user.id !== Auth.session.id ? `<button data-act="ops-staff-auth" data-id="${user.id}" data-access="blocked">停用</button>` : ""}
+            ${user.access === "blocked" ? `<button data-act="ops-staff-auth" data-id="${user.id}" data-access="basic">恢复基本</button>` : ""}
+          </div>
+        </div>
+      `).join("")}
+    `;
+  }
+
+  function renderOps() {
+    if (!Auth.isManager(Auth.session)) {
+      setTop("权限不足", true);
+      setTab("me");
+      view().innerHTML = `
+        <div class="card notice clear">
+          <strong>只有店长可以进入运营事务。</strong>
+          <p class="muted">请先用店长账号登录后重试。</p>
+          <button class="ghost" data-act="go" data-hash="#/home">返回运营首页</button>
+        </div>
+      `;
+      return;
+    }
+    const route = currentOpsRoute();
+    const titleMap = {
+      lessons: "课程管理",
+      exams: "考试管理",
+      notices: "通知与帖子",
+      staff: "员工与权限"
+    };
+    const subtitleMap = {
+      lessons: "创建、更新并安排员工需要学习的课程",
+      exams: "维护考试、题目和合格标准",
+      notices: "发布门店事务、重要消息与学习提醒",
+      staff: "查看成员状态并管理学习权限"
+    };
+    setTop("运营事务", true);
+    setTab("me");
+    const editId = route.mode === "edit" ? route.id : "";
+    const active = route.section;
+    const editLesson = editId && active === "lessons" ? DATA.lessons.find((item) => item.id === editId) : null;
+    const editExam = editId && active === "exams" ? DATA.exams.find((item) => item.id === editId) : null;
+    const editNotice = editId && active === "notices" ? DATA.notices.find((item) => item.id === editId) : null;
+    const listMap = {
+      lessons: active === "lessons" ? (route.mode === "edit" ? renderOpsLessonEditor(editLesson) : renderOpsLessonList()) : "",
+      exams: active === "exams" ? (route.mode === "edit" ? renderOpsExamEditor(editExam) : renderOpsExamList()) : "",
+      notices: active === "notices" ? (route.mode === "edit" ? renderOpsNoticeEditor(editNotice) : renderOpsNoticeList()) : "",
+      staff: active === "staff" ? renderOpsStaff() : ""
+    };
+    const content = route.mode === "add"
+      ? (active === "lessons" ? renderOpsLessonEditor(null)
+        : active === "exams" ? renderOpsExamEditor(null)
+        : active === "notices" ? renderOpsNoticeEditor(null)
+        : listMap[active])
+      : listMap[active];
+
+    const isEditing = route.mode === "add" || route.mode === "edit";
+    view().innerHTML = `
+      <div class="ops-shell">
+        <aside class="ops-sidebar">
+          <div class="ops-brand">
+            <span>JL</span>
+            <div><strong>运营工作台</strong><small>门店学习与事务</small></div>
+          </div>
+          ${renderOpsTabs(active)}
+          <div class="ops-account"><span>${escapeHtml((Auth.session.name || "店长").slice(0, 1))}</span><div><strong>${escapeHtml(Auth.session.name || "店长")}</strong><small>店长账号</small></div></div>
+        </aside>
+        <main class="ops-workspace ${isEditing ? "is-editing" : ""}">
+          ${isEditing ? `<div class="ops-breadcrumb"><button data-act="ops-cancel" data-section="${active}">← 返回${titleMap[active]}</button><span>${route.mode === "add" ? "新建" : "编辑"}</span></div>` : `
+            <header class="ops-workspace-head">
+              <div><p>运营事务</p><h2>${titleMap[active]}</h2><span>${subtitleMap[active]}</span></div>
+            </header>
+          `}
+          <div class="ops-content">${content}</div>
+        </main>
       </div>
     `;
   }
@@ -738,7 +1613,7 @@
       <div class="card lock-card">
         <p class="kicker">权限不足</p>
         <strong>这份内容需要店长授权</strong>
-        <p class="muted">注册后可以看岗前图文。视频、互动、考试和进阶课，要店长在后台点「授权全部」。</p>
+        <p class="muted">注册后可以看火锅岗前图文。视频、互动、考试和进阶课，要店长在后台点「授权全部」。</p>
         <button class="primary" data-act="go" data-hash="#/home">返回通知</button>
       </div>
     `;
@@ -761,6 +1636,12 @@
     const stage = scene.stage || { kind: "callout", kicker: "", text: scene.caption };
     if (stage.kind === "steps") {
       return `<div>${stage.items.map((item, i) => `<div class="demo-row ${i === 0 ? "on" : ""}"><b>${i + 1}</b><span>${escapeHtml(item)}</span></div>`).join("")}</div>`;
+    }
+    if (stage.kind === "media") {
+      return `<div class="media-stage">
+        ${stage.src ? `<video controls src="${escapeHtml(stage.src)}" preload="metadata" style="width:100%;border-radius:12px;display:block"></video>` : `<div class="muted">未选择视频文件</div>`}
+        ${stage.text ? `<div style="margin-top:10px">${escapeHtml(stage.text)}</div>` : ""}
+      </div>`;
     }
     if (stage.kind === "browser") {
       return `<div class="muted" style="margin-bottom:10px">${escapeHtml(stage.bar)}</div>${stage.html}`;
@@ -1013,6 +1894,10 @@
     const exam = examById(id);
     if (!exam) return go("#/exams");
     if (!Gate.canExam(exam)) return renderLocked(exam.title);
+    if (!exam.questions.length) {
+      alert("该考试还没有配置题库，请先在“运营事务”里发布考试题目。");
+      return go("#/ops?section=exams");
+    }
     state.exam = {
       id,
       index: 0,
@@ -1145,7 +2030,9 @@
   function render() {
     if (state.video && state.route.name !== "lesson") state.video.playing = false;
     const route = state.route;
+    document.querySelector(".app")?.classList.toggle("ops-mode", route.name === "ops");
     if (route.name === "home") return renderHome();
+    if (route.name === "ops") return renderOps();
     if (route.name === "learn") return renderLearn(route.type);
     if (route.name === "exams") return renderExams();
     if (route.name === "me") return renderMe();
@@ -1171,6 +2058,277 @@
     const btn = event.target.closest("[data-act]");
     if (!btn || btn.disabled) return;
     const act = btn.dataset.act;
+    if (act === "ops-tab") return go(`#/ops?section=${btn.dataset.section}`);
+    if (act === "ops-cancel") return go(`#/ops?section=${currentOpsRoute().section}`);
+    if (act === "ops-message") return go("#/ops?section=notices");
+    if (act === "ops-delete") {
+      const section = btn.dataset.section;
+      const id = btn.dataset.id;
+      const source = section;
+      const list = opsStore(source);
+      if (!list.length) return;
+      if (!confirm("确认删除吗？")) return;
+      if (source === "lessons") DATA.lessons = list.filter((item) => item.id !== id);
+      else if (source === "exams") DATA.exams = list.filter((item) => item.id !== id);
+      else if (source === "notices") DATA.notices = list.filter((item) => item.id !== id);
+      saveOpsStore();
+      return go(`#/ops?section=${source}`);
+    }
+    if (act === "ops-exam-add-question") {
+      const builder = document.getElementById("ops-exam-question-builder");
+      if (!builder) return;
+      const index = builder.querySelectorAll(".ops-question").length;
+      builder.insertAdjacentHTML("beforeend", renderExamQuestionItem(emptyExamQuestion(index), index));
+      const rawQuestions = collectExamQuestionsFromBuilder();
+      const area = document.getElementById("ops-exam-questions");
+      if (area) area.value = JSON.stringify(rawQuestions, null, 2);
+      return;
+    }
+    if (act === "ops-exam-remove-question") {
+      const questionNode = btn.closest(".ops-question");
+      const builder = document.getElementById("ops-exam-question-builder");
+      if (!questionNode || !builder) return;
+      const total = builder.querySelectorAll(".ops-question").length;
+      if (total <= 1) {
+        alert("至少保留 1 道题。");
+        return;
+      }
+      questionNode.remove();
+      const rawQuestions = collectExamQuestionsFromBuilder();
+      const area = document.getElementById("ops-exam-questions");
+      if (area) area.value = JSON.stringify(rawQuestions, null, 2);
+      return;
+    }
+    if (act === "ops-exam-sync-json") {
+      const rawQuestions = collectExamQuestionsFromBuilder();
+      const area = document.getElementById("ops-exam-questions");
+      if (!area) return;
+      area.value = JSON.stringify(rawQuestions, null, 2);
+      return;
+    }
+    if (act === "ops-lesson-clear-media") {
+      const mediaUrlInput = document.getElementById("ops-lesson-media-url");
+      const mediaInput = document.getElementById("ops-lesson-media");
+      const node = document.querySelector(".media-preview");
+      const msg = document.querySelector(".lesson-media-status");
+      const remove = document.querySelector(".remove-media");
+      if (mediaUrlInput) mediaUrlInput.value = "";
+      if (mediaInput) mediaInput.value = "";
+      if (node) {
+        node.innerHTML = "";
+        node.hidden = true;
+      }
+      if (remove) remove.hidden = true;
+      if (msg) msg.textContent = "点击此处选择文件";
+      return;
+    }
+    if (act === "ops-lesson-insert-block") {
+      const kind = btn.dataset.block;
+      const insert = lessonBlockTemplates(kind);
+      if (!insert) return;
+      const builder = document.getElementById("ops-lesson-block-builder");
+      if (!builder) return;
+      const index = builder.querySelectorAll(".lesson-block-card").length;
+      builder.insertAdjacentHTML("beforeend", renderLessonBlockItem(insert, index));
+      syncLessonBlocksJson();
+      builder.lastElementChild?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    if (act === "ops-lesson-add-list-item") {
+      const card = btn.closest(".lesson-block-card");
+      const list = card?.querySelector(".lesson-list-editor");
+      if (!list) return;
+      const index = list.querySelectorAll(".lesson-list-row").length;
+      list.insertAdjacentHTML("beforeend", `<div class="lesson-list-row"><span>${index + 1}</span><input data-block-field="item" placeholder="填写一项内容"><button type="button" data-act="ops-lesson-remove-list-item" title="删除此项">×</button></div>`);
+      list.lastElementChild?.querySelector("input")?.focus();
+      syncLessonBlocksJson();
+      return;
+    }
+    if (act === "ops-lesson-remove-list-item") {
+      const card = btn.closest(".lesson-block-card");
+      const rows = card?.querySelectorAll(".lesson-list-row");
+      if (!rows?.length) return;
+      if (rows.length === 1) rows[0].querySelector("input").value = "";
+      else btn.closest(".lesson-list-row")?.remove();
+      refreshLessonListNumbers(card);
+      syncLessonBlocksJson();
+      return;
+    }
+    if (act === "ops-lesson-add-table-row") {
+      const table = btn.closest(".lesson-block-body")?.querySelector(".lesson-table-editor");
+      const rows = table?.querySelector(".lesson-table-rows");
+      const columns = table?.querySelectorAll("[data-block-field='header']").length || 1;
+      if (!rows) return;
+      rows.insertAdjacentHTML("beforeend", `<div class="lesson-table-row">${Array.from({ length: columns }, () => '<input data-block-field="cell" placeholder="填写内容">').join("")}<button type="button" data-act="ops-lesson-remove-table-row" title="删除此行">×</button></div>`);
+      rows.lastElementChild?.querySelector("input")?.focus();
+      syncLessonBlocksJson();
+      return;
+    }
+    if (act === "ops-lesson-remove-table-row") {
+      const rows = btn.closest(".lesson-table-rows");
+      if (!rows) return;
+      if (rows.children.length === 1) rows.querySelectorAll("input").forEach((input) => { input.value = ""; });
+      else btn.closest(".lesson-table-row")?.remove();
+      syncLessonBlocksJson();
+      return;
+    }
+    if (act === "ops-lesson-add-table-column") {
+      const table = btn.closest(".lesson-block-body")?.querySelector(".lesson-table-editor");
+      const head = table?.querySelector(".lesson-table-head");
+      if (!table || !head) return;
+      head.insertAdjacentHTML("beforeend", '<input data-block-field="header" placeholder="列标题">');
+      table.querySelectorAll(".lesson-table-row").forEach((row) => row.querySelector("button")?.insertAdjacentHTML("beforebegin", '<input data-block-field="cell" placeholder="填写内容">'));
+      refreshLessonTableGrid(table);
+      syncLessonBlocksJson();
+      return;
+    }
+    if (act === "ops-lesson-remove-table-column") {
+      const table = btn.closest(".lesson-block-body")?.querySelector(".lesson-table-editor");
+      const headers = table?.querySelectorAll("[data-block-field='header']");
+      if (!table || !headers || headers.length <= 1) return;
+      headers[headers.length - 1].remove();
+      table.querySelectorAll(".lesson-table-row").forEach((row) => {
+        const cells = row.querySelectorAll("[data-block-field='cell']");
+        cells[cells.length - 1]?.remove();
+      });
+      refreshLessonTableGrid(table);
+      syncLessonBlocksJson();
+      return;
+    }
+    if (act === "ops-lesson-remove-block") {
+      btn.closest(".lesson-block-card")?.remove();
+      refreshLessonBlockNumbers();
+      syncLessonBlocksJson();
+      return;
+    }
+    if (act === "ops-lesson-move-block") {
+      const card = btn.closest(".lesson-block-card");
+      const builder = card?.parentElement;
+      if (!card || !builder) return;
+      if (btn.dataset.direction === "up" && card.previousElementSibling) builder.insertBefore(card, card.previousElementSibling);
+      if (btn.dataset.direction === "down" && card.nextElementSibling) builder.insertBefore(card.nextElementSibling, card);
+      refreshLessonBlockNumbers();
+      syncLessonBlocksJson();
+      return;
+    }
+    if (act === "ops-staff-auth") {
+      (async () => {
+        try {
+          await Auth.setAccess(btn.dataset.id, btn.dataset.access, Auth.session);
+          go("#/ops?section=staff");
+        } catch (error) {
+          alert(error.message);
+        }
+      })();
+      return;
+    }
+    if (act === "ops-save") {
+      (async () => {
+        const section = btn.dataset.section;
+        const id = coerceString(btn.dataset.id, "");
+        if (section === "lessons") {
+          const list = DATA.lessons.slice();
+          const blocks = collectLessonBlocksFromBuilder();
+          if (blocks === null) {
+            alert("课程内容暂时无法保存，请刷新页面后重试。");
+            return;
+          }
+          const rawType = coerceString(document.getElementById("ops-lesson-type")?.value, "article");
+          const sceneRaw = parseLessonScenes(document.getElementById("ops-lesson-scenes")?.value);
+          if (sceneRaw === null) {
+            alert("视频章节数据异常，请重新选择视频后保存。");
+            return;
+          }
+          const mediaInput = document.getElementById("ops-lesson-media");
+          const mediaUrlFromForm = coerceString(document.getElementById("ops-lesson-media-url")?.value, "");
+          const pickedFile = mediaInput?.files?.[0];
+          const uploaded = pickedFile ? await readLocalVideo(pickedFile) : null;
+          const mediaUrl = uploaded || mediaUrlFromForm;
+          const raw = {
+            id,
+            title: coerceString(document.getElementById("ops-lesson-title")?.value, ""),
+            track: coerceString(document.getElementById("ops-lesson-track")?.value, ""),
+            type: rawType,
+            minutes: document.getElementById("ops-lesson-minutes")?.value || "3",
+            access: document.getElementById("ops-lesson-access")?.value || "full",
+            mediaUrl,
+            summary: coerceString(document.getElementById("ops-lesson-summary")?.value, ""),
+            blocks,
+            scenes: rawType === "video" ? sceneRaw : []
+          };
+          if (!raw.title) {
+            alert("课程标题不能为空。");
+            return;
+          }
+          const normalized = normalizeLesson(raw);
+          const found = list.findIndex((item) => item.id === id);
+          if (found >= 0) list[found] = normalized;
+          else list.push(normalized);
+          DATA.lessons = list;
+          saveOpsStore();
+          return go("#/ops?section=lessons");
+        }
+        if (section === "exams") {
+          const visualQuestions = collectExamQuestionsFromBuilder();
+          const parsed = parseQuestionSource(document.getElementById("ops-exam-questions")?.value);
+          const finalQuestions = visualQuestions && visualQuestions.length ? visualQuestions : parsed;
+          if (finalQuestions === null) {
+            alert("题目暂时无法保存，请检查题目内容后重试。");
+            return;
+          }
+          if (!finalQuestions.length) {
+            alert("考试至少要有 1 道题。");
+            return;
+          }
+          const list = DATA.exams.slice();
+          const raw = {
+            id,
+            title: coerceString(document.getElementById("ops-exam-title")?.value, ""),
+            track: coerceString(document.getElementById("ops-exam-track")?.value, ""),
+            pass: document.getElementById("ops-exam-pass")?.value || "80",
+            minutes: document.getElementById("ops-exam-minutes")?.value || "8",
+            summary: coerceString(document.getElementById("ops-exam-summary")?.value, ""),
+            questions: finalQuestions
+          };
+          if (!raw.title) {
+            alert("考试标题不能为空。");
+            return;
+          }
+          const normalized = normalizeExam(raw);
+          const found = list.findIndex((item) => item.id === id);
+          if (found >= 0) list[found] = normalized;
+          else list.push(normalized);
+          DATA.exams = list;
+          saveOpsStore();
+          return go("#/ops?section=exams");
+        }
+        if (section === "notices") {
+          const list = DATA.notices.slice();
+          const timeValue = document.getElementById("ops-notice-createdAt")?.value;
+          const createdAt = Date.parse(timeValue || "") || Date.now();
+          const raw = {
+            id,
+            title: coerceString(document.getElementById("ops-notice-title")?.value, ""),
+            kicker: coerceString(document.getElementById("ops-notice-kicker")?.value, ""),
+            detail: coerceString(document.getElementById("ops-notice-detail")?.value, ""),
+            tone: coerceString(document.getElementById("ops-notice-tone")?.value, "info"),
+            createdAt
+          };
+          if (!raw.title) {
+            alert("通知标题不能为空。");
+            return;
+          }
+          const normalized = normalizeNotice(raw);
+          const found = list.findIndex((item) => item.id === id);
+          if (found >= 0) list[found] = normalized;
+          else list.push(normalized);
+          DATA.notices = list;
+          saveOpsStore();
+          return go("#/ops?section=notices");
+        }
+      })();
+      return;
+    }
     if (act === "gate-mode") {
       gateMode = btn.dataset.mode;
       return showGate();
@@ -1295,6 +2453,29 @@
   }
 
   function onInput(event) {
+    if (event.target.closest("#ops-lesson-block-builder")) {
+      syncLessonBlocksJson();
+      return;
+    }
+    if (event.target.id === "ops-lesson-type") {
+      const panel = document.querySelector("[data-video-panel]");
+      if (panel) panel.hidden = event.target.value !== "video";
+      return;
+    }
+    if (event.target.id === "ops-lesson-media") {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const preview = document.querySelector(".video-editor-section .media-preview");
+      const status = document.querySelector(".lesson-media-status");
+      const remove = document.querySelector(".remove-media");
+      if (preview) {
+        preview.innerHTML = `<video src="${URL.createObjectURL(file)}" controls></video>`;
+        preview.hidden = false;
+      }
+      if (status) status.textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB`;
+      if (remove) remove.hidden = false;
+      return;
+    }
     const el = event.target.closest("[data-act='box-set']");
     if (!el || !state.game || state.game.kind !== "box") return;
     state.game.values[el.dataset.key] = Number(el.value);
@@ -1381,7 +2562,7 @@
           </div>
           <label>姓名<input name="name" maxlength="16" autocomplete="username" required></label>
           <label>密码<input name="password" type="password" minlength="4" autocomplete="${gateMode === "login" ? "current-password" : "new-password"}" required></label>
-          <p class="muted" id="auth-error">注册后可看岗前图文。全部课程要店长在后台授权。</p>
+          <p class="muted" id="auth-error">注册后可看火锅岗前图文。全部课程要店长在后台授权。</p>
           <button class="primary" type="submit">${gateMode === "login" ? "登录" : "注册并进入"}</button>
         </form>
       </div>
@@ -1421,7 +2602,7 @@
     document.getElementById("tab-exams").innerHTML = `${svgIcon("exam")}<span>考试</span>`;
     document.getElementById("tab-me").innerHTML = `${svgIcon("me")}<span>我的</span>`;
 
-    document.getElementById("back-btn").addEventListener("click", () => history.back());
+    document.getElementById("back-btn").addEventListener("click", goToParentPage);
     document.getElementById("theme-btn").addEventListener("click", () => {
       const next = state.theme === "dark" ? "light" : "dark";
       setTheme(next);
