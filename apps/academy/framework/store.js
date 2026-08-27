@@ -57,12 +57,15 @@ window.AcademyStore = (() => {
     return true;
   }
 
-  async function getJSON(path) {
-    const response = await request(`${objectUrl(path)}?t=${Date.now()}`, {
+  async function getJSON(path, options = {}) {
+    const required = options.required === true;
+    const requestOptions = {
       headers: headers({ "Cache-Control": "no-cache" }),
       cache: "no-store"
-    });
-    if (response.status === 400 || response.status === 404) return null;
+    };
+    if (required && window.APP_NETWORK?.request) requestOptions.appNetworkRequireSuccess = true;
+    const response = await request(`${objectUrl(path)}?t=${Date.now()}`, requestOptions);
+    if (!required && (response.status === 400 || response.status === 404)) return null;
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
   }

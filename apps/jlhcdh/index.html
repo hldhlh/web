@@ -22,7 +22,7 @@
             const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
             let origin = config.url;
             try {
-                const cached = JSON.parse(localStorage.getItem('app-network-best-v2') || 'null');
+                const cached = JSON.parse(localStorage.getItem('app-network-best-v3') || 'null');
                 if (cached && Date.now() - cached.savedAt < 6 * 60 * 60 * 1000 && /^https:\/\//.test(cached.origin)) {
                     origin = cached.origin;
                 }
@@ -1662,7 +1662,7 @@
     </div>
 
     <script src="../vendor/supabase.min.js"></script>
-    <script src="../network.js"></script>
+    <script src="../network.js?v=20260827-8"></script>
     <script>
         const SB_URL = window.JLHCDH_CONFIG.url;
         const SB_KEY = window.JLHCDH_CONFIG.key;

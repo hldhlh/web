@@ -18,7 +18,7 @@
       const config = window.LEDGER_CONFIG;
       let origin = config.url;
       try {
-        const cached = JSON.parse(localStorage.getItem('app-network-best-v2') || 'null');
+        const cached = JSON.parse(localStorage.getItem('app-network-best-v3') || 'null');
         if (cached && Date.now() - cached.savedAt < 6 * 60 * 60 * 1000 && /^https:\/\//.test(cached.origin)) {
           origin = cached.origin;
         }
@@ -52,7 +52,7 @@
   </script>
   <link rel="preload" href="../vendor/supabase.min.js" as="script">
   <script src="../vendor/supabase.min.js" defer></script>
-  <script src="../network.js" defer></script>
+  <script src="../network.js?v=20260827-8" defer></script>
   <style>
     :root {
       --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;

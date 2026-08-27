@@ -22,7 +22,7 @@
             const config = window.CLOUD_CONFIG;
             let origin = config.url;
             try {
-                const cached = JSON.parse(localStorage.getItem('app-network-best-v2') || 'null');
+                const cached = JSON.parse(localStorage.getItem('app-network-best-v3') || 'null');
                 if (cached && Date.now() - cached.savedAt < 6 * 60 * 60 * 1000 && /^https:\/\//.test(cached.origin)) {
                     origin = cached.origin;
                 }
@@ -58,7 +58,7 @@
     <link rel="stylesheet" href="style.css">
     <link rel="preload" href="../vendor/supabase.min.js" as="script">
     <link rel="preload" href="script.js" as="script">
-    <script src="../network.js" defer></script>
+    <script src="../network.js?v=20260827-8" defer></script>
 </head>
 
 <body>

@@ -161,10 +161,14 @@ window.AcademyAuth = (() => {
     if (pullPromise) return pullPromise;
     if (!force && hasPulled && Date.now() - lastPullAt < 30 * 1000) return users;
     pullPromise = (async () => {
-      const data = await window.AcademyStore.getJSON(FILE);
+      const data = await window.AcademyStore.getJSON(FILE, { required: true });
+      if (!data || !Array.isArray(data.users)) {
+        const error = new Error("账号数据不可用");
+        error.code = "ACCOUNT_SYNC_FAILED";
+        throw error;
+      }
       hasPulled = true;
       lastPullAt = Date.now();
-      if (!data || !Array.isArray(data.users)) return users;
       if (Number(data.rev) < rev) return users;
       users = data.users;
       rev = Number(data.rev) || Date.now();
@@ -241,11 +245,18 @@ window.AcademyAuth = (() => {
     password = String(password || "");
     if (!name) throw fieldError("请输入注册时使用的姓名", "name", "NAME_REQUIRED");
     if (!password) throw fieldError("请输入密码", "password", "PASSWORD_REQUIRED");
-    await pull();
-    let user = findByName(name);
-    if (!user) {
-      await pull(true);
+    let user;
+    try {
+      await pull();
       user = findByName(name);
+      if (!user) {
+        await pull(true);
+        user = findByName(name);
+      }
+    } catch (cause) {
+      const error = fieldError("暂时无法读取账号，请检查网络后重试", "", "ACCOUNT_SYNC_FAILED");
+      error.cause = cause;
+      throw error;
     }
     if (!user) throw fieldError("没有找到这个账号，请核对姓名或先注册", "name", "ACCOUNT_NOT_FOUND");
     const hashed = await hashPass(user.name, password, user.salt);

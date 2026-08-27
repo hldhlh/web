@@ -18,7 +18,7 @@
             const config = window.LOG_CONFIG;
             let origin = config.url;
             try {
-                const cached = JSON.parse(localStorage.getItem('app-network-best-v2') || 'null');
+                const cached = JSON.parse(localStorage.getItem('app-network-best-v3') || 'null');
                 if (cached && Date.now() - cached.savedAt < 6 * 60 * 60 * 1000 && /^https:\/\//.test(cached.origin)) {
                     origin = cached.origin;
                 }
@@ -66,7 +66,7 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="preload" href="../vendor/supabase.min.js" as="script">
     <script src="../vendor/supabase.min.js" defer></script>
-    <script src="../network.js" defer></script>
+    <script src="../network.js?v=20260827-8" defer></script>
     <script>
         // 本地 SDK 已由上方 defer 脚本优先加载；这里仅保留跨区域 CDN 兜底。
         const CDN = [

@@ -8,16 +8,15 @@
   const sameOriginGateway = location.protocol === 'https:'
     && location.origin !== PROJECT_ORIGIN
     && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
-    ? [{ name: '站点边缘网关', origin: location.origin }]
-    : [];
+    ? { name: '站点边缘网关', origin: location.origin }
+    : null;
   const ENDPOINTS = [
     { name: 'Supabase Global', origin: PROJECT_ORIGIN }
   ].concat(
-    Array.isArray(window.APP_NETWORK_ENDPOINTS) ? window.APP_NETWORK_ENDPOINTS : [],
-    sameOriginGateway
+    Array.isArray(window.APP_NETWORK_ENDPOINTS) ? window.APP_NETWORK_ENDPOINTS : []
   );
 
-  const CACHE_KEY = 'app-network-best-v2';
+  const CACHE_KEY = 'app-network-best-v3';
   const CACHE_TTL = 6 * 60 * 60 * 1000;
   const READ_TIMEOUT = 6500;
   const RETRY_TIMEOUT = 10000;
@@ -125,7 +124,7 @@
       const response = await withTimeout((signal) => nativeFetch(`${node.origin}/auth/v1/health`, {
         method: 'GET', cache: 'no-store', mode: 'cors', signal
       }));
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok && response.status !== 401) throw new Error(`HTTP ${response.status}`);
       const type = response.headers.get('content-type') || '';
       if (!type.includes('json')) throw new Error('Invalid gateway response');
       const payload = await response.json();
@@ -159,6 +158,15 @@
     return benchmark();
   }
 
+  async function discoverSameOriginGateway() {
+    if (!sameOriginGateway || nodes.some((node) => node.origin === sameOriginGateway.origin)) return false;
+    const result = await probe(sameOriginGateway);
+    if (!Number.isFinite(result.latency)) return false;
+    nodes.push({ name: sameOriginGateway.name, origin: sameOriginGateway.origin });
+    addConnectionHint(sameOriginGateway.origin);
+    return true;
+  }
+
   function getOrderedOrigins() {
     const now = Date.now();
     const ordered = [currentOrigin, ...nodes.map((node) => node.origin).filter((origin) => origin !== currentOrigin)];
@@ -166,7 +174,7 @@
     return healthy.length ? healthy : ordered;
   }
 
-  function raceRead(input, init, origins) {
+  function raceRead(input, init, origins, requireSuccess = false) {
     return new Promise((resolve, reject) => {
       let failures = 0;
       let settled = false;
@@ -179,7 +187,9 @@
             if (index > 0) await delay(HEDGE_DELAY * index, init.signal);
             if (settled) return;
             const response = await fetchWithTimeout(replaceOrigin(input, origin), init);
-            if (isRetryableResponse(response)) throw new Error(`HTTP ${response.status}`);
+            if (isRetryableResponse(response) || (requireSuccess && !response.ok)) {
+              throw new Error(`HTTP ${response.status}`);
+            }
             if (settled) return;
             settled = true;
             unhealthyUntil.delete(origin);
@@ -200,14 +210,16 @@
   async function routeFetch(input, init = {}) {
     const method = String(init.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
     const readable = method === 'GET' || method === 'HEAD';
+    const requireSuccess = init.appNetworkRequireSuccess === true;
     const safeWrite = init.appNetworkSafeWrite === true;
     const requestInit = { ...init };
+    delete requestInit.appNetworkRequireSuccess;
     delete requestInit.appNetworkSafeWrite;
 
     if (readable) {
       const origins = getOrderedOrigins();
       try {
-        return await raceRead(input, requestInit, origins);
+        return await raceRead(input, requestInit, origins, requireSuccess);
       } catch (firstError) {
         if (origins.length > 1 || requestInit.signal?.aborted) throw firstError;
         await delay(160, requestInit.signal);
@@ -215,7 +227,7 @@
       }
     }
 
-    if (!safeWrite) return nativeFetch(replaceOrigin(input, currentOrigin), requestInit);
+    if (!safeWrite) return nativeFetch(replaceOrigin(input, PROJECT_ORIGIN), requestInit);
 
     const origins = getOrderedOrigins();
     let lastError;
@@ -250,7 +262,7 @@
       const directRealtime = options.appNetworkRealtimeDirect === true;
       const clientOptions = { ...options };
       delete clientOptions.appNetworkRealtimeDirect;
-      const targetOrigin = directRealtime ? normalize(url || PROJECT_ORIGIN) : replaceOrigin(url, currentOrigin);
+      const targetOrigin = normalize(url || PROJECT_ORIGIN);
       return createClient(targetOrigin, key, enhanceOptions(clientOptions));
     };
     patched.__appNetworkPatched = true;
@@ -272,5 +284,8 @@
   patchSupabase();
   window.addEventListener('online', benchmark, { passive: true });
   const schedule = window.requestIdleCallback || ((callback) => setTimeout(callback, 1200));
-  schedule(() => benchmark());
+  schedule(async () => {
+    await discoverSameOriginGateway();
+    benchmark();
+  });
 })();
