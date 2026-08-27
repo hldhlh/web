@@ -49,5 +49,10 @@
   <script defer src="./framework/gate.js"></script>
   <script defer src="./content.js?v=20260827-6"></script>
   <script defer src="./app.js?v=20260827-14"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistration().then((registration) => registration?.update()).catch(() => {});
+    }
+  </script>
 </body>
 </html>

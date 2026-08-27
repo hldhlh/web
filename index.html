@@ -635,7 +635,11 @@
     });
 
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}), { once: true });
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+          .then((registration) => registration.update())
+          .catch(() => {});
+      }, { once: true });
     }
   </script>
 </body>
