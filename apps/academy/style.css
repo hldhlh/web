@@ -168,6 +168,12 @@ code, pre, .mono {
   padding-bottom: 28px;
 }
 
+.app.gated {
+  max-width: 100%;
+  width: 100%;
+  margin: 0;
+}
+
 .app.focus .tabbar,
 .app.gated .tabbar {
   display: none;
@@ -200,14 +206,17 @@ code, pre, .mono {
 }
 
 .gate {
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-height: calc(100vh - 56px);
-  padding: 16px;
+  width: 100%;
+  padding: 0 16px;
+  box-sizing: border-box;
 }
 
 .gate-card {
-  width: min(420px, 100%);
+  width: min(420px, calc(100% - 32px));
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 20px;
@@ -218,16 +227,11 @@ code, pre, .mono {
 }
 
 .app.gated .view {
-  padding: 0 16px;
+  padding: 0;
   min-height: calc(100vh - 56px);
-  display: grid;
-  place-items: center;
-}
-
-.app.gated .gate-card {
-  width: min(420px, 100% - 32px);
-  margin-inline: auto;
-  justify-self: center;
+  display: flex;
+  justify-content: center;
+  width: 100%;
 }
 
 .gate-card h2 {

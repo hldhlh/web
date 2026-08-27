@@ -1371,18 +1371,20 @@
     document.querySelector(".app").classList.add("gated");
     setTop("今岭学堂", false);
     view().innerHTML = `
-      <form class="gate-card" id="auth-form">
-        <p class="kicker">进入学堂</p>
-        <h2>用姓名和密码进入</h2>
-        <div class="chips" style="padding-bottom:8px">
-          <button type="button" class="chip ${gateMode === "login" ? "on" : ""}" data-act="gate-mode" data-mode="login">登录</button>
-          <button type="button" class="chip ${gateMode === "register" ? "on" : ""}" data-act="gate-mode" data-mode="register">注册</button>
-        </div>
-        <label>姓名<input name="name" maxlength="16" autocomplete="username" required></label>
-        <label>密码<input name="password" type="password" minlength="4" autocomplete="${gateMode === "login" ? "current-password" : "new-password"}" required></label>
-        <p class="muted" id="auth-error">注册后可看岗前图文。全部课程要店长在后台授权。</p>
-        <button class="primary" type="submit">${gateMode === "login" ? "登录" : "注册并进入"}</button>
-      </form>
+      <div class="gate">
+        <form class="gate-card" id="auth-form">
+          <p class="kicker">进入学堂</p>
+          <h2>用姓名和密码进入</h2>
+          <div class="chips" style="padding-bottom:8px">
+            <button type="button" class="chip ${gateMode === "login" ? "on" : ""}" data-act="gate-mode" data-mode="login">登录</button>
+            <button type="button" class="chip ${gateMode === "register" ? "on" : ""}" data-act="gate-mode" data-mode="register">注册</button>
+          </div>
+          <label>姓名<input name="name" maxlength="16" autocomplete="username" required></label>
+          <label>密码<input name="password" type="password" minlength="4" autocomplete="${gateMode === "login" ? "current-password" : "new-password"}" required></label>
+          <p class="muted" id="auth-error">注册后可看岗前图文。全部课程要店长在后台授权。</p>
+          <button class="primary" type="submit">${gateMode === "login" ? "登录" : "注册并进入"}</button>
+        </form>
+      </div>
     `;
     document.getElementById("auth-form").addEventListener("submit", async (event) => {
       event.preventDefault();
