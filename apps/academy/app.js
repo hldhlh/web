@@ -21,6 +21,7 @@
     tick: 0
   };
   const OPS_STORAGE_KEY = "academy-ops-content-v1";
+  const OPS_LESSON_DRAFT_KEY = "academy-ops-lesson-draft-v1";
   const OPS_TABS = ["lessons", "exams", "notices", "staff"];
   let contentRevision = 0;
 
@@ -321,6 +322,48 @@
     };
   }
 
+  function lessonDraftIdentity() {
+    const route = currentOpsRoute();
+    if (state.route?.name !== "ops" || route.section !== "lessons" || !["add", "edit"].includes(route.mode)) return "";
+    return `${Auth.session?.id || "anonymous"}:${route.mode}:${route.id || "new"}`;
+  }
+
+  function loadLessonDraft() {
+    const identity = lessonDraftIdentity();
+    if (!identity) return null;
+    try {
+      const draft = JSON.parse(sessionStorage.getItem(OPS_LESSON_DRAFT_KEY) || "null");
+      return draft?.identity === identity && draft.data && typeof draft.data === "object" ? draft.data : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function saveLessonDraft() {
+    const identity = lessonDraftIdentity();
+    const form = document.getElementById("ops-editor");
+    if (!identity || !form?.classList.contains("lesson-editor")) return;
+    const blocks = collectLessonBlocksFromBuilder();
+    const scenes = parseLessonScenes(document.getElementById("ops-lesson-scenes")?.value);
+    if (blocks === null || scenes === null) return;
+    const data = {
+      title: document.getElementById("ops-lesson-title")?.value || "",
+      summary: document.getElementById("ops-lesson-summary")?.value || "",
+      type: document.getElementById("ops-lesson-type")?.value || "article",
+      track: document.getElementById("ops-lesson-track")?.value || "onboard",
+      minutes: document.getElementById("ops-lesson-minutes")?.value || "3",
+      access: document.getElementById("ops-lesson-access")?.value || "full",
+      mediaUrl: document.getElementById("ops-lesson-media-url")?.value || "",
+      blocks,
+      scenes
+    };
+    try { sessionStorage.setItem(OPS_LESSON_DRAFT_KEY, JSON.stringify({ identity, data })); } catch (_) { }
+  }
+
+  function clearLessonDraft() {
+    try { sessionStorage.removeItem(OPS_LESSON_DRAFT_KEY); } catch (_) { }
+  }
+
   hydrateContentStore();
 
   function defaults() {
@@ -426,6 +469,11 @@
     },
     refreshView() {
       const stay = state.route?.name;
+      const editingOps = stay === "ops" && ["add", "edit"].includes(currentOpsRoute().mode);
+      if (editingOps) {
+        updateNotificationButton();
+        return;
+      }
       if (stay === "home" || stay === "messages" || stay === "learn" || stay === "exams" || stay === "me" || stay === "result" || stay === "ops") {
         render();
       } else {
@@ -1627,6 +1675,7 @@
     const blocks = collectLessonBlocksFromBuilder();
     const area = document.getElementById("ops-lesson-blocks");
     if (blocks !== null && area) area.value = JSON.stringify(blocks, null, 2);
+    if (blocks !== null) saveLessonDraft();
     return blocks;
   }
 
@@ -1851,7 +1900,8 @@
   }
 
   function renderOpsLessonEditor(item) {
-    const data = lessonForEditor(item);
+    const savedDraft = loadLessonDraft();
+    const data = lessonForEditor(savedDraft ? { ...item, ...savedDraft, id: item?.id || "" } : item);
     const hasMedia = Boolean(data.mediaUrl);
     return `
       <form class="ops-editor lesson-editor" id="ops-editor">
@@ -2734,7 +2784,10 @@
       setTheme(state.theme === "dark" ? "light" : "dark");
       return renderMe();
     }
-    if (act === "ops-cancel") return go(`#/ops?section=${currentOpsRoute().section}`);
+    if (act === "ops-cancel") {
+      if (currentOpsRoute().section === "lessons") clearLessonDraft();
+      return go(`#/ops?section=${currentOpsRoute().section}`);
+    }
     if (act === "ops-message") return go("#/ops?section=notices");
     if (act === "ops-delete") {
       const section = btn.dataset.section;
@@ -2796,6 +2849,7 @@
       }
       if (remove) remove.hidden = true;
       if (msg) msg.textContent = "点击此处选择文件";
+      saveLessonDraft();
       return;
     }
     if (act === "ops-lesson-insert-block") {
@@ -2915,11 +2969,6 @@
             alert("视频章节数据异常，请重新选择视频后保存。");
             return;
           }
-          const mediaInput = document.getElementById("ops-lesson-media");
-          const mediaUrlFromForm = coerceString(document.getElementById("ops-lesson-media-url")?.value, "");
-          const pickedFile = mediaInput?.files?.[0];
-          const uploaded = pickedFile ? await readLocalVideo(pickedFile) : null;
-          const mediaUrl = uploaded || mediaUrlFromForm;
           const raw = {
             id,
             title: coerceString(document.getElementById("ops-lesson-title")?.value, ""),
@@ -2927,13 +2976,20 @@
             type: rawType,
             minutes: document.getElementById("ops-lesson-minutes")?.value || "3",
             access: document.getElementById("ops-lesson-access")?.value || "full",
-            mediaUrl,
+            mediaUrl: coerceString(document.getElementById("ops-lesson-media-url")?.value, ""),
             summary: coerceString(document.getElementById("ops-lesson-summary")?.value, ""),
             blocks,
             scenes: sceneRaw
           };
           if (!raw.title) {
             alert("课程标题不能为空。");
+            return;
+          }
+          const pickedFile = document.getElementById("ops-lesson-media")?.files?.[0];
+          try {
+            raw.mediaUrl = (pickedFile ? await readLocalVideo(pickedFile) : null) || raw.mediaUrl;
+          } catch (error) {
+            alert(error.message || "视频读取失败，请重新选择。");
             return;
           }
           const normalized = normalizeLesson(raw);
@@ -2948,6 +3004,7 @@
             alert("课程已保存在本机，但实时发布失败，请检查网络后再次保存。");
             return;
           }
+          clearLessonDraft();
           return go("#/ops?section=lessons");
         }
         if (section === "exams") {
@@ -3117,6 +3174,7 @@
     if (event.target.id === "ops-lesson-type") {
       const panel = document.querySelector("[data-video-panel]");
       if (panel) panel.hidden = event.target.value !== "video";
+      saveLessonDraft();
       return;
     }
     if (event.target.id === "ops-lesson-media") {
@@ -3131,7 +3189,10 @@
       }
       if (status) status.textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB`;
       if (remove) remove.hidden = false;
+      saveLessonDraft();
+      return;
     }
+    if (event.target.closest(".lesson-editor")) saveLessonDraft();
   }
 
   function onKey(event) {
@@ -3307,7 +3368,10 @@
       Presence.visibility();
       if (document.visibilityState === "visible") ContentSync.pull().catch(() => { });
     });
-    window.addEventListener("pagehide", () => Presence.capture(true));
+    window.addEventListener("pagehide", () => {
+      saveLessonDraft();
+      Presence.capture(true);
+    });
     Auth.onChange((user) => {
       if (!user) return showGate();
       if (!gateBusy) enterApp();
