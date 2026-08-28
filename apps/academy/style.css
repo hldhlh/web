@@ -147,10 +147,8 @@ code, pre, .mono {
   font-size: 11px;
   font-weight: 650;
   letter-spacing: 0.02em;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
-  color: var(--nav-text);
+  padding: 4px 0;
+  color: var(--nav-subtle);
   flex: 0 0 auto;
 }
 
@@ -161,23 +159,31 @@ code, pre, .mono {
   height: 6px;
   border-radius: 50%;
   margin-right: 5px;
-  background: currentColor;
+  background: rgba(255, 255, 255, 0.62);
   vertical-align: 1px;
 }
 
 .live[data-state="live"] {
-  color: #d9f9d4;
-  background: rgba(16, 185, 129, 0.24);
+  color: var(--nav-text);
+  background: transparent;
+}
+
+.live[data-state="live"]::before {
+  background: #86efac;
 }
 
 .live[data-state="offline"] {
-  color: #ffe0e0;
-  background: rgba(248, 113, 113, 0.26);
+  color: var(--nav-subtle);
+  background: transparent;
+}
+
+.live[data-state="offline"]::before {
+  background: #fca5a5;
 }
 
 .live[data-state="local"] {
-  color: var(--muted);
-  background: var(--surface-2);
+  color: var(--nav-subtle);
+  background: transparent;
 }
 
 .view {
