@@ -3026,23 +3026,23 @@ button:disabled,
 
 .live[data-state="live"],
 .live[data-state="online"] {
-  color: var(--ok);
-  background: var(--ok-soft);
+  color: var(--nav-text);
+  background: transparent;
 }
 
 .live[data-state="live"]::before {
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 16%, transparent);
-  animation: realtime-pulse 1.8s ease-out infinite;
+  box-shadow: none;
+  animation: none;
 }
 
 .live[data-state="connecting"] {
-  color: #b7791f;
-  background: rgba(245, 158, 11, 0.12);
+  color: var(--nav-subtle);
+  background: transparent;
 }
 
 .live[data-state="offline"] {
-  color: var(--muted);
-  background: var(--surface-2);
+  color: var(--nav-subtle);
+  background: transparent;
 }
 
 @keyframes realtime-pulse {
