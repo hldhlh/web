@@ -1,4 +1,4 @@
--- 今岭学堂：单行共享状态，Realtime 推全端。
+-- Auto Office：单行共享状态，Realtime 推全端。
 create table if not exists public.academy_state (
   id text primary key,
   payload jsonb not null default '{}'::jsonb,

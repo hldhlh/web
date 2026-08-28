@@ -801,7 +801,7 @@
 
   function bestScore(examId) {
     const logs = state.progress.examHistory[examId] || [];
-    return logs.reduce((max, item) => Math.max(max, item.score), -1);
+    return logs.reduce((max, item) => Math.max(max, Number(item?.score ?? item) || 0), -1);
   }
 
   function nextLesson() {
@@ -929,7 +929,7 @@
     };
     if (parts[0] === "lesson" && parts[1]) return { name: "lesson", id: parts[1] };
     if (parts[0] === "notice" && parts[1]) return { name: "notice", id: parts[1] };
-    if (parts[0] === "exam" && parts[1] && parts[2] === "result") return { name: "result", id: parts[1] };
+    if (parts[0] === "exam" && parts[1] && parts[2] === "result") return { name: "result", id: parts[1], at: Number(params.at) || 0 };
     if (parts[0] === "exam" && parts[1]) return { name: "exam", id: parts[1] };
     return { name: "home" };
   }
@@ -2130,7 +2130,7 @@
       <div class="ops-shell">
         <aside class="ops-sidebar">
           <div class="ops-brand">
-            <span>JL</span>
+            <span>AO</span>
             <div><strong>运营工作台</strong><small>门店学习与事务</small></div>
           </div>
           ${renderOpsTabs(active)}
@@ -2379,7 +2379,7 @@
       wrong.forEach((item) => map.delete(item.id));
     }
     state.progress.wrong = Array.from(map.values());
-    state.exam.result = { score, correct, total: exam.questions.length, pass: score >= exam.pass, wrong };
+    state.exam.result = { score, correct, total: exam.questions.length, pass: score >= exam.pass, wrong, at: record.at };
     touchStreak();
     save();
     go(`#/exam/${exam.id}/result`);
@@ -2387,20 +2387,178 @@
 
   function renderResult() {
     const exam = examById(state.route.id);
-    const result = state.exam?.id === exam.id ? state.exam.result : null;
+    const currentResult = state.exam?.id === exam.id ? state.exam.result : null;
+    const selectedRecord = state.route.at
+      ? (state.progress.examHistory[exam.id] || []).find((item) => Number(item?.at) === state.route.at)
+      : null;
+    const result = selectedRecord
+      ? { ...selectedRecord, wrong: currentResult?.at === selectedRecord.at ? currentResult.wrong : [] }
+      : currentResult;
     const best = bestScore(exam.id);
     const score = result?.score ?? best;
     const pass = score >= exam.pass;
+    const history = (state.progress.examHistory[exam.id] || []).map((record) => ({
+      score: Number(record?.score ?? record) || 0,
+      correct: Number(record?.correct) || 0,
+      total: Number(record?.total) || exam.questions.length,
+      at: Number(record?.at) || 0
+    }));
     setTop(exam.title, true);
     view().innerHTML = `
-      <div class="result">
-        <div class="kicker">${pass ? "通过" : "未通过"}</div>
-        <div class="score">${score < 0 ? "--" : score}</div>
-        <div class="pass" style="color:${pass ? "var(--ok)" : "var(--bad)"}">${pass ? `达到 ${exam.pass} 分` : `还需 ${exam.pass} 分`}</div>
-        <p class="muted">${result ? `对 ${result.correct} / ${result.total}` : "这是历史最好成绩。点下方重考。"}</p>
-      </div>
+      ${pass ? `
+        <button type="button" class="pass-celebration" data-act="dismiss-pass-celebration" aria-label="恭喜通过考试，点击查看成绩">
+          <svg viewBox="0 0 440 330" role="img" aria-labelledby="pass-celebration-title pass-celebration-desc">
+            <title id="pass-celebration-title">恭喜你通过考试</title>
+            <desc id="pass-celebration-desc">现代环形成绩卡庆祝动画</desc>
+            <defs>
+              <linearGradient id="pass-bg" x1="24" y1="18" x2="376" y2="386" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#07162d"/><stop offset=".52" stop-color="#0a2f68"/><stop offset="1" stop-color="#1255da"/>
+              </linearGradient>
+              <radialGradient id="pass-glow" cx="0" cy="0" r="1" gradientTransform="translate(286 92) rotate(126) scale(250)">
+                <stop stop-color="#3c83ff" stop-opacity=".8"/><stop offset="1" stop-color="#3c83ff" stop-opacity="0"/>
+              </radialGradient>
+              <linearGradient id="pass-ring" x1="102" y1="101" x2="300" y2="311" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#82f7c6"/><stop offset=".5" stop-color="#46dca7"/><stop offset="1" stop-color="#b5ff74"/>
+              </linearGradient>
+              <linearGradient id="pass-sheen" x1="0" y1="0" x2="1" y2="0">
+                <stop stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+              </linearGradient>
+              <filter id="pass-shadow" x="-20%" y="-20%" width="140%" height="150%">
+                <feDropShadow dx="0" dy="20" stdDeviation="20" flood-color="#00112f" flood-opacity=".3"/>
+              </filter>
+              <filter id="pass-ring-glow" x="-40%" y="-40%" width="180%" height="180%">
+                <feGaussianBlur stdDeviation="5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+              <filter id="light-burst-glow" x="-60%" y="-60%" width="220%" height="220%">
+                <feGaussianBlur stdDeviation="2.8" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+              <radialGradient id="message-core" cx="50%" cy="48%" r="52%">
+                <stop offset="0" stop-color="#0b2650" stop-opacity=".98"/><stop offset=".72" stop-color="#071a35" stop-opacity=".94"/><stop offset="1" stop-color="#071a35" stop-opacity=".25"/>
+              </radialGradient>
+              <linearGradient id="party-banner" x1="0" y1="0" x2="1" y2="1">
+                <stop stop-color="#ffc91a"/><stop offset="1" stop-color="#ff9800"/>
+              </linearGradient>
+              <filter id="party-shadow" x="-30%" y="-30%" width="160%" height="180%">
+                <feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#111827" flood-opacity=".28"/>
+              </filter>
+              <filter id="party-text-shadow" x="-20%" y="-30%" width="140%" height="170%">
+                <feDropShadow dx="0" dy="5" stdDeviation="2" flood-color="#b65e00" flood-opacity=".48"/>
+              </filter>
+            </defs>
+            <g class="classic-party-card">
+              <g class="party-rays" fill="#fff" opacity=".16">
+                <path d="M220 70 201 4h38Z"/><path d="m179 73-47-57 35-13Z"/><path d="m261 73 48-57-36-13Z"/><path d="m146 91-80-31 20-29Z"/><path d="m294 91 80-31-20-29Z"/>
+              </g>
+              <g class="party-top-note">
+                <rect x="139" y="3" width="162" height="34" rx="17" fill="none" stroke="#fff" stroke-opacity=".42" stroke-width="2"/>
+                <text x="220" y="25" text-anchor="middle" fill="#fff" fill-opacity=".66" font-size="13" font-weight="650" font-family="system-ui, sans-serif">恭喜您获得 ${score} 分！</text>
+              </g>
+              <g class="party-streamers" fill="none" stroke-linecap="round">
+                <path d="M64 158c40-38 34 50 75 7s40 34 66 5" stroke="#ff5267" stroke-width="9"/>
+                <path d="M376 158c-40-38-34 50-75 7s-40 34-66 5" stroke="#ff5267" stroke-width="9"/>
+                <path d="M91 204c-33 28-12 62 13 42s37 8 17 32" stroke="#f7b91c" stroke-width="7"/>
+                <path d="M349 204c33 28 12 62-13 42s-37 8-17 32" stroke="#f7b91c" stroke-width="7"/>
+                <path d="M105 108c-14 23-14 49 2 73s-1 47-16 58" stroke="#7bc3a4" stroke-width="7"/>
+                <path d="M335 108c14 23 14 49-2 73s1 47 16 58" stroke="#7bc3a4" stroke-width="7"/>
+              </g>
+              <g class="party-card-body" filter="url(#party-shadow)">
+                <path d="M80 101c0-15 12-27 27-27h226c15 0 27 12 27 27v174c0 15-12 27-27 27H107c-15 0-27-12-27-27Z" fill="#fffdf2" stroke="#ffbd16" stroke-width="6"/>
+                <path d="M93 105c15-18 29-20 44-1s30 18 45-1 30-18 45 1 30 18 45-1 30-18 45 1 29 17 40 2v30H93Z" fill="#fffaf0"/>
+                <g class="party-flags">
+                  <path d="M97 115h246" stroke="#efb83f" stroke-width="2"/>
+                  <path d="M99 115l12 25 12-25 12 25 12-25 12 25 12-25 12 25 12-25 12 25 12-25 12 25 12-25 12 25 12-25 12 25 12-25 12 25 12-25 12 25 12-25" fill="#18b7b4"/>
+                  <path d="m111 115 12 25 12-25m48 0 12 25 12-25m48 0 12 25 12-25" fill="#ff5775"/>
+                  <path d="m147 115 12 25 12-25m48 0 12 25 12-25m48 0 12 25 12-25" fill="#ff8a18"/>
+                </g>
+                <text x="220" y="213" text-anchor="middle" fill="#ef6500" font-size="38" font-weight="500" font-family="system-ui, sans-serif">${score === 100 ? "满分！" : `${score}分！`}</text>
+              </g>
+              <g class="party-poppers">
+                <g transform="translate(97 246) rotate(22)">
+                  <path d="M0 0 44 12 19 44Z" fill="#ff9d24"/><path d="m8 5 11 32m4-28 10 22" stroke="#ff5a45" stroke-width="5"/>
+                  <ellipse cx="6" cy="3" rx="16" ry="9" fill="#ff4f5f"/><ellipse cx="6" cy="3" rx="10" ry="5" fill="#28445b"/>
+                </g>
+                <g transform="translate(343 246) scale(-1 1) rotate(22)">
+                  <path d="M0 0 44 12 19 44Z" fill="#ff9d24"/><path d="m8 5 11 32m4-28 10 22" stroke="#ff5a45" stroke-width="5"/>
+                  <ellipse cx="6" cy="3" rx="16" ry="9" fill="#ff4f5f"/><ellipse cx="6" cy="3" rx="10" ry="5" fill="#28445b"/>
+                </g>
+              </g>
+              <g class="party-confetti">
+                <rect x="57" y="102" width="7" height="12" rx="2" fill="#16b7b2" transform="rotate(-18 60 108)"/><rect x="378" y="112" width="7" height="12" rx="2" fill="#f7b91c" transform="rotate(18 381 118)"/>
+                <rect x="54" y="241" width="7" height="12" rx="2" fill="#ff7950" transform="rotate(30 57 247)"/><rect x="379" y="238" width="7" height="12" rx="2" fill="#ff7950" transform="rotate(-30 382 244)"/>
+                <circle cx="70" cy="184" r="5" fill="#ffbf19"/><circle cx="370" cy="184" r="5" fill="#ffbf19"/><circle cx="124" cy="283" r="4" fill="#16b7b2"/><circle cx="316" cy="283" r="4" fill="#16b7b2"/>
+              </g>
+              <g class="party-banner" filter="url(#party-shadow)">
+                <rect x="122" y="42" width="196" height="83" rx="12" fill="url(#party-banner)"/>
+                <text x="220" y="98" text-anchor="middle" fill="#fff" font-size="43" font-weight="850" font-family="system-ui, sans-serif" filter="url(#party-text-shadow)">恭喜你</text>
+              </g>
+            </g>
+            <g class="modern-result-card" filter="url(#pass-shadow)">
+              <rect x="20" y="20" width="360" height="360" rx="52" fill="url(#pass-bg)"/>
+              <rect x="20.75" y="20.75" width="358.5" height="358.5" rx="51.25" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width="1.5"/>
+              <rect x="20" y="20" width="360" height="360" rx="52" fill="url(#pass-glow)"/>
+              <g class="light-burst" fill="none" stroke-linecap="round" filter="url(#light-burst-glow)">
+                <path class="light-branch" pathLength="1" d="M200 200C179 170 147 147 86 118c-18-9-31-22-42-39" stroke="#58e8ff" stroke-width="2.4"/>
+                <path class="light-branch" pathLength="1" d="M200 200c-8-38-24-78-52-123-9-15-13-28-13-42" stroke="#8d7cff" stroke-width="1.8"/>
+                <path class="light-branch" pathLength="1" d="M200 200c18-41 29-82 27-139 0-18 5-30 15-42" stroke="#67a4ff" stroke-width="2.2"/>
+                <path class="light-branch" pathLength="1" d="M200 200c39-25 75-41 126-48 17-2 31-9 43-21" stroke="#75f2ca" stroke-width="2.5"/>
+                <path class="light-branch" pathLength="1" d="M200 200c43 4 85 17 132 48 14 9 27 12 39 10" stroke="#4cc8ff" stroke-width="1.9"/>
+                <path class="light-branch" pathLength="1" d="M200 200c30 30 57 65 76 116 6 17 17 29 31 38" stroke="#a4ff77" stroke-width="2.3"/>
+                <path class="light-branch" pathLength="1" d="M200 200c3 43-4 88-25 139-7 17-7 30-2 43" stroke="#5be6b8" stroke-width="1.8"/>
+                <path class="light-branch" pathLength="1" d="M200 200c-31 28-64 57-116 78-17 7-29 18-37 33" stroke="#8a7cff" stroke-width="2.2"/>
+                <path class="light-branch" pathLength="1" d="M200 200c-42-2-84-10-132-35-17-9-30-10-43-5" stroke="#42c7ff" stroke-width="1.9"/>
+                <path class="light-branch branch-fine" pathLength="1" d="M157 154c-22-3-43-1-65 8m56-85c-12 13-21 30-25 49m104-65c17 16 29 34 35 55m64 36c-19 12-35 27-47 45m53 51c-19-1-39 3-58 13m2 55c-17-9-36-13-57-13m-44 36c-11-17-26-30-44-39M84 278c9-18 21-33 37-46" stroke="#d8f6ff" stroke-width="1" opacity=".72"/>
+              </g>
+              <g class="modern-result-head">
+                <rect x="48" y="47" width="170" height="32" rx="16" fill="#fff" fill-opacity=".09" stroke="#fff" stroke-opacity=".12"/>
+                <circle cx="65" cy="63" r="4" fill="#86f6c6"/>
+                <text x="78" y="68" fill="#fff" fill-opacity=".78" font-size="10" font-weight="700" letter-spacing="1.7" font-family="system-ui, sans-serif">AUTO OFFICE · RESULT</text>
+                <g class="modern-check"><circle cx="338" cy="63" r="16" fill="#8af5c6"/><path d="m330 63 5 5 10-11" fill="none" stroke="#083a36" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
+              </g>
+              <g class="pass-center-message">
+                <circle cx="200" cy="204" r="104" fill="url(#message-core)" stroke="#a8f7d7" stroke-opacity=".18"/>
+                <circle class="message-orbit" cx="200" cy="204" r="91" fill="none" stroke="#8af5c6" stroke-opacity=".28" stroke-width="1.5" stroke-dasharray="2 8"/>
+                <text x="200" y="193" text-anchor="middle" fill="#fff" font-size="28" font-weight="780" letter-spacing="1" font-family="system-ui, sans-serif">恭喜您！</text>
+                <text x="200" y="232" text-anchor="middle" fill="#a7f8d3" font-size="25" font-weight="760" letter-spacing="2" font-family="system-ui, sans-serif">考试通过</text>
+              </g>
+              <g class="modern-pass-pill">
+                <rect x="127" y="315" width="146" height="38" rx="19" fill="#8af5c6" fill-opacity=".14" stroke="#8af5c6" stroke-opacity=".42"/>
+                <circle cx="148" cy="334" r="4" fill="#8af5c6"/>
+                <text x="162" y="339" fill="#a7f8d3" font-size="14" font-weight="720" letter-spacing="1" font-family="system-ui, sans-serif">本次 ${score} 分</text>
+              </g>
+              <g class="modern-particles" fill="#fff">
+                <circle cx="64" cy="119" r="2" opacity=".55"/><circle cx="340" cy="126" r="3" opacity=".28"/><circle cx="68" cy="293" r="3" opacity=".24"/><circle cx="331" cy="287" r="2" opacity=".55"/>
+                <path d="M83 247h10M88 242v10M314 226h12M320 220v12" stroke="#8af5c6" stroke-width="2" stroke-linecap="round"/>
+              </g>
+              <rect class="modern-sheen" x="-100" y="20" width="90" height="360" fill="url(#pass-sheen)" transform="skewX(-16)"/>
+            </g>
+          </svg>
+          <div class="pass-celebration-copy">
+            <strong>做得漂亮，继续保持</strong>
+            <span>${result ? `答对 ${result.correct} / ${result.total}` : "这是你的历史最好成绩"} · 合格线 ${exam.pass} 分</span>
+          </div>
+        </button>` : `
+        <div class="result">
+          <div class="kicker">未通过</div>
+          <div class="score">${score < 0 ? "--" : score}</div>
+          <div class="pass" style="color:var(--bad)">还需 ${exam.pass} 分</div>
+          <p class="muted">${result ? `对 ${result.correct} / ${result.total}` : "这是历史最好成绩。点下方重考。"}</p>
+        </div>`}
       ${result?.wrong?.length ? `<div class="sec-title"><h3>错题解析</h3></div>${result.wrong.map((item) =>
         `<div class="card lesson-card"><strong>${escapeHtml(item.stem)}</strong><p class="muted">${escapeHtml(item.explain)}</p></div>`).join("")}` : ""}
+      ${history.length ? `
+        <div class="exam-attempt-history">
+          <div class="sec-title"><h3>历次成绩</h3><span>最近 ${history.length} 次</span></div>
+          <div class="exam-records">${history.map((record, index) => {
+            const passed = record.score >= exam.pass;
+            const active = result?.at && record.at === result.at;
+            return `<button class="exam-record ${passed ? "passed" : "failed"} ${active ? "current" : ""}" data-act="go" data-hash="#/exam/${exam.id}/result?at=${record.at}">
+              <span class="exam-record-state">${passed ? "已通过" : "未通过"}</span>
+              <span class="exam-record-main"><strong>第 ${history.length - index} 次考试</strong><small>${record.at ? renderDateLabel(record.at) : "历史记录"} · 答对 ${record.correct}/${record.total}</small></span>
+              <span class="exam-record-score"><b>${record.score}</b><small>分</small></span>
+              <span class="exam-record-arrow" aria-hidden="true">›</span>
+            </button>`;
+          }).join("")}</div>
+        </div>` : ""}
       <button class="primary" data-act="go" data-hash="#/exam/${exam.id}">再考一次</button>
       <button class="ghost" data-act="go" data-hash="#/exams">返回考试列表</button>
     `;
@@ -2480,6 +2638,11 @@
     const btn = event.target.closest("[data-act]");
     if (!btn || btn.disabled) return;
     const act = btn.dataset.act;
+    if (act === "dismiss-pass-celebration") {
+      btn.classList.add("is-leaving");
+      window.setTimeout(() => btn.remove(), 220);
+      return;
+    }
     if (act === "ops-tab") return go(`#/ops?section=${btn.dataset.section}`);
     if (act === "ops-cancel") return go(`#/ops?section=${currentOpsRoute().section}`);
     if (act === "ops-message") return go("#/ops?section=notices");
@@ -2928,12 +3091,12 @@
     Presence.stop();
     const authNotice = Auth.consumeNotice?.() || "";
     document.querySelector(".app").classList.add("gated");
-    setTop("今岭学堂", false);
+    setTop("Auto Office", false);
     view().innerHTML = `
       <div class="gate">
         <form class="gate-card" id="auth-form">
           <div class="gate-intro">
-            <span class="gate-mark">JL</span>
+            <span class="gate-mark">AO</span>
             <div><p class="kicker">进入学堂</p><h2>${gateMode === "login" ? "欢迎回来" : "创建学习账号"}</h2></div>
           </div>
           <div class="chips" style="padding-bottom:8px">

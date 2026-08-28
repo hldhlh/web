@@ -1,4 +1,4 @@
--- 今岭学堂：每人一行学习记录，Realtime 全端共享。
+-- Auto Office：每人一行学习记录，Realtime 全端共享。
 create table if not exists public.academy_progress (
   user_id text primary key,
   payload jsonb not null default '{}'::jsonb,
