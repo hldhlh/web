@@ -1,5 +1,5 @@
 // 部署时由 scripts/generate-build-meta.mjs 替换为当前 Git 提交版本。
-const CACHE_NAME = 'web-shell-__BUILD_VERSION__-academy-network-first-v2';
+const CACHE_NAME = 'web-shell-__BUILD_VERSION__-academy-network-first-v3';
 const SHELL = [
   './',
   './index.html',
@@ -65,10 +65,10 @@ async function staleWhileRevalidate(request) {
   return cached || network;
 }
 
-async function networkFirst(request) {
+async function networkFirst(request, cacheMode = 'no-cache') {
   const cache = await caches.open(CACHE_NAME);
   try {
-    const response = await fetch(request, { cache: 'no-cache' });
+    const response = await fetch(request, { cache: cacheMode });
     if (response.ok && response.type === 'basic') await cache.put(request, response.clone());
     return response;
   } catch (_) {
@@ -82,7 +82,11 @@ async function networkFirst(request) {
 self.addEventListener('fetch', (event) => {
   if (!canCache(event.request)) return;
   const url = new URL(event.request.url);
-  if (event.request.mode === 'navigate' || url.pathname.includes('/apps/academy/')) {
+  if (url.pathname.includes('/apps/academy/')) {
+    event.respondWith(networkFirst(event.request, 'reload'));
+    return;
+  }
+  if (event.request.mode === 'navigate') {
     event.respondWith(networkFirst(event.request));
     return;
   }

@@ -2370,6 +2370,16 @@ button:disabled,
   animation: party-card-in 620ms cubic-bezier(.2, .9, .25, 1.25) both;
 }
 
+.party-game-bg {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: party-game-breathe 4s ease-in-out infinite alternate;
+}
+
+.party-clouds {
+  animation: party-cloud-drift 5s ease-in-out infinite alternate;
+}
+
 .party-banner {
   transform-box: fill-box;
   transform-origin: center;
@@ -2398,9 +2408,27 @@ button:disabled,
   animation: party-poppers 520ms 480ms cubic-bezier(.2, .9, .25, 1.4) both;
 }
 
+.party-stars path {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: party-star-pop 560ms cubic-bezier(.2, .9, .25, 1.45) both;
+}
+
+.party-stars path:nth-child(1) { animation-delay: 720ms; }
+.party-stars path:nth-child(2) { animation-delay: 830ms; }
+.party-stars path:nth-child(3) { animation-delay: 940ms; }
+
 @keyframes party-card-in {
   from { opacity: 0; transform: translateY(20px) scale(.82); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes party-game-breathe {
+  to { opacity: .94; filter: saturate(1.08); }
+}
+
+@keyframes party-cloud-drift {
+  to { transform: translateX(8px); }
 }
 
 @keyframes party-banner-in {
@@ -2424,6 +2452,11 @@ button:disabled,
 @keyframes party-poppers {
   from { opacity: 0; transform: scale(.5) translateY(15px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes party-star-pop {
+  from { opacity: 0; transform: translateY(8px) scale(.2) rotate(-20deg); }
+  to { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
 }
 
 .celebration-rays {

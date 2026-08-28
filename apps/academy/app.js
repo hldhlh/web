@@ -2438,6 +2438,15 @@
               <linearGradient id="party-banner" x1="0" y1="0" x2="1" y2="1">
                 <stop stop-color="#ffc91a"/><stop offset="1" stop-color="#ff9800"/>
               </linearGradient>
+              <linearGradient id="party-sky" x1="0" y1="0" x2="1" y2="1">
+                <stop stop-color="#4e8cff"/><stop offset=".55" stop-color="#36b9f2"/><stop offset="1" stop-color="#22d2bd"/>
+              </linearGradient>
+              <linearGradient id="party-card-fill" x1="0" y1="0" x2="0" y2="1">
+                <stop stop-color="#fffef4"/><stop offset="1" stop-color="#fff2c7"/>
+              </linearGradient>
+              <linearGradient id="party-star" x1="0" y1="0" x2="1" y2="1">
+                <stop stop-color="#fff46a"/><stop offset=".55" stop-color="#ffc51d"/><stop offset="1" stop-color="#ff8a00"/>
+              </linearGradient>
               <filter id="party-shadow" x="-30%" y="-30%" width="160%" height="180%">
                 <feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#111827" flood-opacity=".28"/>
               </filter>
@@ -2446,12 +2455,18 @@
               </filter>
             </defs>
             <g class="classic-party-card">
+              <rect class="party-game-bg" x="12" y="10" width="416" height="310" rx="45" fill="url(#party-sky)" stroke="#234f91" stroke-width="5"/>
+              <path d="M23 242c44-28 86-22 125 6 35 25 68 26 103 0 48-35 102-32 166 7v50a15 15 0 0 1-15 15H38a15 15 0 0 1-15-15Z" fill="#1475c8" opacity=".34"/>
+              <g class="party-clouds" fill="#fff" opacity=".22">
+                <path d="M34 82c4-13 15-19 27-13 8-14 31-8 31 9 12-1 20 6 20 16H28c-2-5 0-10 6-12Z"/>
+                <path d="M334 77c5-13 16-18 28-11 10-12 29-5 28 11 13-1 21 7 20 17h-84c-1-8 2-14 8-17Z"/>
+              </g>
               <g class="party-rays" fill="#fff" opacity=".16">
                 <path d="M220 70 201 4h38Z"/><path d="m179 73-47-57 35-13Z"/><path d="m261 73 48-57-36-13Z"/><path d="m146 91-80-31 20-29Z"/><path d="m294 91 80-31-20-29Z"/>
               </g>
               <g class="party-top-note">
                 <rect x="139" y="3" width="162" height="34" rx="17" fill="none" stroke="#fff" stroke-opacity=".42" stroke-width="2"/>
-                <text x="220" y="25" text-anchor="middle" fill="#fff" fill-opacity=".66" font-size="13" font-weight="650" font-family="system-ui, sans-serif">恭喜您获得 ${score} 分！</text>
+                <text x="220" y="25" text-anchor="middle" fill="#fff" fill-opacity=".88" font-size="12" font-weight="750" letter-spacing="1" font-family="system-ui, sans-serif">AUTO OFFICE · 挑战完成</text>
               </g>
               <g class="party-streamers" fill="none" stroke-linecap="round">
                 <path d="M64 158c40-38 34 50 75 7s40 34 66 5" stroke="#ff5267" stroke-width="9"/>
@@ -2462,7 +2477,8 @@
                 <path d="M335 108c14 23 14 49-2 73s1 47 16 58" stroke="#7bc3a4" stroke-width="7"/>
               </g>
               <g class="party-card-body" filter="url(#party-shadow)">
-                <path d="M80 101c0-15 12-27 27-27h226c15 0 27 12 27 27v174c0 15-12 27-27 27H107c-15 0-27-12-27-27Z" fill="#fffdf2" stroke="#ffbd16" stroke-width="6"/>
+                <path d="M80 101c0-15 12-27 27-27h226c15 0 27 12 27 27v174c0 15-12 27-27 27H107c-15 0-27-12-27-27Z" fill="url(#party-card-fill)" stroke="#7e4f16" stroke-width="9"/>
+                <path d="M80 101c0-15 12-27 27-27h226c15 0 27 12 27 27v174c0 15-12 27-27 27H107c-15 0-27-12-27-27Z" fill="none" stroke="#ffc928" stroke-width="5"/>
                 <path d="M93 105c15-18 29-20 44-1s30 18 45-1 30-18 45 1 30 18 45-1 30-18 45 1 29 17 40 2v30H93Z" fill="#fffaf0"/>
                 <g class="party-flags">
                   <path d="M97 115h246" stroke="#efb83f" stroke-width="2"/>
@@ -2470,7 +2486,13 @@
                   <path d="m111 115 12 25 12-25m48 0 12 25 12-25m48 0 12 25 12-25" fill="#ff5775"/>
                   <path d="m147 115 12 25 12-25m48 0 12 25 12-25m48 0 12 25 12-25" fill="#ff8a18"/>
                 </g>
-                <text x="220" y="213" text-anchor="middle" fill="#ef6500" font-size="38" font-weight="500" font-family="system-ui, sans-serif">${score === 100 ? "满分！" : `${score}分！`}</text>
+                <text x="220" y="204" text-anchor="middle" fill="#e85c08" font-size="49" font-weight="900" letter-spacing="-2" font-family="system-ui, sans-serif">${score}</text>
+                <text x="220" y="228" text-anchor="middle" fill="#b45c16" font-size="14" font-weight="750" letter-spacing="2" font-family="system-ui, sans-serif">考试挑战成功</text>
+                <g class="party-stars" fill="url(#party-star)" stroke="#d97706" stroke-width="1.5">
+                  <path d="m185 244 5 10 11 1.6-8 7.8 1.9 11-9.9-5.2-9.9 5.2 1.9-11-8-7.8 11-1.6Z"/>
+                  <path d="m220 238 6.2 12.6 13.8 2-10 9.7 2.4 13.7-12.4-6.5-12.4 6.5 2.4-13.7-10-9.7 13.8-2Z"/>
+                  <path d="m255 244 5 10 11 1.6-8 7.8 1.9 11-9.9-5.2-9.9 5.2 1.9-11-8-7.8 11-1.6Z"/>
+                </g>
               </g>
               <g class="party-poppers">
                 <g transform="translate(97 246) rotate(22)">
@@ -2488,8 +2510,9 @@
                 <circle cx="70" cy="184" r="5" fill="#ffbf19"/><circle cx="370" cy="184" r="5" fill="#ffbf19"/><circle cx="124" cy="283" r="4" fill="#16b7b2"/><circle cx="316" cy="283" r="4" fill="#16b7b2"/>
               </g>
               <g class="party-banner" filter="url(#party-shadow)">
-                <rect x="122" y="42" width="196" height="83" rx="12" fill="url(#party-banner)"/>
-                <text x="220" y="98" text-anchor="middle" fill="#fff" font-size="43" font-weight="850" font-family="system-ui, sans-serif" filter="url(#party-text-shadow)">恭喜你</text>
+                <rect x="112" y="42" width="216" height="83" rx="18" fill="url(#party-banner)" stroke="#a85a00" stroke-width="5"/>
+                <path d="M129 57h182" stroke="#fff" stroke-opacity=".42" stroke-width="3" stroke-linecap="round"/>
+                <text x="220" y="96" text-anchor="middle" fill="#fff" font-size="37" font-weight="900" font-family="system-ui, sans-serif" filter="url(#party-text-shadow)">恭喜通关</text>
               </g>
             </g>
             <g class="modern-result-card" filter="url(#pass-shadow)">

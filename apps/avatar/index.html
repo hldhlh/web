@@ -2,381 +2,375 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <title>Icon Preview</title>
+  <title>我的头像 · 极简标识</title>
   <style>
     :root {
       color-scheme: light dark;
-      --bg: #f7f7f4;
-      --fg: #111111;
-      --muted: #6c6c66;
-      --panel: rgba(255, 255, 255, 0.74);
-      --panel-border: rgba(17, 17, 17, 0.12);
-      --button-bg: #111111;
-      --button-fg: #ffffff;
-      --shadow: 0 24px 70px rgba(20, 20, 20, 0.14);
+      --bg: #f8f9fa;
+      --fg: #111827;
+      --muted: #6b7280;
+      --border: rgba(0, 0, 0, 0.08);
+      --border-focus: #111827;
+      --panel: rgba(255, 255, 255, 0.85);
+      --panel-hover: #ffffff;
+      --shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+      --stage-bg: #ffffff;
+      --btn-bg: #111827;
+      --btn-fg: #ffffff;
+      --btn-hover: #1f2937;
+      --radius: 12px;
+      --radius-sm: 8px;
     }
 
     [data-theme="dark"] {
-      --bg: #060606;
-      --fg: #f4f4f0;
-      --muted: #a8a8a0;
-      --panel: rgba(20, 20, 20, 0.78);
-      --panel-border: rgba(255, 255, 255, 0.12);
-      --button-bg: #f4f4f0;
-      --button-fg: #111111;
-      --shadow: 0 24px 80px rgba(0, 0, 0, 0.48);
+      --bg: #090a0f;
+      --fg: #f3f4f6;
+      --muted: #9ca3af;
+      --border: rgba(255, 255, 255, 0.1);
+      --border-focus: #f3f4f6;
+      --panel: rgba(18, 20, 29, 0.85);
+      --panel-hover: #161922;
+      --shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+      --stage-bg: #12141d;
+      --btn-bg: #f3f4f6;
+      --btn-fg: #090a0f;
+      --btn-hover: #ffffff;
     }
 
     * {
       box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
     }
 
     body {
       min-height: 100vh;
-      margin: 0;
-      background:
-        radial-gradient(circle at 50% 36%, rgba(0, 0, 0, 0.08), transparent 34rem),
-        var(--bg);
+      background: var(--bg);
       color: var(--fg);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      transition: background-color 220ms ease, color 220ms ease;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: background 0.2s ease, color 0.2s ease;
     }
 
-    .page {
+    .container {
+      width: 100%;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 1.25rem 1.5rem;
       min-height: 100vh;
-      display: grid;
-      grid-template-rows: auto 1fr auto;
-      padding: clamp(20px, 4vw, 48px);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 1.5rem;
     }
 
-    .topbar {
+    /* 极简顶栏 */
+    .header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
+      gap: 1rem;
     }
 
-    .actions {
+    .header-left {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 0.75rem;
     }
 
-    .brand {
-      display: grid;
-      gap: 3px;
-    }
-
-    .brand strong {
-      font-size: 15px;
-      font-weight: 650;
-      line-height: 1.2;
-    }
-
-    .brand span,
-    .meta {
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.45;
-    }
-
-    .theme-toggle {
+    .nav-back {
       display: inline-flex;
       align-items: center;
-      gap: 10px;
-      min-height: 40px;
-      border: 1px solid var(--panel-border);
-      border-radius: 999px;
-      padding: 5px 6px 5px 14px;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
       background: var(--panel);
-      color: var(--fg);
-      font: inherit;
-      cursor: pointer;
-      backdrop-filter: blur(18px);
-      transition: border-color 180ms ease, transform 180ms ease;
-    }
-
-    .theme-toggle:hover,
-    .download-button:hover,
-    .download-option:hover {
-      transform: translateY(-1px);
-      border-color: color-mix(in srgb, var(--fg), transparent 68%);
-    }
-
-    .theme-toggle:focus-visible,
-    .download-button:focus-visible,
-    .download-option:focus-visible {
-      outline: 3px solid rgba(0, 0, 0, 0.28);
-      outline-offset: 3px;
-    }
-
-    .download-menu {
-      position: relative;
-    }
-
-    .download-menu[open] .download-button {
-      border-color: color-mix(in srgb, var(--fg), transparent 58%);
-    }
-
-    .download-menu summary {
-      list-style: none;
-    }
-
-    .download-menu summary::-webkit-details-marker {
-      display: none;
-    }
-
-    .download-button,
-    .download-option {
-      min-height: 40px;
-      border: 1px solid var(--panel-border);
-      border-radius: 999px;
-      background: var(--panel);
-      color: var(--fg);
-      font: inherit;
-      cursor: pointer;
-      backdrop-filter: blur(18px);
-      transition: border-color 180ms ease, transform 180ms ease;
-    }
-
-    .download-button {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 0 14px;
-    }
-
-    .download-options {
-      position: absolute;
-      top: calc(100% + 8px);
-      right: 0;
-      z-index: 2;
-      display: grid;
-      gap: 6px;
-      min-width: 132px;
-      padding: 8px;
-      border: 1px solid var(--panel-border);
-      border-radius: 8px;
-      background: var(--panel);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(18px);
-    }
-
-    .download-option {
-      border-radius: 7px;
-      padding: 0 12px;
-      text-align: left;
-    }
-
-    .toggle-track {
-      position: relative;
-      width: 54px;
-      height: 28px;
-      flex: 0 0 auto;
-      border-radius: 999px;
-      background: var(--button-bg);
-    }
-
-    .toggle-knob {
-      position: absolute;
-      top: 4px;
-      left: 4px;
-      width: 20px;
-      height: 20px;
-      border-radius: 999px;
-      background: var(--button-fg);
-      transition: transform 200ms ease;
-    }
-
-    [data-theme="dark"] .toggle-knob {
-      transform: translateX(26px);
-    }
-
-    .stage {
-      display: grid;
-      place-items: center;
-      gap: 18px;
-      padding: 7vh 0 5vh;
-    }
-
-    .icon-wrap {
-      width: min(54vw, 360px);
-      min-width: 180px;
-      aspect-ratio: 1;
-      display: grid;
-      place-items: center;
-      border: 1px solid var(--panel-border);
-      border-radius: 8px;
-      background: var(--panel);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(20px);
-    }
-
-    .icon {
-      width: 72%;
-      height: 72%;
-      display: block;
-      filter: drop-shadow(0 18px 38px rgba(0, 0, 0, 0.18));
-    }
-
-    .editor {
-      width: min(54vw, 360px);
-      min-width: 180px;
-      display: grid;
-      gap: 12px;
-    }
-
-    .field {
-      display: grid;
-      gap: 8px;
-    }
-
-    .field span,
-    .color-field span {
       color: var(--muted);
-      font-size: 13px;
-      line-height: 1.45;
+      text-decoration: none;
+      transition: all 0.15s ease;
     }
 
-    .color-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
+    .nav-back:hover {
+      color: var(--fg);
+      border-color: var(--border-focus);
     }
 
-    .color-field {
+    .title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .header-actions {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      min-height: 44px;
-      border: 1px solid var(--panel-border);
-      border-radius: 8px;
-      padding: 0 10px 0 12px;
-      background: var(--panel);
-      backdrop-filter: blur(18px);
+      gap: 0.5rem;
     }
 
-    .color-input {
-      width: 30px;
-      height: 30px;
-      border: 0;
-      border-radius: 999px;
-      padding: 0;
+    /* 快捷导出按钮组 */
+    .export-group {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--panel);
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .btn-export {
+      border: none;
       background: transparent;
+      color: var(--fg);
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 6px;
       cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
     }
 
-    .color-input::-webkit-color-swatch-wrapper {
-      padding: 0;
+    .btn-export:hover {
+      background: var(--btn-bg);
+      color: var(--btn-fg);
     }
 
-    .color-input::-webkit-color-swatch {
-      border: 1px solid var(--panel-border);
-      border-radius: 999px;
+    .btn-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--fg);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-icon:hover {
+      border-color: var(--border-focus);
+      background: var(--panel-hover);
+    }
+
+    /* 核心舞台与控件区 */
+    .workspace {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+      flex: 1;
+      justify-content: center;
+    }
+
+    .preview-card {
+      position: relative;
+      width: min(65vw, 240px);
+      aspect-ratio: 1;
+      border-radius: 20px;
+      background: var(--stage-bg);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      display: grid;
+      place-items: center;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .icon-svg {
+      width: 80%;
+      height: 80%;
+      display: block;
+      filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.16));
+    }
+
+    /* 高效控制台 */
+    .control-panel {
+      width: 100%;
+      max-width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.5rem;
     }
 
     .text-input {
-      width: 100%;
-      min-height: 44px;
-      border: 1px solid var(--panel-border);
-      border-radius: 8px;
-      padding: 0 14px;
+      flex: 1;
+      height: 40px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
       background: var(--panel);
       color: var(--fg);
-      font: inherit;
+      font-size: 0.9rem;
+      padding: 0 12px;
       outline: none;
-      backdrop-filter: blur(18px);
-      transition: border-color 180ms ease, box-shadow 180ms ease;
+      transition: border-color 0.15s ease;
     }
 
     .text-input:focus {
-      border-color: color-mix(in srgb, var(--fg), transparent 58%);
-      box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.12);
+      border-color: var(--border-focus);
     }
 
+    .color-swatches {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      justify-content: space-between;
+    }
+
+    /* 快速预设气泡 */
+    .presets {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .preset-chip {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+      display: grid;
+      place-items: center;
+      padding: 0;
+    }
+
+    .preset-chip:hover {
+      transform: scale(1.15);
+      border-color: var(--border-focus);
+    }
+
+    .preset-chip::after {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--dot-color, #fff);
+    }
+
+    /* 自定义调色卡片 */
+    .pickers {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .color-btn {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      height: 32px;
+      padding: 0 8px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--panel);
+      font-size: 0.75rem;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .color-btn:hover {
+      border-color: var(--border-focus);
+    }
+
+    .color-circle {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+    }
+
+    .color-picker-native {
+      position: absolute;
+      opacity: 0;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+
+    /* 极简页脚 */
     .footer {
       display: flex;
+      align-items: center;
       justify-content: space-between;
-      gap: 16px;
-      flex-wrap: wrap;
+      font-size: 0.75rem;
+      color: var(--muted);
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
     }
 
-    @media (max-width: 560px) {
-      .page {
-        padding: 18px;
+    @media (max-width: 480px) {
+      .container {
+        padding: 1rem;
       }
-
-      .topbar {
-        align-items: flex-start;
-      }
-
-      .actions {
-        gap: 8px;
-      }
-
-      .theme-toggle {
-        padding-left: 10px;
-      }
-
-      .theme-text,
-      .download-text {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        overflow: hidden;
-        clip: rect(0 0 0 0);
-        white-space: nowrap;
-      }
-
-      .icon-wrap {
-        width: min(82vw, 340px);
-      }
-
-      .editor {
-        width: min(82vw, 340px);
-      }
-
-      .color-grid {
-        grid-template-columns: 1fr;
+      .preview-card {
+        width: 60vw;
       }
     }
   </style>
 </head>
 <body>
-  <main class="page">
-    <header class="topbar">
-      <div class="brand">
-        <strong>i.svg</strong>
-        <span>128 x 128</span>
+  <div class="container">
+    <!-- 顶部极简导航与高效导出 -->
+    <header class="header">
+      <div class="header-left">
+        <a href="../../index.html" class="nav-back" title="返回主页" aria-label="返回主页">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m15 18-6-6 6-6"/>
+          </svg>
+        </a>
+        <span class="title">我的头像</span>
       </div>
-      <div class="actions">
-        <details class="download-menu">
-          <summary class="download-button" aria-label="选择下载格式">
-            <span aria-hidden="true">↓</span>
-            <span class="download-text">下载</span>
-          </summary>
-          <div class="download-options">
-            <button class="download-option" type="button" data-format="png">PNG</button>
-            <button class="download-option" type="button" data-format="jpeg">JPEG</button>
-          </div>
-        </details>
-        <button class="theme-toggle" type="button" aria-pressed="false" aria-label="切换日间和夜间模式">
-          <span class="theme-text">日间</span>
-          <span class="toggle-track" aria-hidden="true">
-            <span class="toggle-knob"></span>
-          </span>
+
+      <div class="header-actions">
+        <!-- 单击即刻导出：省去二级菜单 -->
+        <div class="export-group" role="group" aria-label="快捷导出">
+          <button class="btn-export download-btn" type="button" data-format="png" title="下载 1024px PNG">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            PNG
+          </button>
+          <button class="btn-export download-btn" type="button" data-format="jpeg" title="下载 1024px JPEG">
+            JPG
+          </button>
+        </div>
+
+        <!-- 主题切换 -->
+        <button id="themeToggle" class="btn-icon" type="button" title="切换暗黑/日间模式" aria-label="切换主题">
+          <svg id="themeIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"/>
+            <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+          </svg>
         </button>
       </div>
     </header>
 
-    <section class="stage" aria-label="图标预览">
-      <div class="icon-wrap">
-        <svg class="icon export-svg" width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="i.svg 图标">
+    <!-- 工作台舞台 -->
+    <main class="workspace">
+      <div class="preview-card">
+        <svg class="icon-svg export-svg" width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="矢量头像预览">
           <defs>
-            <radialGradient id="mistGradient" cx="64" cy="64" r="64" fx="64" fy="64" gradientUnits="userSpaceOnUse" spreadMethod="pad">
+            <radialGradient id="mistGradient" cx="64" cy="64" r="64" fx="64" fy="64" gradientUnits="userSpaceOnUse">
               <stop class="mist-stop" offset="0%" style="stop-color:#000000;stop-opacity:1" />
               <stop class="mist-stop" offset="34%" style="stop-color:#000000;stop-opacity:1" />
               <stop class="mist-stop" offset="43%" style="stop-color:#000000;stop-opacity:0.96" />
@@ -389,7 +383,7 @@
               <stop class="mist-stop" offset="98%" style="stop-color:#000000;stop-opacity:0.025" />
               <stop class="mist-stop" offset="100%" style="stop-color:#000000;stop-opacity:0" />
             </radialGradient>
-            <radialGradient id="softMist" cx="64" cy="64" r="64" fx="64" fy="64" gradientUnits="userSpaceOnUse" spreadMethod="pad">
+            <radialGradient id="softMist" cx="64" cy="64" r="64" fx="64" fy="64" gradientUnits="userSpaceOnUse">
               <stop class="mist-stop" offset="0%" style="stop-color:#000000;stop-opacity:0.3" />
               <stop class="mist-stop" offset="45%" style="stop-color:#000000;stop-opacity:0.24" />
               <stop class="mist-stop" offset="72%" style="stop-color:#000000;stop-opacity:0.13" />
@@ -405,146 +399,162 @@
           <text id="iconText" x="84" y="76" fill="#ffffff" font-family="Snell Roundhand, Brush Script MT, Georgia, cursive" font-size="13" font-style="italic" font-weight="600" text-anchor="middle">Aries</text>
         </svg>
       </div>
-      <div class="editor">
-        <label class="field">
-          <span>文字</span>
-          <input class="text-input" type="text" value="Aries" maxlength="18" autocomplete="off" aria-label="编辑图标文字">
-        </label>
-        <div class="color-grid">
-          <label class="color-field">
-            <span>雾气</span>
-            <input class="color-input mist-color-input" type="color" value="#000000" aria-label="选择雾气颜色">
-          </label>
-          <label class="color-field">
-            <span>文字</span>
-            <input class="color-input text-color-input" type="color" value="#ffffff" aria-label="选择文字颜色">
-          </label>
-        </div>
-      </div>
-    </section>
 
+      <!-- 紧凑高效控制栏 -->
+      <section class="control-panel" aria-label="参数调节">
+        <div class="input-row">
+          <input id="textInput" class="text-input" type="text" value="Aries" maxlength="18" placeholder="输入签名或文本…" autocomplete="off" aria-label="头像文本">
+        </div>
+
+        <div class="color-swatches">
+          <!-- 一键经典预设 -->
+          <div class="presets" title="快捷配色预设">
+            <button class="preset-chip" type="button" style="background:#000000;--dot-color:#ffffff" data-mist="#000000" data-text="#ffffff" title="暗黑经典"></button>
+            <button class="preset-chip" type="button" style="background:#1e293b;--dot-color:#38bdf8" data-mist="#1e293b" data-text="#38bdf8" title="深海星空"></button>
+            <button class="preset-chip" type="button" style="background:#262626;--dot-color:#f59e0b" data-mist="#262626" data-text="#f59e0b" title="黑金质感"></button>
+            <button class="preset-chip" type="button" style="background:#1c3d2e;--dot-color:#a7f3d0" data-mist="#1c3d2e" data-text="#a7f3d0" title="林间冷杉"></button>
+            <button class="preset-chip" type="button" style="background:#e5e7eb;--dot-color:#111827" data-mist="#e5e7eb" data-text="#111827" title="极简浅灰"></button>
+          </div>
+
+          <!-- 精准调色 -->
+          <div class="pickers">
+            <label class="color-btn" title="更改雾气颜色">
+              <span id="mistDot" class="color-circle" style="background:#000000"></span>
+              <span>雾气</span>
+              <input id="mistPicker" class="color-picker-native" type="color" value="#000000">
+            </label>
+            <label class="color-btn" title="更改文字颜色">
+              <span id="textDot" class="color-circle" style="background:#ffffff"></span>
+              <span>文字</span>
+              <input id="textPicker" class="color-picker-native" type="color" value="#ffffff">
+            </label>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- 底部信息 -->
     <footer class="footer">
-      <span class="meta">SVG preview</span>
-      <span class="meta">Light / Dark</span>
+      <span>1024 × 1024 高清生成</span>
+      <span>1 键极速导出</span>
     </footer>
-  </main>
+  </div>
 
   <script>
     const root = document.documentElement;
-    const button = document.querySelector(".theme-toggle");
-    const label = document.querySelector(".theme-text");
-    const downloadMenu = document.querySelector(".download-menu");
-    const downloadOptions = document.querySelectorAll(".download-option");
+    const themeBtn = document.getElementById("themeToggle");
     const exportSvg = document.querySelector(".export-svg");
-    const iconText = document.querySelector("#iconText");
-    const textInput = document.querySelector(".text-input");
-    const mistColorInput = document.querySelector(".mist-color-input");
-    const textColorInput = document.querySelector(".text-color-input");
+    const iconText = document.getElementById("iconText");
+    const textInput = document.getElementById("textInput");
+    const mistPicker = document.getElementById("mistPicker");
+    const textPicker = document.getElementById("textPicker");
+    const mistDot = document.getElementById("mistDot");
+    const textDot = document.getElementById("textDot");
     const mistStops = document.querySelectorAll(".mist-stop");
+    const presetChips = document.querySelectorAll(".preset-chip");
+    const downloadBtns = document.querySelectorAll(".download-btn");
     const media = window.matchMedia("(prefers-color-scheme: dark)");
 
-    function preferredTheme() {
-      return media.matches ? "dark" : "light";
+    // 主题管理
+    function updateTheme(t, save = true) {
+      root.dataset.theme = t;
+      if (save) localStorage.setItem("avatar-theme", t);
     }
 
-    function setTheme(theme, persist) {
-      root.dataset.theme = theme;
-      button.setAttribute("aria-pressed", String(theme === "dark"));
-      label.textContent = theme === "dark" ? "夜间" : "日间";
+    const savedTheme = localStorage.getItem("avatar-theme") || (media.matches ? "dark" : "light");
+    updateTheme(savedTheme, false);
 
-      if (persist) {
-        localStorage.setItem("icon-preview-theme", theme);
-      }
-    }
-
-    setTheme(localStorage.getItem("icon-preview-theme") || preferredTheme(), false);
-
-    button.addEventListener("click", () => {
-      setTheme(root.dataset.theme === "dark" ? "light" : "dark", true);
-    });
-
-    media.addEventListener("change", () => {
-      if (!localStorage.getItem("icon-preview-theme")) {
-        setTheme(preferredTheme(), false);
+    themeBtn.addEventListener("click", () => {
+      const next = root.dataset.theme === "dark" ? "light" : "dark";
+      if (document.startViewTransition) {
+        document.startViewTransition(() => updateTheme(next));
+      } else {
+        updateTheme(next);
       }
     });
 
+    media.addEventListener("change", (e) => {
+      if (!localStorage.getItem("avatar-theme")) {
+        updateTheme(e.matches ? "dark" : "light", false);
+      }
+    });
+
+    // 颜色与文字实时同步
+    function setMistColor(color) {
+      mistStops.forEach(stop => stop.style.stopColor = color);
+      mistPicker.value = color;
+      mistDot.style.background = color;
+    }
+
+    function setTextColor(color) {
+      iconText.setAttribute("fill", color);
+      textPicker.value = color;
+      textDot.style.background = color;
+    }
+
+    textInput.addEventListener("input", () => {
+      iconText.textContent = textInput.value || " ";
+    });
+
+    mistPicker.addEventListener("input", (e) => setMistColor(e.target.value));
+    textPicker.addEventListener("input", (e) => setTextColor(e.target.value));
+
+    // 预设一键应用
+    presetChips.forEach(chip => {
+      chip.addEventListener("click", () => {
+        setMistColor(chip.dataset.mist);
+        setTextColor(chip.dataset.text);
+      });
+    });
+
+    // 极速高清导出
     function loadImage(url) {
       return new Promise((resolve, reject) => {
-        const image = new Image();
-        image.onload = () => resolve(image);
-        image.onerror = reject;
-        image.src = url;
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = url;
       });
     }
 
-    function getSvgText() {
+    async function exportImage(format) {
+      const size = 1024;
       const clone = exportSvg.cloneNode(true);
-      clone.classList.remove("icon", "export-svg");
+      clone.removeAttribute("class");
       clone.removeAttribute("role");
       clone.removeAttribute("aria-label");
 
-      return new XMLSerializer().serializeToString(clone);
-    }
-
-    async function downloadIcon(format) {
-      const size = 1024;
-      const svgText = getSvgText();
-      const svgBlob = new Blob([svgText], { type: "image/svg+xml;charset=utf-8" });
+      const svgString = new XMLSerializer().serializeToString(clone);
+      const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
       const svgUrl = URL.createObjectURL(svgBlob);
 
       try {
-        const image = await loadImage(svgUrl);
+        const img = await loadImage(svgUrl);
         const canvas = document.createElement("canvas");
-        const context = canvas.getContext("2d");
         canvas.width = size;
         canvas.height = size;
+        const ctx = canvas.getContext("2d");
 
         if (format === "jpeg") {
-          context.fillStyle = "#ffffff";
-          context.fillRect(0, 0, size, size);
+          ctx.fillStyle = root.dataset.theme === "dark" ? "#090a0f" : "#ffffff";
+          ctx.fillRect(0, 0, size, size);
         }
 
-        context.drawImage(image, 0, 0, size, size);
+        ctx.drawImage(img, 0, 0, size, size);
 
-        const mimeType = format === "jpeg" ? "image/jpeg" : "image/png";
-        const extension = format === "jpeg" ? "jpg" : "png";
-        const quality = format === "jpeg" ? 0.95 : undefined;
-        const dataUrl = canvas.toDataURL(mimeType, quality);
+        const mime = format === "jpeg" ? "image/jpeg" : "image/png";
+        const ext = format === "jpeg" ? "jpg" : "png";
         const link = document.createElement("a");
-        link.href = dataUrl;
-        link.download = `i.${extension}`;
+        link.download = `avatar.${ext}`;
+        link.href = canvas.toDataURL(mime, format === "jpeg" ? 0.95 : undefined);
         link.click();
       } finally {
         URL.revokeObjectURL(svgUrl);
       }
     }
 
-    downloadOptions.forEach((option) => {
-      option.addEventListener("click", () => {
-        downloadMenu.open = false;
-        downloadIcon(option.dataset.format);
-      });
-    });
-
-    textInput.addEventListener("input", () => {
-      iconText.textContent = textInput.value || " ";
-    });
-
-    mistColorInput.addEventListener("input", () => {
-      mistStops.forEach((stop) => {
-        stop.style.stopColor = mistColorInput.value;
-      });
-    });
-
-    textColorInput.addEventListener("input", () => {
-      iconText.setAttribute("fill", textColorInput.value);
-    });
-
-    document.addEventListener("click", (event) => {
-      if (!downloadMenu.contains(event.target)) {
-        downloadMenu.open = false;
-      }
+    downloadBtns.forEach(btn => {
+      btn.addEventListener("click", () => exportImage(btn.dataset.format));
     });
   </script>
 </body>
