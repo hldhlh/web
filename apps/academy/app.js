@@ -935,7 +935,8 @@
   }
 
   function go(hash) {
-    location.hash = hash;
+    history.replaceState(history.state, "", hash);
+    onRoute();
   }
 
   function parentHashForRoute(route) {
