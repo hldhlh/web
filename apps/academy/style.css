@@ -16,6 +16,10 @@
   --shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
   --radius: 16px;
   --tab-h: 64px;
+  --nav-bg: #1d4ed8;
+  --nav-text: #ffffff;
+  --nav-subtle: rgba(255, 255, 255, 0.85);
+  --nav-border: rgba(255, 255, 255, 0.2);
   color-scheme: light;
 }
 
@@ -103,9 +107,11 @@ code, pre, .mono {
   gap: 10px;
   min-height: 56px;
   padding: 8px 16px;
-  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  background: var(--nav-bg);
+  color: var(--nav-text);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--nav-border);
 }
 
 .topbar h1 {
@@ -125,7 +131,7 @@ code, pre, .mono {
   border-radius: 10px;
   display: grid;
   place-items: center;
-  color: var(--text);
+  color: var(--nav-text);
   flex: 0 0 auto;
 }
 
@@ -134,7 +140,7 @@ code, pre, .mono {
 }
 
 .icon-btn:hover {
-  background: var(--surface-2);
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .live {
@@ -143,8 +149,8 @@ code, pre, .mono {
   letter-spacing: 0.02em;
   padding: 4px 8px;
   border-radius: 999px;
-  background: var(--surface-2);
-  color: var(--muted);
+  background: rgba(255, 255, 255, 0.18);
+  color: var(--nav-text);
   flex: 0 0 auto;
 }
 
@@ -160,13 +166,13 @@ code, pre, .mono {
 }
 
 .live[data-state="live"] {
-  color: var(--ok);
-  background: var(--ok-soft);
+  color: #d9f9d4;
+  background: rgba(16, 185, 129, 0.24);
 }
 
 .live[data-state="offline"] {
-  color: var(--bad);
-  background: var(--bad-soft);
+  color: #ffe0e0;
+  background: rgba(248, 113, 113, 0.26);
 }
 
 .live[data-state="local"] {
@@ -323,7 +329,9 @@ code, pre, .mono {
   height: var(--tab-h);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  background: var(--nav-bg);
+  color: var(--nav-text);
+  border-color: var(--nav-border);
   border: 1px solid var(--line);
   border-radius: 22px;
   box-shadow: var(--shadow);
@@ -338,9 +346,10 @@ code, pre, .mono {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  color: var(--muted);
+  color: var(--nav-subtle);
   font-size: 11px;
   font-weight: 600;
+  transition: background-color 120ms ease;
 }
 
 .tab svg {
@@ -349,7 +358,8 @@ code, pre, .mono {
 }
 
 .tab.active {
-  color: var(--accent);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .hello {
@@ -2807,9 +2817,7 @@ button:disabled,
 }
 
 .learning-continue {
-  position: sticky;
-  bottom: 70px;
-  z-index: 4;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
