@@ -154,6 +154,34 @@
     };
   }
 
+  function normalizeNoticeAudience(audience) {
+    const mode = ["all", "staff", "manager", "selected"].includes(audience?.mode) ? audience.mode : "all";
+    const userIds = Array.isArray(audience?.userIds)
+      ? Array.from(new Set(audience.userIds.map((id) => coerceString(id, "")).filter(Boolean)))
+      : [];
+    return { mode, userIds };
+  }
+
+  function noticeVisibleTo(notice, user = Auth.session) {
+    if (!user || user.access === "blocked") return false;
+    const audience = normalizeNoticeAudience(notice?.audience);
+    if (audience.mode === "all") return true;
+    if (audience.mode === "staff") return user.role !== "manager";
+    if (audience.mode === "manager") return user.role === "manager";
+    return audience.userIds.includes(user.id);
+  }
+
+  function noticeAudienceLabel(notice) {
+    const audience = normalizeNoticeAudience(notice?.audience);
+    if (audience.mode === "all") return "全体成员";
+    if (audience.mode === "staff") return "普通员工";
+    if (audience.mode === "manager") return "店长";
+    const names = Auth.list()
+      .filter((user) => audience.userIds.includes(user.id))
+      .map((user) => user.name);
+    return names.length ? names.join("、") : "指定成员";
+  }
+
   function normalizeNotice(item) {
     return {
       id: coerceId("notice", item.id),
@@ -161,7 +189,8 @@
       kicker: coerceString(item.kicker, "运营通知"),
       title: coerceString(item.title, "新消息"),
       detail: coerceString(item.detail || item.content, "请尽快查看。"),
-      createdAt: coerceNumber(item.createdAt, Date.now())
+      createdAt: coerceNumber(item.createdAt, Date.now()),
+      audience: normalizeNoticeAudience(item.audience)
     };
   }
 
@@ -797,14 +826,15 @@
     const pendingExams = DATA.exams.filter((exam) => Gate.canExam(exam) && !examPassed(exam));
     const failedExams = pendingExams.filter((exam) => bestScore(exam.id) >= 0);
     const notices = [];
-    const posted = (DATA.notices || []).map((notice) => ({
+    const posted = (DATA.notices || []).filter((notice) => noticeVisibleTo(notice)).map((notice) => ({
       tone: notice.tone === "urgent" ? "urgent" : "info",
       kicker: coerceString(notice.kicker, "运营通知"),
       title: coerceString(notice.title, "新通知"),
       detail: coerceString(notice.detail, "请尽快查看"),
-      act: "ops-message",
+      act: "go",
+      id: notice.id,
       createdAt: coerceNumber(notice.createdAt, Date.now()),
-      hash: "#/ops"
+      hash: `#/notice/${notice.id}`
     }));
     posted.sort((a, b) => b.createdAt - a.createdAt);
     notices.push(...posted);
@@ -898,6 +928,7 @@
       id: params.id
     };
     if (parts[0] === "lesson" && parts[1]) return { name: "lesson", id: parts[1] };
+    if (parts[0] === "notice" && parts[1]) return { name: "notice", id: parts[1] };
     if (parts[0] === "exam" && parts[1] && parts[2] === "result") return { name: "result", id: parts[1] };
     if (parts[0] === "exam" && parts[1]) return { name: "exam", id: parts[1] };
     return { name: "home" };
@@ -910,6 +941,7 @@
   function parentHashForRoute(route) {
     if (!route) return "#/home";
     if (route.name === "lesson") return "#/learn";
+    if (route.name === "notice") return "#/home";
     if (route.name === "exam" || route.name === "result") return "#/exams";
     if (route.name === "ops") {
       if (route.mode === "add" || route.mode === "edit") return `#/ops?section=${route.section}`;
@@ -1437,7 +1469,8 @@
       kicker: coerceString(raw?.kicker, "运营通知"),
       detail: coerceString(raw?.detail, ""),
       tone: raw?.tone === "urgent" ? "urgent" : "info",
-      createdAt: coerceNumber(raw?.createdAt, Date.now())
+      createdAt: coerceNumber(raw?.createdAt, Date.now()),
+      audience: normalizeNoticeAudience(raw?.audience)
     };
   }
 
@@ -1744,12 +1777,35 @@
   function renderOpsNoticeEditor(item) {
     const data = noticeForEditor(item);
     const timeValue = renderDateTimeInput(data.createdAt);
+    const members = Auth.list().filter((user) => user.access !== "blocked");
+    const audienceOptions = [
+      { value: "all", title: "全体成员", hint: "默认，所有店长和员工都能收到" },
+      { value: "staff", title: "普通员工", hint: "发送给所有非店长成员" },
+      { value: "manager", title: "店长", hint: "仅店长可见" },
+      { value: "selected", title: "指定成员", hint: "只发送给下方勾选的人" }
+    ];
     return `
       <form class="card ops-editor" id="ops-editor">
         <p class="kicker">${data.id ? "编辑帖子" : "新增帖子"}</p>
         <label>标题<input id="ops-notice-title" value="${escapeHtml(data.title)}"></label>
         <label>标签<input id="ops-notice-kicker" value="${escapeHtml(data.kicker)}"></label>
         <label>内容<textarea id="ops-notice-detail">${escapeHtml(data.detail)}</textarea></label>
+        <fieldset class="notice-audience">
+          <legend>发送给 <span>必选，默认全体成员</span></legend>
+          <div class="audience-options">
+            ${audienceOptions.map((option) => `<label class="audience-option">
+              <input type="radio" name="ops-notice-audience" value="${option.value}" ${data.audience.mode === option.value ? "checked" : ""}>
+              <span><b>${option.title}</b><small>${option.hint}</small></span>
+            </label>`).join("")}
+          </div>
+          <div class="audience-members">
+            <p>指定成员 <small>选择“指定成员”后生效</small></p>
+            ${members.length ? members.map((user) => `<label class="audience-member">
+              <input type="checkbox" name="ops-notice-recipient" value="${escapeHtml(user.id)}" ${data.audience.userIds.includes(user.id) ? "checked" : ""}>
+              <span><b>${escapeHtml(user.name)}</b><small>${user.role === "manager" ? "店长" : "员工"}</small></span>
+            </label>`).join("") : `<p class="muted">暂无可选择成员</p>`}
+          </div>
+        </fieldset>
         <label>发布时间<input id="ops-notice-createdAt" type="datetime-local" value="${timeValue}"></label>
         <label>重要程度
           <select id="ops-notice-tone">
@@ -1774,6 +1830,7 @@
           <div class="top"><span class="ops-tag">${notice.tone === "urgent" ? "重要" : "一般"}</span><span>${renderDateLabel(notice.createdAt)}</span></div>
           <strong>${escapeHtml(notice.title)}</strong>
           <p class="muted">${escapeHtml(notice.kicker)} · ${escapeHtml(notice.detail)}</p>
+          <p class="notice-recipient-line">发送给：${escapeHtml(noticeAudienceLabel(notice))}</p>
           <div class="tools">
             <button data-act="go" data-hash="#/ops?section=notices&mode=edit&id=${notice.id}">编辑</button>
             <button data-act="ops-delete" data-section="notices" data-id="${notice.id}">删除</button>
@@ -2364,11 +2421,38 @@
     renderExam();
   }
 
+  function renderNotice(id) {
+    const notice = (DATA.notices || []).find((item) => item.id === id);
+    setTop("帖子详情", true);
+    setTab("home");
+    if (!notice || !noticeVisibleTo(notice)) {
+      view().innerHTML = `
+        <div class="card notice clear">
+          <strong>这条帖子不可查看</strong>
+          <p class="muted">帖子可能已删除，或没有发送给当前账号。</p>
+          <button class="ghost" data-act="go" data-hash="#/home">返回首页</button>
+        </div>`;
+      return;
+    }
+    view().innerHTML = `
+      <article class="card post-detail ${notice.tone === "urgent" ? "urgent" : ""}">
+        <header>
+          <span class="ops-tag">${escapeHtml(notice.kicker)}</span>
+          <time>${renderDateLabel(notice.createdAt)}</time>
+        </header>
+        <p class="kicker">${notice.tone === "urgent" ? "重要帖子" : "事务帖子"}</p>
+        <h2>${escapeHtml(notice.title)}</h2>
+        <div class="post-detail-body">${escapeHtml(notice.detail)}</div>
+        <footer><span>发送给</span><b>${escapeHtml(noticeAudienceLabel(notice))}</b></footer>
+      </article>`;
+  }
+
   function render() {
     if (state.video && state.route.name !== "lesson") state.video.playing = false;
     const route = state.route;
     document.querySelector(".app")?.classList.toggle("ops-mode", route.name === "ops");
     if (route.name === "home") return renderHome();
+    if (route.name === "notice") return renderNotice(route.id);
     if (route.name === "ops") return renderOps();
     if (route.name === "learn") return renderLearn(route.type);
     if (route.name === "exams") return renderExams();
@@ -2656,13 +2740,22 @@
           const list = DATA.notices.slice();
           const timeValue = document.getElementById("ops-notice-createdAt")?.value;
           const createdAt = Date.parse(timeValue || "") || Date.now();
+          const audienceMode = document.querySelector('input[name="ops-notice-audience"]:checked')?.value || "all";
+          const recipientIds = Array.from(document.querySelectorAll('input[name="ops-notice-recipient"]:checked'))
+            .map((input) => input.value)
+            .filter(Boolean);
+          if (audienceMode === "selected" && !recipientIds.length) {
+            alert("请选择至少一位接收成员。 ");
+            return;
+          }
           const raw = {
             id,
             title: coerceString(document.getElementById("ops-notice-title")?.value, ""),
             kicker: coerceString(document.getElementById("ops-notice-kicker")?.value, ""),
             detail: coerceString(document.getElementById("ops-notice-detail")?.value, ""),
             tone: coerceString(document.getElementById("ops-notice-tone")?.value, "info"),
-            createdAt
+            createdAt,
+            audience: { mode: audienceMode, userIds: recipientIds }
           };
           if (!raw.title) {
             alert("通知标题不能为空。");
