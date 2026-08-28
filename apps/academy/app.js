@@ -1120,7 +1120,7 @@
     view().innerHTML = `
       <div class="hello">
         <div>
-          <p>${memberName}${hello} · ${date}</p>
+          <p><strong>${memberName}${hello}</strong><span>· ${date}</span></p>
           <h2>${headline}</h2>
         </div>
         ${progressRing(completionRate())}

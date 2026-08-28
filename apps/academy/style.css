@@ -376,15 +376,33 @@ code, pre, .mono {
 }
 
 .hello p {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 6px;
+}
+
+.hello p strong {
+  color: var(--ink);
+  font-size: 24px;
+  font-weight: 720;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+
+.hello p span {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .hello h2 {
-  font-size: 28px;
-  letter-spacing: -0.045em;
-  font-weight: 700;
-  line-height: 1.15;
+  color: var(--muted);
+  font-size: 16px;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .ring-wrap {
