@@ -72,7 +72,7 @@
     const type = normalizeLessonType(item.type);
     const blocks = (Array.isArray(item.blocks) && item.blocks.length)
       ? item.blocks
-      : (type === "article" ? defaultBlocks(item.summary) : []);
+      : defaultBlocks(item.summary);
     const scenes = (Array.isArray(item.scenes) && item.scenes.length)
       ? item.scenes
       : (type === "video" ? defaultScenes(item.mediaUrl) : []);
@@ -85,8 +85,8 @@
       summary: coerceString(item.summary, "课程内容待完善。"),
       access: item.access === "basic" ? "basic" : "full",
       mediaUrl: coerceString(item.mediaUrl, ""),
-      blocks: type === "article" ? blocks : [],
-      scenes: type === "video" ? scenes : []
+      blocks,
+      scenes
     };
   }
 
@@ -2676,7 +2676,7 @@
             mediaUrl,
             summary: coerceString(document.getElementById("ops-lesson-summary")?.value, ""),
             blocks,
-            scenes: rawType === "video" ? sceneRaw : []
+            scenes: sceneRaw
           };
           if (!raw.title) {
             alert("课程标题不能为空。");
