@@ -231,10 +231,19 @@
 
     const origins = getOrderedOrigins();
     let lastError;
+    const bodyBytes = typeof requestInit.body === 'string'
+      ? new Blob([requestInit.body]).size
+      : Number(requestInit.body?.size || 0);
+    const writeTimeout = Math.min(
+      180000,
+      RETRY_TIMEOUT + Math.ceil(bodyBytes / (256 * 1024)) * 1000
+    );
     for (const origin of origins) {
       try {
-        const response = await fetchWithTimeout(replaceOrigin(input, origin), requestInit, RETRY_TIMEOUT);
-        if (isRetryableResponse(response)) throw new Error(`HTTP ${response.status}`);
+        const response = await fetchWithTimeout(replaceOrigin(input, origin), requestInit, writeTimeout);
+        // Safe writes are idempotent upserts. Any failed gateway response can
+        // therefore fall back to the next route without creating duplicates.
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         unhealthyUntil.delete(origin);
         if (origin !== currentOrigin) remember(origin, null);
         return response;

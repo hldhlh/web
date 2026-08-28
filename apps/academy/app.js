@@ -690,7 +690,25 @@
       contentRevision = Date.now();
       saveOpsStore();
       const payload = { rev: contentRevision, data: this.snapshot() };
-      await window.AcademyStore.putJSON(this.path, payload);
+      try {
+        await window.AcademyStore.putJSON(this.path, payload);
+      } catch (routeError) {
+        const cfg = window.ACADEMY_CONFIG;
+        if (!cfg?.url || !cfg?.key || !cfg?.bucket) throw routeError;
+        const response = await window.fetch(`${cfg.url}/storage/v1/object/${cfg.bucket}/${this.path}`, {
+          method: "POST",
+          headers: {
+            apikey: cfg.key,
+            Authorization: `Bearer ${cfg.key}`,
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            "x-upsert": "true",
+            "cache-control": "max-age=0"
+          },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      }
       if (this.channel) {
         this.channel.send({
           type: "broadcast",
@@ -2775,6 +2793,76 @@
     render();
   }
 
+  function ensurePublishStateStyles() {
+    if (document.getElementById("academy-publish-state-styles")) return;
+    const style = document.createElement("style");
+    style.id = "academy-publish-state-styles";
+    style.textContent = `
+      [data-publish-state] {
+        position: relative;
+        min-width: 128px;
+        overflow: hidden;
+        transition: background .2s ease, color .2s ease, transform .2s ease, opacity .2s ease;
+      }
+      [data-publish-state="publishing"] { cursor: wait; }
+      [data-publish-state="success"] { background: #16a05d !important; color: #fff !important; }
+      [data-publish-state="failed"] { background: #fff1f0 !important; color: #c9342e !important; box-shadow: inset 0 0 0 1px #efb3af !important; }
+      .ops-publish-state {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        white-space: nowrap;
+      }
+      .ops-publish-spinner {
+        width: 15px;
+        height: 15px;
+        border: 2px solid currentColor;
+        border-right-color: transparent;
+        border-radius: 50%;
+        animation: ops-publish-spin .72s linear infinite;
+      }
+      .ops-publish-check {
+        width: 17px;
+        height: 17px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        animation: ops-publish-pop .34s cubic-bezier(.2,.9,.25,1.3) both;
+      }
+      [data-publish-state="failed"] .ops-publish-state { animation: ops-publish-shake .32s ease both; }
+      @keyframes ops-publish-spin { to { transform: rotate(360deg); } }
+      @keyframes ops-publish-pop { from { opacity: 0; transform: scale(.35); } to { opacity: 1; transform: scale(1); } }
+      @keyframes ops-publish-shake { 0%,100% { transform: translateX(0); } 30% { transform: translateX(-4px); } 65% { transform: translateX(4px); } }
+      @media (prefers-reduced-motion: reduce) {
+        .ops-publish-spinner, .ops-publish-check, [data-publish-state="failed"] .ops-publish-state { animation: none !important; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  async function publishWithState(button, contentLabel) {
+    ensurePublishStateStyles();
+    if (!button.dataset.publishOriginal) button.dataset.publishOriginal = button.innerHTML;
+    button.disabled = true;
+    button.dataset.publishState = "publishing";
+    button.innerHTML = `<span class="ops-publish-state"><i class="ops-publish-spinner" aria-hidden="true"></i>${contentLabel}发布中</span>`;
+    try {
+      await ContentSync.publish();
+      button.dataset.publishState = "success";
+      button.innerHTML = `<span class="ops-publish-state"><svg class="ops-publish-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>发布成功</span>`;
+      await new Promise((resolve) => setTimeout(resolve, 620));
+      return true;
+    } catch (error) {
+      button.disabled = false;
+      button.dataset.publishState = "failed";
+      button.innerHTML = `<span class="ops-publish-state">发布失败 · 重试</span>`;
+      throw error;
+    }
+  }
+
   function onClick(event) {
     const btn = event.target.closest("[data-act]");
     if (!btn || btn.disabled) return;
@@ -2999,9 +3087,9 @@
           DATA.lessons = list;
           saveOpsStore();
           try {
-            await ContentSync.publish();
-          } catch (_) {
-            alert("课程已保存在本机，但实时发布失败，请检查网络后再次保存。");
+            await publishWithState(btn, "课程");
+          } catch (error) {
+            alert(`课程已保存在本机，实时发布失败：${error?.message || "网络连接异常"}。请点击按钮重试。`);
             return;
           }
           clearLessonDraft();
@@ -3040,9 +3128,9 @@
           DATA.exams = list;
           saveOpsStore();
           try {
-            await ContentSync.publish();
-          } catch (_) {
-            alert("考试已保存在本机，但实时发布失败，请检查网络后再次保存。");
+            await publishWithState(btn, "考试");
+          } catch (error) {
+            alert(`考试已保存在本机，实时发布失败：${error?.message || "网络连接异常"}。请点击按钮重试。`);
             return;
           }
           return go("#/ops?section=exams");
@@ -3079,9 +3167,9 @@
           DATA.notices = list;
           saveOpsStore();
           try {
-            await ContentSync.publish();
-          } catch (_) {
-            alert("通知已保存在本机，但实时发布失败，请检查网络后再次保存。");
+            await publishWithState(btn, "通知");
+          } catch (error) {
+            alert(`通知已保存在本机，实时发布失败：${error?.message || "网络连接异常"}。请点击按钮重试。`);
             return;
           }
           return go("#/ops?section=notices");
