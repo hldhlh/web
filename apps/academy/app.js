@@ -426,7 +426,11 @@
     },
     refreshView() {
       const stay = state.route?.name;
-      if (stay === "home" || stay === "learn" || stay === "exams" || stay === "me" || stay === "result" || stay === "ops") render();
+      if (stay === "home" || stay === "messages" || stay === "learn" || stay === "exams" || stay === "me" || stay === "result" || stay === "ops") {
+        render();
+      } else {
+        updateNotificationButton();
+      }
     },
     async pull() {
       const id = Auth.session?.id;
@@ -790,6 +794,7 @@
     state.progress.last = { type: "lesson", id };
     touchStreak();
     save();
+    updateNotificationButton();
   }
 
   function completionRate() {
@@ -918,6 +923,7 @@
     const params = {};
     new URLSearchParams(query || "").forEach((value, key) => { params[key] = value; });
     if (!parts.length || parts[0] === "home") return { name: "home" };
+    if (parts[0] === "messages") return { name: "messages" };
     if (parts[0] === "learn") return { name: "learn", type: params.type || "all" };
     if (parts[0] === "exams") return { name: "exams" };
     if (parts[0] === "me") return { name: "me" };
@@ -942,13 +948,13 @@
   function parentHashForRoute(route) {
     if (!route) return "#/home";
     if (route.name === "lesson") return "#/learn";
-    if (route.name === "notice") return "#/home";
+    if (route.name === "notice") return "#/messages";
     if (route.name === "exam" || route.name === "result") return "#/exams";
     if (route.name === "ops") {
       if (route.mode === "add" || route.mode === "edit") return `#/ops?section=${route.section}`;
       return "#/home";
     }
-    if (route.name === "learn" || route.name === "exams" || route.name === "me") return "#/home";
+    if (route.name === "learn" || route.name === "exams" || route.name === "me" || route.name === "messages") return "#/home";
     return "#/home";
   }
 
@@ -964,8 +970,6 @@
     localStorage.setItem("app-theme", theme);
     const color = document.querySelector("meta[name='theme-color']");
     if (color) color.content = theme === "dark" ? "#0b0d12" : "#f4f5f7";
-    const btn = document.getElementById("theme-btn");
-    if (btn) btn.title = theme === "dark" ? "切换到白天" : "切换到黑夜";
   }
 
   function svgIcon(name) {
@@ -973,6 +977,7 @@
       back: '<path d="M15 6 9 12l6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
       sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.2 4.2l1.4 1.4m12.8 12.8 1.4 1.4M2 12h2m16 0h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>',
       moon: '<path d="M20 12.6A8 8 0 1 1 11.4 4 6.2 6.2 0 0 0 20 12.6Z"/>',
+      bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"/><path d="M10 21h4"/>',
       home: '<path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-8Z"/>',
       learn: '<path d="M4 7.5 12 4l8 3.5M4 7.5v9L12 20l8-3.5v-9M4 7.5 12 11l8-3.5"/>',
       exam: '<path d="M8 4h8v16H8z"/><path d="M10.5 9h5M10.5 13h3"/>',
@@ -1141,7 +1146,7 @@
           <b>${pendingUpdates.length}</b>
           <small>今日有更新可学习</small>
         </button>
-        <button class="ops-card" data-act="go" data-hash="#/me">
+        <button class="ops-card" data-act="go" data-hash="#/messages">
           <span class="ops-tag">重要消息</span>
           <b>${box.notices.length}</b>
           <small>待处理运营通知</small>
@@ -1406,6 +1411,10 @@
           <p class="muted">${escapeHtml(item.explain)}</p>
         </button>`).join("") : `<p class="empty">还没有错题。考试里答错的会出现在这里。</p>`}
       <div class="actions">
+        <button class="ghost theme-setting" data-act="theme-toggle">
+          <span>${svgIcon(state.theme === "dark" ? "moon" : "sun")}主题模式</span>
+          <b>${state.theme === "dark" ? "深色" : "浅色"}</b>
+        </button>
         ${Auth.isManager(Auth.session) ? `<button class="primary" data-act="go" data-hash="#/ops">运营事务管理</button>` : ""}
         <button class="ghost" data-act="logout">退出账号</button>
         <button class="ghost" data-act="reset">清除本机学习记录</button>
@@ -2382,6 +2391,7 @@
     state.exam.result = { score, correct, total: exam.questions.length, pass: score >= exam.pass, wrong, at: record.at };
     touchStreak();
     save();
+    updateNotificationButton();
     go(`#/exam/${exam.id}/result`);
   }
 
@@ -2403,10 +2413,21 @@
       total: Number(record?.total) || exam.questions.length,
       at: Number(record?.at) || 0
     }));
+    const celebrationToken = result?.at ? `${exam.id}:${result.at}` : "";
+    let playCelebrationIntro = false;
+    if (pass && currentResult && !state.route.at && celebrationToken) {
+      const celebrationKey = "academy-pass-celebration";
+      try {
+        playCelebrationIntro = sessionStorage.getItem(celebrationKey) !== celebrationToken;
+        if (playCelebrationIntro) sessionStorage.setItem(celebrationKey, celebrationToken);
+      } catch (_) {
+        playCelebrationIntro = true;
+      }
+    }
     setTop(exam.title, true);
     view().innerHTML = `
       ${pass ? `
-        <section class="pass-celebration" aria-label="恭喜通过考试">
+        <section class="pass-celebration ${playCelebrationIntro ? "is-intro" : "is-idle"}" aria-label="恭喜通过考试">
           <svg viewBox="0 0 440 330" role="img" aria-labelledby="pass-celebration-title pass-celebration-desc">
             <title id="pass-celebration-title">恭喜你通过考试</title>
             <desc id="pass-celebration-desc">现代环形成绩卡庆祝动画</desc>
@@ -2438,14 +2459,17 @@
               <linearGradient id="party-banner" x1="0" y1="0" x2="1" y2="1">
                 <stop stop-color="#ffc91a"/><stop offset="1" stop-color="#ff9800"/>
               </linearGradient>
-              <linearGradient id="party-sky" x1="0" y1="0" x2="1" y2="1">
-                <stop stop-color="#4e8cff"/><stop offset=".55" stop-color="#36b9f2"/><stop offset="1" stop-color="#22d2bd"/>
-              </linearGradient>
               <linearGradient id="party-card-fill" x1="0" y1="0" x2="0" y2="1">
                 <stop stop-color="#fffef4"/><stop offset="1" stop-color="#fff2c7"/>
               </linearGradient>
               <linearGradient id="party-star" x1="0" y1="0" x2="1" y2="1">
                 <stop stop-color="#fff46a"/><stop offset=".55" stop-color="#ffc51d"/><stop offset="1" stop-color="#ff8a00"/>
+              </linearGradient>
+              <radialGradient id="party-medal" cx="38%" cy="28%" r="75%">
+                <stop stop-color="#ffffff"/><stop offset=".58" stop-color="#fff9df"/><stop offset="1" stop-color="#ffe39a"/>
+              </radialGradient>
+              <linearGradient id="party-ribbon-side" x1="0" y1="0" x2="0" y2="1">
+                <stop stop-color="#ffb719"/><stop offset="1" stop-color="#e36b00"/>
               </linearGradient>
               <filter id="party-shadow" x="-30%" y="-30%" width="160%" height="180%">
                 <feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#111827" flood-opacity=".28"/>
@@ -2455,18 +2479,12 @@
               </filter>
             </defs>
             <g class="classic-party-card">
-              <rect class="party-game-bg" x="12" y="10" width="416" height="310" rx="45" fill="url(#party-sky)" stroke="#234f91" stroke-width="5"/>
-              <path d="M23 242c44-28 86-22 125 6 35 25 68 26 103 0 48-35 102-32 166 7v50a15 15 0 0 1-15 15H38a15 15 0 0 1-15-15Z" fill="#1475c8" opacity=".34"/>
-              <g class="party-clouds" fill="#fff" opacity=".22">
-                <path d="M34 82c4-13 15-19 27-13 8-14 31-8 31 9 12-1 20 6 20 16H28c-2-5 0-10 6-12Z"/>
-                <path d="M334 77c5-13 16-18 28-11 10-12 29-5 28 11 13-1 21 7 20 17h-84c-1-8 2-14 8-17Z"/>
-              </g>
-              <g class="party-rays" fill="#fff" opacity=".16">
+              <g class="party-rays" fill="#ffc928" opacity=".2">
                 <path d="M220 70 201 4h38Z"/><path d="m179 73-47-57 35-13Z"/><path d="m261 73 48-57-36-13Z"/><path d="m146 91-80-31 20-29Z"/><path d="m294 91 80-31-20-29Z"/>
               </g>
-              <g class="party-top-note">
-                <rect x="139" y="3" width="162" height="34" rx="17" fill="none" stroke="#fff" stroke-opacity=".42" stroke-width="2"/>
-                <text x="220" y="25" text-anchor="middle" fill="#fff" fill-opacity=".88" font-size="12" font-weight="750" letter-spacing="1" font-family="system-ui, sans-serif">AUTO OFFICE · 挑战完成</text>
+              <g class="party-side-stars" fill="url(#party-star)" stroke="#d97706" stroke-width="1.2">
+                <path d="m57 120 5 10 11 1.5-8 7.8 1.9 11-9.9-5.2-9.9 5.2 1.9-11-8-7.8 11-1.5Z"/>
+                <path d="m383 120 5 10 11 1.5-8 7.8 1.9 11-9.9-5.2-9.9 5.2 1.9-11-8-7.8 11-1.5Z"/>
               </g>
               <g class="party-streamers" fill="none" stroke-linecap="round">
                 <path d="M64 158c40-38 34 50 75 7s40 34 66 5" stroke="#ff5267" stroke-width="9"/>
@@ -2475,10 +2493,19 @@
                 <path d="M349 204c33 28 12 62-13 42s-37 8-17 32" stroke="#f7b91c" stroke-width="7"/>
                 <path d="M105 108c-14 23-14 49 2 73s-1 47-16 58" stroke="#7bc3a4" stroke-width="7"/>
                 <path d="M335 108c14 23 14 49-2 73s1 47 16 58" stroke="#7bc3a4" stroke-width="7"/>
+                <path d="M48 126c27-21 46-8 40 17s13 35 31 23" stroke="#7d6cf2" stroke-width="5"/>
+                <path d="M392 126c-27-21-46-8-40 17s-13 35-31 23" stroke="#7d6cf2" stroke-width="5"/>
+                <path d="M53 222c19-12 36-5 34 12s13 26 29 20" stroke="#20b9c2" stroke-width="5"/>
+                <path d="M387 222c-19-12-36-5-34 12s-13 26-29 20" stroke="#20b9c2" stroke-width="5"/>
+                <path d="M137 287c10-21 28-23 36-7s24 12 31-3" stroke="#ff6f91" stroke-width="5"/>
+                <path d="M303 287c-10-21-28-23-36-7s-24 12-31-3" stroke="#ff6f91" stroke-width="5"/>
+                <path d="M155 67c-9-18 1-32 17-25s25-3 24-17" stroke="#38cfa2" stroke-width="4"/>
+                <path d="M285 67c9-18-1-32-17-25s-25-3-24-17" stroke="#38cfa2" stroke-width="4"/>
               </g>
               <g class="party-card-body" filter="url(#party-shadow)">
-                <path d="M80 101c0-15 12-27 27-27h226c15 0 27 12 27 27v174c0 15-12 27-27 27H107c-15 0-27-12-27-27Z" fill="url(#party-card-fill)" stroke="#7e4f16" stroke-width="9"/>
-                <path d="M80 101c0-15 12-27 27-27h226c15 0 27 12 27 27v174c0 15-12 27-27 27H107c-15 0-27-12-27-27Z" fill="none" stroke="#ffc928" stroke-width="5"/>
+                <path d="M80 101c0-15 12-27 27-27h226c15 0 27 12 27 27v174c0 15-12 27-27 27H107c-15 0-27-12-27-27Z" fill="url(#party-card-fill)" stroke="#9b5b11" stroke-width="7"/>
+                <path d="M80 101c0-15 12-27 27-27h226c15 0 27 12 27 27v174c0 15-12 27-27 27H107c-15 0-27-12-27-27Z" fill="none" stroke="#ffd34a" stroke-width="3"/>
+                <path d="M97 153v116c0 9 7 16 16 16h214" fill="none" stroke="#e7b43e" stroke-opacity=".42" stroke-width="2" stroke-linecap="round"/>
                 <path d="M93 105c15-18 29-20 44-1s30 18 45-1 30-18 45 1 30 18 45-1 30-18 45 1 29 17 40 2v30H93Z" fill="#fffaf0"/>
                 <g class="party-flags">
                   <path d="M97 115h246" stroke="#efb83f" stroke-width="2"/>
@@ -2486,8 +2513,14 @@
                   <path d="m111 115 12 25 12-25m48 0 12 25 12-25m48 0 12 25 12-25" fill="#ff5775"/>
                   <path d="m147 115 12 25 12-25m48 0 12 25 12-25m48 0 12 25 12-25" fill="#ff8a18"/>
                 </g>
-                <text x="220" y="204" text-anchor="middle" fill="#e85c08" font-size="49" font-weight="900" letter-spacing="-2" font-family="system-ui, sans-serif">${score}</text>
-                <text x="220" y="228" text-anchor="middle" fill="#b45c16" font-size="14" font-weight="750" letter-spacing="2" font-family="system-ui, sans-serif">考试挑战成功</text>
+                <g class="party-score-medal">
+                  <circle class="medal-glow" cx="220" cy="194" r="54" fill="#ffc928" fill-opacity=".18"/>
+                  <circle cx="220" cy="194" r="47" fill="url(#party-medal)" stroke="#e9a512" stroke-width="4"/>
+                  <circle cx="220" cy="194" r="40" fill="none" stroke="#ffd65c" stroke-width="2" stroke-dasharray="2 5"/>
+                  <path d="M190 171c12-17 34-24 53-13" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" opacity=".85"/>
+                  <text x="220" y="205" text-anchor="middle" fill="#e85c08" font-size="45" font-weight="900" letter-spacing="-2" font-family="system-ui, sans-serif">${score}</text>
+                  <text x="220" y="224" text-anchor="middle" fill="#b45c16" font-size="10" font-weight="800" letter-spacing="1.7" font-family="system-ui, sans-serif">挑战成功</text>
+                </g>
                 <g class="party-stars" fill="url(#party-star)" stroke="#d97706" stroke-width="1.5">
                   <path d="m185 244 5 10 11 1.6-8 7.8 1.9 11-9.9-5.2-9.9 5.2 1.9-11-8-7.8 11-1.6Z"/>
                   <path d="m220 238 6.2 12.6 13.8 2-10 9.7 2.4 13.7-12.4-6.5-12.4 6.5 2.4-13.7-10-9.7 13.8-2Z"/>
@@ -2508,11 +2541,20 @@
                 <rect x="57" y="102" width="7" height="12" rx="2" fill="#16b7b2" transform="rotate(-18 60 108)"/><rect x="378" y="112" width="7" height="12" rx="2" fill="#f7b91c" transform="rotate(18 381 118)"/>
                 <rect x="54" y="241" width="7" height="12" rx="2" fill="#ff7950" transform="rotate(30 57 247)"/><rect x="379" y="238" width="7" height="12" rx="2" fill="#ff7950" transform="rotate(-30 382 244)"/>
                 <circle cx="70" cy="184" r="5" fill="#ffbf19"/><circle cx="370" cy="184" r="5" fill="#ffbf19"/><circle cx="124" cy="283" r="4" fill="#16b7b2"/><circle cx="316" cy="283" r="4" fill="#16b7b2"/>
+                <rect x="39" y="168" width="6" height="10" rx="2" fill="#8a72f4" transform="rotate(44 42 173)"/><rect x="395" y="168" width="6" height="10" rx="2" fill="#8a72f4" transform="rotate(-44 398 173)"/>
+                <rect x="82" y="76" width="6" height="11" rx="2" fill="#ff5f7c" transform="rotate(-31 85 81)"/><rect x="352" y="76" width="6" height="11" rx="2" fill="#ff5f7c" transform="rotate(31 355 81)"/>
+                <circle cx="45" cy="207" r="3.5" fill="#46d7aa"/><circle cx="395" cy="207" r="3.5" fill="#46d7aa"/><circle cx="150" cy="303" r="3" fill="#ffc928"/><circle cx="290" cy="303" r="3" fill="#ffc928"/>
               </g>
               <g class="party-banner" filter="url(#party-shadow)">
-                <rect x="112" y="42" width="216" height="83" rx="18" fill="url(#party-banner)" stroke="#a85a00" stroke-width="5"/>
-                <path d="M129 57h182" stroke="#fff" stroke-opacity=".42" stroke-width="3" stroke-linecap="round"/>
-                <text x="220" y="96" text-anchor="middle" fill="#fff" font-size="37" font-weight="900" font-family="system-ui, sans-serif" filter="url(#party-text-shadow)">恭喜通关</text>
+                <path d="m114 63-31 7 13 19-13 22 39 5Z" fill="url(#party-ribbon-side)" stroke="#a85a00" stroke-width="3" stroke-linejoin="round"/>
+                <path d="m326 63 31 7-13 19 13 22-39 5Z" fill="url(#party-ribbon-side)" stroke="#a85a00" stroke-width="3" stroke-linejoin="round"/>
+                <rect x="112" y="42" width="216" height="83" rx="18" fill="url(#party-banner)" stroke="#a85a00" stroke-width="4"/>
+                <rect x="117" y="47" width="206" height="73" rx="14" fill="none" stroke="#ffe67a" stroke-opacity=".65" stroke-width="2"/>
+                <path class="party-banner-shine" d="M133 58h91" stroke="#fff" stroke-opacity=".56" stroke-width="4" stroke-linecap="round"/>
+                <text x="220" y="94" text-anchor="middle" fill="#fff" font-size="28" font-weight="900" letter-spacing="1" font-family="system-ui, sans-serif" filter="url(#party-text-shadow)">${score === 100 ? "恭喜满分通过" : "恭喜通过考试"}</text>
+              </g>
+              <g class="party-card-studs" fill="#ffd657" stroke="#b76b09" stroke-width="1.5">
+                <circle cx="101" cy="163" r="4"/><circle cx="339" cy="163" r="4"/><circle cx="112" cy="280" r="4"/><circle cx="328" cy="280" r="4"/>
               </g>
             </g>
             <g class="modern-result-card" filter="url(#pass-shadow)">
@@ -2629,11 +2671,37 @@
       </article>`;
   }
 
+  function renderMessages() {
+    setTop("消息通知", true);
+    setTab("home");
+    const messages = inbox().notices;
+    view().innerHTML = `
+      <div class="sec-title"><h3>全部消息</h3><span>${messages.length}</span></div>
+      ${messages.length ? messages.map((item) => `
+        <button class="card notice ${item.tone === "urgent" ? "urgent" : ""}" data-act="${item.act}" ${item.id ? `data-id="${item.id}"` : ""} ${item.hash ? `data-hash="${item.hash}"` : ""}>
+          <div class="kicker">${escapeHtml(item.kicker)}</div>
+          <strong>${escapeHtml(item.title)}</strong>
+          <p class="muted">${escapeHtml(item.detail)}</p>
+        </button>`).join("") : `<div class="card notice clear"><strong>当前没有新消息</strong><p class="muted">运营通知、学习任务和考试提醒会显示在这里。</p></div>`}
+    `;
+  }
+
+  function updateNotificationButton() {
+    const btn = document.getElementById("notification-btn");
+    if (!btn || !Auth.session) return;
+    const count = inbox().notices.length;
+    btn.innerHTML = `${svgIcon("bell")}${count ? `<span class="notification-count" aria-hidden="true">${count > 99 ? "99+" : count}</span>` : ""}`;
+    btn.title = count ? `消息通知，${count} 条待处理` : "消息通知";
+    btn.setAttribute("aria-label", btn.title);
+  }
+
   function render() {
     if (state.video && state.route.name !== "lesson") state.video.playing = false;
     const route = state.route;
     document.querySelector(".app")?.classList.toggle("ops-mode", route.name === "ops");
+    updateNotificationButton();
     if (route.name === "home") return renderHome();
+    if (route.name === "messages") return renderMessages();
     if (route.name === "notice") return renderNotice(route.id);
     if (route.name === "ops") return renderOps();
     if (route.name === "learn") return renderLearn(route.type);
@@ -2662,6 +2730,10 @@
     if (!btn || btn.disabled) return;
     const act = btn.dataset.act;
     if (act === "ops-tab") return go(`#/ops?section=${btn.dataset.section}`);
+    if (act === "theme-toggle") {
+      setTheme(state.theme === "dark" ? "light" : "dark");
+      return renderMe();
+    }
     if (act === "ops-cancel") return go(`#/ops?section=${currentOpsRoute().section}`);
     if (act === "ops-message") return go("#/ops?section=notices");
     if (act === "ops-delete") {
@@ -3211,18 +3283,13 @@
   async function init() {
     setTheme(state.theme);
     document.getElementById("back-btn").innerHTML = svgIcon("back");
-    document.getElementById("theme-btn").innerHTML = state.theme === "dark" ? svgIcon("sun") : svgIcon("moon");
+    document.getElementById("notification-btn").innerHTML = svgIcon("bell");
     document.getElementById("tab-home").innerHTML = `${svgIcon("home")}<span>运营</span>`;
     document.getElementById("tab-learn").innerHTML = `${svgIcon("learn")}<span>课程</span>`;
     document.getElementById("tab-exams").innerHTML = `${svgIcon("exam")}<span>考试</span>`;
     document.getElementById("tab-me").innerHTML = `${svgIcon("me")}<span>我的</span>`;
 
     document.getElementById("back-btn").addEventListener("click", goToParentPage);
-    document.getElementById("theme-btn").addEventListener("click", () => {
-      const next = state.theme === "dark" ? "light" : "dark";
-      setTheme(next);
-      document.getElementById("theme-btn").innerHTML = next === "dark" ? svgIcon("sun") : svgIcon("moon");
-    });
     document.getElementById("app").addEventListener("click", onClick);
     document.getElementById("app").addEventListener("input", onInput);
     window.addEventListener("app-network-change", () => {

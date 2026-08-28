@@ -143,6 +143,51 @@ code, pre, .mono {
   background: rgba(255, 255, 255, 0.16);
 }
 
+.icon-btn > svg {
+  width: 20px;
+  height: 20px;
+}
+
+.notification-btn {
+  position: relative;
+}
+
+.notification-btn .notification-count {
+  position: absolute;
+  top: 1px;
+  right: 0;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border: 2px solid var(--nav-bg);
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 11px;
+  text-align: center;
+}
+
+.theme-setting {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.theme-setting span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-setting svg {
+  width: 18px;
+  height: 18px;
+}
+
 .live {
   font-size: 11px;
   font-weight: 650;
@@ -243,7 +288,8 @@ code, pre, .mono {
 }
 
 .app.gated .topbar .live,
-.app.gated .topbar .icon-btn#back-btn {
+.app.gated .topbar .icon-btn#back-btn,
+.app.gated .topbar .notification-btn {
   display: none;
 }
 
@@ -256,12 +302,6 @@ code, pre, .mono {
   padding-top: 10px;
   padding-bottom: 8px;
   position: relative;
-}
-
-.app.gated .topbar .icon-btn#theme-btn {
-  position: absolute;
-  top: 10px;
-  right: 16px;
 }
 
 .app.gated .topbar #top-title {
@@ -2367,48 +2407,66 @@ button:disabled,
 .classic-party-card {
   transform-box: fill-box;
   transform-origin: center;
+}
+
+.pass-celebration.is-intro .classic-party-card {
   animation: party-card-in 620ms cubic-bezier(.2, .9, .25, 1.25) both;
-}
-
-.party-game-bg {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: party-game-breathe 4s ease-in-out infinite alternate;
-}
-
-.party-clouds {
-  animation: party-cloud-drift 5s ease-in-out infinite alternate;
 }
 
 .party-banner {
   transform-box: fill-box;
   transform-origin: center;
+}
+
+.pass-celebration.is-intro .party-banner {
   animation: party-banner-in 680ms 140ms cubic-bezier(.2, .9, .25, 1.35) both;
 }
 
 .party-rays {
   transform-box: fill-box;
   transform-origin: center bottom;
-  animation: party-rays 1.5s ease-in-out infinite alternate;
+  animation: party-rays-idle 4s 1.1s ease-in-out infinite alternate;
+}
+
+.pass-celebration.is-intro .party-rays {
+  animation: party-rays-burst 820ms 180ms ease-out both, party-rays-idle 4s 1.1s ease-in-out infinite alternate;
 }
 
 .party-streamers {
   stroke-dasharray: 180;
+  stroke-dashoffset: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: party-ribbon-group-idle 4.8s 1.2s cubic-bezier(.45, 0, .55, 1) infinite alternate;
+  will-change: transform;
+}
+
+.pass-celebration.is-intro .party-streamers {
   stroke-dashoffset: 180;
-  animation: party-streamers 860ms 320ms ease-out forwards;
+  animation: party-streamers 920ms 260ms cubic-bezier(.16, 1, .3, 1) forwards, party-ribbon-group-idle 4.8s 1.3s cubic-bezier(.45, 0, .55, 1) infinite alternate;
 }
 
 .party-confetti {
-  animation: party-confetti 1.7s ease-in-out infinite alternate;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: party-confetti-idle 4.2s 1.4s cubic-bezier(.45, 0, .55, 1) infinite alternate;
+  will-change: transform, opacity;
+}
+
+.pass-celebration.is-intro .party-confetti {
+  animation: party-confetti-burst 1.4s 240ms cubic-bezier(.16, 1, .3, 1) both, party-confetti-idle 4.2s 1.7s cubic-bezier(.45, 0, .55, 1) infinite alternate;
 }
 
 .party-poppers {
   transform-box: fill-box;
   transform-origin: center bottom;
+}
+
+.pass-celebration.is-intro .party-poppers {
   animation: party-poppers 520ms 480ms cubic-bezier(.2, .9, .25, 1.4) both;
 }
 
-.party-stars path {
+.pass-celebration.is-intro .party-stars path {
   transform-box: fill-box;
   transform-origin: center;
   animation: party-star-pop 560ms cubic-bezier(.2, .9, .25, 1.45) both;
@@ -2418,17 +2476,31 @@ button:disabled,
 .party-stars path:nth-child(2) { animation-delay: 830ms; }
 .party-stars path:nth-child(3) { animation-delay: 940ms; }
 
+.party-side-stars {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: party-side-stars-idle 2.8s 1.2s ease-in-out infinite alternate;
+}
+
+.pass-celebration.is-intro .party-score-medal {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: party-medal-in 620ms 500ms cubic-bezier(.2, .9, .25, 1.4) both;
+}
+
+.medal-glow {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: party-medal-glow 2.8s 1.4s ease-in-out infinite alternate;
+}
+
+.party-banner-shine {
+  animation: party-banner-shine 3.6s 1.2s ease-in-out infinite;
+}
+
 @keyframes party-card-in {
   from { opacity: 0; transform: translateY(20px) scale(.82); }
   to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes party-game-breathe {
-  to { opacity: .94; filter: saturate(1.08); }
-}
-
-@keyframes party-cloud-drift {
-  to { transform: translateX(8px); }
 }
 
 @keyframes party-banner-in {
@@ -2436,17 +2508,34 @@ button:disabled,
   to { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
 }
 
-@keyframes party-rays {
-  to { opacity: .3; transform: scaleX(1.08); }
+@keyframes party-rays-burst {
+  from { opacity: 0; transform: scale(.6); }
+  to { opacity: .3; transform: scale(1.08); }
+}
+
+@keyframes party-rays-idle {
+  from { opacity: .13; transform: scaleX(.98); }
+  to { opacity: .24; transform: scaleX(1.04); }
 }
 
 @keyframes party-streamers {
   to { stroke-dashoffset: 0; }
 }
 
-@keyframes party-confetti {
-  from { transform: translateY(-3px) rotate(-2deg); }
-  to { transform: translateY(7px) rotate(3deg); }
+@keyframes party-ribbon-group-idle {
+  from { transform: translateY(-1px) rotate(-.35deg); }
+  to { transform: translateY(3px) rotate(.35deg); }
+}
+
+@keyframes party-confetti-burst {
+  from { opacity: 0; transform: translateY(-18px) scale(.6) rotate(-8deg); }
+  45% { opacity: 1; }
+  to { opacity: .78; transform: translateY(6px) scale(1) rotate(3deg); }
+}
+
+@keyframes party-confetti-idle {
+  from { opacity: .68; transform: translateY(-2px) rotate(-1deg); }
+  to { opacity: 1; transform: translateY(4px) rotate(1deg); }
 }
 
 @keyframes party-poppers {
@@ -2457,6 +2546,26 @@ button:disabled,
 @keyframes party-star-pop {
   from { opacity: 0; transform: translateY(8px) scale(.2) rotate(-20deg); }
   to { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+}
+
+@keyframes party-side-stars-idle {
+  from { opacity: .62; transform: scale(.94) rotate(-2deg); }
+  to { opacity: 1; transform: scale(1.06) rotate(2deg); }
+}
+
+@keyframes party-medal-in {
+  from { opacity: 0; transform: scale(.45) rotate(-12deg); }
+  to { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+@keyframes party-medal-glow {
+  from { opacity: .35; transform: scale(.94); }
+  to { opacity: .78; transform: scale(1.08); }
+}
+
+@keyframes party-banner-shine {
+  0%, 62%, 100% { opacity: .2; transform: translateX(0); }
+  78% { opacity: .72; transform: translateX(83px); }
 }
 
 .celebration-rays {
