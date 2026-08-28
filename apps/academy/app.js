@@ -2406,7 +2406,7 @@
     setTop(exam.title, true);
     view().innerHTML = `
       ${pass ? `
-        <button type="button" class="pass-celebration" data-act="dismiss-pass-celebration" aria-label="恭喜通过考试，点击查看成绩">
+        <section class="pass-celebration" aria-label="恭喜通过考试">
           <svg viewBox="0 0 440 330" role="img" aria-labelledby="pass-celebration-title pass-celebration-desc">
             <title id="pass-celebration-title">恭喜你通过考试</title>
             <desc id="pass-celebration-desc">现代环形成绩卡庆祝动画</desc>
@@ -2536,7 +2536,7 @@
             <strong>做得漂亮，继续保持</strong>
             <span>${result ? `答对 ${result.correct} / ${result.total}` : "这是你的历史最好成绩"} · 合格线 ${exam.pass} 分</span>
           </div>
-        </button>` : `
+        </section>` : `
         <div class="result">
           <div class="kicker">未通过</div>
           <div class="score">${score < 0 ? "--" : score}</div>
@@ -2638,11 +2638,6 @@
     const btn = event.target.closest("[data-act]");
     if (!btn || btn.disabled) return;
     const act = btn.dataset.act;
-    if (act === "dismiss-pass-celebration") {
-      btn.classList.add("is-leaving");
-      window.setTimeout(() => btn.remove(), 220);
-      return;
-    }
     if (act === "ops-tab") return go(`#/ops?section=${btn.dataset.section}`);
     if (act === "ops-cancel") return go(`#/ops?section=${currentOpsRoute().section}`);
     if (act === "ops-message") return go("#/ops?section=notices");

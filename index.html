@@ -301,7 +301,7 @@
     <footer id="version-footer" class="version-footer" aria-live="polite">版本信息读取中…</footer>
   </div>
 
-  <button id="clear-cache-btn" class="clear-cache-btn" title="清除离线缓存">
+  <button id="clear-cache-btn" class="clear-cache-btn" title="清理所有 App 本地缓存" aria-label="清理所有 App 本地缓存">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
       stroke-linecap="round" stroke-linejoin="round">
       <path
@@ -346,6 +346,45 @@
 
     // 缓存管理
     const CACHE_PREFIX = 'app_icon_v2_';
+    const APP_CACHE_KEY_PATTERN = /(?:^|[-_:])(cache|cached|icon-cache|cdn-manager)(?:[-_:]|$)/i;
+
+    const isAppCacheKey = (key) => key.startsWith(CACHE_PREFIX) || APP_CACHE_KEY_PATTERN.test(key);
+
+    const clearStorageCacheKeys = (storage) => {
+      let cleared = 0;
+      Object.keys(storage).forEach((key) => {
+        if (!isAppCacheKey(key)) return;
+        storage.removeItem(key);
+        cleared += 1;
+      });
+      return cleared;
+    };
+
+    const clearAllAppCaches = async () => {
+      let cleared = clearStorageCacheKeys(localStorage) + clearStorageCacheKeys(sessionStorage);
+
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        const results = await Promise.all(cacheNames.map((name) => caches.delete(name)));
+        cleared += results.filter(Boolean).length;
+      }
+
+      if ('indexedDB' in window && typeof indexedDB.databases === 'function') {
+        const databases = await indexedDB.databases();
+        const cacheDatabases = databases
+          .map((database) => database.name)
+          .filter((name) => name && isAppCacheKey(name));
+        await Promise.all(cacheDatabases.map((name) => new Promise((resolve) => {
+          const request = indexedDB.deleteDatabase(name);
+          request.onsuccess = request.onerror = request.onblocked = () => resolve();
+        })));
+        cleared += cacheDatabases.length;
+      }
+
+      sessionStorage.setItem('force_clear_cache', 'true');
+      return cleared;
+    };
+
     const iconCache = {
       get(dir) {
         try {
@@ -624,13 +663,19 @@
       loadVersion();
       document.getElementById('theme-toggle').onclick = () => Theme.toggle();
       document.getElementById('clear-cache-btn').onclick = async () => {
-        Object.keys(localStorage).forEach((key) => {
-          if (key.startsWith(CACHE_PREFIX)) localStorage.removeItem(key);
-        });
-        if ('caches' in window) {
-          await Promise.all((await caches.keys()).map((key) => caches.delete(key)));
+        const button = document.getElementById('clear-cache-btn');
+        if (!confirm('将清理所有 App 的离线文件和本地缓存，不会删除账号、业务数据或云端数据。是否继续？')) return;
+        button.disabled = true;
+        button.title = '正在清理所有 App 缓存';
+        try {
+          await clearAllAppCaches();
+          location.reload();
+        } catch (error) {
+          console.error('清理所有 App 缓存失败', error);
+          button.disabled = false;
+          button.title = '清理所有 App 本地缓存';
+          alert('缓存未能完全清理，请稍后重试。');
         }
-        location.reload();
       };
     });
 
