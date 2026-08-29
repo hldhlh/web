@@ -15,7 +15,7 @@
   --bad-soft: rgba(220, 38, 38, 0.1);
   --shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
   --radius: 16px;
-  --tab-h: 64px;
+  --tab-h: 58px;
   --topbar-h: calc(56px + env(safe-area-inset-top));
   --nav-bg: #1d4ed8;
   --nav-text: #ffffff;
@@ -384,20 +384,20 @@ code, pre, .mono {
   transform: translateX(-50%);
   width: min(100%, 760px);
   height: calc(var(--tab-h) + env(safe-area-inset-bottom));
-  padding: 0 6px env(safe-area-inset-bottom);
+  padding: 3px 8px env(safe-area-inset-bottom);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   isolation: isolate;
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--surface) 78%, transparent),
-    color-mix(in srgb, var(--surface) 68%, transparent)
+    color-mix(in srgb, var(--surface) 80%, transparent),
+    color-mix(in srgb, var(--surface) 72%, transparent)
   );
   color: var(--text);
-  border-top: 1px solid color-mix(in srgb, var(--surface) 70%, var(--line));
-  box-shadow: 0 -10px 34px rgba(15, 23, 42, 0.08), inset 0 1px 0 color-mix(in srgb, #fff 52%, transparent);
-  backdrop-filter: saturate(165%) blur(24px);
-  -webkit-backdrop-filter: saturate(165%) blur(24px);
+  border-top: 0.5px solid color-mix(in srgb, var(--text) 10%, transparent);
+  box-shadow: 0 -4px 18px rgba(15, 23, 42, 0.045), inset 0 1px 0 color-mix(in srgb, #fff 55%, transparent);
+  backdrop-filter: saturate(180%) blur(26px);
+  -webkit-backdrop-filter: saturate(180%) blur(26px);
   z-index: 30;
 }
 
@@ -411,24 +411,35 @@ code, pre, .mono {
 }
 
 [data-theme="dark"] .tabbar {
-  box-shadow: 0 -10px 34px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .tab {
   min-width: 0;
-  min-height: 48px;
+  min-height: 50px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 1px;
   color: var(--muted);
-  font-size: 14px;
-  font-weight: 520;
-  letter-spacing: -0.015em;
-  transition: color 160ms ease, font-weight 160ms ease, transform 120ms ease;
+  font-size: 10px;
+  font-weight: 560;
+  line-height: 1.2;
+  letter-spacing: 0;
+  transition: color 160ms ease, opacity 160ms ease, transform 120ms ease;
 }
 
 .tab svg {
-  display: none;
+  width: 22px;
+  height: 22px;
+  display: block;
+  flex: 0 0 auto;
+}
+
+.tab span {
+  display: block;
+  white-space: nowrap;
 }
 
 .tab:active {
@@ -436,10 +447,20 @@ code, pre, .mono {
 }
 
 .tab.active {
-  color: var(--text);
+  color: var(--accent);
   background: transparent;
-  font-size: 15px;
-  font-weight: 760;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.tab.active svg {
+  stroke-width: 2.1;
+}
+
+.tab:focus-visible {
+  border-radius: 10px;
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: -3px;
 }
 
 .hello {
