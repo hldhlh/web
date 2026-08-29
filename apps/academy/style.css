@@ -380,43 +380,66 @@ code, pre, .mono {
 .tabbar {
   position: fixed;
   left: 50%;
-  bottom: calc(12px + env(safe-area-inset-bottom));
+  bottom: 0;
   transform: translateX(-50%);
-  width: min(420px, calc(100% - 24px));
-  height: var(--tab-h);
+  width: min(100%, 760px);
+  height: calc(var(--tab-h) + env(safe-area-inset-bottom));
+  padding: 0 6px env(safe-area-inset-bottom);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  background: var(--nav-bg);
-  color: var(--nav-text);
-  border-color: var(--nav-border);
-  border: 1px solid var(--line);
-  border-radius: 22px;
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  isolation: isolate;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface) 78%, transparent),
+    color-mix(in srgb, var(--surface) 68%, transparent)
+  );
+  color: var(--text);
+  border-top: 1px solid color-mix(in srgb, var(--surface) 70%, var(--line));
+  box-shadow: 0 -10px 34px rgba(15, 23, 42, 0.08), inset 0 1px 0 color-mix(in srgb, #fff 52%, transparent);
+  backdrop-filter: saturate(165%) blur(24px);
+  -webkit-backdrop-filter: saturate(165%) blur(24px);
   z-index: 30;
 }
 
+.tabbar::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 4%, color-mix(in srgb, #fff 72%, transparent) 50%, transparent 96%);
+  pointer-events: none;
+}
+
+[data-theme="dark"] .tabbar {
+  box-shadow: 0 -10px 34px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
 .tab {
+  min-width: 0;
+  min-height: 48px;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  color: var(--nav-subtle);
-  font-size: 11px;
-  font-weight: 600;
-  transition: background-color 120ms ease;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 520;
+  letter-spacing: -0.015em;
+  transition: color 160ms ease, font-weight 160ms ease, transform 120ms ease;
 }
 
 .tab svg {
-  width: 20px;
-  height: 20px;
+  display: none;
+}
+
+.tab:active {
+  transform: scale(0.96);
 }
 
 .tab.active {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.18);
+  color: var(--text);
+  background: transparent;
+  font-size: 15px;
+  font-weight: 760;
 }
 
 .hello {
