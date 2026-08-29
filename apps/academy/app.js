@@ -86,6 +86,7 @@
       summary: coerceString(item.summary, "课程内容待完善。"),
       access: item.access === "basic" ? "basic" : "full",
       mediaUrl: coerceString(item.mediaUrl, ""),
+      publishedAt: coerceNumber(item.publishedAt, 0),
       blocks,
       scenes
     };
@@ -191,6 +192,7 @@
       minutes: Math.max(1, Math.round(coerceNumber(item.minutes, 8))),
       pass: Math.max(1, Math.min(100, Math.round(coerceNumber(item.pass, 80)))),
       summary: coerceString(item.summary, "考试说明待补充。"),
+      publishedAt: coerceNumber(item.publishedAt, 0),
       questions
     };
   }
@@ -416,7 +418,8 @@
       lastSeenAt: 0,
       last: null,
       streakDate: "",
-      streak: 0
+      streak: 0,
+      readMessages: {}
     };
   }
 
@@ -443,6 +446,7 @@
     if (!next.completed || typeof next.completed !== "object") next.completed = {};
     if (!next.examHistory || typeof next.examHistory !== "object") next.examHistory = {};
     if (!Array.isArray(next.wrong)) next.wrong = [];
+    if (!next.readMessages || typeof next.readMessages !== "object" || Array.isArray(next.readMessages)) next.readMessages = {};
     return next;
   }
 
@@ -931,13 +935,61 @@
     return bestScore(exam.id) >= exam.pass;
   }
 
+  function contentMessageKey(kind, id, publishedAt) {
+    const timestamp = Math.max(0, Number(publishedAt) || 0);
+    return timestamp ? `${kind}:${id}:${timestamp}` : "";
+  }
+
+  function messageUnread(message) {
+    return Boolean(message?.key && !state.progress.readMessages[message.key]);
+  }
+
+  function markMessageRead(key) {
+    if (!key || state.progress.readMessages[key]) return false;
+    state.progress.readMessages[key] = Date.now();
+    save();
+    updateNotificationButton();
+    return true;
+  }
+
+  function markPublishedContentRead(kind, item) {
+    return markMessageRead(contentMessageKey(kind, item?.id, item?.publishedAt || item?.createdAt));
+  }
+
   function inbox() {
     const pendingLessons = DATA.lessons.filter((item) => Gate.canLesson(item) && !isDone(item.id));
     const urgentLessons = pendingLessons.filter((item) => isUrgentTrack(item.track));
     const pendingExams = DATA.exams.filter((exam) => Gate.canExam(exam) && !examPassed(exam));
-    const failedExams = pendingExams.filter((exam) => bestScore(exam.id) >= 0);
     const notices = [];
+
+    DATA.lessons.filter((lesson) => Gate.canLesson(lesson) && lesson.publishedAt > 0).forEach((lesson) => {
+      notices.push({
+        key: contentMessageKey("lesson", lesson.id, lesson.publishedAt),
+        tone: "info",
+        kicker: "新课程",
+        title: lesson.title,
+        detail: `${lesson.summary} · ${minutesLabel(lesson.minutes)}`,
+        act: "open-lesson",
+        id: lesson.id,
+        createdAt: lesson.publishedAt
+      });
+    });
+
+    DATA.exams.filter((exam) => Gate.canExam(exam) && exam.publishedAt > 0).forEach((exam) => {
+      notices.push({
+        key: contentMessageKey("exam", exam.id, exam.publishedAt),
+        tone: "info",
+        kicker: "新考试",
+        title: exam.title,
+        detail: `${exam.summary} · ${exam.questions.length} 题`,
+        act: "go",
+        hash: `#/exam/${exam.id}`,
+        createdAt: exam.publishedAt
+      });
+    });
+
     const posted = (DATA.notices || []).filter((notice) => noticeVisibleTo(notice)).map((notice) => ({
+      key: contentMessageKey("notice", notice.id, notice.createdAt),
       tone: notice.tone === "urgent" ? "urgent" : "info",
       kicker: coerceString(notice.kicker, "运营通知"),
       title: coerceString(notice.title, "新通知"),
@@ -947,79 +999,10 @@
       createdAt: coerceNumber(notice.createdAt, Date.now()),
       hash: `#/notice/${notice.id}`
     }));
-    posted.sort((a, b) => b.createdAt - a.createdAt);
     notices.push(...posted);
-
-    if (urgentLessons.length) {
-      const first = urgentLessons[0];
-      notices.push({
-        tone: "urgent",
-        kicker: "紧急待学",
-        title: `岗前必修还剩 ${urgentLessons.length} 课`,
-        detail: `下一课：${first.title} · ${minutesLabel(first.minutes)}`,
-        act: "open-lesson",
-        id: first.id
-      });
-    }
-
-    failedExams.forEach((exam) => {
-      notices.push({
-        tone: "urgent",
-        kicker: "紧急补考",
-        title: `${exam.title} 未通过`,
-        detail: `最高 ${bestScore(exam.id)} 分，${exam.pass} 分才过关`,
-        act: "go",
-        hash: `#/exam/${exam.id}`
-      });
-    });
-
-    pendingExams.filter((exam) => isUrgentTrack(exam.track) && bestScore(exam.id) < 0).forEach((exam) => {
-      notices.push({
-        tone: "urgent",
-        kicker: "紧急待考",
-        title: `${exam.title} 还没考`,
-        detail: `${exam.questions.length} 题 · ${minutesLabel(exam.minutes)}`,
-        act: "go",
-        hash: `#/exam/${exam.id}`
-      });
-    });
-
-    const laterLessons = pendingLessons.filter((item) => !isUrgentTrack(item.track));
-    if (laterLessons.length) {
-      const first = laterLessons[0];
-      notices.push({
-        tone: "info",
-        kicker: "待学习",
-        title: `还有 ${laterLessons.length} 个教程待学`,
-        detail: `下一课：${first.title}`,
-        act: "open-lesson",
-        id: first.id
-      });
-    }
-
-    pendingExams.filter((exam) => !isUrgentTrack(exam.track) && bestScore(exam.id) < 0).forEach((exam) => {
-      notices.push({
-        tone: "info",
-        kicker: "待考试",
-        title: `${exam.title} 待完成`,
-        detail: `${exam.questions.length} 题 · ${exam.pass} 分过关`,
-        act: "go",
-        hash: `#/exam/${exam.id}`
-      });
-    });
-
-    if (state.progress.wrong.length) {
-      notices.push({
-        tone: "info",
-        kicker: "待复习",
-        title: `${state.progress.wrong.length} 道错题待看`,
-        detail: "从错题本里补上缺口",
-        act: "go",
-        hash: "#/me"
-      });
-    }
-
-    return { pendingLessons, urgentLessons, pendingExams, notices };
+    notices.sort((a, b) => b.createdAt - a.createdAt);
+    const unreadNotices = notices.filter(messageUnread);
+    return { pendingLessons, urgentLessons, pendingExams, notices, unreadNotices };
   }
 
   function parseHash() {
@@ -1190,11 +1173,11 @@
     const importantExams = DATA.exams
       .filter((exam) => Gate.canExam(exam) && (isUrgentTrack(exam.track) || bestScore(exam.id) < exam.pass))
       .sort((a, b) => Number(isUrgentTrack(b.track)) - Number(isUrgentTrack(a.track)));
-    const importantMessages = box.notices.slice(0, 5);
+    const importantMessages = box.unreadNotices.slice(0, 5);
     const headline = pendingUpdates.length || importantExams.length
       ? `今天还有 ${unlearnedCount + importantExams.length} 项学习任务`
-      : box.notices.length
-        ? `${box.notices.length} 条待办`
+      : box.unreadNotices.length
+        ? `${box.unreadNotices.length} 条新消息`
         : "今日任务已清理";
     const tracks = [];
     [...DATA.lessons, ...DATA.exams].forEach((item) => {
@@ -1254,8 +1237,8 @@
         </button>
         <button class="ops-card" data-act="go" data-hash="#/messages">
           <span class="ops-tag">重要消息</span>
-          <b>${box.notices.length}</b>
-          <small>待处理运营通知</small>
+          <b>${box.unreadNotices.length}</b>
+          <small>未读发布消息</small>
         </button>
       </div>
       <section class="learning-plan">
@@ -1307,8 +1290,8 @@
       </section>
       <div class="sec-title"><h3>重要消息</h3><span>${importantMessages.length}</span></div>
       ${importantMessages.length ? importantMessages.map((item) => `
-        <button class="card notice ${item.tone === "urgent" ? "urgent" : ""}" data-act="${item.act}" ${item.id ? `data-id="${item.id}"` : ""} ${item.hash ? `data-hash="${item.hash}"` : ""}>
-          <div class="kicker">${item.kicker}</div>
+        <button class="card notice unread-message ${item.tone === "urgent" ? "urgent" : ""}" data-act="${item.act}" data-message-key="${escapeHtml(item.key)}" ${item.id ? `data-id="${item.id}"` : ""} ${item.hash ? `data-hash="${item.hash}"` : ""}>
+          <div class="kicker"><span class="message-alarm">${svgIcon("bell")}</span>${escapeHtml(item.kicker)}</div>
           <strong>${escapeHtml(item.title)}</strong>
           <p class="muted">${escapeHtml(item.detail)}</p>
         </button>`).join("") : `<div class="card notice clear"><strong>当前无待处理消息</strong><p class="muted">新消息和考试更新会推送到这里。</p></div>`}
@@ -1536,15 +1519,15 @@
 
   function renderOpsTabs(section) {
     const sections = [
-      { key: "lessons", mark: "课", label: "课程内容", count: DATA.lessons.length },
-      { key: "exams", mark: "考", label: "考试题库", count: DATA.exams.length },
-      { key: "notices", mark: "讯", label: "事务通知", count: (DATA.notices || []).length },
-      { key: "staff", mark: "人", label: "员工权限", count: Auth.list().length }
+      { key: "lessons", mark: "课", label: "课程", fullLabel: "课程内容", count: DATA.lessons.length },
+      { key: "exams", mark: "考", label: "考试", fullLabel: "考试题库", count: DATA.exams.length },
+      { key: "notices", mark: "讯", label: "通知", fullLabel: "事务通知", count: (DATA.notices || []).length },
+      { key: "staff", mark: "人", label: "员工", fullLabel: "员工与权限", count: Auth.list().length }
     ];
     return `<nav class="ops-subtabs" aria-label="运营事务导航">${sections.map((item) => `
-      <button class="${section === item.key ? "on" : ""}" data-act="ops-tab" data-section="${item.key}">
+      <button class="${section === item.key ? "on" : ""}" data-act="ops-tab" data-section="${item.key}" aria-label="${item.fullLabel}，${item.count} 项">
         <span class="ops-nav-mark">${item.mark}</span>
-        <span>${item.label}</span>
+        <span class="ops-nav-label">${item.label}</span>
         <small>${item.count}</small>
       </button>
     `).join("")}</nav>`;
@@ -1941,7 +1924,7 @@
   function renderOpsNoticeList() {
     const items = (DATA.notices || []).slice().sort((a, b) => b.createdAt - a.createdAt);
     return `
-      <button class="primary" data-act="go" data-hash="#/ops?section=notices&mode=add">新建帖子</button>
+      <button class="primary ops-create-button" data-act="go" data-hash="#/ops?section=notices&mode=add">新建帖子</button>
       ${items.length ? items.map((notice) => `
         <div class="card lesson-card">
           <div class="top"><span class="ops-tag">${notice.tone === "urgent" ? "重要" : "一般"}</span><span>${renderDateLabel(notice.createdAt)}</span></div>
@@ -2036,7 +2019,7 @@
 
   function renderOpsLessonList() {
     return `
-      <button class="primary" data-act="go" data-hash="#/ops?section=lessons&mode=add">新建课程</button>
+      <button class="primary ops-create-button" data-act="go" data-hash="#/ops?section=lessons&mode=add">新建课程</button>
       ${DATA.lessons.length ? DATA.lessons.map((lesson) => `
         <div class="card lesson-card">
           <div class="top"><span class="ops-tag">${TYPE_LABEL[lesson.type] || lesson.type}</span><span>${minutesLabel(lesson.minutes)}</span></div>
@@ -2089,7 +2072,7 @@
 
   function renderOpsExamList() {
     return `
-      <button class="primary" data-act="go" data-hash="#/ops?section=exams&mode=add">新建考试</button>
+      <button class="primary ops-create-button" data-act="go" data-hash="#/ops?section=exams&mode=add">新建考试</button>
       ${DATA.exams.length ? DATA.exams.map((exam) => `
         <div class="card lesson-card">
           <div class="top"><span class="ops-tag">${exam.pass}分</span><span>${minutesLabel(exam.minutes)}</span></div>
@@ -2277,6 +2260,7 @@
     const lesson = lessonById(id);
     if (!lesson) return go("#/home");
     if (!Gate.canLesson(lesson)) return renderLocked(lesson.title);
+    markPublishedContentRead("lesson", lesson);
     state.progress.last = { type: "lesson", id };
     save();
     touchStreak();
@@ -2406,6 +2390,7 @@
     const exam = examById(id);
     if (!exam) return go("#/exams");
     if (!Gate.canExam(exam)) return renderLocked(exam.title);
+    markPublishedContentRead("exam", exam);
     if (!exam.questions.length) {
       alert("该考试还没有配置题库，请先在“运营事务”里发布考试题目。");
       return go("#/ops?section=exams");
@@ -2766,6 +2751,7 @@
         </div>`;
       return;
     }
+    markPublishedContentRead("notice", notice);
     view().innerHTML = `
       <article class="card post-detail ${notice.tone === "urgent" ? "urgent" : ""}">
         <header>
@@ -2782,24 +2768,25 @@
   function renderMessages() {
     setTop("消息通知", true);
     setTab("home");
-    const messages = inbox().notices;
+    const box = inbox();
+    const messages = box.notices;
     view().innerHTML = `
-      <div class="sec-title"><h3>全部消息</h3><span>${messages.length}</span></div>
+      <div class="sec-title"><h3>发布消息</h3><span>${box.unreadNotices.length} 条未读</span></div>
       ${messages.length ? messages.map((item) => `
-        <button class="card notice ${item.tone === "urgent" ? "urgent" : ""}" data-act="${item.act}" ${item.id ? `data-id="${item.id}"` : ""} ${item.hash ? `data-hash="${item.hash}"` : ""}>
-          <div class="kicker">${escapeHtml(item.kicker)}</div>
+        <button class="card notice ${messageUnread(item) ? "unread-message" : "read-message"} ${item.tone === "urgent" ? "urgent" : ""}" data-act="${item.act}" data-message-key="${escapeHtml(item.key)}" ${item.id ? `data-id="${item.id}"` : ""} ${item.hash ? `data-hash="${item.hash}"` : ""}>
+          <div class="kicker">${messageUnread(item) ? `<span class="message-alarm">${svgIcon("bell")}</span>` : ""}${escapeHtml(item.kicker)}<time>${renderDateLabel(item.createdAt)}</time></div>
           <strong>${escapeHtml(item.title)}</strong>
           <p class="muted">${escapeHtml(item.detail)}</p>
-        </button>`).join("") : `<div class="card notice clear"><strong>当前没有新消息</strong><p class="muted">运营通知、学习任务和考试提醒会显示在这里。</p></div>`}
+        </button>`).join("") : `<div class="card notice clear"><strong>当前没有发布消息</strong><p class="muted">新课程、新考试和运营通知发布后会显示在这里。</p></div>`}
     `;
   }
 
   function updateNotificationButton() {
     const btn = document.getElementById("notification-btn");
     if (!btn || !Auth.session) return;
-    const count = inbox().notices.length;
+    const count = inbox().unreadNotices.length;
     btn.innerHTML = `${svgIcon("bell")}${count ? `<span class="notification-count" aria-hidden="true">${count > 99 ? "99+" : count}</span>` : ""}`;
-    btn.title = count ? `消息通知，${count} 条待处理` : "消息通知";
+    btn.title = count ? `消息通知，${count} 条未读` : "消息通知";
     btn.setAttribute("aria-label", btn.title);
   }
 
@@ -2938,6 +2925,7 @@
   function onClick(event) {
     const btn = event.target.closest("[data-act]");
     if (!btn || btn.disabled) return;
+    if (btn.dataset.messageKey) markMessageRead(btn.dataset.messageKey);
     const act = btn.dataset.act;
     if (act === "ops-tab") return go(`#/ops?section=${btn.dataset.section}`);
     if (act === "theme-toggle") {
@@ -3140,6 +3128,7 @@
             minutes: document.getElementById("ops-lesson-minutes")?.value || "3",
             access: document.getElementById("ops-lesson-access")?.value || "full",
             mediaUrl: coerceString(document.getElementById("ops-lesson-media-url")?.value, ""),
+            publishedAt: Date.now(),
             summary: coerceString(document.getElementById("ops-lesson-summary")?.value, ""),
             blocks,
             scenes: sceneRaw
@@ -3196,6 +3185,7 @@
             track: coerceString(document.getElementById("ops-exam-track")?.value, ""),
             pass: document.getElementById("ops-exam-pass")?.value || "80",
             minutes: document.getElementById("ops-exam-minutes")?.value || "8",
+            publishedAt: Date.now(),
             summary: coerceString(document.getElementById("ops-exam-summary")?.value, ""),
             questions: finalQuestions
           };
