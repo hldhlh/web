@@ -906,7 +906,7 @@ code, pre, .mono {
   .ops-sidebar .ops-subtabs button {
     width: 100%;
     min-width: 0;
-    min-height: 38px;
+    min-height: 44px;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 4px;
     padding: 5px 7px;
@@ -3604,30 +3604,104 @@ textarea:focus-visible {
 
 /* Member learning operations */
 .staff-toolbar {
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
-.staff-toolbar > div {
-  display: grid;
-  gap: 4px;
-}
-
-.staff-toolbar strong {
-  font-size: 20px;
-}
-
-.staff-toolbar span {
+.staff-sync-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: var(--muted);
+  font-size: 13px;
+}
+
+.staff-sync-note i {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 0 4px var(--ok-soft);
+}
+
+.staff-toolbar .ghost {
+  width: auto;
+  min-width: 72px;
+  margin-top: 0;
+  padding-inline: 14px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent);
   font-size: 14px;
+}
+
+.staff-toolbar .ghost:hover {
+  background: var(--accent-soft);
 }
 
 .staff-counts {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-bottom: 22px;
+  gap: 0;
+  overflow: hidden;
+  margin-bottom: 28px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.staff-counts .count {
+  min-width: 0;
+  padding: 20px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.staff-counts .count + .count {
+  border-left: 1px solid var(--line);
+}
+
+.staff-counts .count span {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.staff-counts .count b {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.staff-list-title {
+  min-height: 44px;
+  margin-bottom: 8px;
+  padding-inline: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.staff-list-title > div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.staff-list-title strong {
+  font-size: 20px;
+  letter-spacing: -0.025em;
+}
+
+.staff-list-title span {
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .staff-list {
@@ -3661,7 +3735,7 @@ textarea:focus-visible {
   display: grid;
   place-items: center;
   border-radius: 14px;
-  background: var(--ink);
+  background: var(--text);
   color: var(--bg);
   font-size: 18px;
   font-weight: 750;
@@ -3869,12 +3943,31 @@ textarea:focus-visible {
 }
 
 @media (max-width: 720px) {
-  .staff-toolbar {
-    align-items: flex-end;
+  .ops-workspace.is-staff .ops-workspace-head {
+    min-height: 82px;
+    padding-bottom: 14px;
   }
 
   .staff-counts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-bottom: 22px;
+  }
+
+  .staff-counts .count {
+    min-height: 94px;
+    padding: 16px;
+  }
+
+  .staff-counts .count:nth-child(3) {
+    border-left: 0;
+  }
+
+  .staff-counts .count:nth-child(n + 3) {
+    border-top: 1px solid var(--line);
+  }
+
+  .staff-counts .count b {
+    font-size: 30px;
   }
 
   .staff-member-head {
@@ -4342,10 +4435,6 @@ textarea:focus-visible {
   font-size: 13px;
 }
 
-.course-search-meta small {
-  font-size: 12px;
-}
-
 .course-result {
   position: relative;
 }
@@ -4737,7 +4826,6 @@ textarea:focus-visible {
 .task-main i,
 .task-main em,
 .learning-continue span,
-.course-search-meta small,
 .course-match-hint {
   font-size: 12px;
 }

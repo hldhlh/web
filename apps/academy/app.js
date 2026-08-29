@@ -1425,7 +1425,7 @@
         <input id="course-search-input" type="search" inputmode="search" autocomplete="off" placeholder="搜索课程、内容或拼音简写" aria-label="搜索课程">
         <button type="button" id="course-search-clear" hidden>清空</button>
       </div>
-      <div class="course-search-meta"><span id="course-search-count">共 ${items.length} 门课程</span><small>支持中文、全拼和首字母</small></div>
+      <div class="course-search-meta"><span id="course-search-count">共 ${items.length} 门课程</span></div>
       <div class="chips">
         ${chips.map(([id, label]) => `<button class="chip ${type === id ? "on" : ""}" data-act="go" data-hash="#/learn?type=${id}">${label}</button>`).join("")}
       </div>
@@ -2210,14 +2210,18 @@
       : "尚未产生记录";
     return `
       <div class="staff-toolbar">
-        <div><strong>成员学习概览</strong><span>完成度和在线时间每 30 秒自动更新</span></div>
-        <button type="button" class="ghost" data-staff-refresh>刷新数据</button>
+        <span class="staff-sync-note"><i aria-hidden="true"></i>学习状态每 30 秒自动更新</span>
+        <button type="button" class="ghost" data-staff-refresh>刷新</button>
       </div>
-      <div class="counts staff-counts">
-        <div class="count"><b>${people.length}</b><span>注册人数</span></div>
-        <div class="count ${pending ? "hot" : ""}"><b>${pending}</b><span>待授权</span></div>
-        <div class="count"><b>${onlineNow}</b><span>当前在线</span></div>
-        <div class="count"><b>${average}%</b><span>平均完成度</span></div>
+      <div class="counts staff-counts" aria-label="成员数据摘要">
+        <div class="count"><span>注册成员</span><b>${people.length}</b></div>
+        <div class="count ${pending ? "hot" : ""}"><span>待授权</span><b>${pending}</b></div>
+        <div class="count"><span>当前在线</span><b>${onlineNow}</b></div>
+        <div class="count"><span>平均完成度</span><b>${average}%</b></div>
+      </div>
+      <div class="staff-list-title">
+        <div><strong>成员</strong><span>${people.length} 人</span></div>
+        <span>学习进度与权限</span>
       </div>
       <div class="staff-list">
         ${memberData.map((item) => {
@@ -2324,7 +2328,7 @@
           ${renderOpsTabs(active)}
           <div class="ops-account"><span>${escapeHtml((Auth.session.name || "店长").slice(0, 1))}</span><div><strong>${escapeHtml(Auth.session.name || "店长")}</strong><small>店长账号</small></div></div>
         </aside>
-        <main class="ops-workspace ${isEditing ? "is-editing" : ""}">
+        <main class="ops-workspace ${isEditing ? "is-editing" : ""} ${active === "staff" ? "is-staff" : ""}">
           ${isEditing ? `<div class="ops-breadcrumb"><button data-act="ops-cancel" data-section="${active}">← 返回${titleMap[active]}</button><span>${route.mode === "add" ? "新建" : "编辑"}</span></div>` : `
             <header class="ops-workspace-head">
               <div><p>运营事务</p><h2>${titleMap[active]}</h2><span>${subtitleMap[active]}</span></div>
