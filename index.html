@@ -301,7 +301,7 @@
     <footer id="version-footer" class="version-footer" aria-live="polite">版本信息读取中…</footer>
   </div>
 
-  <button id="clear-cache-btn" class="clear-cache-btn" title="清理所有 App 本地缓存" aria-label="清理所有 App 本地缓存">
+  <button id="clear-cache-btn" class="clear-cache-btn" title="清理全站缓存和 Cookie" aria-label="清理全站缓存和 Cookie">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
       stroke-linecap="round" stroke-linejoin="round">
       <path
@@ -311,6 +311,12 @@
 
   <script type="module">
     import { getAppDirectories } from './apps.js';
+
+    const loadedUrl = new URL(location.href);
+    if (loadedUrl.searchParams.has('_cache_refresh')) {
+      loadedUrl.searchParams.delete('_cache_refresh');
+      history.replaceState(history.state, '', loadedUrl.href);
+    }
 
     const Theme = {
       getTheme() { return localStorage.getItem('app-theme') || 'light' },
@@ -346,39 +352,136 @@
 
     // 缓存管理
     const CACHE_PREFIX = 'app_icon_v2_';
-    const APP_CACHE_KEY_PATTERN = /(?:^|[-_:])(cache|cached|icon-cache|cdn-manager)(?:[-_:]|$)/i;
+    const APP_CACHE_KEY_PATTERNS = [
+      /(?:^|[-_:])(cache|cached|icon-cache|cdn-manager)(?:[-_:]|$)/i,
+      /^(?:app-network-best-v3|cdn_speed_results|cdn_best_|vista_(?:feed|catalog)|todo-initial-view|thought-matrix-snapshot|jlhcdh-(?:products|cart))/i
+    ];
 
-    const isAppCacheKey = (key) => key.startsWith(CACHE_PREFIX) || APP_CACHE_KEY_PATTERN.test(key);
+    const isAppCacheKey = (key) => key.startsWith(CACHE_PREFIX) || APP_CACHE_KEY_PATTERNS.some((pattern) => pattern.test(key));
 
     const clearStorageCacheKeys = (storage) => {
       let cleared = 0;
-      Object.keys(storage).forEach((key) => {
-        if (!isAppCacheKey(key)) return;
-        storage.removeItem(key);
-        cleared += 1;
-      });
+      try {
+        Object.keys(storage).forEach((key) => {
+          if (!isAppCacheKey(key)) return;
+          storage.removeItem(key);
+          cleared += 1;
+        });
+      } catch (error) {
+        console.warn('无法访问浏览器存储', error);
+      }
       return cleared;
+    };
+
+    const getSiteCookieTargets = () => {
+      const siteRoot = new URL('./', location.href);
+      const urls = new Set([siteRoot.href]);
+      const paths = new Set(['/', siteRoot.pathname, siteRoot.pathname.replace(/\/$/, '') || '/']);
+
+      getAppDirectories().forEach(({ path }) => {
+        const appUrl = new URL(path, siteRoot);
+        urls.add(appUrl.href);
+
+        const segments = appUrl.pathname.split('/').filter(Boolean);
+        for (let index = 1; index <= segments.length; index += 1) {
+          paths.add(`/${segments.slice(0, index).join('/')}`);
+          paths.add(`/${segments.slice(0, index).join('/')}/`);
+        }
+      });
+
+      return { urls: [...urls], paths: [...paths] };
+    };
+
+    const clearAllSiteCookies = async () => {
+      const { urls, paths } = getSiteCookieTargets();
+      const cookieNames = new Set(
+        document.cookie
+          .split(';')
+          .map((item) => item.split('=')[0].trim())
+          .filter(Boolean)
+      );
+
+      // Cookie Store 能发现同源 App 子路径下的 Cookie；不支持时仍会走 document.cookie 兜底。
+      if ('cookieStore' in window) {
+        const discovered = new Map();
+        for (const url of urls) {
+          try {
+            const cookies = await window.cookieStore.getAll({ url });
+            cookies.forEach((cookie) => {
+              cookieNames.add(cookie.name);
+              discovered.set(`${cookie.name}|${cookie.domain || ''}|${cookie.path || '/'}`, cookie);
+            });
+          } catch (_) { }
+        }
+
+        const deletions = [];
+        discovered.forEach((cookie) => {
+          const options = { name: cookie.name, path: cookie.path || '/' };
+          deletions.push(window.cookieStore.delete(options));
+          if (cookie.domain) deletions.push(window.cookieStore.delete({ ...options, domain: cookie.domain }));
+        });
+        await Promise.allSettled(deletions);
+      }
+
+      const domains = ['', location.hostname, `.${location.hostname}`];
+      cookieNames.forEach((name) => {
+        paths.forEach((path) => {
+          domains.forEach((domain) => {
+            const domainPart = domain ? `; Domain=${domain}` : '';
+            document.cookie = `${name}=; Path=${path}${domainPart}; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0`;
+          });
+        });
+      });
+
+      return cookieNames.size;
     };
 
     const clearAllAppCaches = async () => {
       let cleared = clearStorageCacheKeys(localStorage) + clearStorageCacheKeys(sessionStorage);
 
       if ('caches' in window) {
-        const cacheNames = await caches.keys();
-        const results = await Promise.all(cacheNames.map((name) => caches.delete(name)));
-        cleared += results.filter(Boolean).length;
+        try {
+          const cacheNames = await caches.keys();
+          const siteCacheNames = cacheNames.filter((name) => name.startsWith('web-shell-'));
+          const results = await Promise.allSettled(siteCacheNames.map((name) => caches.delete(name)));
+          cleared += results.filter((result) => result.status === 'fulfilled' && result.value).length;
+        } catch (error) {
+          console.warn('Cache Storage 清理失败', error);
+        }
       }
 
       if ('indexedDB' in window && typeof indexedDB.databases === 'function') {
-        const databases = await indexedDB.databases();
-        const cacheDatabases = databases
-          .map((database) => database.name)
-          .filter((name) => name && isAppCacheKey(name));
-        await Promise.all(cacheDatabases.map((name) => new Promise((resolve) => {
-          const request = indexedDB.deleteDatabase(name);
-          request.onsuccess = request.onerror = request.onblocked = () => resolve();
-        })));
-        cleared += cacheDatabases.length;
+        try {
+          const databases = await indexedDB.databases();
+          const cacheDatabases = databases
+            .map((database) => database.name)
+            .filter((name) => name && isAppCacheKey(name));
+          await Promise.all(cacheDatabases.map((name) => new Promise((resolve) => {
+            const request = indexedDB.deleteDatabase(name);
+            request.onsuccess = request.onerror = request.onblocked = () => resolve();
+          })));
+          cleared += cacheDatabases.length;
+        } catch (error) {
+          console.warn('IndexedDB 缓存清理失败', error);
+        }
+      }
+
+      try {
+        cleared += await clearAllSiteCookies();
+      } catch (error) {
+        console.warn('Cookie 清理失败', error);
+      }
+
+      if ('serviceWorker' in navigator) {
+        try {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          const siteRoot = new URL('./', location.href).href;
+          const siteRegistrations = registrations.filter((registration) => registration.scope.startsWith(siteRoot));
+          const results = await Promise.allSettled(siteRegistrations.map((registration) => registration.unregister()));
+          cleared += results.filter((result) => result.status === 'fulfilled' && result.value).length;
+        } catch (error) {
+          console.warn('Service Worker 注销失败', error);
+        }
       }
 
       sessionStorage.setItem('force_clear_cache', 'true');
@@ -664,17 +767,19 @@
       document.getElementById('theme-toggle').onclick = () => Theme.toggle();
       document.getElementById('clear-cache-btn').onclick = async () => {
         const button = document.getElementById('clear-cache-btn');
-        if (!confirm('将清理所有 App 的离线文件和本地缓存，不会删除账号、业务数据或云端数据。是否继续？')) return;
+        if (!confirm('将清理本站所有 App 缓存和可由网页访问的 Cookie，可能会退出登录；不会删除业务数据或云端数据。是否继续？')) return;
         button.disabled = true;
-        button.title = '正在清理所有 App 缓存';
+        button.title = '正在清理全站缓存和 Cookie';
         try {
           await clearAllAppCaches();
-          location.reload();
+          const reloadUrl = new URL('./', location.href);
+          reloadUrl.searchParams.set('_cache_refresh', Date.now().toString());
+          location.replace(reloadUrl.href);
         } catch (error) {
-          console.error('清理所有 App 缓存失败', error);
+          console.error('清理全站缓存和 Cookie 失败', error);
           button.disabled = false;
-          button.title = '清理所有 App 本地缓存';
-          alert('缓存未能完全清理，请稍后重试。');
+          button.title = '清理全站缓存和 Cookie';
+          alert('缓存或 Cookie 未能完全清理，请稍后重试。');
         }
       };
     });
