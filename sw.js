@@ -11,7 +11,7 @@ const SHELL = [
   './apps/thought-matrix/icon.svg',
   './apps/cloud/icon.svg',
   './apps/eatwhat/icon.svg',
-  './apps/jlbj/icon.svg',
+  './apps/notes/icon.svg',
   './apps/jlksh/icon.svg',
   './apps/jlhcdh/icon.svg',
   './apps/academy/icon.svg',

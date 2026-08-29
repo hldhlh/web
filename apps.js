@@ -6,7 +6,7 @@ export function getAppDirectories() {
     { name: "思维矩阵", path: "thought-matrix/index.html", icon: "thought-matrix/icon.svg", fallback: "思" },
     { name: "云盘", path: "cloud/index.html", icon: "cloud/icon.svg", fallback: "云" },
     { name: "吃什么", path: "eatwhat/index.html", icon: "eatwhat/icon.svg", fallback: "食" },
-    { name: "今岭笔记", path: "jlbj/index.html", icon: "jlbj/icon.svg", fallback: "笔" },
+    { name: "今岭笔记", path: "notes/index.html", icon: "notes/icon.svg", fallback: "笔" },
     { name: "今岭流水可视化", path: "jlksh/index.html", icon: "jlksh/icon.svg", fallback: "流" },
     { name: "今岭后厨订货", path: "jlhcdh/index.html", icon: "jlhcdh/icon.svg", fallback: "订" },
     { name: "Auto Office", path: "academy/index.html", icon: "academy/icon.svg", fallback: "AO" },
