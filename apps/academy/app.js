@@ -100,21 +100,61 @@
     }
   }
 
-  async function readLocalVideo(file) {
-    if (!file) return null;
+  function validateVideoFile(file) {
+    if (!file) return;
     if (!file.type.startsWith("video/")) {
-      alert("只能上传视频文件（mp4、mov、webm 等）。");
-      return null;
+      throw new Error("只能上传视频文件（MP4、MOV、WebM 等）。");
     }
     if (file.size > 200 * 1024 * 1024) {
-      alert("视频超过 200MB，请先压缩后再上传。");
-      return null;
+      throw new Error("视频超过 200MB，请先压缩后再上传。");
     }
+  }
+
+  function storagePublicUrl(path, version = Date.now()) {
+    const cfg = window.ACADEMY_CONFIG;
+    const encodedPath = String(path).split("/").map(encodeURIComponent).join("/");
+    return `${cfg.url}/storage/v1/object/public/${encodeURIComponent(cfg.bucket)}/${encodedPath}?v=${version}`;
+  }
+
+  function uploadLessonVideo(file, lessonId, onProgress) {
+    validateVideoFile(file);
+    const cfg = window.ACADEMY_CONFIG;
+    if (!cfg?.url || !cfg?.key || !cfg?.bucket) throw new Error("视频存储配置缺失。");
+    if (!window.tus?.Upload) throw new Error("视频上传组件加载失败，请刷新页面后重试。");
+
+    const safeLessonId = String(lessonId || "lesson").replace(/[^a-zA-Z0-9_-]/g, "-");
+    const objectPath = `academy/videos/${safeLessonId}`;
+    const uploadOrigin = window.APP_NETWORK?.origin || cfg.url;
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = () => reject(new Error("视频读取失败，请重新选择。"));
-      reader.readAsDataURL(file);
+      const upload = new window.tus.Upload(file, {
+        endpoint: `${uploadOrigin}/storage/v1/upload/resumable`,
+        retryDelays: [0, 1000, 3000, 5000, 10000],
+        headers: {
+          apikey: cfg.key,
+          authorization: `Bearer ${cfg.key}`,
+          "x-upsert": "true"
+        },
+        uploadDataDuringCreation: true,
+        removeFingerprintOnSuccess: true,
+        chunkSize: 6 * 1024 * 1024,
+        metadata: {
+          bucketName: cfg.bucket,
+          objectName: objectPath,
+          contentType: file.type || "video/mp4",
+          cacheControl: 3600
+        },
+        onProgress(bytesUploaded, bytesTotal) {
+          const percent = bytesTotal ? Math.min(100, Math.round((bytesUploaded / bytesTotal) * 100)) : 0;
+          onProgress?.(percent, bytesUploaded, bytesTotal);
+        },
+        onError(error) {
+          reject(new Error(error?.message || "视频上传失败，请检查网络后重试。"));
+        },
+        onSuccess() {
+          resolve(storagePublicUrl(objectPath));
+        }
+      });
+      upload.start();
     });
   }
 
@@ -2804,7 +2844,10 @@
         overflow: hidden;
         transition: background .2s ease, color .2s ease, transform .2s ease, opacity .2s ease;
       }
-      [data-publish-state="publishing"] { cursor: wait; }
+      [data-publish-state]:disabled { opacity: 1; }
+      [data-publish-state="preparing"],
+      [data-publish-state="uploading"],
+      [data-publish-state="publishing"] { cursor: wait; animation: ops-publish-press .26s ease both; }
       [data-publish-state="success"] { background: #16a05d !important; color: #fff !important; }
       [data-publish-state="failed"] { background: #fff1f0 !important; color: #c9342e !important; box-shadow: inset 0 0 0 1px #efb3af !important; }
       .ops-publish-state {
@@ -2822,6 +2865,20 @@
         border-radius: 50%;
         animation: ops-publish-spin .72s linear infinite;
       }
+      .ops-upload-progress {
+        position: absolute;
+        inset: auto 0 0;
+        height: 3px;
+        background: rgba(255,255,255,.3);
+      }
+      .ops-upload-progress::after {
+        content: "";
+        display: block;
+        width: var(--upload-progress, 0%);
+        height: 100%;
+        background: currentColor;
+        transition: width .18s ease;
+      }
       .ops-publish-check {
         width: 17px;
         height: 17px;
@@ -2833,32 +2890,47 @@
         animation: ops-publish-pop .34s cubic-bezier(.2,.9,.25,1.3) both;
       }
       [data-publish-state="failed"] .ops-publish-state { animation: ops-publish-shake .32s ease both; }
+      @keyframes ops-publish-press { 0% { transform: scale(.96); } 100% { transform: scale(1); } }
       @keyframes ops-publish-spin { to { transform: rotate(360deg); } }
       @keyframes ops-publish-pop { from { opacity: 0; transform: scale(.35); } to { opacity: 1; transform: scale(1); } }
       @keyframes ops-publish-shake { 0%,100% { transform: translateX(0); } 30% { transform: translateX(-4px); } 65% { transform: translateX(4px); } }
       @media (prefers-reduced-motion: reduce) {
-        .ops-publish-spinner, .ops-publish-check, [data-publish-state="failed"] .ops-publish-state { animation: none !important; }
+        [data-publish-state], .ops-publish-spinner, .ops-publish-check, [data-publish-state="failed"] .ops-publish-state { animation: none !important; }
       }
     `;
     document.head.appendChild(style);
   }
 
-  async function publishWithState(button, contentLabel) {
+  function setPublishState(button, state, html, busy = true) {
     ensurePublishStateStyles();
     if (!button.dataset.publishOriginal) button.dataset.publishOriginal = button.innerHTML;
-    button.disabled = true;
-    button.dataset.publishState = "publishing";
-    button.innerHTML = `<span class="ops-publish-state"><i class="ops-publish-spinner" aria-hidden="true"></i>${contentLabel}发布中</span>`;
+    button.disabled = busy;
+    button.dataset.publishState = state;
+    button.setAttribute("aria-busy", busy ? "true" : "false");
+    button.innerHTML = html;
+  }
+
+  function setVideoUploadProgress(button, percent) {
+    setPublishState(
+      button,
+      "uploading",
+      `<span class="ops-publish-state"><i class="ops-publish-spinner" aria-hidden="true"></i>上传视频 ${percent}%</span><i class="ops-upload-progress" style="--upload-progress:${percent}%" aria-hidden="true"></i>`
+    );
+  }
+
+  function setPublishFailed(button, label = "发布失败 · 重试") {
+    setPublishState(button, "failed", `<span class="ops-publish-state">${label}</span>`, false);
+  }
+
+  async function publishWithState(button, contentLabel) {
+    setPublishState(button, "publishing", `<span class="ops-publish-state"><i class="ops-publish-spinner" aria-hidden="true"></i>${contentLabel}发布中</span>`);
     try {
       await ContentSync.publish();
-      button.dataset.publishState = "success";
-      button.innerHTML = `<span class="ops-publish-state"><svg class="ops-publish-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>发布成功</span>`;
+      setPublishState(button, "success", `<span class="ops-publish-state"><svg class="ops-publish-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>发布成功</span>`);
       await new Promise((resolve) => setTimeout(resolve, 620));
       return true;
     } catch (error) {
-      button.disabled = false;
-      button.dataset.publishState = "failed";
-      button.innerHTML = `<span class="ops-publish-state">发布失败 · 重试</span>`;
+      setPublishFailed(button);
       throw error;
     }
   }
@@ -3046,19 +3118,22 @@
         const id = coerceString(btn.dataset.id, "");
         if (section === "lessons") {
           const list = DATA.lessons.slice();
+          setPublishState(btn, "preparing", `<span class="ops-publish-state"><i class="ops-publish-spinner" aria-hidden="true"></i>准备发布</span>`);
           const blocks = collectLessonBlocksFromBuilder();
           if (blocks === null) {
+            setPublishFailed(btn);
             alert("课程内容暂时无法保存，请刷新页面后重试。");
             return;
           }
           const rawType = coerceString(document.getElementById("ops-lesson-type")?.value, "article");
           const sceneRaw = parseLessonScenes(document.getElementById("ops-lesson-scenes")?.value);
           if (sceneRaw === null) {
+            setPublishFailed(btn);
             alert("视频章节数据异常，请重新选择视频后保存。");
             return;
           }
           const raw = {
-            id,
+            id: id || coerceId("lesson", ""),
             title: coerceString(document.getElementById("ops-lesson-title")?.value, ""),
             track: coerceString(document.getElementById("ops-lesson-track")?.value, ""),
             type: rawType,
@@ -3070,14 +3145,21 @@
             scenes: sceneRaw
           };
           if (!raw.title) {
+            setPublishFailed(btn);
             alert("课程标题不能为空。");
             return;
           }
           const pickedFile = document.getElementById("ops-lesson-media")?.files?.[0];
           try {
-            raw.mediaUrl = (pickedFile ? await readLocalVideo(pickedFile) : null) || raw.mediaUrl;
+            if (pickedFile) {
+              raw.mediaUrl = await uploadLessonVideo(pickedFile, raw.id, (percent) => setVideoUploadProgress(btn, percent));
+              raw.scenes = raw.scenes.map((scene) => scene?.stage?.kind === "media"
+                ? { ...scene, stage: { ...scene.stage, src: raw.mediaUrl } }
+                : scene);
+            }
           } catch (error) {
-            alert(error.message || "视频读取失败，请重新选择。");
+            setPublishFailed(btn, "上传失败 · 重试");
+            alert(error.message || "视频上传失败，请重新选择。");
             return;
           }
           const normalized = normalizeLesson(raw);

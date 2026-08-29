@@ -1,18 +1,35 @@
 <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
   <title id="title">Auto Office</title>
-  <desc id="desc">蓝圆角方块上的翻开书本与完成标记</desc>
+  <desc id="desc">蓝紫渐变圆角方块上的自动化办公面板</desc>
   <defs>
-    <linearGradient id="acad-bg" x1="16" y1="10" x2="86" y2="92" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#5B8CFF"/>
-      <stop offset="1" stop-color="#1D4ED8"/>
+    <linearGradient id="office-bg" x1="15" y1="10" x2="88" y2="92" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3978FF"/>
+      <stop offset=".52" stop-color="#3155E7"/>
+      <stop offset="1" stop-color="#7138C8"/>
     </linearGradient>
+    <linearGradient id="panel" x1="31" y1="27" x2="72" y2="78" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E9EEFF"/>
+    </linearGradient>
+    <filter id="shadow" x="12" y="15" width="76" height="77" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#172D89" flood-opacity=".28"/>
+    </filter>
   </defs>
-  <rect x="7" y="7" width="86" height="86" rx="24" fill="url(#acad-bg)"/>
-  <rect x="7.75" y="7.75" width="84.5" height="84.5" rx="23.25" fill="none" stroke="#fff" stroke-opacity=".16" stroke-width="1.5"/>
-  <path d="M21 70c8.5-5.5 17.5-5.5 29-1.2V30.5C38.2 26 28.8 26.2 21 31.2V70Z" fill="#fff"/>
-  <path d="M79 70c-8.5-5.5-17.5-5.5-29-1.2V30.5C61.8 26 71.2 26.2 79 31.2V70Z" fill="#EEF3FF"/>
-  <path d="M50 29.8v39.2" stroke="#1D4ED8" stroke-opacity=".22" stroke-width="2" stroke-linecap="round"/>
-  <path d="M30 42.5h12.5M30 50h9" stroke="#1D4ED8" stroke-opacity=".35" stroke-width="2.4" stroke-linecap="round"/>
-  <circle cx="67.5" cy="50.5" r="9.5" fill="#1D4ED8"/>
-  <path d="m63.6 50.6 2.6 2.6 5.4-5.6" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="7" y="7" width="86" height="86" rx="24" fill="url(#office-bg)"/>
+  <rect x="7.75" y="7.75" width="84.5" height="84.5" rx="23.25" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="1.5"/>
+  <g filter="url(#shadow)">
+    <rect x="24" y="25" width="52" height="55" rx="12" fill="url(#panel)"/>
+    <rect x="39" y="20" width="22" height="12" rx="6" fill="#DDE6FF"/>
+    <rect x="44" y="23.5" width="12" height="5" rx="2.5" fill="#5375EC"/>
+  </g>
+  <circle cx="36" cy="44" r="4" fill="#3C74F4"/>
+  <path d="m34.3 44 1.2 1.2 2.4-2.5" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="45" y="41.5" width="18" height="5" rx="2.5" fill="#AABAF1"/>
+  <circle cx="36" cy="58" r="4" fill="#8056D8"/>
+  <path d="m34.3 58 1.2 1.2 2.4-2.5" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="45" y="55.5" width="23" height="5" rx="2.5" fill="#AABAF1"/>
+  <path d="M36 65.5v2.2a4 4 0 0 0 4 4h19" fill="none" stroke="#607DE2" stroke-width="3" stroke-linecap="round"/>
+  <path d="m57 68.5 3.4 3.2-3.4 3.2" fill="none" stroke="#607DE2" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M76 18.5v4.3M76 31.2v4.3M69.5 27h-4.3M86.8 27h-4.3" stroke="#fff" stroke-width="2.8" stroke-linecap="round"/>
+  <path d="m71.7 22.7-2.8-2.8M83.1 34.1l-2.8-2.8M80.3 22.7l2.8-2.8M68.9 34.1l2.8-2.8" stroke="#fff" stroke-opacity=".78" stroke-width="2" stroke-linecap="round"/>
 </svg>
