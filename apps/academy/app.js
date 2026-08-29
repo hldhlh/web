@@ -52,21 +52,21 @@
   }
 
   function defaultBlocks(summary) {
-    return [{ type: "lead", text: coerceString(summary, "课程内容待完善。"), }];
+    return [{ type: "lead", text: coerceString(summary, "本课内容正在准备中。"), }];
   }
 
   function defaultScenes(mediaUrl) {
     const mediaStage = mediaUrl ? {
       kind: "media",
       src: mediaUrl,
-      caption: "课程视频素材",
-      text: "先看完视频并按下方章节推进按钮"
+      caption: "课程视频",
+      text: "看完视频，掌握本课重点"
     } : {
       kind: "callout",
-      kicker: "待发布",
-      text: "课程场景将从后台补充"
+      kicker: "准备中",
+      text: "本课内容正在准备中"
     };
-    return [{ duration: 120, title: "课程分段", caption: "课程内容尚未发布，请在后台补充。", stage: mediaStage }];
+    return [{ duration: 120, title: "课程内容", caption: "本课内容正在准备中。", stage: mediaStage }];
   }
 
   function normalizeLesson(item) {
@@ -120,8 +120,8 @@
   function uploadLessonVideo(file, lessonId, onProgress) {
     validateVideoFile(file);
     const cfg = window.ACADEMY_CONFIG;
-    if (!cfg?.url || !cfg?.key || !cfg?.bucket) throw new Error("视频存储配置缺失。");
-    if (!window.tus?.Upload) throw new Error("视频上传组件加载失败，请刷新页面后重试。");
+    if (!cfg?.url || !cfg?.key || !cfg?.bucket) throw new Error("视频服务暂不可用，请稍后重试。");
+    if (!window.tus?.Upload) throw new Error("上传服务尚未就绪，请刷新页面后重试。");
 
     const safeLessonId = String(lessonId || "lesson").replace(/[^a-zA-Z0-9_-]/g, "-");
     const objectPath = `academy/videos/${safeLessonId}`;
@@ -191,7 +191,7 @@
       track: normalizeTrack(item.track),
       minutes: Math.max(1, Math.round(coerceNumber(item.minutes, 8))),
       pass: Math.max(1, Math.min(100, Math.round(coerceNumber(item.pass, 80)))),
-      summary: coerceString(item.summary, "考试说明待补充。"),
+      summary: coerceString(item.summary, "考试内容正在准备中。"),
       publishedAt: coerceNumber(item.publishedAt, 0),
       questions
     };
@@ -2364,8 +2364,8 @@
       <div class="card lock-card">
         <p class="kicker">权限不足</p>
         <strong>这份内容需要店长授权</strong>
-        <p class="muted">注册后可以看火锅岗前图文。视频、考试和进阶课，要店长在后台点「授权全部」。</p>
-        <button class="primary" data-act="go" data-hash="#/home">返回通知</button>
+        <p class="muted">当前账号暂未开通这项内容。如需学习，请联系店长。</p>
+        <button class="primary" data-act="go" data-hash="#/home">返回首页</button>
       </div>
     `;
   }
@@ -2419,8 +2419,6 @@
     const status = player?.querySelector("[data-video-status]");
     const toggle = player?.querySelector('[data-act="video-toggle"]');
     const complete = player?.querySelector('[data-act="complete"]');
-    const completeTitle = player?.querySelector("[data-video-complete-title]");
-    const completeHint = player?.querySelector("[data-video-complete-hint]");
     if (fill) fill.style.width = `${progress}%`;
     if (time) time.textContent = `${videoTimeLabel(current)} / ${videoTimeLabel(duration)}`;
     if (durationMeta) durationMeta.textContent = duration ? `实际时长 ${videoTimeLabel(duration)}` : "正在读取视频";
@@ -2430,8 +2428,6 @@
       const unlocked = state.video.watchedToEnd || isDone(state.video.id);
       complete.disabled = !unlocked;
       complete.textContent = isDone(state.video.id) ? "已完成，返回" : unlocked ? "完成本课" : "看完视频后可完成";
-      if (completeTitle) completeTitle.textContent = unlocked ? "视频已看完" : "完成条件";
-      if (completeHint) completeHint.textContent = unlocked ? "现在可以完成本课" : "播放器真实播放结束后自动解锁";
     }
   }
 
@@ -2474,7 +2470,7 @@
 
         <section class="video-player-card">
           <div class="video-frame">
-            ${source ? `<video id="lesson-video" src="${escapeHtml(source)}" controls playsinline preload="metadata"></video>` : `<div class="video-empty"><strong>视频尚未发布</strong><span>请联系管理员补充课程视频。</span></div>`}
+            ${source ? `<video id="lesson-video" src="${escapeHtml(source)}" controls playsinline preload="metadata"></video>` : `<div class="video-empty"><strong>暂时无法播放</strong><span>请稍后再试。</span></div>`}
           </div>
           ${source ? `
           <div class="video-playback">
@@ -2501,7 +2497,6 @@
         </section>` : ""}
 
         <footer class="video-complete-panel">
-          <div><strong data-video-complete-title>${unlocked ? "视频已看完" : "完成条件"}</strong><span data-video-complete-hint>${unlocked ? "现在可以完成本课" : "播放器真实播放结束后自动解锁"}</span></div>
           <button class="primary" data-act="complete" data-id="${lesson.id}" ${unlocked ? "" : "disabled"}>${done ? "已完成，返回" : unlocked ? "完成本课" : "看完视频后可完成"}</button>
         </footer>
       </article>
@@ -2515,8 +2510,8 @@
     if (!Gate.canExam(exam)) return renderLocked(exam.title);
     markPublishedContentRead("exam", exam);
     if (!exam.questions.length) {
-      alert("该考试还没有配置题库，请先在“运营事务”里发布考试题目。");
-      return go("#/ops?section=exams");
+      alert("这项考试正在准备中，请稍后再试。");
+      return go("#/exams");
     }
     state.exam = {
       id,
@@ -3071,7 +3066,7 @@
       else if (source === "exams") DATA.exams = list.filter((item) => item.id !== id);
       else if (source === "notices") DATA.notices = list.filter((item) => item.id !== id);
       saveOpsStore();
-      ContentSync.publish().catch(() => alert("内容已保存在本机，但实时发布失败，请检查网络后重试。"));
+      ContentSync.publish().catch(() => alert("内容已暂存，请检查网络后重新发布。"));
       return go(`#/ops?section=${source}`);
     }
     if (act === "ops-exam-add-question") {
@@ -3241,7 +3236,7 @@
           const sceneRaw = parseLessonScenes(document.getElementById("ops-lesson-scenes")?.value);
           if (sceneRaw === null) {
             setPublishFailed(btn);
-            alert("视频章节数据异常，请重新选择视频后保存。");
+            alert("视频信息无法读取，请重新选择视频后保存。");
             return;
           }
           const raw = {
@@ -3284,7 +3279,7 @@
           try {
             await publishWithState(btn, "课程");
           } catch (error) {
-            alert(`课程已保存在本机，实时发布失败：${error?.message || "网络连接异常"}。请点击按钮重试。`);
+            alert(`课程已暂存，暂时无法发布：${error?.message || "请检查网络后重试"}。`);
             return;
           }
           clearLessonDraft();
@@ -3326,7 +3321,7 @@
           try {
             await publishWithState(btn, "考试");
           } catch (error) {
-            alert(`考试已保存在本机，实时发布失败：${error?.message || "网络连接异常"}。请点击按钮重试。`);
+            alert(`考试已暂存，暂时无法发布：${error?.message || "请检查网络后重试"}。`);
             return;
           }
           return go("#/ops?section=exams");
@@ -3365,7 +3360,7 @@
           try {
             await publishWithState(btn, "通知");
           } catch (error) {
-            alert(`通知已保存在本机，实时发布失败：${error?.message || "网络连接异常"}。请点击按钮重试。`);
+            alert(`通知已暂存，暂时无法发布：${error?.message || "请检查网络后重试"}。`);
             return;
           }
           return go("#/ops?section=notices");

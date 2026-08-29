@@ -2519,7 +2519,7 @@ textarea:focus-visible {
 
 .video-frame {
   width: 100%;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 1 / 1;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -2531,6 +2531,7 @@ textarea:focus-visible {
   height: 100%;
   display: block;
   object-fit: contain;
+  object-position: center;
   background: #000;
 }
 
@@ -2742,24 +2743,6 @@ textarea:focus-visible {
 
 .video-complete-panel {
   padding: 14px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 260px);
-  align-items: center;
-  gap: 14px;
-}
-
-.video-complete-panel > div {
-  display: grid;
-  gap: 2px;
-}
-
-.video-complete-panel strong {
-  font-size: 14px;
-}
-
-.video-complete-panel span {
-  color: var(--muted);
-  font-size: 12px;
 }
 
 .video-complete-panel .primary {
@@ -2814,8 +2797,7 @@ textarea:focus-visible {
   }
 
   .video-complete-panel {
-    grid-template-columns: 1fr;
-    gap: 10px;
+    padding: 12px;
   }
 }
 
