@@ -1058,7 +1058,7 @@
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("app-theme", theme);
     const color = document.querySelector("meta[name='theme-color']");
-    if (color) color.content = theme === "dark" ? "#0b0d12" : "#f4f5f7";
+    if (color) color.content = theme === "dark" ? "#000000" : "#f2f2f7";
   }
 
   function svgIcon(name) {
