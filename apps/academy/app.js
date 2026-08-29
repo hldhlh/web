@@ -1636,17 +1636,20 @@
     const type = LESSON_BLOCK_META[block?.type] ? block.type : "p";
     const meta = LESSON_BLOCK_META[type];
     const content = type === "callout" ? `
-      <div class="ops-grid">
-        <label class="editor-field"><span>提示标题</span><input data-block-field="title" value="${escapeHtml(block.title || "")}" placeholder="例如：必须确认"></label>
-        <label class="editor-field"><span>提示类型</span>
+      <div class="wysiwyg-callout ${block.tone === "warn" ? "warn" : ""}">
+        <div class="ops-grid">
+          <label class="editor-field wysiwyg-callout-title"><span>提示标题</span><input data-block-field="title" value="${escapeHtml(block.title || "")}" placeholder="例如：必须确认"></label>
+          <label class="editor-field wysiwyg-tone"><span>提示类型</span>
           <select data-block-field="tone">
             <option value="key" ${block.tone !== "warn" ? "selected" : ""}>重点</option>
             <option value="warn" ${block.tone === "warn" ? "selected" : ""}>警告</option>
           </select>
-        </label>
+          </label>
+        </div>
+        <label class="editor-field wysiwyg-callout-text"><span>提示内容</span><textarea data-block-field="text" placeholder="${meta.placeholder}">${escapeHtml(block.text || "")}</textarea></label>
       </div>
-      <label class="editor-field"><span>提示内容</span><textarea data-block-field="text" placeholder="${meta.placeholder}">${escapeHtml(block.text || "")}</textarea></label>
     ` : type === "ul" || type === "ol" ? renderLessonListEditor(block) : type === "figure" ? `
+      <div class="wysiwyg-figure-preview">${figure(block.kind || "day-flow")}</div>
       <label class="editor-field"><span>选择图示样式</span>
         <select data-block-field="kind">
           <option value="day-flow" ${block.kind === "day-flow" ? "selected" : ""}>门店一天流程</option>
@@ -1655,22 +1658,22 @@
       </label>
       <p class="field-help">保存后会在课程中显示对应图示。</p>
     ` : type === "table" ? renderLessonTableEditor(block) : `
-      <label class="editor-field">
-        <span>${meta.label}内容</span>
+      <label class="editor-field wysiwyg-text-field wysiwyg-${type}">
+        <span class="wysiwyg-field-label">${meta.label}内容</span>
         <textarea data-block-field="text" placeholder="${meta.placeholder}">${escapeHtml(block.text || "")}</textarea>
       </label>
     `;
     return `
-      <article class="lesson-block-card" data-block-type="${type}">
+      <article class="lesson-block-card wysiwyg-block" data-block-type="${type}">
         <header class="lesson-block-head">
-          <div><span class="block-number">${index + 1}</span><strong>${meta.label}</strong><small>${meta.hint}</small></div>
+          <div><button type="button" class="block-drag-handle" draggable="true" aria-label="拖拽调整${meta.label}顺序" title="按住拖拽排序"><span aria-hidden="true">⋮⋮</span><em>拖拽</em></button><span class="block-number">${index + 1}</span><strong>${meta.label}</strong><small>${meta.hint}</small></div>
           <div class="block-tools" aria-label="调整内容模块">
             <button type="button" data-act="ops-lesson-move-block" data-direction="up" title="上移">↑</button>
             <button type="button" data-act="ops-lesson-move-block" data-direction="down" title="下移">↓</button>
             <button type="button" class="danger-text" data-act="ops-lesson-remove-block" title="删除">删除</button>
           </div>
         </header>
-        <div class="lesson-block-body">${content}</div>
+        <div class="lesson-block-body wysiwyg-block-body">${content}</div>
       </article>
     `;
   }
@@ -1725,6 +1728,91 @@
       const number = card.querySelector(".block-number");
       if (number) number.textContent = index + 1;
     });
+  }
+
+  function resizeLessonEditorFields(root = document) {
+    root.querySelectorAll?.("textarea").forEach((area) => {
+      area.style.height = "auto";
+      area.style.height = `${Math.max(44, area.scrollHeight)}px`;
+    });
+  }
+
+  let draggedLessonBlock = null;
+  let touchLessonBlockDrag = null;
+
+  function placeDraggedLessonBlock(clientY) {
+    const builder = document.getElementById("ops-lesson-block-builder");
+    if (!builder || !draggedLessonBlock) return;
+    const siblings = Array.from(builder.querySelectorAll(".lesson-block-card")).filter((card) => card !== draggedLessonBlock);
+    const before = siblings.find((card) => {
+      const rect = card.getBoundingClientRect();
+      return clientY < rect.top + rect.height / 2;
+    });
+    if (before) builder.insertBefore(draggedLessonBlock, before);
+    else builder.appendChild(draggedLessonBlock);
+  }
+
+  function finishLessonBlockDrag() {
+    if (!draggedLessonBlock) return;
+    draggedLessonBlock.classList.remove("is-dragging");
+    document.getElementById("ops-lesson-block-builder")?.classList.remove("is-sorting");
+    draggedLessonBlock = null;
+    touchLessonBlockDrag = null;
+    refreshLessonBlockNumbers();
+    syncLessonBlocksJson();
+  }
+
+  function onLessonBlockDragStart(event) {
+    const handle = event.target.closest(".block-drag-handle");
+    const card = handle?.closest(".lesson-block-card");
+    if (!handle || !card) return;
+    draggedLessonBlock = card;
+    card.classList.add("is-dragging");
+    card.parentElement?.classList.add("is-sorting");
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", card.dataset.blockType || "content-block");
+    }
+  }
+
+  function onLessonBlockDragOver(event) {
+    if (!draggedLessonBlock || !event.target.closest("#ops-lesson-block-builder")) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+    placeDraggedLessonBlock(event.clientY);
+  }
+
+  function onLessonBlockDrop(event) {
+    if (!draggedLessonBlock) return;
+    event.preventDefault();
+    finishLessonBlockDrag();
+  }
+
+  function onLessonBlockPointerDown(event) {
+    if (event.pointerType === "mouse") return;
+    const handle = event.target.closest(".block-drag-handle");
+    const card = handle?.closest(".lesson-block-card");
+    if (!handle || !card) return;
+    draggedLessonBlock = card;
+    touchLessonBlockDrag = { pointerId: event.pointerId, handle };
+    handle.setPointerCapture?.(event.pointerId);
+    card.classList.add("is-dragging");
+    card.parentElement?.classList.add("is-sorting");
+    event.preventDefault();
+  }
+
+  function onLessonBlockPointerMove(event) {
+    if (!touchLessonBlockDrag || event.pointerId !== touchLessonBlockDrag.pointerId) return;
+    event.preventDefault();
+    if (event.clientY < 90) window.scrollBy(0, -10);
+    else if (event.clientY > window.innerHeight - 90) window.scrollBy(0, 10);
+    placeDraggedLessonBlock(event.clientY);
+  }
+
+  function onLessonBlockPointerEnd(event) {
+    if (!touchLessonBlockDrag || event.pointerId !== touchLessonBlockDrag.pointerId) return;
+    touchLessonBlockDrag.handle.releasePointerCapture?.(event.pointerId);
+    finishLessonBlockDrag();
   }
 
   function refreshLessonListNumbers(card) {
@@ -1974,7 +2062,7 @@
         </section>
 
         <section class="card editor-section">
-          <div class="editor-section-head"><span>02</span><div><h3>课程正文</h3><p>按员工实际学习顺序添加内容，可随时调整顺序</p></div></div>
+          <div class="editor-section-head"><span>02</span><div><h3>课程正文</h3><p>编辑内容即为最终效果，按住拖拽手柄可调整顺序</p></div></div>
           <div class="lesson-block-builder" id="ops-lesson-block-builder">
             ${data.blocks.map((block, index) => renderLessonBlockItem(block, index)).join("")}
           </div>
@@ -2246,6 +2334,7 @@
         </main>
       </div>
     `;
+    if (isEditing && active === "lessons") resizeLessonEditorFields(view());
     if (active === "staff") {
       StaffProgress.load();
       view().querySelector("[data-staff-refresh]")?.addEventListener("click", (event) => {
@@ -2294,96 +2383,130 @@
     `;
   }
 
-  function sceneHtml(scene) {
-    const stage = scene.stage || { kind: "callout", kicker: "", text: scene.caption };
-    if (stage.kind === "steps") {
-      return `<div>${stage.items.map((item, i) => `<div class="demo-row ${i === 0 ? "on" : ""}"><b>${i + 1}</b><span>${escapeHtml(item)}</span></div>`).join("")}</div>`;
-    }
-    if (stage.kind === "media") {
-      return `<div class="media-stage">
-        ${stage.src ? `<video controls src="${escapeHtml(stage.src)}" preload="metadata" style="width:100%;border-radius:12px;display:block"></video>` : `<div class="muted">未选择视频文件</div>`}
-        ${stage.text ? `<div style="margin-top:10px">${escapeHtml(stage.text)}</div>` : ""}
-      </div>`;
-    }
-    if (stage.kind === "browser") {
-      return `<div class="muted" style="margin-bottom:10px">${escapeHtml(stage.bar)}</div>${stage.html}`;
-    }
-    if (stage.kind === "split") {
-      return `<div class="split"><pre>${escapeHtml(stage.code)}</pre><div class="pane">${stage.preview}</div></div>`;
-    }
-    if (stage.kind === "figure") return figure(stage.name);
-    return `<div class="kicker">${escapeHtml(stage.kicker || "要点")}</div><div style="font-size:22px;font-weight:700;letter-spacing:-.04em;white-space:pre-line;margin-top:12px">${escapeHtml(stage.text)}</div>`;
+  function lessonVideoSource(lesson) {
+    if (lesson.mediaUrl) return lesson.mediaUrl;
+    const mediaScene = lesson.scenes.find((scene) => scene.stage?.kind === "media" && scene.stage.src);
+    return mediaScene?.stage?.src || "";
   }
 
-  function videoTotal(lesson) {
-    return lesson.scenes.reduce((sum, scene) => sum + scene.duration, 0);
-  }
-
-  function sceneIndexAt(lesson, t) {
-    let acc = 0;
-    for (let i = 0; i < lesson.scenes.length; i += 1) {
-      acc += lesson.scenes[i].duration;
-      if (t < acc) return i;
-    }
-    return lesson.scenes.length - 1;
+  function videoTimeLabel(seconds) {
+    if (!Number.isFinite(seconds) || seconds < 0) return "--:--";
+    const value = Math.floor(seconds);
+    const hours = Math.floor(value / 3600);
+    const minutes = Math.floor((value % 3600) / 60);
+    const secs = String(value % 60).padStart(2, "0");
+    return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${secs}` : `${minutes}:${secs}`;
   }
 
   function startVideo(lesson) {
-    state.video = { id: lesson.id, t: 0, playing: true, speed: 1, last: performance.now() };
+    state.video = { id: lesson.id, t: 0, duration: 0, playing: false, speed: 1, watchedToEnd: isDone(lesson.id) };
     renderVideo();
+  }
+
+  function updateLessonVideoUi(video) {
+    if (!state.video || !video) return;
+    const duration = Number.isFinite(video.duration) ? video.duration : 0;
+    const current = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+    const progress = duration ? Math.min(100, (current / duration) * 100) : 0;
+    state.video.t = current;
+    state.video.duration = duration;
+    state.video.playing = !video.paused && !video.ended;
+
+    const player = video.closest(".video-course");
+    const fill = player?.querySelector(".video-timeline > i");
+    const time = player?.querySelector(".video-time");
+    const durationMeta = player?.querySelector("[data-video-duration]");
+    const status = player?.querySelector("[data-video-status]");
+    const toggle = player?.querySelector('[data-act="video-toggle"]');
+    const complete = player?.querySelector('[data-act="complete"]');
+    const completeTitle = player?.querySelector("[data-video-complete-title]");
+    const completeHint = player?.querySelector("[data-video-complete-hint]");
+    if (fill) fill.style.width = `${progress}%`;
+    if (time) time.textContent = `${videoTimeLabel(current)} / ${videoTimeLabel(duration)}`;
+    if (durationMeta) durationMeta.textContent = duration ? `实际时长 ${videoTimeLabel(duration)}` : "正在读取视频";
+    if (status) status.textContent = state.video.watchedToEnd ? "已看完" : current > 0 ? `已观看 ${Math.floor(progress)}%` : "尚未开始";
+    if (toggle) toggle.textContent = state.video.playing ? "暂停" : current > 0 && !video.ended ? "继续" : "播放";
+    if (complete) {
+      const unlocked = state.video.watchedToEnd || isDone(state.video.id);
+      complete.disabled = !unlocked;
+      complete.textContent = isDone(state.video.id) ? "已完成，返回" : unlocked ? "完成本课" : "看完视频后可完成";
+      if (completeTitle) completeTitle.textContent = unlocked ? "视频已看完" : "完成条件";
+      if (completeHint) completeHint.textContent = unlocked ? "现在可以完成本课" : "播放器真实播放结束后自动解锁";
+    }
+  }
+
+  function bindLessonVideo() {
+    const video = document.getElementById("lesson-video");
+    if (!video || !state.video) return;
+    video.playbackRate = state.video.speed;
+    const update = () => updateLessonVideoUi(video);
+    video.addEventListener("loadedmetadata", update);
+    video.addEventListener("durationchange", update);
+    video.addEventListener("timeupdate", update);
+    video.addEventListener("play", update);
+    video.addEventListener("pause", update);
+    video.addEventListener("ratechange", update);
+    video.addEventListener("ended", () => {
+      state.video.watchedToEnd = true;
+      state.video.playing = false;
+      update();
+    });
+    video.addEventListener("error", () => {
+      const status = video.closest(".video-course")?.querySelector("[data-video-status]");
+      if (status) status.textContent = "视频加载失败，请检查网络";
+    });
+    update();
   }
 
   function renderVideo() {
     const lesson = lessonById(state.video.id);
-    const total = videoTotal(lesson);
-    const index = sceneIndexAt(lesson, state.video.t);
-    const scene = lesson.scenes[index];
+    const source = lessonVideoSource(lesson);
+    const done = isDone(lesson.id);
+    const unlocked = state.video.watchedToEnd || done;
     setTop(lesson.title, true);
     view().innerHTML = `
-      <div class="player">
-        <div class="stage">
-          <div class="scene-title">${index + 1}/${lesson.scenes.length} · ${escapeHtml(scene.title)}</div>
-          ${sceneHtml(scene)}
-        </div>
-        <p class="caption">${escapeHtml(scene.caption)}</p>
-        <div class="bar" data-act="scrub" style="height:8px;cursor:pointer"><i style="width:${(state.video.t / total) * 100}%"></i></div>
-        <div class="controls">
-          <button class="chip" data-act="video-skip" data-delta="-8" aria-label="后退 8 秒">−8s</button>
-          <button class="primary" style="width:auto;min-width:88px" data-act="video-toggle">${state.video.playing ? "暂停" : "播放"}</button>
-          <button class="chip" data-act="video-speed">${state.video.speed}x</button>
-          <span class="time">${Math.floor(state.video.t)} / ${total}s</span>
-        </div>
-        <div class="chapters">
-          ${lesson.scenes.map((item, i) => `
-            <button class="chapter ${i === index ? "on" : ""}" data-act="video-scene" data-index="${i}">
-              <span>${escapeHtml(item.title)}</span><span class="muted">${item.duration}s</span>
-            </button>`).join("")}
-        </div>
-        <button class="primary" data-act="complete" data-id="${lesson.id}" ${state.video.t >= total - 0.4 || isDone(lesson.id) ? "" : "disabled"}>${state.video.t >= total - 0.4 || isDone(lesson.id) ? "完成本课" : "看到最后再完成"}</button>
-      </div>
-    `;
-  }
+      <article class="video-course">
+        <header class="video-course-head">
+          <div><span class="video-course-kicker">视频课程</span><h2>${escapeHtml(lesson.title)}</h2></div>
+          <p>${escapeHtml(lesson.summary)}</p>
+          <div class="video-course-meta"><span data-video-status>${done ? "已完成" : "尚未开始"}</span><span data-video-duration>${source ? "正在读取视频" : "暂无视频"}</span></div>
+        </header>
 
-  function tickVideo(now) {
-    if (!state.video || !state.video.playing) return;
-    if (state.route.name !== "lesson") return;
-    const lesson = lessonById(state.video.id);
-    if (!lesson || lesson.type !== "video") return;
-    const dt = Math.min(0.25, (now - state.video.last) / 1000) * state.video.speed;
-    state.video.last = now;
-    const total = videoTotal(lesson);
-    const prev = sceneIndexAt(lesson, state.video.t);
-    state.video.t = Math.min(total, state.video.t + dt);
-    if (state.video.t >= total) state.video.playing = false;
-    const nextIndex = sceneIndexAt(lesson, state.video.t);
-    if (prev !== nextIndex || state.video.t >= total) {
-      renderVideo();
-      return;
-    }
-    const bar = view().querySelector(".bar > i");
-    const time = view().querySelector(".time");
-    if (bar) bar.style.width = `${(state.video.t / total) * 100}%`;
-    if (time) time.textContent = `${Math.floor(state.video.t)} / ${total}s`;
+        <section class="video-player-card">
+          <div class="video-frame">
+            ${source ? `<video id="lesson-video" src="${escapeHtml(source)}" controls playsinline preload="metadata"></video>` : `<div class="video-empty"><strong>视频尚未发布</strong><span>请联系管理员补充课程视频。</span></div>`}
+          </div>
+          ${source ? `
+          <div class="video-playback">
+            <button class="video-timeline" data-act="scrub" aria-label="调整视频播放进度"><i></i></button>
+            <div class="video-player-actions">
+              <div>
+                <button class="video-control" data-act="video-skip" data-delta="-10" aria-label="后退 10 秒">−10</button>
+                <button class="video-control video-control-main" data-act="video-toggle">播放</button>
+                <button class="video-control" data-act="video-speed">${state.video.speed}×</button>
+              </div>
+              <span class="video-time">0:00 / --:--</span>
+            </div>
+          </div>` : ""}
+        </section>
+
+        <section class="video-key-card">
+          <header><div><span>课程重点</span><h3>边看边掌握关键信息</h3></div><small>${lesson.blocks.length} 项内容</small></header>
+          <div class="video-key-content">${renderBlocks(lesson.blocks)}</div>
+        </section>
+
+        ${lesson.scenes.length > 1 ? `<section class="video-chapter-card">
+          <header><span>内容提要</span><strong>${lesson.scenes.length} 个章节</strong></header>
+          <div class="video-chapter-list">${lesson.scenes.map((scene, index) => `<div><b>${String(index + 1).padStart(2, "0")}</b><span><strong>${escapeHtml(scene.title)}</strong><small>${escapeHtml(scene.caption)}</small></span></div>`).join("")}</div>
+        </section>` : ""}
+
+        <footer class="video-complete-panel">
+          <div><strong data-video-complete-title>${unlocked ? "视频已看完" : "完成条件"}</strong><span data-video-complete-hint>${unlocked ? "现在可以完成本课" : "播放器真实播放结束后自动解锁"}</span></div>
+          <button class="primary" data-act="complete" data-id="${lesson.id}" ${unlocked ? "" : "disabled"}>${done ? "已完成，返回" : unlocked ? "完成本课" : "看完视频后可完成"}</button>
+        </footer>
+      </article>
+    `;
+    bindLessonVideo();
   }
 
   function startExam(id) {
@@ -3009,6 +3132,7 @@
       const index = builder.querySelectorAll(".lesson-block-card").length;
       builder.insertAdjacentHTML("beforeend", renderLessonBlockItem(insert, index));
       syncLessonBlocksJson();
+      resizeLessonEditorFields(builder.lastElementChild);
       builder.lastElementChild?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
@@ -3258,8 +3382,7 @@
     if (act === "complete") {
       const lesson = lessonById(btn.dataset.id);
       if (lesson?.type === "video") {
-        const total = videoTotal(lesson);
-        if (state.video && state.video.t < total - 0.8 && !isDone(lesson.id)) return;
+        if (!state.video?.watchedToEnd && !isDone(lesson.id)) return;
       }
       completeLesson(btn.dataset.id);
       const items = lessonsIn(lesson.track);
@@ -3270,32 +3393,33 @@
       return go("#/home");
     }
     if (act === "video-toggle" && state.video) {
-      state.video.playing = !state.video.playing;
-      state.video.last = performance.now();
-      return renderVideo();
+      const video = document.getElementById("lesson-video");
+      if (!video) return;
+      if (video.paused || video.ended) video.play().catch(() => { });
+      else video.pause();
+      return;
     }
     if (act === "video-speed" && state.video) {
       const speeds = [1, 1.5, 2, 0.75];
       state.video.speed = speeds[(speeds.indexOf(state.video.speed) + 1) % speeds.length];
-      return renderVideo();
+      const video = document.getElementById("lesson-video");
+      if (video) video.playbackRate = state.video.speed;
+      btn.textContent = `${state.video.speed}×`;
+      return;
     }
     if (act === "video-skip" && state.video) {
-      const lesson = lessonById(state.video.id);
-      state.video.t = Math.max(0, Math.min(videoTotal(lesson), state.video.t + Number(btn.dataset.delta)));
-      return renderVideo();
-    }
-    if (act === "video-scene" && state.video) {
-      const lesson = lessonById(state.video.id);
-      let t = 0;
-      for (let i = 0; i < Number(btn.dataset.index); i += 1) t += lesson.scenes[i].duration;
-      state.video.t = t;
-      return renderVideo();
+      const video = document.getElementById("lesson-video");
+      if (!video || !Number.isFinite(video.duration)) return;
+      video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + Number(btn.dataset.delta)));
+      return;
     }
     if (act === "scrub" && state.video) {
+      const video = document.getElementById("lesson-video");
+      if (!video || !Number.isFinite(video.duration)) return;
       const rect = btn.getBoundingClientRect();
       const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
-      state.video.t = ratio * videoTotal(lessonById(state.video.id));
-      return renderVideo();
+      video.currentTime = ratio * video.duration;
+      return;
     }
     if (act === "pick") return pickOption(btn.dataset.index);
     if (act === "exam-next") {
@@ -3328,6 +3452,14 @@
 
   function onInput(event) {
     if (event.target.closest("#ops-lesson-block-builder")) {
+      if (event.target.matches("textarea")) resizeLessonEditorFields(event.target.parentElement || document);
+      if (event.target.matches('[data-block-field="kind"]')) {
+        const preview = event.target.closest(".lesson-block-body")?.querySelector(".wysiwyg-figure-preview");
+        if (preview) preview.innerHTML = figure(event.target.value);
+      }
+      if (event.target.matches('[data-block-field="tone"]')) {
+        event.target.closest(".wysiwyg-callout")?.classList.toggle("warn", event.target.value === "warn");
+      }
       syncLessonBlocksJson();
       return;
     }
@@ -3391,7 +3523,6 @@
         }
       }
     }
-    tickVideo(now);
     requestAnimationFrame(loop);
   }
 
@@ -3511,8 +3642,17 @@
     document.getElementById("tab-me").innerHTML = `${svgIcon("me")}<span>我的</span>`;
 
     document.getElementById("back-btn").addEventListener("click", goToParentPage);
-    document.getElementById("app").addEventListener("click", onClick);
-    document.getElementById("app").addEventListener("input", onInput);
+    const appRoot = document.getElementById("app");
+    appRoot.addEventListener("click", onClick);
+    appRoot.addEventListener("input", onInput);
+    appRoot.addEventListener("dragstart", onLessonBlockDragStart);
+    appRoot.addEventListener("dragover", onLessonBlockDragOver);
+    appRoot.addEventListener("drop", onLessonBlockDrop);
+    appRoot.addEventListener("dragend", finishLessonBlockDrag);
+    appRoot.addEventListener("pointerdown", onLessonBlockPointerDown);
+    appRoot.addEventListener("pointermove", onLessonBlockPointerMove);
+    appRoot.addEventListener("pointerup", onLessonBlockPointerEnd);
+    appRoot.addEventListener("pointercancel", onLessonBlockPointerEnd);
     window.addEventListener("app-network-change", () => {
       Live.scheduleReconnect(true);
       ContentSync.pull().catch(() => { });
