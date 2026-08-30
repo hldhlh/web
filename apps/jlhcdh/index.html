@@ -7,7 +7,7 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <link rel="icon" href="./icon.svg" type="image/svg+xml">
     <title>今岭每日订货表</title>
-    <!-- 首屏只预加载核心 SDK；图标、日期、拼音和导出能力均不阻塞页面解析 -->
+    <!-- 首屏只预加载核心 SDK；图标全部内联为 SVG，不产生额外连接 -->
     <link rel="dns-prefetch" href="//fmxddvjgkykuqwmasigo.supabase.co">
     <link rel="preconnect" href="https://fmxddvjgkykuqwmasigo.supabase.co" crossorigin>
     <script>
@@ -16,6 +16,8 @@
             url: 'https://fmxddvjgkykuqwmasigo.supabase.co',
             key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo'
         };
+        // 首次访问也能立即渲染；联网结果返回后会自动校准并写入本地缓存。
+        window.JLHCDH_SEED_PRODUCTS = [{"id":87,"name":"老姜","location":"不锈钢操作台C","unit":"斤","tags":["后厨","周订"],"is_deleted":false},{"id":1,"name":"土豆","location":"不锈钢操作台C","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":79,"name":"生姜","location":"不锈钢操作台C","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":6,"name":"洋葱","location":"不锈钢操作台C","unit":"斤","tags":["后厨","周订"],"is_deleted":false},{"id":109,"name":"南姜","location":"不锈钢操作台C","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":106,"name":"柱候酱","location":"不锈钢操作台C","unit":"桶","tags":["后厨","周订"],"is_deleted":false},{"id":76,"name":"沙姜","location":"不锈钢操作台C","unit":"斤","tags":["后厨","周订"],"is_deleted":false},{"id":43,"name":"大豆油","location":"不锈钢操作台C","unit":"桶","tags":["后厨","日订"],"is_deleted":false},{"id":52,"name":"花生油","location":"不锈钢操作台C","unit":"瓶","tags":["后厨","周订"],"is_deleted":false},{"id":98,"name":"厨师帽","location":"临时前厅柜子","unit":"个","tags":["后厨","周订"],"is_deleted":false},{"id":39,"name":"煲汤袋8X10cm","location":"临时前厅柜子","unit":"只","tags":["后厨","周订"],"is_deleted":false},{"id":102,"name":"小碗","location":"临时前厅柜子","unit":"箱","tags":["后厨","周订"],"is_deleted":false},{"id":100,"name":"大垃圾袋90x110","location":"临时前厅柜子","unit":"包","tags":["后厨","周订"],"is_deleted":false},{"id":29,"name":"雪花六两金（鲜去皮猪颈肉）（[嫩邦]冻 猪颈肉（肉青）2斤）","location":"卧式冷柜A","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":40,"name":"火锅底料","location":"卧式冷柜B","unit":"袋","tags":["后厨","日订"],"is_deleted":false},{"id":161,"name":"桑叶","location":"卧式冷柜C","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":21,"name":"冻豆腐","location":"卧式冷柜C","unit":"份","tags":["后厨","日订"],"is_deleted":false},{"id":25,"name":"农家小酥肉（美好）","location":"卧式冷柜C","unit":"袋","tags":["后厨","周订"],"is_deleted":false},{"id":33,"name":"小酥肉粉","location":"卧式冷柜C","unit":"袋","tags":["后厨","周订"],"is_deleted":false},{"id":22,"name":"老豆腐","location":"卧式冷柜D","unit":"盒","tags":["后厨","日订"],"is_deleted":false},{"id":15,"name":"平菇","location":"卧式冷柜D","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":69,"name":"小米辣","location":"卧式冷柜D","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":146,"name":"泡椒","location":"卧式冷柜D","unit":"袋","tags":["后厨","周订"],"is_deleted":false},{"id":32,"name":"鸡翅（食乐意）","location":"卧式冷柜D","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":107,"name":"酸菜","location":"卧式冷柜D","unit":"袋","tags":["后厨","日订"],"is_deleted":false},{"id":152,"name":"绿豆芽","location":"卧式冷柜D","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":92,"name":"蒜","location":"卧式冷柜D","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":9,"name":"番茄","location":"卧式冷柜D","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":28,"name":"肉卷","location":"卧式冷柜D","unit":"袋","tags":["后厨","日订"],"is_deleted":false},{"id":16,"name":"海带苗（小袋）","location":"卧式冷柜D","unit":"袋","tags":["后厨","日订"],"is_deleted":false},{"id":166,"name":"【绿邻农】鲜去皮鸡腿肉","location":"卧式冷柜D","unit":"斤","tags":["日订","后厨"],"is_deleted":false},{"id":89,"name":"花椒","location":"层架B","unit":"克","tags":["后厨","周订"],"is_deleted":false},{"id":73,"name":"干辣椒","location":"层架B","unit":"斤","tags":["后厨","周订"],"is_deleted":false},{"id":50,"name":"芝麻酱","location":"层架C","unit":"桶","tags":["后厨","日订"],"is_deleted":false},{"id":101,"name":"圆形花底纸6.5寸","location":"层架C","unit":"袋","tags":["后厨","周订"],"is_deleted":false},{"id":147,"name":"防油打包纸袋","location":"层架C","unit":"袋","tags":["后厨","周订"],"is_deleted":false},{"id":55,"name":"蚝油","location":"层架D","unit":"瓶","tags":["后厨","日订"],"is_deleted":false},{"id":99,"name":"厨房用纸","location":"层架D","unit":"卷","tags":["后厨","周订"],"is_deleted":false},{"id":61,"name":"黄豆酱","location":"层架D","unit":"袋","tags":["后厨","周订"],"is_deleted":false},{"id":46,"name":"红腐乳","location":"层架D","unit":"瓶","tags":["后厨","周订"],"is_deleted":false},{"id":48,"name":"草菇老抽","location":"层架D","unit":"瓶","tags":["后厨","周订"],"is_deleted":false},{"id":56,"name":"川味辣椒油","location":"层架D","unit":"瓶","tags":["后厨","周订"],"is_deleted":false},{"id":57,"name":"一品鲜酱油（东古）","location":"层架D","unit":"瓶","tags":["后厨","周订"],"is_deleted":false},{"id":37,"name":"香辣酥","location":"层架D","unit":"袋","tags":["后厨","周订"],"is_deleted":false},{"id":38,"name":"黄豆","location":"层架D","unit":"袋","tags":["后厨","周订"],"is_deleted":false},{"id":53,"name":"菌菇酱（喜家厨）","location":"层架D","unit":"袋","tags":["后厨","周订"],"is_deleted":false},{"id":65,"name":"冰糖","location":"层架D","unit":"克","tags":["后厨","日订"],"is_deleted":false},{"id":81,"name":"白糖","location":"层架D","unit":"克","tags":["后厨","周订"],"is_deleted":false},{"id":82,"name":"白胡椒粒","location":"层架D","unit":"克","tags":["后厨","周订"],"is_deleted":false},{"id":83,"name":"白芷","location":"层架D","unit":"克","tags":["后厨","周订"],"is_deleted":false},{"id":88,"name":"胡椒粉","location":"层架D","unit":"克","tags":["后厨","周订"],"is_deleted":false},{"id":97,"name":"黄芪","location":"层架D","unit":"克","tags":["后厨","周订"],"is_deleted":false},{"id":103,"name":"黑色手套","location":"层架D","unit":"盒","tags":["后厨","周订"],"is_deleted":false},{"id":70,"name":"小茴香","location":"层架D","unit":"克","tags":["后厨","周订"],"is_deleted":false},{"id":64,"name":"八角","location":"层架D","unit":"克","tags":["后厨","周订"],"is_deleted":false},{"id":67,"name":"味精","location":"层架D","unit":"袋","tags":["后厨","日订"],"is_deleted":false},{"id":77,"name":"瑶柱","location":"层架D","unit":"克","tags":["后厨","周订"],"is_deleted":false},{"id":91,"name":"草果","location":"层架D","unit":"克","tags":["后厨","周订"],"is_deleted":false},{"id":93,"name":"陈皮","location":"层架D","unit":"克","tags":["后厨","周订"],"is_deleted":false},{"id":78,"name":"甘草","location":"层架D","unit":"克","tags":["后厨","周订"],"is_deleted":false},{"id":71,"name":"山奈","location":"层架D","unit":"克","tags":["后厨","周订"],"is_deleted":false},{"id":111,"name":"蚝油","location":"层架D","unit":"瓶","tags":["前厅"],"is_deleted":false},{"id":45,"name":"生抽酱油","location":"层架D","unit":"4.9L/桶","tags":["后厨","周订"],"is_deleted":false},{"id":157,"name":"竹签，穿虾的竹签（30cm）","location":"层架D","unit":"袋","tags":["后厨","日订"],"is_deleted":false},{"id":42,"name":"南乳汁","location":"层架D","unit":"2.2kg/桶","tags":["后厨","周订"],"is_deleted":false},{"id":44,"name":"甜辣酱","location":"层架D","unit":"袋","tags":["后厨","周订"],"is_deleted":false},{"id":59,"name":"鱼露","location":"层架D","unit":"瓶","tags":["后厨","周订"],"is_deleted":false},{"id":36,"name":"花生米","location":"层架D","unit":"袋","tags":["后厨","日订"],"is_deleted":false},{"id":35,"name":"淀粉","location":"层架D","unit":"袋","tags":["后厨","日订"],"is_deleted":false},{"id":75,"name":"桂皮","location":"层架D","unit":"克","tags":["后厨","周订"],"is_deleted":false},{"id":96,"name":"鸡精","location":"层架D","unit":"袋","tags":["后厨","周订"],"is_deleted":false},{"id":62,"name":"丁香","location":"层架D","unit":"克","tags":["后厨","周订"],"is_deleted":false},{"id":84,"name":"盐","location":"层架D","unit":"箱","tags":["后厨","周订"],"is_deleted":false},{"id":90,"name":"茴香","location":"层架D","unit":"克","tags":["后厨","周订"],"is_deleted":false},{"id":95,"name":"香砂","location":"层架D","unit":"克","tags":["后厨","周订"],"is_deleted":false},{"id":94,"name":"香叶","location":"层架D","unit":"克","tags":["后厨","周订"],"is_deleted":false},{"id":159,"name":"咸鸭蛋","location":"操作台A","unit":"个","tags":["后厨","日订"],"is_deleted":false},{"id":169,"name":"贝贝南瓜","location":"操作台B","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":119,"name":"五常大米","location":"操作台B","unit":"袋","tags":["前厅"],"is_deleted":false},{"id":122,"name":"马蹄爽(300ml)","location":"未分类","unit":"瓶","tags":["前厅"],"is_deleted":false},{"id":135,"name":"透明粗吸管","location":"未分类","unit":"包","tags":["前厅"],"is_deleted":false},{"id":112,"name":"花椒油","location":"未分类","unit":"瓶","tags":["前厅"],"is_deleted":false},{"id":120,"name":"王老吉(310ml)","location":"未分类","unit":"罐","tags":["前厅"],"is_deleted":false},{"id":121,"name":"果粒橙(450ml)","location":"未分类","unit":"瓶","tags":["前厅"],"is_deleted":false},{"id":114,"name":"米醋","location":"未分类","unit":"瓶","tags":["前厅"],"is_deleted":false},{"id":113,"name":"芝麻油","location":"未分类","unit":"瓶","tags":["前厅"],"is_deleted":false},{"id":149,"name":"香砂仁","location":"未分类","unit":"斤","tags":[],"is_deleted":false},{"id":143,"name":"小垃圾袋","location":"未分类","unit":"卷","tags":["前厅"],"is_deleted":false},{"id":140,"name":"矿泉水哇哈哈（569ml）","location":"未分类","unit":"瓶","tags":["前厅"],"is_deleted":false},{"id":141,"name":"小醋包","location":"未分类","unit":"包","tags":["前厅"],"is_deleted":false},{"id":142,"name":"拖地水","location":"未分类","unit":"桶","tags":["前厅","洗碗间"],"is_deleted":false},{"id":125,"name":"一次性手套","location":"未分类","unit":"盒","tags":["前厅"],"is_deleted":false},{"id":124,"name":"卫生纸","location":"未分类","unit":"卷","tags":["前厅"],"is_deleted":false},{"id":115,"name":"醋","location":"未分类","unit":"瓶","tags":["前厅"],"is_deleted":false},{"id":138,"name":"大热敏纸（80mm*80mm）","location":"未分类","unit":"斤","tags":["前厅"],"is_deleted":false},{"id":139,"name":"小热敏纸（57mm*50mm）","location":"未分类","unit":"卷","tags":["前厅"],"is_deleted":false},{"id":137,"name":"紫菜","location":"未分类","unit":"包","tags":["前厅"],"is_deleted":false},{"id":110,"name":"老干妈","location":"未分类","unit":"瓶","tags":["前厅"],"is_deleted":false},{"id":130,"name":"大打包袋(30×50cm)","location":"未分类","unit":"扎","tags":["前厅"],"is_deleted":false},{"id":145,"name":"烧碱","location":"未分类","unit":"袋","tags":["洗碗间","周订"],"is_deleted":false},{"id":134,"name":"白色细吸管","location":"未分类","unit":"包","tags":["前厅"],"is_deleted":false},{"id":131,"name":"500打包盒(米饭盒)","location":"未分类","unit":"扎","tags":["前厅"],"is_deleted":false},{"id":132,"name":"保温棉（35*35x4cm）","location":"未分类","unit":"卷","tags":["前厅"],"is_deleted":false},{"id":133,"name":"外卖封口贴","location":"未分类","unit":"卷","tags":["前厅"],"is_deleted":false},{"id":123,"name":"冬瓜茶(596ml)","location":"未分类","unit":"瓶","tags":["前厅"],"is_deleted":false},{"id":155,"name":"橡胶手套","location":"未分类","unit":"双","tags":["洗碗间","后厨"],"is_deleted":false},{"id":154,"name":"洗洁精","location":"未分类","unit":"桶","tags":["洗碗间"],"is_deleted":false},{"id":128,"name":"皮筋","location":"未分类","unit":"包","tags":["前厅"],"is_deleted":false},{"id":136,"name":"一次性筷子套(150mm)","location":"未分类","unit":"扎","tags":["前厅"],"is_deleted":false},{"id":129,"name":"中打包袋(26×42cm)","location":"未分类","unit":"扎","tags":["前厅"],"is_deleted":false},{"id":127,"name":"牙线","location":"未分类","unit":"盒","tags":["前厅"],"is_deleted":false},{"id":116,"name":"生抽","location":"未分类","unit":"瓶","tags":["前厅"],"is_deleted":false},{"id":117,"name":"蘸料粉(翠宏)","location":"未分类","unit":"包","tags":["前厅"],"is_deleted":false},{"id":118,"name":"辣椒油包","location":"未分类","unit":"包","tags":["前厅"],"is_deleted":false},{"id":126,"name":"一次性围裙","location":"未分类","unit":"包","tags":["前厅"],"is_deleted":false},{"id":170,"name":"杀虫剂","location":"洗碗间","unit":"斤","tags":["洗碗间"],"is_deleted":false},{"id":162,"name":"百洁布","location":"洗碗间","unit":"件","tags":[],"is_deleted":false},{"id":27,"name":"鲜牛骨","location":"立式冷柜A","unit":"斤","tags":["后厨","日订","每日必买"],"is_deleted":false},{"id":7,"name":"玉米","location":"立式冷柜B","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":11,"name":"小芥兰","location":"立式冷柜B","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":14,"name":"香菜","location":"立式冷柜B","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":23,"name":"腐竹","location":"立式冷柜B","unit":"袋","tags":["后厨","周订"],"is_deleted":false},{"id":34,"name":"手擀面","location":"立式冷柜B","unit":"袋","tags":["后厨","日订"],"is_deleted":false},{"id":4,"name":"小葱","location":"立式冷柜B","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":3,"name":"娃娃菜","location":"立式冷柜B","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":163,"name":"菠菜","location":"立式冷柜B","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":20,"name":"金针菇","location":"立式冷柜B","unit":"袋","tags":["后厨","日订"],"is_deleted":false},{"id":2,"name":"大葱","location":"立式冷柜B","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":165,"name":"蛤蜊","location":"立式冷柜B","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":13,"name":"茼蒿","location":"立式冷柜B","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":72,"name":"干葱头","location":"立式冷柜B","unit":"斤","tags":["后厨","周订"],"is_deleted":false},{"id":12,"name":"芹菜","location":"立式冷柜B","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":10,"name":"白萝卜","location":"立式冷柜B","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":24,"name":"豆皮","location":"立式冷柜B","unit":"袋","tags":["后厨","日订"],"is_deleted":false},{"id":164,"name":"线椒","location":"立式冷柜B","unit":"斤","tags":["后厨","日订"],"is_deleted":false},{"id":8,"name":"生菜","location":"立式冷柜B","unit":"斤","tags":["后厨","日订"],"is_deleted":false}];
         window.JLHCDH_BOOTSTRAP = (() => {
             const config = window.JLHCDH_CONFIG;
             const now = new Date();
@@ -53,8 +55,6 @@
                     error => ({ data: null, error })
                 ).finally(() => clearTimeout(timer));
             };
-            const start = `${date}T00:00:00+08:00`;
-            const end = `${date}T23:59:59+08:00`;
             return {
                 date,
                 used: new Set(),
@@ -67,20 +67,11 @@
                     select: 'product_id,quantity,is_purchased',
                     order_date: `eq.${date}`
                 }),
-                legacy: request('jlhcdh_orders', {
-                    select: 'order_data',
-                    created_at: `gte.${start}`,
-                    and: `(created_at.lte.${end})`,
-                    order: 'created_at.desc',
-                    limit: '1'
-                }, 'low')
+                // 旧订单兼容数据不属于首屏关键路径；仅在当天购物车为空时延后读取。
             };
         })();
     </script>
     <link rel="preload" href="../vendor/supabase.min.js" as="script">
-    <link rel="stylesheet" href="../vendor/fontawesome/css/all.min.css" media="print"
-        onload="this.media='all'">
-    <noscript><link rel="stylesheet" href="../vendor/fontawesome/css/all.min.css"></noscript>
     <style>
         /* 全局变量与 Apple 风格重塑 */
         :root {
@@ -111,6 +102,29 @@
             --shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
             --card-bg: rgba(40, 40, 60, 0.9);
             --input-bg: rgba(255, 255, 255, 0.08);
+        }
+
+        .svg-icon {
+            width: 1em;
+            height: 1em;
+            display: inline-block;
+            flex: 0 0 auto;
+            vertical-align: -0.125em;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .svg-icon.spin {
+            width: 2em;
+            height: 2em;
+            animation: svg-icon-spin 0.9s linear infinite;
+        }
+
+        @keyframes svg-icon-spin {
+            to { transform: rotate(360deg); }
         }
 
         body.dark-mode .modal-card {
@@ -242,11 +256,6 @@
             box-shadow: 0 4px 12px rgba(0, 113, 227, 0.3);
         }
 
-        .icon-btn.active i {
-            font-weight: 900;
-            /* 切换为实心图标 */
-        }
-
         /* 搜索与筛选栏 - PC & Mobile 适配 */
         .toolbar {
             max-width: 800px;
@@ -317,7 +326,7 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         }
 
-        .date-picker-container i {
+        .date-picker-container .svg-icon {
             color: var(--primary);
             font-size: 14px;
         }
@@ -502,7 +511,7 @@
             gap: 6px;
         }
 
-        .filter-section-title i {
+        .filter-section-title .svg-icon {
             font-size: 10px;
             opacity: 0.8;
         }
@@ -781,7 +790,7 @@
             font-weight: 600;
         }
 
-        .product-location-tag i {
+        .product-location-tag .svg-icon {
             font-size: 10px;
             opacity: 0.8;
         }
@@ -798,7 +807,7 @@
             line-height: 1.2;
         }
 
-        .prediction-hint i {
+        .prediction-hint .svg-icon {
             font-size: 10px;
             opacity: 0.7;
         }
@@ -1139,15 +1148,14 @@
         }
 
         .custom-checkbox:checked::after {
-            content: '\f00c';
-            font-family: "Font Awesome 6 Free";
-            font-weight: 900;
-            color: white;
-            font-size: 14px;
+            content: '';
             position: absolute;
             top: 50%;
             left: 50%;
+            width: 14px;
+            height: 14px;
             transform: translate(-50%, -50%);
+            background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 4 4L19 6'/%3E%3C/svg%3E");
         }
 
         .agg-item.checked .agg-name {
@@ -1284,7 +1292,7 @@
             border-color: var(--primary);
         }
 
-        .quick-action-btn i {
+        .quick-action-btn .svg-icon {
             font-size: 12px;
         }
 
@@ -1367,6 +1375,31 @@
 </head>
 
 <body>
+    <svg aria-hidden="true" width="0" height="0" style="position:absolute;overflow:hidden">
+        <symbol id="icon-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></symbol>
+        <symbol id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/></symbol>
+        <symbol id="icon-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></symbol>
+        <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0 2 5M20 4v7h-7"/></symbol>
+        <symbol id="icon-list" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 10h6M9 14h6M9 18h4"/></symbol>
+        <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+        <symbol id="icon-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.1A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.1A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.1A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.14.37.36.7.66.96.3.26.68.4 1.08.4H21v4h-.1A1.7 1.7 0 0 0 19.4 15Z"/></symbol>
+        <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
+        <symbol id="icon-sort" viewBox="0 0 24 24"><path d="M3 6h12M3 12h9M3 18h6M19 5v14M16 16l3 3 3-3"/></symbol>
+        <symbol id="icon-tags" viewBox="0 0 24 24"><path d="M20.6 13.6 11 4H4v7l9.6 9.6a2 2 0 0 0 2.8 0l4.2-4.2a2 2 0 0 0 0-2.8Z"/><circle cx="7.5" cy="7.5" r=".5"/></symbol>
+        <symbol id="icon-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15 9-2 4-4 2 2-4 4-2Z"/></symbol>
+        <symbol id="icon-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+        <symbol id="icon-edit" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></symbol>
+        <symbol id="icon-check-all" viewBox="0 0 24 24"><path d="m1 12 4 4L15 6M9 17l2 2L23 7"/></symbol>
+        <symbol id="icon-close" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+        <symbol id="icon-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></symbol>
+        <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 15H6L5 6M10 11v6M14 11v6"/></symbol>
+        <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+        <symbol id="icon-spinner" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.2-8.56"/></symbol>
+        <symbol id="icon-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 22h4M8.5 15.5A7 7 0 1 1 15.5 15.5c-.8.6-1.2 1.3-1.3 2.5h-4.4c-.1-1.2-.5-1.9-1.3-2.5Z"/></symbol>
+        <symbol id="icon-undo" viewBox="0 0 24 24"><path d="M9 7 4 12l5 5M5 12h9a6 6 0 0 1 6 6"/></symbol>
+        <symbol id="icon-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2"/></symbol>
+        <symbol id="icon-location" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/></symbol>
+    </svg>
     <!-- 1. 下单页 -->
     <div id="indexPage" class="page active">
         <header class="app-header">
@@ -1376,34 +1409,30 @@
                     <h1>今岭每日订货表</h1>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
-                    <button id="darkModeBtn" onclick="toggleDarkMode()" class="icon-btn" title="切换深色模式"><i
-                            class="fas fa-moon"></i></button>
+                    <button id="darkModeBtn" onclick="toggleDarkMode()" class="icon-btn" title="切换深色模式"><svg class="svg-icon" aria-hidden="true"><use href="#icon-moon"></use></svg></button>
                     <div class="date-picker-container" id="datePickerIndex">
-                        <i class="far fa-calendar-alt"></i>
+                        <svg class="svg-icon" aria-hidden="true"><use href="#icon-calendar"></use></svg>
                         <input type="text" id="dateInputIndex" readonly>
                     </div>
-                    <button onclick="location.reload()" class="icon-btn"><i class="fas fa-sync-alt"></i></button>
-                    <button onclick="goToPage('orders')" class="icon-btn" title="核对清单"><i
-                            class="fas fa-clipboard-list"></i></button>
-                    <button onclick="goToPage('analytics')" class="icon-btn" title="周月分析"><i
-                            class="fas fa-chart-bar"></i></button>
-                    <button onclick="goToPage('admin')" class="icon-btn" title="管理商品"><i
-                            class="fas fa-cog"></i></button>
+                    <button onclick="location.reload()" class="icon-btn"><svg class="svg-icon" aria-hidden="true"><use href="#icon-refresh"></use></svg></button>
+                    <button onclick="goToPage('orders')" class="icon-btn" title="核对清单"><svg class="svg-icon" aria-hidden="true"><use href="#icon-list"></use></svg></button>
+                    <button onclick="goToPage('analytics')" class="icon-btn" title="周月分析"><svg class="svg-icon" aria-hidden="true"><use href="#icon-chart"></use></svg></button>
+                    <button onclick="goToPage('admin')" class="icon-btn" title="管理商品"><svg class="svg-icon" aria-hidden="true"><use href="#icon-settings"></use></svg></button>
                 </div>
             </div>
         </header>
         <div class="toolbar">
             <div class="search-box">
-                <i class="fas fa-search"></i>
+                <svg class="svg-icon" aria-hidden="true"><use href="#icon-search"></use></svg>
                 <input type="text" id="searchInput" placeholder="搜索食材...">
             </div>
             <div style="display:flex; gap:8px;">
-                <button id="sortBtn" class="icon-btn" title="排序方式"><i class="fas fa-sort-amount-down"></i></button>
+                <button id="sortBtn" class="icon-btn" title="排序方式"><svg class="svg-icon" aria-hidden="true"><use href="#icon-sort"></use></svg></button>
             </div>
         </div>
-        <div class="filter-section-title"><i class="fas fa-tags"></i> 常用标签</div>
+        <div class="filter-section-title"><svg class="svg-icon" aria-hidden="true"><use href="#icon-tags"></use></svg> 常用标签</div>
         <div id="tagFilterList" class="tag-row"></div>
-        <div class="filter-section-title"><i class="fas fa-compass"></i> 商品定位</div>
+        <div class="filter-section-title"><svg class="svg-icon" aria-hidden="true"><use href="#icon-compass"></use></svg> 商品定位</div>
         <div id="locationList"></div>
         <main class="product-grid" id="productList"></main>
     </div>
@@ -1413,15 +1442,14 @@
         <header class="app-header">
             <div class="header-content">
                 <div class="header-title-group">
-                    <button onclick="goToPage('index')" class="icon-btn"><i class="fas fa-chevron-left"></i></button>
+                    <button onclick="goToPage('index')" class="icon-btn"><svg class="svg-icon" aria-hidden="true"><use href="#icon-back"></use></svg></button>
                     <div class="sync-status online" title="实时同步中"></div>
                     <h1>订货核对</h1>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
-                    <button id="editModeBtn" class="icon-btn" onclick="toggleEditMode()" title="修订模式"><i
-                            class="fas fa-edit"></i></button>
+                    <button id="editModeBtn" class="icon-btn" onclick="toggleEditMode()" title="修订模式"><svg class="svg-icon" aria-hidden="true"><use href="#icon-edit"></use></svg></button>
                     <div class="date-picker-container" id="datePickerOrders">
-                        <i class="far fa-calendar-alt"></i>
+                        <svg class="svg-icon" aria-hidden="true"><use href="#icon-calendar"></use></svg>
                         <input type="text" id="dateInput" readonly>
                     </div>
                 </div>
@@ -1430,13 +1458,13 @@
         <!-- 快捷操作栏 -->
         <div class="quick-actions">
             <button class="quick-action-btn" onclick="batchSelectAll()">
-                <i class="fas fa-check-double"></i> 全部勾选
+                <svg class="svg-icon" aria-hidden="true"><use href="#icon-check-all"></use></svg> 全部勾选
             </button>
             <button class="quick-action-btn" onclick="batchDeselectAll()">
-                <i class="fas fa-times"></i> 全部取消
+                <svg class="svg-icon" aria-hidden="true"><use href="#icon-close"></use></svg> 全部取消
             </button>
             <button class="quick-action-btn" onclick="exportOrderImage()">
-                <i class="fas fa-image"></i> 导出图片
+                <svg class="svg-icon" aria-hidden="true"><use href="#icon-image"></use></svg> 导出图片
             </button>
         </div>
         <main class="admin-main">
@@ -1456,7 +1484,7 @@
         <header class="app-header">
             <div class="header-content">
                 <div class="header-title-group">
-                    <button onclick="goToPage('index')" class="icon-btn"><i class="fas fa-chevron-left"></i></button>
+                    <button onclick="goToPage('index')" class="icon-btn"><svg class="svg-icon" aria-hidden="true"><use href="#icon-back"></use></svg></button>
                     <div class="sync-status online" title="实时同步中"></div>
                     <h1>管理后台</h1>
                 </div>
@@ -1466,17 +1494,17 @@
 
         <div class="toolbar">
             <div class="search-box">
-                <i class="fas fa-search"></i>
+                <svg class="svg-icon" aria-hidden="true"><use href="#icon-search"></use></svg>
                 <input type="text" id="adminSearchInput" placeholder="搜索名称或定位...">
             </div>
             <div style="display: flex; gap: 8px;">
                 <select id="adminLocFilter" class="select-custom" style="flex: 1;"></select>
                 <button class="select-custom"
                     style="padding: 0 12px; display: flex; align-items: center; justify-content: center;"
-                    onclick="openCategoryManager()" title="管理商品定位"><i class="fas fa-cog"></i></button>
+                    onclick="openCategoryManager()" title="管理商品定位"><svg class="svg-icon" aria-hidden="true"><use href="#icon-settings"></use></svg></button>
                 <button class="select-custom"
                     style="padding: 0 12px; display: flex; align-items: center; justify-content: center; background: rgba(255, 59, 48, 0.1); color: var(--accent);"
-                    onclick="openTrashBin()" title="回收站"><i class="fas fa-trash-alt"></i></button>
+                    onclick="openTrashBin()" title="回收站"><svg class="svg-icon" aria-hidden="true"><use href="#icon-trash"></use></svg></button>
             </div>
         </div>
 
@@ -1484,7 +1512,7 @@
             <div id="adminTableBody" class="admin-grid"></div>
         </main>
 
-        <div class="fab-add" id="openAddModal"><i class="fas fa-plus"></i></div>
+        <div class="fab-add" id="openAddModal"><svg class="svg-icon" aria-hidden="true"><use href="#icon-plus"></use></svg></div>
     </div>
 
     <!-- 4. 分析页 -->
@@ -1492,7 +1520,7 @@
         <header class="app-header">
             <div class="header-content">
                 <div class="header-title-group">
-                    <button onclick="goToPage('index')" class="icon-btn"><i class="fas fa-chevron-left"></i></button>
+                    <button onclick="goToPage('index')" class="icon-btn"><svg class="svg-icon" aria-hidden="true"><use href="#icon-back"></use></svg></button>
                     <h1>周月数据分析</h1>
                 </div>
             </div>
@@ -1635,7 +1663,7 @@
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
                     <button type="button" class="btn-delete" onclick="deleteFromEditModal()"
                         style="font-size: 13px; padding: 0 4px;">
-                        <i class="fas fa-trash-alt"></i> 移到回收站
+                        <svg class="svg-icon" aria-hidden="true"><use href="#icon-trash"></use></svg> 移到回收站
                     </button>
                     <button type="button" class="btn-delete" style="background:#f2f2f7;color:#1d1d1f;"
                         onclick="closeEditProductModal()">取消</button>
@@ -1664,6 +1692,7 @@
     <script src="../vendor/supabase.min.js"></script>
     <script src="../network.js?v=20260827-8"></script>
     <script>
+        const iconSvg = (name, className = '') => `<svg class="svg-icon${className ? ` ${className}` : ''}" aria-hidden="true"><use href="#icon-${name}"></use></svg>`;
         const SB_URL = window.JLHCDH_CONFIG.url;
         const SB_KEY = window.JLHCDH_CONFIG.key;
         const sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: false } });
@@ -1728,9 +1757,12 @@
             document.head.appendChild(link);
         }
 
-        function runAfterFirstPaint(task, timeout = 1200) {
-            const schedule = window.requestIdleCallback || ((callback) => setTimeout(callback, 0));
-            schedule(() => Promise.resolve(task()).catch(error => console.warn('后台任务失败:', error)), { timeout });
+        function runAfterFirstPaint(task, delay = 1200) {
+            // requestIdleCallback 的 timeout 不是延迟时间；先显式等待，再利用空闲帧执行。
+            setTimeout(() => {
+                const schedule = window.requestIdleCallback || ((callback) => setTimeout(callback, 0));
+                schedule(() => Promise.resolve(task()).catch(error => console.warn('后台任务失败:', error)), { timeout: 1500 });
+            }, delay);
         }
 
         function readCache(key, maxAge) {
@@ -1750,7 +1782,12 @@
         function restoreStartupCache() {
             const products = readCache(CACHE_KEYS.products, 24 * 60 * 60 * 1000);
             const cart = readCache(`${CACHE_KEYS.cart}:${state.currentDate}`, 5 * 60 * 1000);
-            if (Array.isArray(products) && products.length) state.products = products;
+            const startupProducts = Array.isArray(products) && products.length
+                ? products
+                : window.JLHCDH_SEED_PRODUCTS;
+            if (Array.isArray(startupProducts) && startupProducts.length) {
+                state.products = startupProducts.map(product => ({ ...product }));
+            }
             if (cart && typeof cart === 'object') state.orders = cart;
             return Boolean(state.products.length);
         }
@@ -1848,7 +1885,12 @@
             // 命中本地缓存时立即画出可操作界面，后台请求只负责校准数据。
             if (restoreStartupCache()) renderProducts();
 
-            document.getElementById('searchInput').oninput = e => { state.searchQuery = e.target.value.trim(); renderProducts(); };
+            document.getElementById('searchInput').oninput = e => {
+                state.searchQuery = e.target.value.trim();
+                renderProducts();
+                // 仅在用户实际输入拼音时加载 345KB 拼音库。
+                if (/[a-z]/i.test(state.searchQuery)) hydrateMissingPinyin();
+            };
             document.getElementById('adminSearchInput').oninput = e => { state.adminSearch = e.target.value.trim(); renderAdminTable(); };
             document.getElementById('adminLocFilter').onchange = e => { state.adminLoc = e.target.value; renderAdminTable(); };
             document.getElementById('sortBtn').onclick = () => {
@@ -1859,18 +1901,17 @@
             document.getElementById('openAddModal').onclick = () => { document.getElementById('editModal').classList.add('visible'); };
             document.getElementById('productForm').onsubmit = handleAdd;
 
-            // 商品、当天订货和实时连接同时启动；任一数据先返回就先更新界面。
+            // 商品快照先让首屏可操作，联网数据在后台校准。
             const productsPromise = fetchProducts().then(() => renderProducts());
             const cartPromise = fetchCart().then(() => renderProducts());
-            setupRealtime();
             setupStatusIndicatorClick();
             await Promise.allSettled([productsPromise, cartPromise]);
             renderProducts();
+            setupRealtime();
 
-            // 首屏可操作后再加载日期控件、历史预测和拼音库。
-            runAfterFirstPaint(initDatePickers, 500);
-            runAfterFirstPaint(fetchOrderPredictions, 1500);
-            runAfterFirstPaint(hydrateMissingPinyin, 2500);
+            // 首屏稳定后再加载非关键能力；拼音库改为用户输入拼音时按需加载。
+            runAfterFirstPaint(initDatePickers, 800);
+            runAfterFirstPaint(fetchOrderPredictions, 6000);
 
             // --- 中国区网络专项优化：页面唤醒同步 ---
             // 当用户切回系统或手机点亮屏幕时，立即强制刷一次数据，防止实时连接在后台断掉
@@ -1932,6 +1973,9 @@
                 onMonthChange: (selectedDates, dateStr, instance) => {
                     updateHasDataMarkers(instance);
                 },
+                onOpen: (selectedDates, dateStr, instance) => {
+                    if (!state.historyDatesLoadedAt) updateHasDataMarkers(instance);
+                },
                 // 标记有数据的日期
                 onDayCreate: function (dObj, dStr, fp, dayElem) {
                     const dateStr = fp.formatDate(dayElem.dateObj, "Y-m-d");
@@ -1962,11 +2006,6 @@
 
             state.fpIndex = flatpickr("#dateInputIndex", fpConfig);
             state.fpOrders = flatpickr("#dateInput", fpConfig);
-
-            // 两个实例共享一次历史日期请求，避免启动时重复扫描数据表。
-            await fetchHistoryDates();
-            state.fpIndex.redraw();
-            state.fpOrders.redraw();
         }
 
         let analyticsMode = 7;
@@ -1981,7 +2020,7 @@
         }
 
         async function renderAnalytics() {
-            document.getElementById('analyticsContainer').innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-sub);"><i class="fas fa-spinner fa-spin fa-2x"></i><p style="margin-top:10px;">读取大数据中...</p></div>';
+                document.getElementById('analyticsContainer').innerHTML = `<div style="text-align: center; padding: 40px; color: var(--text-sub);">${iconSvg('spinner', 'spin')}<p style="margin-top:10px;">读取大数据中...</p></div>`;
 
             const end = new Date();
             const start = new Date();
@@ -2124,51 +2163,54 @@
             const requestedDate = state.currentDate;
             const nextOrders = {};
             try {
-                const start = `${requestedDate}T00:00:00+08:00`;
-                const end = `${requestedDate}T23:59:59+08:00`;
-
-                // 当天购物车与旧订单兼容数据并行读取，避免空购物车再多等一次网络往返。
-                const [cartResult, legacyResult] = await Promise.all([
-                    bootstrapOrFetch('cart', requestedDate, () =>
-                        sb.from('jlhcdh_cart')
-                            .select('product_id,quantity,is_purchased')
-                            .eq('order_date', requestedDate)
-                    ),
-                    bootstrapOrFetch('legacy', requestedDate, () =>
-                        sb.from('jlhcdh_orders')
-                            .select('order_data')
-                            .gte('created_at', start)
-                            .lte('created_at', end)
-                            .order('created_at', { ascending: false })
-                            .limit(1)
-                    )
-                ]);
+                const cartResult = await bootstrapOrFetch('cart', requestedDate, () =>
+                    sb.from('jlhcdh_cart')
+                        .select('product_id,quantity,is_purchased')
+                        .eq('order_date', requestedDate)
+                );
                 const { data: cartData, error: cartError } = cartResult;
-                let errorOccurred = false;
 
                 if (cartData && cartData.length > 0) {
                     cartData.forEach(i => nextOrders[i.product_id] = { qty: parseFloat(i.quantity), purchased: i.is_purchased });
-                    errorOccurred = !!cartError;
-                } else {
-                    const rec = legacyResult.data?.find(r => r.order_data);
-                    if (rec) {
-                        const raw = rec.order_data;
-                        const items = Array.isArray(raw) ? raw : (raw.order_data || []);
-                        items.forEach(i => {
-                            const pid = i.id || i.product_id;
-                            if (pid) nextOrders[pid] = { qty: parseFloat(i.qty || i.quantity || 0), purchased: !!i.is_purchased };
-                        });
-                    }
-                    errorOccurred = !!legacyResult.error || (!!cartError && !rec);
                 }
                 // 切换日期期间可能有旧请求晚返回，绝不能覆盖新日期。
-                if (requestedDate === state.currentDate && !errorOccurred) {
+                if (requestedDate === state.currentDate && !cartError) {
                     state.orders = nextOrders;
                     writeCache(`${CACHE_KEYS.cart}:${requestedDate}`, nextOrders);
+                    // 仅空购物车需要兼容旧表，并且不再阻塞首屏。
+                    if (!cartData?.length) runAfterFirstPaint(() => fetchLegacyCart(requestedDate), 2500);
                 }
                 updateFooter();
-                endSync(errorOccurred);
+                endSync(!!cartError);
             } catch (e) { endSync(true); }
+        }
+
+        async function fetchLegacyCart(requestedDate) {
+            // 用户已输入或日期已切换时，不允许旧数据覆盖当前状态。
+            if (requestedDate !== state.currentDate || Object.keys(state.orders).length) return;
+            const start = `${requestedDate}T00:00:00+08:00`;
+            const end = `${requestedDate}T23:59:59+08:00`;
+            const { data, error } = await sb.from('jlhcdh_orders')
+                .select('order_data')
+                .gte('created_at', start)
+                .lte('created_at', end)
+                .order('created_at', { ascending: false })
+                .limit(1);
+            if (error || requestedDate !== state.currentDate || Object.keys(state.orders).length) return;
+            const rec = data?.find(row => row.order_data);
+            if (!rec) return;
+            const raw = rec.order_data;
+            const items = Array.isArray(raw) ? raw : (raw.order_data || []);
+            const legacyOrders = {};
+            items.forEach(item => {
+                const pid = item.id || item.product_id;
+                if (pid) legacyOrders[pid] = { qty: parseFloat(item.qty || item.quantity || 0), purchased: !!item.is_purchased };
+            });
+            if (!Object.keys(legacyOrders).length) return;
+            state.orders = legacyOrders;
+            writeCache(`${CACHE_KEYS.cart}:${requestedDate}`, legacyOrders);
+            renderProducts();
+            updateFooter();
         }
 
         function parseDateOnly(dateStr) {
@@ -2328,7 +2370,7 @@
             if (!prediction) return '';
             return `
                 <div class="prediction-hint" title="按最近历史自动估算，只作订货参考">
-                    <i class="far fa-lightbulb"></i> 参考 ${formatPredictionQty(prediction.qty)}${product.unit || ''}
+                    ${iconSvg('bulb')} 参考 ${formatPredictionQty(prediction.qty)}${product.unit || ''}
                 </div>`;
         }
 
@@ -2587,10 +2629,10 @@
                     </div>
                     <div style="display: flex; gap: 8px;">
                         <button class="btn-delete" style="width: auto; padding: 4px 12px; background: rgba(52,199,89,0.1); color: #34c759; border: none; font-size: 13px;" onclick="restoreProduct(${p.id})">
-                            <i class="fas fa-undo-alt" style="font-size: 11px; margin-right: 4px;"></i> 恢复
+                            ${iconSvg('undo')} 恢复
                         </button>
                         <button class="btn-delete" style="width: auto; padding: 4px 12px; background: rgba(255,59,48,0.1); color: var(--accent); border: none; font-size: 13px;" onclick="deleteProductPermanently(${p.id}, '${p.name}')">
-                            <i class="fas fa-trash-alt" style="font-size: 11px; margin-right: 4px;"></i> 彻底删除
+                            ${iconSvg('trash')} 彻底删除
                         </button>
                     </div>
                 </div>
@@ -2686,10 +2728,10 @@
                     </div>
                     <div style="display: flex; gap: 8px;">
                         <button class="icon-btn" style="width: 32px; height: 32px; background: rgba(0,113,227,0.1); color: var(--primary);" onclick="renameCategory('${loc}')">
-                            <i class="fas fa-edit" style="font-size: 12px;"></i>
+                            ${iconSvg('edit')}
                         </button>
                         <button class="icon-btn" style="width: 32px; height: 32px; background: rgba(255,59,48,0.1); color: var(--accent);" onclick="deleteCategory('${loc}', ${count})">
-                            <i class="fas fa-trash-alt" style="font-size: 12px;"></i>
+                            ${iconSvg('trash')}
                         </button>
                     </div>
                 </div>
@@ -2829,7 +2871,7 @@
                             onchange="updateTags(${p.id}, this.value)">
                     </div>
                     <button class="btn-delete-icon" onclick="deleteProduct(${p.id})" title="移到回收站">
-                        <i class="fas fa-trash-alt"></i>
+                        ${iconSvg('trash')}
                     </button>
                 </div>`;
             }).join('');
@@ -3185,7 +3227,7 @@
                                 <button class="icon-btn" style="width:28px;height:28px;background:none;" onclick="updateQty(${item.id}, 1); fetchDayData();">+</button>
                             </div>
                             <button class="btn-delete-icon" style="margin-right:8px;" onclick="deleteCartItem(${item.id})" title="删除">
-                                <i class="fas fa-trash-alt"></i>
+                                ${iconSvg('trash')}
                             </button>
                         ` : `
                             <span class="agg-qty">${item.qty}</span>
@@ -3309,7 +3351,7 @@
                 const qty = state.orders[p.id]?.qty || '';
                 const tagsHtml = (p.tags || []).map(t => `<span class="tag-badge">${t}</span>`).join('');
                 const historyLabel = getHistoryLabel(p.last_purchased_date);
-                const historyBadgeHtml = historyLabel ? `<span class="history-badge"><i class="fas fa-history"></i> ${historyLabel}</span>` : '';
+                const historyBadgeHtml = historyLabel ? `<span class="history-badge">${iconSvg('history')} ${historyLabel}</span>` : '';
                 const prediction = state.predictions[p.id];
                 const predictionHtml = prediction && !qty ? getPredictionHintHtml(p, prediction) : '';
                 const qtyPlaceholder = '0';
@@ -3331,7 +3373,7 @@
                             </div>
                         </div>
                         <div class="product-location-tag">
-                            <i class="fas fa-location-arrow"></i> ${p.location}
+                            ${iconSvg('location')} ${p.location}
                         </div>
                         ${predictionHtml}
                     </div>
@@ -3738,11 +3780,11 @@
         function updateDarkModeIcon() {
             const btn = document.getElementById('darkModeBtn');
             if (btn) {
-                const icon = btn.querySelector('i');
+                const icon = btn.querySelector('use');
                 if (document.body.classList.contains('dark-mode')) {
-                    icon.className = 'fas fa-sun';
+                    icon.setAttribute('href', '#icon-sun');
                 } else {
-                    icon.className = 'fas fa-moon';
+                    icon.setAttribute('href', '#icon-moon');
                 }
             }
         }

@@ -298,6 +298,21 @@ code, pre, .mono {
   padding-bottom: 28px;
 }
 
+.app.embedded-mode .view {
+  min-height: 100dvh;
+  padding: var(--topbar-h) 0 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.embedded-app-frame {
+  width: 100%;
+  min-height: calc(100dvh - var(--topbar-h));
+  flex: 1;
+  border: 0;
+  background: #000c18;
+}
+
 .app.gated {
   max-width: 100%;
   width: 100%;
@@ -507,6 +522,93 @@ code, pre, .mono {
   letter-spacing: -0.02em;
   font-weight: 600;
   line-height: 1.35;
+}
+
+.home-shortcuts {
+  margin: 0 0 18px;
+}
+
+.home-shortcuts-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 9px;
+}
+
+.home-shortcuts-head span {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.home-shortcuts-head h3 {
+  margin-top: 2px;
+  color: var(--ink);
+  font-size: 19px;
+  letter-spacing: -.025em;
+}
+
+.home-app-shortcut {
+  min-height: 82px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--surface), color-mix(in srgb, var(--accent-soft) 30%, var(--surface)));
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  text-decoration: none;
+  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.home-app-shortcut:hover {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--line));
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--accent) 12%, transparent);
+  transform: translateY(-1px);
+}
+
+.home-app-shortcut:active {
+  transform: scale(.985);
+}
+
+.home-app-shortcut img {
+  width: 54px;
+  height: 54px;
+  flex: 0 0 auto;
+  border-radius: 16px;
+}
+
+.home-app-shortcut-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  flex: 1;
+}
+
+.home-app-shortcut-copy strong {
+  font-size: 16px;
+  letter-spacing: -.015em;
+}
+
+.home-app-shortcut-copy small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-app-shortcut-action {
+  flex: 0 0 auto;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .ring-wrap {
@@ -1869,6 +1971,193 @@ textarea:focus-visible {
 .lesson-editor .ops-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0 12px;
+}
+
+.lesson-group-options {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.lesson-group-options legend {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.lesson-group-options > p {
+  margin: 4px 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.lesson-group-options > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.lesson-group-options label {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface-2);
+  cursor: pointer;
+}
+
+.lesson-group-options input {
+  position: absolute;
+  width: 1px;
+  min-height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lesson-group-options label > span {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--muted);
+  border-radius: 7px;
+  background: var(--bg);
+}
+
+.lesson-group-options label:has(input:checked) {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--line));
+  background: var(--accent-soft);
+}
+
+.lesson-group-options label:has(input:checked) > span {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.lesson-group-options label:has(input:checked) > span::after {
+  content: "";
+  width: 10px;
+  height: 6px;
+  border: solid #fff;
+  border-width: 0 0 2px 2px;
+  transform: rotate(-45deg) translateY(-1px);
+}
+
+.lesson-group-options label:has(input:focus-visible) {
+  outline: 3px solid color-mix(in srgb, var(--accent) 42%, transparent);
+  outline-offset: 2px;
+}
+
+.course-group-manager {
+  margin-bottom: 16px;
+  padding: 18px;
+}
+
+.course-group-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.course-group-head h3 {
+  margin: 2px 0 3px;
+  font-size: 20px;
+}
+
+.course-group-head span,
+.course-group-row > span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.course-group-create {
+  display: flex;
+  gap: 8px;
+}
+
+.course-group-create input {
+  min-height: 44px;
+  min-width: 210px;
+}
+
+.course-group-create button,
+.course-group-row button {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+.course-group-list {
+  display: grid;
+  gap: 8px;
+}
+
+.course-group-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface-2);
+}
+
+.course-group-row input {
+  min-height: 44px;
+}
+
+.course-group-row .danger {
+  color: var(--bad);
+}
+
+.course-group-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 8px 0 2px;
+}
+
+.course-group-badges span {
+  padding: 3px 7px;
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.course-group-filters {
+  margin-top: -4px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 720px) {
+  .lesson-group-options > div {
+    grid-template-columns: 1fr;
+  }
+
+  .course-group-head,
+  .course-group-create {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .course-group-create input {
+    min-width: 0;
+  }
+
+  .course-group-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .course-group-row > span {
+    text-align: right;
+  }
 }
 
 .input-suffix {

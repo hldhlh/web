@@ -51,6 +51,27 @@
     return ["article", "video"].includes(type) ? type : "article";
   }
 
+  function defaultCourseGroups() {
+    return DATA.tracks.map((track, index) => ({
+      id: coerceId("group", track.id),
+      name: coerceString(track.title, `课程分组 ${index + 1}`)
+    }));
+  }
+
+  function normalizeCourseGroups(items) {
+    const source = Array.isArray(items) && items.length ? items : defaultCourseGroups();
+    const seen = new Set();
+    return source.map((item, index) => ({
+      id: coerceId("group", item?.id),
+      name: coerceString(item?.name || item?.title, `课程分组 ${index + 1}`)
+    })).filter((item) => !seen.has(item.id) && seen.add(item.id));
+  }
+
+  function normalizeLessonGroupIds(groupIds, fallbackTrack = "onboard") {
+    const source = Array.isArray(groupIds) && groupIds.length ? groupIds : [fallbackTrack];
+    return Array.from(new Set(source.map((id) => coerceString(id, "")).filter(Boolean)));
+  }
+
   function defaultBlocks(summary) {
     return [{ type: "lead", text: coerceString(summary, "本课内容正在准备中。"), }];
   }
@@ -71,6 +92,7 @@
 
   function normalizeLesson(item) {
     const type = normalizeLessonType(item.type);
+    const track = normalizeTrack(item.track);
     const blocks = (Array.isArray(item.blocks) && item.blocks.length)
       ? item.blocks
       : defaultBlocks(item.summary);
@@ -80,7 +102,8 @@
     return {
       id: coerceId("lesson", item.id),
       type,
-      track: normalizeTrack(item.track),
+      track,
+      groupIds: normalizeLessonGroupIds(item.groupIds, track),
       title: coerceString(item.title, "未命名课程"),
       minutes: Math.max(1, Math.round(coerceNumber(item.minutes, 3))),
       summary: coerceString(item.summary, "课程内容待完善。"),
@@ -252,6 +275,7 @@
   function isDroppedExam(item) {
     if (!item) return true;
     if (item.track === "html") return true;
+    if (String(item.title || "").trim() === "测试" && /开发者使用/.test(String(item.summary || ""))) return true;
     return DROPPED_EXAM_IDS.has(item.id);
   }
 
@@ -288,6 +312,7 @@
     let raw = null;
     try { raw = JSON.parse(localStorage.getItem(OPS_STORAGE_KEY) || "null"); } catch (_) { }
     contentRevision = Number(raw?.rev) || 0;
+    const courseGroups = normalizeCourseGroups(raw?.courseGroups || DATA.courseGroups);
     const fallbackLessons = DATA.lessons.filter((item) => !isDroppedLesson(item)).map(normalizeLesson);
     const fallbackExams = rebuildMixExam(DATA.exams.filter((item) => !isDroppedExam(item)).map(normalizeExam));
     const lessons = Array.isArray(raw?.lessons)
@@ -304,6 +329,7 @@
       : fallbackExams;
     const notices = Array.isArray(raw?.notices) ? raw.notices.map(normalizeNotice) : [];
     return {
+      courseGroups,
       lessons,
       exams: rebuildMixExam(exams),
       notices
@@ -315,6 +341,7 @@
       try { return localStorage.getItem(OPS_STORAGE_KEY) || ""; } catch (_) { return ""; }
     })();
     const snapshot = stripUnrelatedCurriculum(loadOpsStore());
+    DATA.courseGroups = snapshot.courseGroups;
     DATA.lessons = snapshot.lessons;
     DATA.exams = snapshot.exams;
     DATA.notices = snapshot.notices;
@@ -339,6 +366,7 @@
     const payload = {
       rev: contentRevision,
       updatedAt: Date.now(),
+      courseGroups: DATA.courseGroups,
       lessons: DATA.lessons,
       exams: DATA.exams,
       notices: DATA.notices
@@ -398,6 +426,7 @@
       summary: document.getElementById("ops-lesson-summary")?.value || "",
       type: document.getElementById("ops-lesson-type")?.value || "article",
       track: document.getElementById("ops-lesson-track")?.value || "onboard",
+      groupIds: Array.from(document.querySelectorAll('input[name="ops-lesson-groups"]:checked')).map((input) => input.value),
       minutes: document.getElementById("ops-lesson-minutes")?.value || "3",
       access: document.getElementById("ops-lesson-access")?.value || "full",
       mediaUrl: document.getElementById("ops-lesson-media-url")?.value || "",
@@ -698,6 +727,7 @@
       return {
         rev: contentRevision,
         updatedAt: Date.now(),
+        courseGroups: DATA.courseGroups,
         lessons: DATA.lessons,
         exams: DATA.exams,
         notices: DATA.notices || []
@@ -708,11 +738,14 @@
       if (!source || !Array.isArray(source.lessons) || !Array.isArray(source.exams)) return false;
       const rev = Number(payload?.rev || source.rev) || 0;
       if (rev && rev <= contentRevision) return false;
+      const courseGroups = normalizeCourseGroups(source.courseGroups);
       const normalized = stripUnrelatedCurriculum({
+        courseGroups,
         lessons: source.lessons.map(normalizeLesson),
         exams: source.exams.map(normalizeExam),
         notices: Array.isArray(source.notices) ? source.notices.map(normalizeNotice) : []
       });
+      DATA.courseGroups = normalized.courseGroups;
       DATA.lessons = normalized.lessons;
       DATA.exams = normalized.exams;
       DATA.notices = normalized.notices;
@@ -1038,7 +1071,8 @@
     new URLSearchParams(query || "").forEach((value, key) => { params[key] = value; });
     if (!parts.length || parts[0] === "home") return { name: "home" };
     if (parts[0] === "messages") return { name: "messages" };
-    if (parts[0] === "learn") return { name: "learn", type: params.type || "all" };
+    if (parts[0] === "apps" && parts[1] === "notes") return { name: "embedded-app", app: "notes" };
+    if (parts[0] === "learn") return { name: "learn", type: params.type || "all", group: params.group || "all" };
     if (parts[0] === "exams") return { name: "exams" };
     if (parts[0] === "me") return { name: "me" };
     if (parts[0] === "ops") return {
@@ -1063,6 +1097,7 @@
     if (!route) return "#/home";
     if (route.name === "lesson") return "#/learn";
     if (route.name === "notice") return "#/messages";
+    if (route.name === "embedded-app") return "#/home";
     if (route.name === "exam" || route.name === "result") return "#/exams";
     if (route.name === "ops") {
       if (route.mode === "add" || route.mode === "edit") return `#/ops?section=${route.section}`;
@@ -1244,6 +1279,16 @@
         </div>
         ${progressRing(completionRate())}
       </div>
+      <section class="home-shortcuts" aria-labelledby="home-shortcuts-title">
+        <header class="home-shortcuts-head">
+          <div><span>连接</span><h3 id="home-shortcuts-title">快捷访问</h3></div>
+        </header>
+        <a class="home-app-shortcut" href="#/apps/notes" aria-label="在 Auto Office 内打开今岭笔记">
+          <img src="https://hldhlh.github.io/web/apps/notes/icon.svg" width="54" height="54" alt="">
+          <span class="home-app-shortcut-copy"><strong>今岭笔记</strong><small>快速记录和查找门店笔记</small></span>
+          <span class="home-app-shortcut-action">打开</span>
+        </a>
+      </section>
       <div class="ops-kpi">
         <button class="ops-card" data-act="go" data-hash="#/learn">
           <span class="ops-tag">学习进度</span>
@@ -1430,6 +1475,7 @@
     return items.map((lesson) => {
       const locked = !Gate.canLesson(lesson);
       const done = isDone(lesson.id);
+      const groupBadges = lessonGroupNames(lesson).map((name) => `<span>${escapeHtml(name)}</span>`).join("");
       const completeBadge = done ? `<span class="course-complete-badge" role="img" aria-label="已通过，优秀">
         <svg viewBox="0 0 560 370" aria-hidden="true" focusable="false">
           <rect class="course-pass-bg" width="560" height="370" rx="28"/>
@@ -1451,6 +1497,7 @@
         ${completeBadge}
         <div class="course-result-body">
           <div class="top"><span class="tag">${locked ? "需授权" : TYPE_LABEL[lesson.type]}</span>${done ? "" : `<span>${minutesLabel(lesson.minutes)}</span>`}</div>
+          ${groupBadges ? `<div class="course-group-badges" aria-label="课程分组">${groupBadges}</div>` : ""}
           <strong>${escapeHtml(lesson.title)}</strong>
           <p class="muted">${locked ? "店长授权后可学" : escapeHtml(lesson.summary)}</p>
           ${keyword ? `<small class="course-match-hint">匹配“${escapeHtml(keyword)}”</small>` : ""}
@@ -1459,12 +1506,13 @@
     }).join("");
   }
 
-  function renderLearn(type) {
+  function renderLearn(type, groupId) {
     setTop("课程", false);
     setTab("learn");
     if (type !== "article" && type !== "video") type = "all";
+    if (groupId !== "all" && !DATA.courseGroups.some((group) => group.id === groupId)) groupId = "all";
     const chips = [["all", "全部"], ["article", "图文"], ["video", "视频"]];
-    const items = DATA.lessons.filter((item) => type === "all" || item.type === type);
+    const items = DATA.lessons.filter((item) => (type === "all" || item.type === type) && (groupId === "all" || item.groupIds?.includes(groupId)));
     view().innerHTML = `
       <div class="course-search" role="search">
         <span class="course-search-icon" aria-hidden="true"></span>
@@ -1473,7 +1521,11 @@
       </div>
       <div class="course-search-meta"><span id="course-search-count">共 ${items.length} 门课程</span></div>
       <div class="chips">
-        ${chips.map(([id, label]) => `<button class="chip ${type === id ? "on" : ""}" data-act="go" data-hash="#/learn?type=${id}">${label}</button>`).join("")}
+        ${chips.map(([id, label]) => `<button class="chip ${type === id ? "on" : ""}" data-act="go" data-hash="#/learn?type=${id}&group=${encodeURIComponent(groupId)}">${label}</button>`).join("")}
+      </div>
+      <div class="chips course-group-filters" aria-label="课程分组筛选">
+        <button class="chip ${groupId === "all" ? "on" : ""}" data-act="go" data-hash="#/learn?type=${type}&group=all">全部分组</button>
+        ${DATA.courseGroups.map((group) => `<button class="chip ${groupId === group.id ? "on" : ""}" data-act="go" data-hash="#/learn?type=${type}&group=${encodeURIComponent(group.id)}">${escapeHtml(group.name)}</button>`).join("")}
       </div>
       ${!Auth.canFull(Auth.session) ? `<p class="muted" style="margin-bottom:12px">当前是基本权限。视频和进阶课需要店长授权。</p>` : ""}
       <div id="course-search-results">${renderCourseCards(items, "")}</div>
@@ -1581,10 +1633,14 @@
 
   function lessonForEditor(raw) {
     const blocks = Array.isArray(raw?.blocks) ? raw.blocks : [];
+    const track = normalizeTrack(raw?.track);
+    const availableGroupIds = new Set((DATA.courseGroups || []).map((group) => group.id));
+    const groupIds = normalizeLessonGroupIds(raw?.groupIds, track).filter((id) => availableGroupIds.has(id));
     return {
       id: raw?.id || "",
       title: coerceString(raw?.title, ""),
-      track: normalizeTrack(raw?.track),
+      track,
+      groupIds: groupIds.length ? groupIds : (DATA.courseGroups?.[0] ? [DATA.courseGroups[0].id] : []),
       type: normalizeLessonType(raw?.type),
       minutes: Math.max(1, Math.round(coerceNumber(raw?.minutes, 3))),
       summary: coerceString(raw?.summary, ""),
@@ -1650,6 +1706,32 @@
       <span><b>${title}</b><small>${hint}</small></span>
       <i aria-hidden="true"></i>
     </label>`;
+  }
+
+  function courseGroupName(groupId) {
+    return DATA.courseGroups?.find((group) => group.id === groupId)?.name || "未命名分组";
+  }
+
+  function lessonGroupNames(lesson) {
+    return normalizeLessonGroupIds(lesson?.groupIds, lesson?.track)
+      .map(courseGroupName)
+      .filter((name, index, names) => names.indexOf(name) === index);
+  }
+
+  function renderLessonGroupOptions(selectedIds) {
+    const selected = new Set(normalizeLessonGroupIds(selectedIds, ""));
+    if (!DATA.courseGroups?.length) return `<p class="empty group-empty">请先返回课程管理创建分组。</p>`;
+    return `<fieldset class="lesson-group-options">
+      <legend>选择发布分组</legend>
+      <p>课程会显示在所有勾选的分组中，至少选择一个。</p>
+      <div>${DATA.courseGroups.map((group) => {
+        const id = `ops-lesson-group-${group.id}`;
+        return `<label for="${escapeHtml(id)}">
+          <input id="${escapeHtml(id)}" name="ops-lesson-groups" type="checkbox" value="${escapeHtml(group.id)}" ${selected.has(group.id) ? "checked" : ""}>
+          <span aria-hidden="true"></span><b>${escapeHtml(group.name)}</b>
+        </label>`;
+      }).join("")}</div>
+    </fieldset>`;
   }
 
   function lessonBlockTemplates(kind) {
@@ -2165,8 +2247,13 @@
           <button type="button" class="remove-media" data-act="ops-lesson-clear-media" ${hasMedia ? "" : "hidden"}>移除当前视频</button>
         </section>
 
+        <section class="card editor-section lesson-group-editor">
+          <div class="editor-section-head"><span data-lesson-step="group">${data.type === "video" ? "04" : "03"}</span><div><h3>发布分组</h3><p>勾选这门课程需要出现在哪些分组</p></div></div>
+          ${renderLessonGroupOptions(data.groupIds)}
+        </section>
+
         <section class="card editor-section lesson-completion-editor">
-          <div class="editor-section-head"><span>04</span><div><h3>完成与通知</h3><p>设置员工完成本课的条件，以及发布后是否提醒</p></div></div>
+          <div class="editor-section-head"><span data-lesson-step="completion">${data.type === "video" ? "05" : "04"}</span><div><h3>完成与通知</h3><p>设置员工完成本课的条件，以及发布后是否提醒</p></div></div>
           <label class="editor-field"><span>衔接考试</span>
             <select id="ops-lesson-required-exam">
               <option value="">不关联考试</option>
@@ -2193,13 +2280,28 @@
 
   function renderOpsLessonList() {
     return `
+      <section class="card course-group-manager">
+        <div class="course-group-head">
+          <div><p class="kicker">课程分组</p><h3>管理发布分组</h3><span>分组可自定义名称；发布课程时可同时勾选多个。</span></div>
+          <div class="course-group-create"><input id="ops-group-new-name" maxlength="30" placeholder="输入新分组名称" aria-label="新分组名称"><button type="button" class="primary" data-act="ops-group-add">新增分组</button></div>
+        </div>
+        <div class="course-group-list">${DATA.courseGroups.map((group) => {
+          const count = DATA.lessons.filter((lesson) => lesson.groupIds?.includes(group.id)).length;
+          return `<div class="course-group-row" data-group-id="${escapeHtml(group.id)}">
+            <input data-group-name value="${escapeHtml(group.name)}" maxlength="30" aria-label="分组名称">
+            <span>${count} 门课程</span>
+            <button type="button" data-act="ops-group-rename" data-id="${escapeHtml(group.id)}">保存名称</button>
+            <button type="button" class="danger" data-act="ops-group-delete" data-id="${escapeHtml(group.id)}">删除</button>
+          </div>`;
+        }).join("")}</div>
+      </section>
       <button class="primary ops-create-button" data-act="go" data-hash="#/ops?section=lessons&mode=add">新建课程</button>
       ${DATA.lessons.length ? DATA.lessons.map((lesson) => `
         <div class="card lesson-card">
           <div class="top"><span class="ops-tag">${TYPE_LABEL[lesson.type] || lesson.type}</span><span>${minutesLabel(lesson.minutes)}</span></div>
           <strong>${escapeHtml(lesson.title)}</strong>
           <p class="muted">${escapeHtml(lesson.summary)}</p>
-          <p class="ops-content-meta">完成条件：${escapeHtml(lessonCompletionLabel(lesson))} · ${lesson.notify !== false ? "发送铃铛消息" : "不发送铃铛消息"}</p>
+          <p class="ops-content-meta">发布分组：${escapeHtml(lessonGroupNames(lesson).join("、") || "未分组")} · 完成条件：${escapeHtml(lessonCompletionLabel(lesson))} · ${lesson.notify !== false ? "发送铃铛消息" : "不发送铃铛消息"}</p>
           <div class="tools">
             <button data-act="go" data-hash="#/ops?section=lessons&mode=edit&id=${lesson.id}">编辑</button>
             <button data-act="ops-delete" data-section="lessons" data-id="${lesson.id}">删除</button>
@@ -2565,12 +2667,33 @@
     }
   }
 
+  function fitLessonVideoToSquare(video) {
+    const width = Number(video?.videoWidth || 0);
+    const height = Number(video?.videoHeight || 0);
+    if (!video || !width || !height) return;
+    const ratio = width / height;
+    video.style.aspectRatio = `${width} / ${height}`;
+    if (ratio >= 1) {
+      video.style.width = "100%";
+      video.style.height = `${100 / ratio}%`;
+    } else {
+      video.style.width = `${ratio * 100}%`;
+      video.style.height = "100%";
+    }
+  }
+
   function bindLessonVideo() {
     const video = document.getElementById("lesson-video");
     if (!video || !state.video) return;
     video.playbackRate = state.video.speed;
     const update = () => updateLessonVideoUi(video);
-    video.addEventListener("loadedmetadata", update);
+    const fitAndUpdate = () => {
+      fitLessonVideoToSquare(video);
+      update();
+    };
+    video.addEventListener("loadedmetadata", fitAndUpdate);
+    video.addEventListener("loadeddata", fitAndUpdate);
+    video.addEventListener("resize", fitAndUpdate);
     video.addEventListener("durationchange", update);
     video.addEventListener("timeupdate", update);
     video.addEventListener("play", update);
@@ -2591,7 +2714,7 @@
       const status = video.closest(".video-course")?.querySelector("[data-video-status]");
       if (status) status.textContent = "视频加载失败，请检查网络";
     });
-    update();
+    fitAndUpdate();
   }
 
   function renderVideo() {
@@ -3042,6 +3165,19 @@
     `;
   }
 
+  function renderEmbeddedApp(appName) {
+    if (appName !== "notes") return go("#/home");
+    setTop("今岭笔记", true);
+    setTab("home");
+    view().innerHTML = `
+      <iframe
+        class="embedded-app-frame"
+        src="https://hldhlh.github.io/web/apps/notes/index.html"
+        title="今岭笔记"
+        referrerpolicy="strict-origin-when-cross-origin"
+      ></iframe>`;
+  }
+
   function updateNotificationButton() {
     const btn = document.getElementById("notification-btn");
     if (!btn || !Auth.session) return;
@@ -3055,12 +3191,14 @@
     if (state.video && state.route.name !== "lesson") state.video.playing = false;
     const route = state.route;
     document.querySelector(".app")?.classList.toggle("ops-mode", route.name === "ops");
+    document.querySelector(".app")?.classList.toggle("embedded-mode", route.name === "embedded-app");
     updateNotificationButton();
     if (route.name === "home") return renderHome();
     if (route.name === "messages") return renderMessages();
+    if (route.name === "embedded-app") return renderEmbeddedApp(route.app);
     if (route.name === "notice") return renderNotice(route.id);
     if (route.name === "ops") return renderOps();
-    if (route.name === "learn") return renderLearn(route.type);
+    if (route.name === "learn") return renderLearn(route.type, route.group);
     if (route.name === "exams") return renderExams();
     if (route.name === "me") return renderMe();
     if (route.name === "lesson") return openLesson(route.id);
@@ -3198,6 +3336,40 @@
       return go(`#/ops?section=${currentOpsRoute().section}`);
     }
     if (act === "ops-message") return go("#/ops?section=notices");
+    if (act === "ops-group-add") {
+      const input = document.getElementById("ops-group-new-name");
+      const name = coerceString(input?.value, "");
+      if (!name) return alert("请输入分组名称。");
+      if (DATA.courseGroups.some((group) => group.name.toLowerCase() === name.toLowerCase())) return alert("已经有同名分组。");
+      DATA.courseGroups = DATA.courseGroups.concat({ id: coerceId("group", ""), name });
+      saveOpsStore();
+      ContentSync.publish().catch(() => alert("分组已暂存，请检查网络后重新发布。"));
+      return renderOps();
+    }
+    if (act === "ops-group-rename") {
+      const row = btn.closest("[data-group-id]");
+      const name = coerceString(row?.querySelector("[data-group-name]")?.value, "");
+      if (!name) return alert("分组名称不能为空。");
+      if (DATA.courseGroups.some((group) => group.id !== btn.dataset.id && group.name.toLowerCase() === name.toLowerCase())) return alert("已经有同名分组。");
+      DATA.courseGroups = DATA.courseGroups.map((group) => group.id === btn.dataset.id ? { ...group, name } : group);
+      saveOpsStore();
+      ContentSync.publish().catch(() => alert("名称已暂存，请检查网络后重新发布。"));
+      return renderOps();
+    }
+    if (act === "ops-group-delete") {
+      if (DATA.courseGroups.length <= 1) return alert("至少保留一个课程分组。");
+      const group = DATA.courseGroups.find((item) => item.id === btn.dataset.id);
+      if (!group || !confirm(`确认删除分组“${group.name}”吗？分组内课程会移到其他分组。`)) return;
+      const remaining = DATA.courseGroups.filter((item) => item.id !== group.id);
+      DATA.courseGroups = remaining;
+      DATA.lessons = DATA.lessons.map((lesson) => {
+        const groupIds = normalizeLessonGroupIds(lesson.groupIds, lesson.track).filter((id) => id !== group.id);
+        return { ...lesson, groupIds: groupIds.length ? groupIds : [remaining[0].id] };
+      });
+      saveOpsStore();
+      ContentSync.publish().catch(() => alert("分组变更已暂存，请检查网络后重新发布。"));
+      return renderOps();
+    }
     if (act === "ops-delete") {
       const section = btn.dataset.section;
       const id = btn.dataset.id;
@@ -3386,6 +3558,7 @@
             id: id || coerceId("lesson", ""),
             title: coerceString(document.getElementById("ops-lesson-title")?.value, ""),
             track: coerceString(document.getElementById("ops-lesson-track")?.value, ""),
+            groupIds: Array.from(document.querySelectorAll('input[name="ops-lesson-groups"]:checked')).map((input) => input.value),
             type: rawType,
             minutes: document.getElementById("ops-lesson-minutes")?.value || "3",
             access: document.getElementById("ops-lesson-access")?.value || "full",
@@ -3401,6 +3574,11 @@
           if (!raw.title) {
             setPublishFailed(btn);
             alert("课程标题不能为空。");
+            return;
+          }
+          if (!raw.groupIds.length) {
+            setPublishFailed(btn);
+            alert("发布课程前请至少勾选一个分组。");
             return;
           }
           const pickedFile = document.getElementById("ops-lesson-media")?.files?.[0];
@@ -3618,6 +3796,11 @@
     if (event.target.id === "ops-lesson-type") {
       const panel = document.querySelector("[data-video-panel]");
       if (panel) panel.hidden = event.target.value !== "video";
+      const hasVideoStep = event.target.value === "video";
+      const groupStep = document.querySelector('[data-lesson-step="group"]');
+      const completionStep = document.querySelector('[data-lesson-step="completion"]');
+      if (groupStep) groupStep.textContent = hasVideoStep ? "04" : "03";
+      if (completionStep) completionStep.textContent = hasVideoStep ? "05" : "04";
       saveLessonDraft();
       return;
     }

@@ -215,8 +215,6 @@
       heading.textContent = "必做考试";
     }
 
-    const developerTest = examCard("测试", "测试开发者使用");
-    if (developerTest) developerTest.classList.add("ao-redundant-exam");
     const repeatedMock = examCard("综合模拟", "待复查");
     if (repeatedMock) repeatedMock.classList.add("ao-redundant-exam");
 
