@@ -87,6 +87,9 @@
       access: item.access === "basic" ? "basic" : "full",
       mediaUrl: coerceString(item.mediaUrl, ""),
       publishedAt: coerceNumber(item.publishedAt, 0),
+      notify: item.notify !== false,
+      requiredExamId: coerceString(item.requiredExamId, ""),
+      requireConfirmation: item.requireConfirmation !== false,
       blocks,
       scenes
     };
@@ -193,6 +196,7 @@
       pass: Math.max(1, Math.min(100, Math.round(coerceNumber(item.pass, 80)))),
       summary: coerceString(item.summary, "考试内容正在准备中。"),
       publishedAt: coerceNumber(item.publishedAt, 0),
+      notify: item.notify !== false,
       questions
     };
   }
@@ -233,6 +237,7 @@
       title: coerceString(item.title, "新消息"),
       detail: coerceString(item.detail || item.content, "请尽快查看。"),
       createdAt: coerceNumber(item.createdAt, Date.now()),
+      notify: item.notify !== false,
       audience: normalizeNoticeAudience(item.audience)
     };
   }
@@ -396,6 +401,9 @@
       minutes: document.getElementById("ops-lesson-minutes")?.value || "3",
       access: document.getElementById("ops-lesson-access")?.value || "full",
       mediaUrl: document.getElementById("ops-lesson-media-url")?.value || "",
+      requiredExamId: document.getElementById("ops-lesson-required-exam")?.value || "",
+      requireConfirmation: Boolean(document.getElementById("ops-lesson-require-confirmation")?.checked),
+      notify: document.getElementById("ops-lesson-notify")?.checked !== false,
       blocks,
       scenes
     };
@@ -896,27 +904,43 @@
   }
 
   function isDone(id) {
-    return Boolean(state.progress.completed[id]);
+    const lesson = lessonById(id);
+    return lesson ? lessonCompletedForProgress(lesson, state.progress) : Boolean(state.progress.completed[id]);
+  }
+
+  function progressBestScore(progress, examId) {
+    const logs = progress?.examHistory?.[examId] || [];
+    return logs.reduce((max, item) => Math.max(max, Number(item?.score ?? item) || 0), -1);
+  }
+
+  function lessonCompletedForProgress(lesson, progress) {
+    if (!lesson) return false;
+    if (progress?.completed?.[lesson.id]) return true;
+    if (!lesson.requiredExamId) return false;
+    const exam = examById(lesson.requiredExamId);
+    return Boolean(exam && progressBestScore(progress, exam.id) >= exam.pass);
   }
 
   function completeLesson(id) {
+    const lesson = lessonById(id);
+    if (lesson?.requiredExamId && !lessonCompletedForProgress(lesson, state.progress)) return false;
     state.progress.completed[id] = Date.now();
     state.progress.last = { type: "lesson", id };
     touchStreak();
     save();
     updateNotificationButton();
+    return true;
   }
 
   function completionRate() {
     const total = DATA.lessons.length + DATA.exams.length;
     const examDone = DATA.exams.filter((exam) => bestScore(exam.id) >= exam.pass).length;
-    const done = Object.keys(state.progress.completed).length + examDone;
+    const done = DATA.lessons.filter((lesson) => isDone(lesson.id)).length + examDone;
     return Math.round((done / total) * 100);
   }
 
   function bestScore(examId) {
-    const logs = state.progress.examHistory[examId] || [];
-    return logs.reduce((max, item) => Math.max(max, Number(item?.score ?? item) || 0), -1);
+    return progressBestScore(state.progress, examId);
   }
 
   function nextLesson() {
@@ -953,6 +977,7 @@
   }
 
   function markPublishedContentRead(kind, item) {
+    if (item?.notify === false) return false;
     return markMessageRead(contentMessageKey(kind, item?.id, item?.publishedAt || item?.createdAt));
   }
 
@@ -962,7 +987,7 @@
     const pendingExams = DATA.exams.filter((exam) => Gate.canExam(exam) && !examPassed(exam));
     const notices = [];
 
-    DATA.lessons.filter((lesson) => Gate.canLesson(lesson) && lesson.publishedAt > 0).forEach((lesson) => {
+    DATA.lessons.filter((lesson) => Gate.canLesson(lesson) && lesson.notify !== false && lesson.publishedAt > 0).forEach((lesson) => {
       notices.push({
         key: contentMessageKey("lesson", lesson.id, lesson.publishedAt),
         tone: "info",
@@ -975,7 +1000,7 @@
       });
     });
 
-    DATA.exams.filter((exam) => Gate.canExam(exam) && exam.publishedAt > 0).forEach((exam) => {
+    DATA.exams.filter((exam) => Gate.canExam(exam) && exam.notify !== false && exam.publishedAt > 0).forEach((exam) => {
       notices.push({
         key: contentMessageKey("exam", exam.id, exam.publishedAt),
         tone: "info",
@@ -988,7 +1013,7 @@
       });
     });
 
-    const posted = (DATA.notices || []).filter((notice) => noticeVisibleTo(notice)).map((notice) => ({
+    const posted = (DATA.notices || []).filter((notice) => notice.notify !== false && noticeVisibleTo(notice)).map((notice) => ({
       key: contentMessageKey("notice", notice.id, notice.createdAt),
       tone: notice.tone === "urgent" ? "urgent" : "info",
       kicker: coerceString(notice.kicker, "运营通知"),
@@ -1404,11 +1429,32 @@
       </div>`;
     return items.map((lesson) => {
       const locked = !Gate.canLesson(lesson);
-      return `<button class="card lesson-card course-result" data-act="open-lesson" data-id="${lesson.id}">
-        <div class="top"><span class="tag">${locked ? "需授权" : TYPE_LABEL[lesson.type]}</span><span>${isDone(lesson.id) ? "已完成" : minutesLabel(lesson.minutes)}</span></div>
-        <strong>${escapeHtml(lesson.title)}</strong>
-        <p class="muted">${locked ? "店长授权后可学" : escapeHtml(lesson.summary)}</p>
-        ${keyword ? `<small class="course-match-hint">匹配“${escapeHtml(keyword)}”</small>` : ""}
+      const done = isDone(lesson.id);
+      const completeBadge = done ? `<span class="course-complete-badge" role="img" aria-label="已通过，优秀">
+        <svg viewBox="0 0 560 370" aria-hidden="true" focusable="false">
+          <rect class="course-pass-bg" width="560" height="370" rx="28"/>
+          <g class="course-pass-stamp" transform="rotate(-13 218 218)">
+            <path class="course-pass-ring course-pass-ring-strong" d="M218 70C128 70 72 132 72 218c0 80 50 133 119 145m31 2c83 0 144-57 144-147 0-82-59-142-148-148"/>
+            <path class="course-pass-ring course-pass-ring-soft" d="M126 214c14-58 53-93 105-96 47-2 86 22 108 61M139 286c39 39 101 47 151 16"/>
+            <text class="course-pass-label" x="218" y="238" text-anchor="middle">已通过</text>
+          </g>
+          <g class="course-excellent-medal">
+            <path class="course-medal-ribbon-red" d="M424 5h42l-7 91h-30zM477 5h42l-5 91h-31z"/>
+            <path class="course-medal-ribbon-yellow" d="M417 4h110v15H417z"/>
+            <path class="course-medal-face" d="M472 59l23 11 25-2 13 21 21 14-3 25 11 23-17 18-4 25-25 7-18 18-24-9-24 9-18-18-25-7-4-25-17-18 11-23-3-25 21-14 13-21 25 2z"/>
+            <path class="course-medal-highlight" d="M472 71l20 10 22-2 11 18 18 12-2 22 9 20-15 16-3 21-21 6-15 15-21-8-20 8-15-15-21-6-3-21-15-16 9-20-2-22 18-12 11-18 22 2z"/>
+            <text class="course-medal-label" x="472" y="154" text-anchor="middle">优秀</text>
+          </g>
+        </svg>
+      </span>` : "";
+      return `<button class="card lesson-card course-result ${done ? "is-complete" : ""}" data-act="open-lesson" data-id="${lesson.id}">
+        ${completeBadge}
+        <div class="course-result-body">
+          <div class="top"><span class="tag">${locked ? "需授权" : TYPE_LABEL[lesson.type]}</span>${done ? "" : `<span>${minutesLabel(lesson.minutes)}</span>`}</div>
+          <strong>${escapeHtml(lesson.title)}</strong>
+          <p class="muted">${locked ? "店长授权后可学" : escapeHtml(lesson.summary)}</p>
+          ${keyword ? `<small class="course-match-hint">匹配“${escapeHtml(keyword)}”</small>` : ""}
+        </div>
       </button>`;
     }).join("");
   }
@@ -1544,9 +1590,20 @@
       summary: coerceString(raw?.summary, ""),
       access: raw?.access === "basic" ? "basic" : "full",
       mediaUrl: coerceString(raw?.mediaUrl, ""),
+      requiredExamId: coerceString(raw?.requiredExamId, ""),
+      requireConfirmation: raw?.id ? raw?.requireConfirmation !== false : Boolean(raw?.requireConfirmation),
+      notify: raw?.notify !== false,
       blocks: blocks.length ? blocks : defaultBlocks(coerceString(raw?.summary, "课程内容待完善。")),
       scenes: Array.isArray(raw?.scenes) && raw.scenes.length ? raw.scenes : []
     };
+  }
+
+  function lessonCompletionLabel(lesson) {
+    if (lesson.requiredExamId) {
+      const exam = examById(lesson.requiredExamId);
+      return exam ? `通过「${exam.title}」` : "关联考试不可用";
+    }
+    return lesson.requireConfirmation ? "员工确认完成" : "阅读或观看结束自动完成";
   }
 
   function examForEditor(raw) {
@@ -1557,6 +1614,7 @@
       pass: Math.max(1, Math.min(100, Math.round(coerceNumber(raw?.pass, 80)))),
       minutes: Math.max(1, Math.round(coerceNumber(raw?.minutes, 8))),
       summary: coerceString(raw?.summary, ""),
+      notify: raw?.notify !== false,
       questions: Array.isArray(raw?.questions) ? raw.questions : []
     };
   }
@@ -1569,6 +1627,7 @@
       detail: coerceString(raw?.detail, ""),
       tone: raw?.tone === "urgent" ? "urgent" : "info",
       createdAt: coerceNumber(raw?.createdAt, Date.now()),
+      notify: raw?.notify !== false,
       audience: normalizeNoticeAudience(raw?.audience)
     };
   }
@@ -1583,6 +1642,14 @@
     const date = new Date(coerceNumber(ms, Date.now()));
     const pad = (num) => String(num).padStart(2, "0");
     return `${date.getMonth() + 1}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  function renderPublishToggle(id, checked, title, hint) {
+    return `<label class="publish-option" for="${id}">
+      <input id="${id}" type="checkbox" ${checked ? "checked" : ""}>
+      <span><b>${title}</b><small>${hint}</small></span>
+      <i aria-hidden="true"></i>
+    </label>`;
   }
 
   function lessonBlockTemplates(kind) {
@@ -2001,6 +2068,10 @@
             <option value="urgent" ${data.tone === "urgent" ? "selected" : ""}>重要</option>
           </select>
         </label>
+        <fieldset class="publish-options">
+          <legend>消息提醒</legend>
+          ${renderPublishToggle("ops-notice-notify", data.notify, "发送铃铛消息", "发布后进入成员消息列表并显示未读铃铛")}
+        </fieldset>
         <div class="actions">
           <button class="primary" type="button" data-act="ops-save" data-section="notices" data-id="${data.id}">${data.id ? "保存帖子" : "发布帖子"}</button>
           <button class="ghost" type="button" data-act="ops-cancel" data-section="notices">取消</button>
@@ -2018,7 +2089,7 @@
           <div class="top"><span class="ops-tag">${notice.tone === "urgent" ? "重要" : "一般"}</span><span>${renderDateLabel(notice.createdAt)}</span></div>
           <strong>${escapeHtml(notice.title)}</strong>
           <p class="muted">${escapeHtml(notice.kicker)} · ${escapeHtml(notice.detail)}</p>
-          <p class="notice-recipient-line">发送给：${escapeHtml(noticeAudienceLabel(notice))}</p>
+          <p class="notice-recipient-line">发送给：${escapeHtml(noticeAudienceLabel(notice))} · ${notice.notify !== false ? "发送铃铛消息" : "不发送铃铛消息"}</p>
           <div class="tools">
             <button data-act="go" data-hash="#/ops?section=notices&mode=edit&id=${notice.id}">编辑</button>
             <button data-act="ops-delete" data-section="notices" data-id="${notice.id}">删除</button>
@@ -2094,6 +2165,21 @@
           <button type="button" class="remove-media" data-act="ops-lesson-clear-media" ${hasMedia ? "" : "hidden"}>移除当前视频</button>
         </section>
 
+        <section class="card editor-section lesson-completion-editor">
+          <div class="editor-section-head"><span>04</span><div><h3>完成与通知</h3><p>设置员工完成本课的条件，以及发布后是否提醒</p></div></div>
+          <label class="editor-field"><span>衔接考试</span>
+            <select id="ops-lesson-required-exam">
+              <option value="">不关联考试</option>
+              ${DATA.exams.map((exam) => `<option value="${escapeHtml(exam.id)}" ${exam.id === data.requiredExamId ? "selected" : ""}>${escapeHtml(exam.title)} · ${exam.pass} 分通过</option>`).join("")}
+            </select>
+            <small>选择后，员工必须通过这场考试，本教程才会显示为已完成。</small>
+          </label>
+          <div class="publish-options">
+            ${renderPublishToggle("ops-lesson-require-confirmation", data.requireConfirmation, "阅读后需要确认", "不关联考试时，正文末尾显示“确认完成本课”按钮；关闭后阅读即完成")}
+            ${renderPublishToggle("ops-lesson-notify", data.notify, "发送铃铛消息", "发布后进入成员消息列表并显示未读铃铛")}
+          </div>
+        </section>
+
         <textarea id="ops-lesson-blocks" hidden>${escapeHtml(JSON.stringify(data.blocks))}</textarea>
         <textarea id="ops-lesson-scenes" hidden>${escapeHtml(JSON.stringify(data.scenes))}</textarea>
 
@@ -2113,6 +2199,7 @@
           <div class="top"><span class="ops-tag">${TYPE_LABEL[lesson.type] || lesson.type}</span><span>${minutesLabel(lesson.minutes)}</span></div>
           <strong>${escapeHtml(lesson.title)}</strong>
           <p class="muted">${escapeHtml(lesson.summary)}</p>
+          <p class="ops-content-meta">完成条件：${escapeHtml(lessonCompletionLabel(lesson))} · ${lesson.notify !== false ? "发送铃铛消息" : "不发送铃铛消息"}</p>
           <div class="tools">
             <button data-act="go" data-hash="#/ops?section=lessons&mode=edit&id=${lesson.id}">编辑</button>
             <button data-act="ops-delete" data-section="lessons" data-id="${lesson.id}">删除</button>
@@ -2143,6 +2230,10 @@
           </label>
         </div>
         <label>简介<textarea id="ops-exam-summary">${escapeHtml(data.summary)}</textarea></label>
+        <fieldset class="publish-options">
+          <legend>消息提醒</legend>
+          ${renderPublishToggle("ops-exam-notify", data.notify, "发送铃铛消息", "发布后进入成员消息列表并显示未读铃铛")}
+        </fieldset>
         <label>题目（可视化编辑）
           <div class="actions">
             <button type="button" class="ghost" data-act="ops-exam-add-question">新增题目</button>
@@ -2166,6 +2257,7 @@
           <div class="top"><span class="ops-tag">${exam.pass}分</span><span>${minutesLabel(exam.minutes)}</span></div>
           <strong>${escapeHtml(exam.title)}</strong>
           <p class="muted">${escapeHtml(exam.summary)}</p>
+          <p class="ops-content-meta">${exam.notify !== false ? "发布时发送铃铛消息" : "发布时不发送铃铛消息"}</p>
           <div class="tools">
             <button data-act="go" data-hash="#/ops?section=exams&mode=edit&id=${exam.id}">编辑</button>
             <button data-act="ops-delete" data-section="exams" data-id="${exam.id}">删除</button>
@@ -2184,7 +2276,7 @@
         : StaffProgress.rows.get(user.id);
       if (!cached) return { user, loading: true };
       const progress = cached.progress;
-      const lessonDone = DATA.lessons.filter((lesson) => Boolean(progress.completed?.[lesson.id]));
+      const lessonDone = DATA.lessons.filter((lesson) => lessonCompletedForProgress(lesson, progress));
       const examDone = DATA.exams.filter((exam) => {
         const attempts = Array.isArray(progress.examHistory?.[exam.id]) ? progress.examHistory[exam.id] : [];
         const best = attempts.reduce((score, attempt) => Math.max(score, Number(attempt?.score ?? attempt) || 0), 0);
@@ -2232,7 +2324,7 @@
               <div class="staff-loading-line"></div>
             </article>`;
           const isOnline = item.lastSeenAt && Date.now() - item.lastSeenAt < 90000;
-          const pendingLessons = DATA.lessons.filter((lesson) => !item.progress.completed?.[lesson.id]);
+          const pendingLessons = DATA.lessons.filter((lesson) => !lessonCompletedForProgress(lesson, item.progress));
           const passedExamIds = new Set(item.examDone.map((exam) => exam.id));
           const pendingExams = DATA.exams.filter((exam) => !passedExamIds.has(exam.id));
           return `
@@ -2374,17 +2466,52 @@
     `;
   }
 
+  function lessonCompletionPanel(lesson, unlocked = true) {
+    if (isDone(lesson.id)) {
+      return `<footer class="lesson-completion-panel is-done"><div><strong>本课已完成</strong><span>学习记录已保存</span></div><button class="primary" data-act="complete" data-id="${lesson.id}">继续学习</button></footer>`;
+    }
+    const linkedExam = lesson.requiredExamId ? examById(lesson.requiredExamId) : null;
+    if (lesson.requiredExamId) {
+      if (!linkedExam || !Gate.canExam(linkedExam)) {
+        return `<footer class="lesson-completion-panel is-locked"><div><strong>关联考试暂不可用</strong><span>请联系店长检查考试配置或权限</span></div></footer>`;
+      }
+      return `<footer class="lesson-completion-panel"><div><strong>通过考试后完成本课</strong><span>${escapeHtml(linkedExam.title)} · ${linkedExam.pass} 分通过</span></div><button class="primary" data-act="lesson-exam" data-exam-id="${linkedExam.id}" ${unlocked ? "" : "disabled"}>${unlocked ? "参加考试" : "看完视频后参加考试"}</button></footer>`;
+    }
+    if (lesson.requireConfirmation) {
+      return `<footer class="lesson-completion-panel"><div><strong>确认学习结果</strong><span>${unlocked ? "确认后，本课将计入已完成" : "视频播放结束后即可确认"}</span></div><button class="primary" data-act="complete" data-id="${lesson.id}" ${unlocked ? "" : "disabled"}>${unlocked ? "确认完成本课" : "看完视频后可确认"}</button></footer>`;
+    }
+    return `<footer class="lesson-completion-panel is-auto" data-auto-complete role="status" aria-live="polite"><div><strong>${unlocked ? "正在记录学习结果" : "看完视频后自动完成"}</strong><span>${unlocked ? "阅读到本页末尾后自动完成，无需再次确认" : "播放结束时会自动保存完成状态"}</span></div><i aria-hidden="true"></i></footer>`;
+  }
+
+  function bindArticleAutoCompletion(lesson) {
+    const panel = view().querySelector("[data-auto-complete]");
+    if (!panel || isDone(lesson.id)) return;
+    const finish = () => {
+      if (!panel.isConnected || state.route.name !== "lesson" || state.route.id !== lesson.id) {
+        window.removeEventListener("scroll", check);
+        return;
+      }
+      if (panel.getBoundingClientRect().bottom > window.innerHeight + 24) return;
+      window.removeEventListener("scroll", check);
+      completeLesson(lesson.id);
+      panel.classList.add("is-done");
+      panel.innerHTML = `<div><strong>本课已自动完成</strong><span>学习记录已保存</span></div><span class="lesson-complete-check" aria-hidden="true">✓</span>`;
+    };
+    const check = () => requestAnimationFrame(finish);
+    window.addEventListener("scroll", check, { passive: true });
+    requestAnimationFrame(finish);
+  }
+
   function renderArticle(lesson) {
     setTop(lesson.title, true);
     view().innerHTML = `
       <article class="article">
         <p class="muted">${TYPE_LABEL.article} · ${minutesLabel(lesson.minutes)}</p>
         ${renderBlocks(lesson.blocks)}
-        <div class="actions">
-          <button class="primary" data-act="complete" data-id="${lesson.id}">${isDone(lesson.id) ? "已完成，返回" : "完成本课"}</button>
-        </div>
+        ${lessonCompletionPanel(lesson)}
       </article>
     `;
+    if (!lesson.requiredExamId && !lesson.requireConfirmation) bindArticleAutoCompletion(lesson);
   }
 
   function lessonVideoSource(lesson) {
@@ -2422,7 +2549,7 @@
     const durationMeta = player?.querySelector("[data-video-duration]");
     const status = player?.querySelector("[data-video-status]");
     const toggle = player?.querySelector('[data-act="video-toggle"]');
-    const complete = player?.querySelector('[data-act="complete"]');
+    const complete = player?.querySelector('[data-act="complete"], [data-act="lesson-exam"]');
     if (fill) fill.style.width = `${progress}%`;
     if (time) time.textContent = `${videoTimeLabel(current)} / ${videoTimeLabel(duration)}`;
     if (durationMeta) durationMeta.textContent = duration ? `实际时长 ${videoTimeLabel(duration)}` : "正在读取视频";
@@ -2431,7 +2558,10 @@
     if (complete) {
       const unlocked = state.video.watchedToEnd || isDone(state.video.id);
       complete.disabled = !unlocked;
-      complete.textContent = isDone(state.video.id) ? "已完成，返回" : unlocked ? "完成本课" : "看完视频后可完成";
+      if (!isDone(state.video.id)) {
+        if (lessonById(state.video.id)?.requiredExamId) complete.textContent = unlocked ? "参加考试" : "看完视频后参加考试";
+        else complete.textContent = unlocked ? "确认完成本课" : "看完视频后可确认";
+      }
     }
   }
 
@@ -2449,6 +2579,12 @@
     video.addEventListener("ended", () => {
       state.video.watchedToEnd = true;
       state.video.playing = false;
+      const lesson = lessonById(state.video.id);
+      if (lesson && !lesson.requiredExamId && !lesson.requireConfirmation && !isDone(lesson.id)) {
+        completeLesson(lesson.id);
+        renderVideo();
+        return;
+      }
       update();
     });
     video.addEventListener("error", () => {
@@ -2500,9 +2636,7 @@
           <div class="video-chapter-list">${lesson.scenes.map((scene, index) => `<div><b>${String(index + 1).padStart(2, "0")}</b><span><strong>${escapeHtml(scene.title)}</strong><small>${escapeHtml(scene.caption)}</small></span></div>`).join("")}</div>
         </section>` : ""}
 
-        <footer class="video-complete-panel">
-          <button class="primary" data-act="complete" data-id="${lesson.id}" ${unlocked ? "" : "disabled"}>${done ? "已完成，返回" : unlocked ? "完成本课" : "看完视频后可完成"}</button>
-        </footer>
+        ${lessonCompletionPanel(lesson, unlocked)}
       </article>
     `;
     bindLessonVideo();
@@ -2601,6 +2735,11 @@
     wrong.forEach((item) => map.set(item.id, item));
     if (score >= exam.pass) {
       wrong.forEach((item) => map.delete(item.id));
+      DATA.lessons
+        .filter((lesson) => lesson.requiredExamId === exam.id)
+        .forEach((lesson) => {
+          if (!state.progress.completed[lesson.id]) state.progress.completed[lesson.id] = record.at;
+        });
     }
     state.progress.wrong = Array.from(map.values());
     state.exam.result = { score, correct, total: exam.questions.length, pass: score >= exam.pass, wrong, at: record.at };
@@ -3252,6 +3391,9 @@
             access: document.getElementById("ops-lesson-access")?.value || "full",
             mediaUrl: coerceString(document.getElementById("ops-lesson-media-url")?.value, ""),
             publishedAt: Date.now(),
+            notify: document.getElementById("ops-lesson-notify")?.checked !== false,
+            requiredExamId: coerceString(document.getElementById("ops-lesson-required-exam")?.value, ""),
+            requireConfirmation: Boolean(document.getElementById("ops-lesson-require-confirmation")?.checked),
             summary: coerceString(document.getElementById("ops-lesson-summary")?.value, ""),
             blocks,
             scenes: sceneRaw
@@ -3309,6 +3451,7 @@
             pass: document.getElementById("ops-exam-pass")?.value || "80",
             minutes: document.getElementById("ops-exam-minutes")?.value || "8",
             publishedAt: Date.now(),
+            notify: document.getElementById("ops-exam-notify")?.checked !== false,
             summary: coerceString(document.getElementById("ops-exam-summary")?.value, ""),
             questions: finalQuestions
           };
@@ -3349,6 +3492,7 @@
             detail: coerceString(document.getElementById("ops-notice-detail")?.value, ""),
             tone: coerceString(document.getElementById("ops-notice-tone")?.value, "info"),
             createdAt,
+            notify: document.getElementById("ops-notice-notify")?.checked !== false,
             audience: { mode: audienceMode, userIds: recipientIds }
           };
           if (!raw.title) {
@@ -3378,12 +3522,21 @@
     }
     if (act === "go") return go(btn.dataset.hash);
     if (act === "open-lesson") return go(`#/lesson/${btn.dataset.id}`);
+    if (act === "lesson-exam") {
+      const exam = examById(btn.dataset.examId);
+      if (!exam || !Gate.canExam(exam)) return alert("关联考试暂不可用，请联系店长。");
+      return go(`#/exam/${exam.id}`);
+    }
     if (act === "complete") {
       const lesson = lessonById(btn.dataset.id);
       if (lesson?.type === "video") {
         if (!state.video?.watchedToEnd && !isDone(lesson.id)) return;
       }
-      completeLesson(btn.dataset.id);
+      if (!completeLesson(btn.dataset.id)) {
+        const linkedExam = examById(lesson?.requiredExamId);
+        if (linkedExam && Gate.canExam(linkedExam)) return go(`#/exam/${linkedExam.id}`);
+        return;
+      }
       const items = lessonsIn(lesson.track);
       const following = items.slice(items.findIndex((item) => item.id === lesson.id) + 1).find((item) => Gate.canLesson(item));
       if (following) return go(`#/lesson/${following.id}`);

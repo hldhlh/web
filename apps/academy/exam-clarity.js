@@ -245,6 +245,8 @@
   };
 
   const render = () => {
+    const app = document.querySelector(".app");
+    if (app?.classList.contains("ops-mode") || location.hash.startsWith("#/ops")) return;
     addPriorityStrip();
     simplifyExamList();
   };
