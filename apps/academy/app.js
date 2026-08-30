@@ -3537,8 +3537,7 @@
       <div class="gate">
         <form class="gate-card" id="auth-form">
           <div class="gate-intro">
-            <span class="gate-mark">AO</span>
-            <div><p class="kicker">进入学堂</p><h2>${gateMode === "login" ? "欢迎回来" : "创建学习账号"}</h2></div>
+            <h2>${gateMode === "login" ? "欢迎回来" : "创建学习账号"}</h2>
           </div>
           <div class="chips" style="padding-bottom:8px">
             <button type="button" class="chip ${gateMode === "login" ? "on" : ""}" data-act="gate-mode" data-mode="login">登录</button>

@@ -4512,25 +4512,11 @@ textarea:focus-visible {
 .gate-intro {
   display: flex;
   align-items: center;
-  gap: 13px;
   margin-bottom: 18px;
 }
 
 .gate-intro h2 {
-  margin: 2px 0 0;
-}
-
-.gate-mark {
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border-radius: 14px;
-  background: var(--ink);
-  color: var(--bg);
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  margin: 0;
 }
 
 .gate-label {
