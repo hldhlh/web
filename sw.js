@@ -15,6 +15,7 @@ const SHELL = [
   './apps/jlksh/icon.svg',
   './apps/jlhcdh/icon.svg',
   './apps/academy/icon.svg',
+  './apps/academy/version-guard.js',
   './apps/vista/icon.svg',
   './apps/svg/icon.svg',
   './apps/vista/index.html',

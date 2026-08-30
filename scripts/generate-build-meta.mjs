@@ -52,4 +52,11 @@ if (existsSync(serviceWorkerPath)) {
   writeFileSync(serviceWorkerPath, rendered);
 }
 
+const academyIndexPath = join(outputRoot, 'apps', 'academy', 'index.html');
+if (existsSync(academyIndexPath)) {
+  const academyIndex = readFileSync(academyIndexPath, 'utf8');
+  const rendered = academyIndex.replaceAll('__BUILD_VERSION__', build.version);
+  writeFileSync(academyIndexPath, rendered);
+}
+
 console.log(`Generated version ${build.version} for ${Object.keys(apps).length} apps.`);

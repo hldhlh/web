@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f2f2f7">
+  <meta name="app-build-version" content="__BUILD_VERSION__">
   <title>Auto Office</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="dns-prefetch" href="//fmxddvjgkykuqwmasigo.supabase.co">
@@ -23,11 +24,11 @@
       table: "academy_progress"
     };
   </script>
-  <link rel="stylesheet" href="./style.css?v=20260830-2">
-  <link rel="preload" href="../network.js?v=20260827-8" as="script">
+  <link rel="stylesheet" href="./style.css?v=__BUILD_VERSION__">
+  <link rel="preload" href="../network.js?v=__BUILD_VERSION__" as="script">
   <link rel="preload" href="../vendor/supabase.min.js" as="script">
   <link rel="preload" href="../vendor/cloud/tus.min.js" as="script">
-  <link rel="preload" href="./app.js?v=20260830-2" as="script">
+  <link rel="preload" href="./app.js?v=__BUILD_VERSION__" as="script">
 </head>
 <body>
   <div class="app" id="app">
@@ -47,19 +48,20 @@
     </nav>
   </div>
   <noscript>Auto Office 需要启用 JavaScript。</noscript>
-  <script defer src="../network.js?v=20260827-8"></script>
-  <script defer src="./framework/store.js?v=20260827-5"></script>
-  <script defer src="./framework/auth.js?v=20260827-6"></script>
-  <script defer src="./framework/gate.js"></script>
-  <script defer src="./content.js?v=20260827-6"></script>
+  <script defer src="./version-guard.js?v=__BUILD_VERSION__"></script>
+  <script defer src="../network.js?v=__BUILD_VERSION__"></script>
+  <script defer src="./framework/store.js?v=__BUILD_VERSION__"></script>
+  <script defer src="./framework/auth.js?v=__BUILD_VERSION__"></script>
+  <script defer src="./framework/gate.js?v=__BUILD_VERSION__"></script>
+  <script defer src="./content.js?v=__BUILD_VERSION__"></script>
   <script defer src="../vendor/supabase.min.js"></script>
   <script defer src="../vendor/cloud/tus.min.js"></script>
-  <script defer src="./app.js?v=20260830-2"></script>
-  <script defer src="./pass-star.js?v=20260828-3"></script>
-  <script defer src="./dashboard-workbench.js?v=20260828-1"></script>
-  <script defer src="./task-outline.js?v=20260828-1"></script>
-  <script defer src="./pass-badge.js?v=20260828-1"></script>
-  <script defer src="./exam-clarity.js?v=20260830-1"></script>
+  <script defer src="./app.js?v=__BUILD_VERSION__"></script>
+  <script defer src="./pass-star.js?v=__BUILD_VERSION__"></script>
+  <script defer src="./dashboard-workbench.js?v=__BUILD_VERSION__"></script>
+  <script defer src="./task-outline.js?v=__BUILD_VERSION__"></script>
+  <script defer src="./pass-badge.js?v=__BUILD_VERSION__"></script>
+  <script defer src="./exam-clarity.js?v=__BUILD_VERSION__"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistration().then((registration) => registration?.update()).catch(() => {});

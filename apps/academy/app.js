@@ -1281,7 +1281,7 @@
       </div>
       <section class="home-shortcuts" aria-labelledby="home-shortcuts-title">
         <header class="home-shortcuts-head">
-          <div><span>连接</span><h3 id="home-shortcuts-title">快捷访问</h3></div>
+          <div><h3 id="home-shortcuts-title">快捷访问</h3></div>
         </header>
         <a class="home-app-shortcut" href="#/apps/notes" aria-label="在 Auto Office 内打开今岭笔记">
           <img src="https://hldhlh.github.io/web/apps/notes/icon.svg" width="54" height="54" alt="">
