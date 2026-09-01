@@ -55,6 +55,10 @@
       text-anchor: middle;
       opacity: .78;
     }
+    .ao-pass-badge.is-learned .ao-pass-en {
+      font-size: 8.5px;
+      letter-spacing: 1.2px;
+    }
     .ao-passed-item:hover .ao-pass-badge {
       transform: translateY(-50%) rotate(-6deg) scale(1.025);
     }
@@ -86,9 +90,10 @@
     return null;
   };
 
-  const badge = () => {
+  const badge = (state = "passed") => {
+    const learned = state === "learned";
     const wrapper = document.createElement("span");
-    wrapper.className = "ao-pass-badge";
+    wrapper.className = `ao-pass-badge${learned ? " is-learned" : ""}`;
     wrapper.setAttribute("aria-hidden", "true");
     wrapper.innerHTML = `
       <svg viewBox="0 0 120 120">
@@ -96,20 +101,21 @@
         <circle class="ao-pass-inner" cx="60" cy="60" r="43"/>
         <path class="ao-pass-rule" d="M29 42h62M29 88h62"/>
         <path class="ao-pass-check" d="m47 31 8 8 18-18"/>
-        <text class="ao-pass-en" x="61" y="56">PASS</text>
-        <text class="ao-pass-cn" x="60" y="80">已通过</text>
+        <text class="ao-pass-en" x="61" y="56">${learned ? "LEARNED" : "PASS"}</text>
+        <text class="ao-pass-cn" x="60" y="80">${learned ? "已学习" : "已通过"}</text>
       </svg>`;
     return wrapper;
   };
 
-  const decorate = (item) => {
+  const decorate = (item, state = "passed") => {
     if (!item || item.closest(".learning-plan") || item.dataset.aoPassBadge === "true") return;
     item.dataset.aoPassBadge = "true";
     item.classList.add("ao-passed-item");
-    item.appendChild(badge());
+    item.appendChild(badge(state));
   };
 
   const render = () => {
+    document.querySelectorAll('[data-course-learned="true"]').forEach((item) => decorate(item, "learned"));
     document.querySelectorAll('[data-exam-passed="true"]').forEach(decorate);
     statusLeaves().forEach((status) => {
       const item = findItem(status);

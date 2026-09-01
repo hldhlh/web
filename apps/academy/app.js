@@ -1585,12 +1585,8 @@
       const locked = !Gate.canLesson(lesson);
       const done = isDone(lesson.id);
       const groupBadges = lessonGroupNames(lesson).map((name) => `<span>${escapeHtml(name)}</span>`).join("");
-      const completeBadge = done ? `<span class="course-complete-badge" role="img" aria-label="已通过，成绩优秀">
-        <span class="course-pass-label" aria-hidden="true">已通过</span>
-        <span class="course-excellent-label" aria-hidden="true">优秀</span>
-      </span>` : "";
-      return `<button class="card lesson-card course-result ${done ? "is-complete" : ""}" data-act="open-lesson" data-id="${lesson.id}">
-        ${completeBadge}
+      const accessibleState = done ? "已学习" : locked ? "需授权" : `${TYPE_LABEL[lesson.type]}，${minutesLabel(lesson.minutes)}`;
+      return `<button class="card lesson-card course-result ${done ? "is-complete" : ""}" data-act="open-lesson" data-id="${lesson.id}" ${done ? 'data-course-learned="true"' : ""} aria-label="${escapeHtml(`${lesson.title}，${accessibleState}`)}">
         <div class="course-result-body">
           <div class="top"><span class="tag">${locked ? "需授权" : TYPE_LABEL[lesson.type]}</span>${done ? "" : `<span>${minutesLabel(lesson.minutes)}</span>`}</div>
           ${groupBadges ? `<div class="course-group-badges" aria-label="课程分组">${groupBadges}</div>` : ""}
@@ -4009,7 +4005,7 @@
       <div class="gate">
         <form class="gate-card" id="auth-form">
           <div class="gate-intro">
-            <h2>${gateMode === "login" ? "欢迎回来" : "创建学习账号"}</h2>
+            <h2>${gateMode === "login" ? "欢迎使用 Auto Office" : "创建 Auto Office 账号"}</h2>
           </div>
           <div class="chips" style="padding-bottom:8px">
             <button type="button" class="chip ${gateMode === "login" ? "on" : ""}" data-act="gate-mode" data-mode="login">登录</button>
@@ -4018,9 +4014,9 @@
           <label class="gate-label"><span>姓名</span><input name="name" maxlength="16" autocomplete="username" placeholder="请输入注册时的姓名" required><small data-field-error="name"></small></label>
           <label class="gate-label"><span>密码</span><span class="gate-password"><input name="password" type="password" minlength="4" autocomplete="${gateMode === "login" ? "current-password" : "new-password"}" placeholder="请输入密码" required><button type="button" data-password-toggle>显示</button></span><small data-field-error="password"></small></label>
           ${authNotice ? `<div class="auth-kicked" role="alert"><i>!</i><span>${escapeHtml(authNotice)}</span></div>` : ""}
-          <p class="auth-message" id="auth-error" role="status" aria-live="polite">${gateMode === "login" ? "使用注册时的姓名和密码登录" : "注册后可学习基础课程，完整权限由店长开放"}</p>
+          <p class="auth-message" id="auth-error" role="status" aria-live="polite">${gateMode === "login" ? "使用 Auto Office 账号登录" : "注册后即可使用 Auto Office，完整权限由店长开放"}</p>
           <button class="primary gate-submit" id="auth-submit" type="submit"><span>${gateMode === "login" ? "登录" : "注册并进入"}</span><i aria-hidden="true"></i></button>
-          <div class="gate-success" aria-hidden="true"><i>✓</i><strong>${gateMode === "login" ? "登录成功" : "注册成功"}</strong><span>正在进入学堂</span></div>
+          <div class="gate-success" aria-hidden="true"><i>✓</i><strong>${gateMode === "login" ? "登录成功" : "注册成功"}</strong><span>正在进入 Auto Office</span></div>
         </form>
       </div>
     `;
