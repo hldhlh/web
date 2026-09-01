@@ -3,12 +3,16 @@
 
   const CHECK_INTERVAL_MS = 5 * 60 * 1000;
   const DISMISSED_KEY = 'academy-version-dismissed';
+  const REALTIME_ROW_ID = 'app-version';
   const VERSION_PATTERN = /^[0-9a-f]{7,40}$/i;
   const currentVersion = document.querySelector('meta[name="app-build-version"]')?.content?.trim() || '';
   const manifestUrl = new URL('../../version.json', document.baseURI);
   let checking = null;
   let updating = false;
   let modal = null;
+  let realtimeChannel = null;
+  let realtimeRetryTimer = 0;
+  let realtimeRetryAttempt = 0;
 
   function isVersion(value) {
     return VERSION_PATTERN.test(String(value || '').trim());
@@ -32,6 +36,19 @@
     if (!response.ok) throw new Error(`Version check failed: ${response.status}`);
     const manifest = await response.json();
     return String(manifest?.version || '').trim();
+  }
+
+  function handleLatestVersion(latestVersion) {
+    const normalized = String(latestVersion || '').trim();
+    if (!isVersion(currentVersion) || !isVersion(normalized) || updating) return false;
+    if (normalized === currentVersion) {
+      try { sessionStorage.removeItem(DISMISSED_KEY); } catch (_) {}
+      return false;
+    }
+    let dismissed = '';
+    try { dismissed = sessionStorage.getItem(DISMISSED_KEY) || ''; } catch (_) {}
+    if (dismissed !== normalized) showPrompt(normalized);
+    return true;
   }
 
   function injectStyles() {
@@ -157,15 +174,7 @@
     checking = (async () => {
       try {
         const latestVersion = await fetchLatestVersion();
-        if (!isVersion(latestVersion)) return false;
-        if (latestVersion === currentVersion) {
-          try { sessionStorage.removeItem(DISMISSED_KEY); } catch (_) {}
-          return false;
-        }
-        let dismissed = '';
-        try { dismissed = sessionStorage.getItem(DISMISSED_KEY) || ''; } catch (_) {}
-        if (dismissed !== latestVersion) showPrompt(latestVersion);
-        return true;
+        return handleLatestVersion(latestVersion);
       } catch (error) {
         console.debug('[Auto Office] 后台版本核对暂不可用。', error);
         return false;
@@ -176,15 +185,71 @@
     return checking;
   }
 
+  function scheduleRealtimeReconnect() {
+    if (realtimeRetryTimer || realtimeChannel || updating || !navigator.onLine) return;
+    const delay = Math.min(30000, 800 * (2 ** Math.min(realtimeRetryAttempt, 5)));
+    realtimeRetryAttempt += 1;
+    realtimeRetryTimer = setTimeout(() => {
+      realtimeRetryTimer = 0;
+      connectRealtime();
+    }, delay);
+  }
+
+  function connectRealtime() {
+    if (realtimeChannel || updating || !navigator.onLine) return realtimeChannel;
+    const client = window.AcademyStore?.realtimeClient?.();
+    if (!client) {
+      scheduleRealtimeReconnect();
+      return null;
+    }
+    const channel = client
+      .channel('auto-office-version-live')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'academy_state',
+        filter: `id=eq.${REALTIME_ROW_ID}`
+      }, (change) => {
+        const row = change?.new && Object.keys(change.new).length ? change.new : change?.old;
+        handleLatestVersion(row?.payload?.version);
+      });
+    realtimeChannel = channel;
+    channel.subscribe((status) => {
+      if (realtimeChannel !== channel) return;
+      if (status === 'SUBSCRIBED') {
+        realtimeRetryAttempt = 0;
+        clearTimeout(realtimeRetryTimer);
+        realtimeRetryTimer = 0;
+        return;
+      }
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        realtimeChannel = null;
+        try { client.removeChannel(channel); } catch (_) {}
+        scheduleRealtimeReconnect();
+      }
+    });
+    return channel;
+  }
+
   removeRefreshMarker();
   window.AutoOfficeVersion = Object.freeze({
     current: currentVersion,
-    check: checkForUpdate
+    check: checkForUpdate,
+    subscribe: connectRealtime
   });
-  window.addEventListener('load', () => setTimeout(checkForUpdate, 1200), { once: true });
-  window.addEventListener('online', checkForUpdate);
+  window.addEventListener('load', () => {
+    connectRealtime();
+    setTimeout(checkForUpdate, 1200);
+  }, { once: true });
+  window.addEventListener('online', () => {
+    connectRealtime();
+    checkForUpdate();
+  });
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') checkForUpdate();
+    if (document.visibilityState === 'visible') {
+      connectRealtime();
+      checkForUpdate();
+    }
   });
   setInterval(checkForUpdate, CHECK_INTERVAL_MS);
 })();
