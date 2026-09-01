@@ -208,13 +208,14 @@
 
   const taskTitle = (row) => row.innerText.split("\n")
     .map((line) => line.trim())
-    .find((line) => line && !/^(去学习|已完成|必修|选修|图文|视频|音频|考试|\d+\s*分钟)$/.test(line)) || "继续下一项学习";
+    .find((line) => line && !/^(✓|锁|去学习|去考试|已完成|待授权|(?:必修|选修|图文|视频|音频|考试)(?:\s*·.*)?|\d+\s*分钟)$/.test(line)) || "继续下一项学习";
 
   const taskDuration = (row) => row.innerText.match(/\d+\s*分钟/)?.[0] || "几分钟";
 
   const taskType = (row) => row.innerText.split("\n")
     .map((line) => line.trim())
-    .find((line) => /^(图文|视频|音频|考试)$/.test(line)) || "学习任务";
+    .map((line) => line.match(/^(图文|视频|音频|考试)(?:\s*·|$)/)?.[1])
+    .find(Boolean) || "学习任务";
 
   const commonParent = (nodes) => {
     let parent = nodes[0]?.parentElement;

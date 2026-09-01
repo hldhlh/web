@@ -23,6 +23,7 @@
   const OPS_STORAGE_KEY = "academy-ops-content-v1";
   const OPS_LESSON_DRAFT_KEY = "academy-ops-lesson-draft-v1";
   const OPS_TABS = ["lessons", "exams", "notices", "staff"];
+  const NAVIGATION_STATE_KEY = "academyNavigation";
   let contentRevision = 0;
 
   const view = () => document.getElementById("view");
@@ -977,11 +978,12 @@
   }
 
   function nextLesson() {
+    const available = DATA.lessons.filter((item) => Gate.canLesson(item) && !isDone(item.id));
     if (state.progress.last?.type === "lesson") {
       const current = lessonById(state.progress.last.id);
-      if (current && !isDone(current.id)) return current;
+      if (current && Gate.canLesson(current) && !isDone(current.id)) return current;
     }
-    return DATA.lessons.find((item) => !isDone(item.id)) || DATA.lessons[0];
+    return available[0] || null;
   }
 
   function isUrgentTrack(trackId) {
@@ -1071,7 +1073,7 @@
     new URLSearchParams(query || "").forEach((value, key) => { params[key] = value; });
     if (!parts.length || parts[0] === "home") return { name: "home" };
     if (parts[0] === "messages") return { name: "messages" };
-    if (parts[0] === "apps" && parts[1] === "notes") return { name: "embedded-app", app: "notes" };
+    if (parts[0] === "apps" && ["notes", "jlhcdh"].includes(parts[1])) return { name: "embedded-app", app: parts[1] };
     if (parts[0] === "learn") return { name: "learn", type: params.type || "all", group: params.group || "all" };
     if (parts[0] === "exams") return { name: "exams" };
     if (parts[0] === "me") return { name: "me" };
@@ -1088,8 +1090,65 @@
     return { name: "home" };
   }
 
-  function go(hash) {
-    history.replaceState(history.state, "", hash);
+  function currentHash() {
+    return location.hash?.startsWith("#/") ? location.hash : "#/home";
+  }
+
+  function navigationState() {
+    const current = history.state;
+    return current && typeof current === "object" ? current : {};
+  }
+
+  function hasNavigationParent(current = navigationState()) {
+    return Boolean(
+      current[NAVIGATION_STATE_KEY]
+      && Number(current.academyDepth) > 0
+      && typeof current.academyFrom === "string"
+      && current.academyFrom.startsWith("#/")
+      && current.academyFrom !== currentHash()
+    );
+  }
+
+  function initializeNavigationState() {
+    const current = navigationState();
+    const depth = Number(current.academyDepth);
+    const valid = current[NAVIGATION_STATE_KEY]
+      && Number.isInteger(depth)
+      && depth >= 0
+      && typeof current.academyFrom === "string"
+      && (depth === 0 || current.academyFrom.startsWith("#/"));
+    if (valid) return;
+    history.replaceState({
+      ...current,
+      [NAVIGATION_STATE_KEY]: true,
+      academyDepth: 0,
+      academyFrom: ""
+    }, "", currentHash());
+  }
+
+  function go(hash, options = {}) {
+    const target = hash?.startsWith("#/") ? hash : "#/home";
+    const source = currentHash();
+    if (source === target) {
+      onRoute();
+      return;
+    }
+
+    const current = navigationState();
+    const depth = Number(current.academyDepth) || 0;
+    if (!options.replace && current[NAVIGATION_STATE_KEY] && depth > 0 && current.academyFrom === target) {
+      history.back();
+      return;
+    }
+
+    const next = {
+      ...current,
+      [NAVIGATION_STATE_KEY]: true,
+      academyDepth: options.replace ? depth : depth + 1,
+      academyFrom: options.replace ? (current.academyFrom || "") : source
+    };
+    if (options.replace) history.replaceState(next, "", target);
+    else history.pushState(next, "", target);
     onRoute();
   }
 
@@ -1108,9 +1167,12 @@
   }
 
   function goToParentPage() {
-    const target = parentHashForRoute(state.route);
-    if (location.hash === target) return;
-    go(target);
+    const current = navigationState();
+    if (hasNavigationParent(current)) {
+      history.back();
+      return;
+    }
+    go(parentHashForRoute(state.route), { replace: true });
   }
 
   function setTheme(theme) {
@@ -1130,7 +1192,9 @@
       home: '<path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-8Z"/>',
       learn: '<path d="M4 7.5 12 4l8 3.5M4 7.5v9L12 20l8-3.5v-9M4 7.5 12 11l8-3.5"/>',
       exam: '<path d="M8 4h8v16H8z"/><path d="M10.5 9h5M10.5 13h3"/>',
-      me: '<circle cx="12" cy="8" r="3"/><path d="M5 19c1.4-3 3.8-4.5 7-4.5S17.6 16 19 19"/>'
+      me: '<circle cx="12" cy="8" r="3"/><path d="M5 19c1.4-3 3.8-4.5 7-4.5S17.6 16 19 19"/>',
+      add: '<path d="M12 5v14M5 12h14"/>',
+      group: '<rect x="4" y="5" width="16" height="5" rx="2"/><rect x="4" y="14" width="16" height="5" rx="2"/>'
     };
     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${icons[name]}</svg>`;
   }
@@ -1141,6 +1205,41 @@
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll("\"", "&quot;");
+  }
+
+  function truncateNoticeText(value, limit = 96) {
+    const text = String(value || "").replace(/\s+/g, " ").trim();
+    const chars = Array.from(text);
+    if (chars.length <= limit) return text;
+    return `${chars.slice(0, limit).join("").replace(/[，。；、,;\s]+$/u, "")}…`;
+  }
+
+  function numberedNoticeItems(value) {
+    const text = String(value || "").replace(/\s+/g, " ").trim();
+    const matches = Array.from(text.matchAll(/(?:^|\s)(\d{1,2})[.、]\s*([\s\S]*?)(?=(?:\s+\d{1,2}[.、]\s*)|$)/g));
+    if (matches.length < 2 || (matches[0].index || 0) > 2) return [];
+    return matches.map((match) => ({ number: match[1], text: match[2].trim() })).filter((item) => item.text);
+  }
+
+  function renderNoticePreview(detail) {
+    const items = numberedNoticeItems(detail);
+    if (items.length) {
+      const visible = items.slice(0, 2);
+      return `<div class="notice-preview-list">${visible.map((item) => `
+        <span class="notice-preview-line"><b>${item.number}</b><span>${escapeHtml(truncateNoticeText(item.text, 76))}</span></span>
+      `).join("")}</div>
+      <div class="notice-preview-footer"><span>${items.length > visible.length ? `还有 ${items.length - visible.length} 项` : `${items.length} 项内容`}</span><b>查看全文 <i aria-hidden="true">›</i></b></div>`;
+    }
+    return `<p class="notice-preview-text">${escapeHtml(truncateNoticeText(detail, 120))}</p>
+      <div class="notice-preview-footer"><span></span><b>查看详情 <i aria-hidden="true">›</i></b></div>`;
+  }
+
+  function renderNoticeDetail(detail) {
+    const items = numberedNoticeItems(detail);
+    if (!items.length) return `<p class="notice-detail-text">${escapeHtml(detail)}</p>`;
+    return `<ol class="notice-detail-list">${items.map((item) => `
+      <li><span>${item.number}</span><p>${escapeHtml(item.text)}</p></li>
+    `).join("")}</ol>`;
   }
 
   function minutesLabel(n) {
@@ -1210,49 +1309,37 @@
     });
   }
 
+  function greetingForHour(hour) {
+    if (hour < 5) return { text: "晚上好", rest: true };
+    if (hour < 11) return { text: "早上好", rest: false };
+    if (hour < 13) return { text: "中午好", rest: false };
+    if (hour < 18) return { text: "下午好", rest: false };
+    if (hour < 22) return { text: "晚上好", rest: false };
+    return { text: "晚上好", rest: true };
+  }
+
   function renderHome() {
     setTop("运营事务看板", false);
     setTab("home");
     const box = inbox();
     const next = box.urgentLessons[0] || nextLesson();
-    const hour = new Date().getHours();
-    const hello = hour < 12 ? "早上好" : hour < 18 ? "下午好" : "晚上好";
-    const date = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "short" }).format(new Date());
+    const now = new Date();
+    const greeting = greetingForHour(now.getHours());
+    const date = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "short" }).format(now);
+    const dateTime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const memberName = escapeHtml(Auth.session?.name || "学员");
     const learnableLessons = DATA.lessons.filter((item) => Gate.canLesson(item));
     const learnedCount = learnableLessons.filter((item) => isDone(item.id)).length;
     const unlearnedCount = learnableLessons.length - learnedCount;
-    const pendingUpdates = learnableLessons
-      .filter((item) => !isDone(item.id))
-      .map((item) => ({
-        ...item,
-        urgency: isUrgentTrack(item.track) ? "更新优先" : "待学习"
-      }))
-      .sort((a, b) => Number(b.urgency === "更新优先") - Number(a.urgency === "更新优先"))
-      .slice(0, 5);
     const importantExams = DATA.exams
       .filter((exam) => Gate.canExam(exam) && (isUrgentTrack(exam.track) || bestScore(exam.id) < exam.pass))
       .sort((a, b) => Number(isUrgentTrack(b.track)) - Number(isUrgentTrack(a.track)));
     const importantMessages = box.unreadNotices.slice(0, 5);
-    const headline = pendingUpdates.length || importantExams.length
-      ? `今天还有 ${unlearnedCount + importantExams.length} 项学习任务`
-      : box.unreadNotices.length
-        ? `${box.unreadNotices.length} 条新消息`
-        : "今日任务已清理";
     const tracks = [];
     [...DATA.lessons, ...DATA.exams].forEach((item) => {
       if (!tracks.includes(item.track)) tracks.push(item.track);
     });
-    const trackNames = {
-      onboarding: "上岗准备",
-      required: "岗前必修",
-      basic: "基础规范",
-      service: "服务标准",
-      front: "前厅岗位",
-      kitchen: "后厨岗位",
-      advanced: "岗位进阶",
-      management: "门店管理"
-    };
+    const trackNames = Object.fromEntries(DATA.tracks.map((track) => [track.id, track.title]));
     const stages = tracks.map((track, index) => {
       const tasks = [
         ...DATA.lessons.filter((lesson) => lesson.track === track).map((lesson) => ({ kind: "lesson", data: lesson })),
@@ -1272,22 +1359,30 @@
     const activeStage = Math.max(0, stages.findIndex((stage) => stage.available && stage.done < stage.tasks.length));
 
     view().innerHTML = `
-      <div class="hello">
-        <div>
-          <p><strong>${memberName}${hello}</strong><span>· ${date}</span></p>
-          <h2>${headline}</h2>
+      <header class="hello home-hello">
+        <div class="home-hello-copy">
+          <h2>${greeting.text}，${memberName}</h2>
+          ${greeting.rest ? `<p class="home-rest-reminder">夜深了，早点休息</p>` : ""}
+          <time datetime="${dateTime}">${date}</time>
         </div>
         ${progressRing(completionRate())}
-      </div>
+      </header>
       <section class="home-shortcuts" aria-labelledby="home-shortcuts-title">
         <header class="home-shortcuts-head">
           <div><h3 id="home-shortcuts-title">快捷访问</h3></div>
         </header>
-        <a class="home-app-shortcut" href="#/apps/notes" aria-label="在 Auto Office 内打开今岭笔记">
-          <img src="https://hldhlh.github.io/web/apps/notes/icon.svg" width="54" height="54" alt="">
-          <span class="home-app-shortcut-copy"><strong>今岭笔记</strong><small>快速记录和查找门店笔记</small></span>
-          <span class="home-app-shortcut-action">打开</span>
-        </a>
+        <div class="home-shortcut-grid">
+          <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/notes" aria-label="在 Auto Office 内打开今岭笔记">
+            <img src="https://hldhlh.github.io/web/apps/notes/icon.svg" width="54" height="54" alt="">
+            <span class="home-app-shortcut-copy"><strong>今岭笔记</strong><small>快速记录和查找门店笔记</small></span>
+            <span class="home-app-shortcut-action">打开</span>
+          </button>
+          <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/jlhcdh" aria-label="在 Auto Office 内打开今岭每日订货表">
+            <img src="https://hldhlh.github.io/web/apps/jlhcdh/icon.svg" width="54" height="54" alt="">
+            <span class="home-app-shortcut-copy"><strong>今岭每日订货表</strong><small>完成每日订货与采购核对</small></span>
+            <span class="home-app-shortcut-action">打开</span>
+          </button>
+        </div>
       </section>
       <div class="ops-kpi">
         <button class="ops-card" data-act="go" data-hash="#/learn">
@@ -1300,10 +1395,10 @@
           <b>${box.pendingExams.length}</b>
           <small>待完成考试（含需补考）</small>
         </button>
-        <button class="ops-card" data-act="go" data-hash="#/me">
+        <button class="ops-card" data-act="${next ? "open-lesson" : "go"}" ${next ? `data-id="${next.id}"` : 'data-hash="#/learn"'}>
           <span class="ops-tag">待学习课程</span>
-          <b>${pendingUpdates.length}</b>
-          <small>今日有更新可学习</small>
+          <b>${box.pendingLessons.length}</b>
+          <small>${box.pendingLessons.length ? "今日有课程可继续学习" : "当前课程已全部完成"}</small>
         </button>
         <button class="ops-card" data-act="go" data-hash="#/messages">
           <span class="ops-tag">重要消息</span>
@@ -1313,25 +1408,22 @@
       </div>
       <section class="learning-plan">
         <header class="learning-plan-head">
-          <div><span>学习路径</span><h3>任务大纲</h3></div>
-          <strong>${learnedCount} / ${learnableLessons.length}<small> 已完成课程</small></strong>
+          <h3>任务面板</h3>
+          <strong><small>已完成</small><b>${learnedCount}/${learnableLessons.length}</b></strong>
         </header>
-        <div class="stage-tabs" aria-label="学习阶段">
+        <div class="stage-tabs" role="tablist" aria-label="学习阶段">
           ${stages.map((stage, index) => `
-            <button type="button" class="stage-tab ${index === activeStage ? "on" : ""} ${!stage.available ? "locked" : ""}" data-stage-target="academy-stage-${index}">
-              <i>${stage.done === stage.tasks.length && stage.tasks.length ? "✓" : !stage.available ? "×" : index + 1}</i>
-              <span>阶段${index + 1}</span>
-              <small>${stage.percent}%</small>
+            <button type="button" class="stage-tab ${index === activeStage ? "on" : ""} ${!stage.available ? "locked" : ""}" id="academy-stage-tab-${index}" role="tab" aria-label="阶段 ${index + 1}，${escapeHtml(stage.title)}，已完成 ${stage.done}/${stage.tasks.length} 项" aria-selected="${index === activeStage}" aria-controls="academy-stage-${index}" tabindex="${index === activeStage ? "0" : "-1"}" data-stage-target="academy-stage-${index}">
+              <span>阶段 ${index + 1}</span>
             </button>`).join("")}
         </div>
         <div class="learning-stages">
           ${stages.map((stage, stageIndex) => `
-            <section class="learning-stage" id="academy-stage-${stageIndex}">
+            <section class="learning-stage" id="academy-stage-${stageIndex}" role="tabpanel" aria-labelledby="academy-stage-tab-${stageIndex}" ${stageIndex === activeStage ? "" : "hidden"}>
               <div class="learning-stage-head">
-                <div><span>阶段 ${String(stageIndex + 1).padStart(2, "0")}</span><h4>${escapeHtml(stage.title)}</h4><small>${stage.tasks.length} 项任务</small></div>
-                <div class="stage-score"><b>${stage.percent}%</b><span>阶段进度</span></div>
+                <div class="learning-stage-copy"><h4>${escapeHtml(stage.title)}</h4><small>已完成 ${stage.done}/${stage.tasks.length} 项</small></div>
               </div>
-              <div class="stage-progress"><i style="width:${stage.percent}%"></i></div>
+              <div class="stage-progress" role="progressbar" aria-label="阶段进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${stage.percent}"><i style="width:${stage.percent}%"></i></div>
               <div class="task-list">
                 ${stage.tasks.map((task) => {
                   const item = task.data;
@@ -1341,22 +1433,20 @@
                   const score = isExam ? bestScore(item.id) : -1;
                   const action = locked ? "locked" : isExam ? "go" : "open-lesson";
                   const attrs = isExam ? `data-hash="#/exam/${item.id}"` : `data-id="${item.id}"`;
-                  return `<button class="learning-task ${done ? "done" : ""} ${locked ? "locked" : ""}" data-act="${action}" ${attrs}>
-                    <span class="task-status">${done ? "✓" : locked ? "锁" : ""}</span>
+                  const meta = isExam ? `考试 · ${score >= 0 ? `${score} 分` : minutesLabel(item.minutes)}` : `${TYPE_LABEL[item.type]} · ${minutesLabel(item.minutes)}`;
+                  const result = done ? "已完成" : locked ? "待授权" : isExam ? "去考试" : "去学习";
+                  return `<button class="learning-task ${done ? "done" : ""} ${locked ? "locked" : ""}" data-act="${action}" ${attrs} aria-label="${escapeHtml(`${item.title}，${meta}，${result}`)}">
+                    <span class="task-status" aria-hidden="true">${done ? "✓" : locked ? "锁" : ""}</span>
                     <span class="task-main">
                       <strong>${escapeHtml(item.title)}</strong>
-                      <small><i>必修</i><i>${isExam ? "考试" : TYPE_LABEL[item.type]}</i>${isExam && score >= 0 ? `<em>${score} 分</em>` : `<em>${minutesLabel(item.minutes)}</em>`}</small>
+                      <small>${meta}</small>
                     </span>
-                    <span class="task-result">${done ? (isExam ? "已通过" : "已完成") : locked ? "待授权" : isExam ? "去考试" : "去学习"}</span>
+                    <span class="task-result">${done ? "" : locked ? "待授权" : `<i aria-hidden="true">›</i>`}</span>
                   </button>`;
                 }).join("")}
               </div>
             </section>`).join("")}
         </div>
-        ${box.pendingLessons.length && next ? `<div class="learning-continue">
-          <div><span>${box.urgentLessons.length ? "优先学习" : "最近学习"}</span><strong>${escapeHtml(next.title)}</strong></div>
-          <button class="primary" data-act="open-lesson" data-id="${next.id}">继续学习</button>
-        </div>` : `<div class="learning-continue complete"><div><span>学习任务</span><strong>当前课程已全部完成</strong></div><b>✓</b></div>`}
       </section>
       <div class="sec-title"><h3>重要消息</h3><span>${importantMessages.length}</span></div>
       ${importantMessages.length ? importantMessages.map((item) => `
@@ -1369,7 +1459,7 @@
       ${importantExams.length ? importantExams.slice(0, 4).map((exam) => {
           const best = bestScore(exam.id);
           return `<button class="card lesson-card" data-act="go" data-hash="#/exam/${exam.id}">
-            <div class="top"><span class="ops-tag">${isUrgentTrack(exam.track) ? "关键考核" : "待复查"}${best >= 0 ? ` · ${best}分` : ""}</span><span>${best >= 0 ? `最高 ${best} 分` : minutesLabel(exam.minutes)}</span></div>
+            <div class="top"><span class="ops-tag">${isUrgentTrack(exam.track) ? "关键考核" : "待复查"}${best >= 0 ? ` · ${best}分` : ""}</span><span>${minutesLabel(exam.minutes)}</span></div>
             <strong>${escapeHtml(exam.title)}</strong>
             <p class="muted">${escapeHtml(exam.summary)}</p>
           </button>`;
@@ -1377,9 +1467,28 @@
     `;
     view().querySelectorAll("[data-stage-target]").forEach((button) => {
       button.addEventListener("click", () => {
-        const target = document.getElementById(button.dataset.stageTarget);
-        target?.scrollIntoView({ behavior: "smooth", block: "start" });
-        view().querySelectorAll(".stage-tab").forEach((item) => item.classList.toggle("on", item === button));
+        view().querySelectorAll(".stage-tab").forEach((item) => {
+          const selected = item === button;
+          item.classList.toggle("on", selected);
+          item.setAttribute("aria-selected", String(selected));
+          item.tabIndex = selected ? 0 : -1;
+        });
+        view().querySelectorAll(".learning-stage").forEach((stage) => {
+          stage.hidden = stage.id !== button.dataset.stageTarget;
+        });
+      });
+      button.addEventListener("keydown", (event) => {
+        const tabs = [...view().querySelectorAll(".stage-tab")];
+        const index = tabs.indexOf(button);
+        const targetIndex = event.key === "ArrowRight" ? (index + 1) % tabs.length
+          : event.key === "ArrowLeft" ? (index - 1 + tabs.length) % tabs.length
+            : event.key === "Home" ? 0
+              : event.key === "End" ? tabs.length - 1
+                : -1;
+        if (targetIndex < 0) return;
+        event.preventDefault();
+        tabs[targetIndex].focus();
+        tabs[targetIndex].click();
       });
     });
   }
@@ -1551,9 +1660,11 @@
     setTab("exams");
     view().innerHTML = DATA.exams.map((exam) => {
       const best = bestScore(exam.id);
+      const passed = best >= exam.pass;
       const locked = !Gate.canExam(exam);
-      return `<button class="card lesson-card" data-act="${locked ? "locked" : "go"}" data-hash="#/exam/${exam.id}">
-        <div class="top"><span class="tag">${locked ? "需授权" : `${exam.questions.length} 题`}</span><span>${best >= 0 ? `最高 ${best} 分` : minutesLabel(exam.minutes)}</span></div>
+      const accessibleState = passed ? `已通过，成绩 ${best} 分` : locked ? "需授权" : `${exam.questions.length} 题`;
+      return `<button class="card lesson-card" data-act="${locked ? "locked" : "go"}" data-hash="#/exam/${exam.id}" ${passed ? 'data-exam-passed="true"' : ""} aria-label="${escapeHtml(`${exam.title}，${accessibleState}，${minutesLabel(exam.minutes)}`)}">
+        <div class="top"><span class="tag">${locked ? "需授权" : `${exam.questions.length} 题`}</span><span>${minutesLabel(exam.minutes)}</span></div>
         <strong>${escapeHtml(exam.title)}</strong>
         <p class="muted">${locked ? "店长授权后可考" : escapeHtml(exam.summary)}</p>
       </button>`;
@@ -1584,15 +1695,23 @@
           <strong>${escapeHtml(item.stem)}</strong>
           <p class="muted">${escapeHtml(item.explain)}</p>
         </button>`).join("") : `<p class="empty">还没有错题。考试里答错的会出现在这里。</p>`}
-      <div class="actions">
-        <button class="ghost theme-setting" data-act="theme-toggle">
-          <span>${svgIcon(state.theme === "dark" ? "moon" : "sun")}主题模式</span>
-          <b>${state.theme === "dark" ? "深色" : "浅色"}</b>
-        </button>
-        ${Auth.isManager(Auth.session) ? `<button class="primary" data-act="go" data-hash="#/ops">运营事务管理</button>` : ""}
-        <button class="ghost" data-act="logout">退出账号</button>
-        <button class="ghost" data-act="reset">清除本机学习记录</button>
-      </div>
+      <section class="account-settings" aria-label="设置与账号">
+        <div class="account-setting-group">
+          <button class="account-setting-row" data-act="theme-toggle" role="switch" aria-checked="${state.theme === "dark"}">
+            <span class="account-setting-icon">${svgIcon(state.theme === "dark" ? "moon" : "sun")}</span>
+            <span class="account-setting-copy"><strong>深色模式</strong><small>当前为${state.theme === "dark" ? "深色" : "浅色"}外观</small></span>
+            <span class="account-switch" aria-hidden="true"><i></i></span>
+          </button>
+          ${Auth.isManager(Auth.session) ? `<button class="account-setting-row" data-act="go" data-hash="#/ops">
+            <span class="account-setting-icon">${svgIcon("group")}</span>
+            <span class="account-setting-copy"><strong>运营事务管理</strong><small>管理课程、考试与员工</small></span>
+            <span class="account-setting-chevron" aria-hidden="true">›</span>
+          </button>` : ""}
+        </div>
+        <div class="account-setting-group account-session-group">
+          <button class="account-logout" data-act="logout">退出账号</button>
+        </div>
+      </section>
     `;
   }
 
@@ -1604,14 +1723,14 @@
 
   function renderOpsTabs(section) {
     const sections = [
-      { key: "lessons", mark: "课", label: "课程", fullLabel: "课程内容", count: DATA.lessons.length },
-      { key: "exams", mark: "考", label: "考试", fullLabel: "考试题库", count: DATA.exams.length },
-      { key: "notices", mark: "讯", label: "通知", fullLabel: "事务通知", count: (DATA.notices || []).length },
-      { key: "staff", mark: "人", label: "员工", fullLabel: "员工与权限", count: Auth.list().length }
+      { key: "lessons", icon: "learn", label: "课程", fullLabel: "课程内容", count: DATA.lessons.length },
+      { key: "exams", icon: "exam", label: "考试", fullLabel: "考试题库", count: DATA.exams.length },
+      { key: "notices", icon: "bell", label: "通知", fullLabel: "事务通知", count: (DATA.notices || []).length },
+      { key: "staff", icon: "me", label: "员工", fullLabel: "员工与权限", count: Auth.list().length }
     ];
     return `<nav class="ops-subtabs" aria-label="运营事务导航">${sections.map((item) => `
-      <button class="${section === item.key ? "on" : ""}" data-act="ops-tab" data-section="${item.key}" aria-label="${item.fullLabel}，${item.count} 项">
-        <span class="ops-nav-mark">${item.mark}</span>
+      <button class="${section === item.key ? "on" : ""}" data-act="ops-tab" data-section="${item.key}" aria-label="${item.fullLabel}，${item.count} 项" ${section === item.key ? 'aria-current="page"' : ""}>
+        <span class="ops-nav-mark">${svgIcon(item.icon)}</span>
         <span class="ops-nav-label">${item.label}</span>
         <small>${item.count}</small>
       </button>
@@ -2152,19 +2271,23 @@
   function renderOpsNoticeList() {
     const items = (DATA.notices || []).slice().sort((a, b) => b.createdAt - a.createdAt);
     return `
-      <button class="primary ops-create-button" data-act="go" data-hash="#/ops?section=notices&mode=add">新建帖子</button>
-      ${items.length ? items.map((notice) => `
-        <div class="card lesson-card">
-          <div class="top"><span class="ops-tag">${notice.tone === "urgent" ? "重要" : "一般"}</span><span>${renderDateLabel(notice.createdAt)}</span></div>
-          <strong>${escapeHtml(notice.title)}</strong>
-          <p class="muted">${escapeHtml(notice.kicker)} · ${escapeHtml(notice.detail)}</p>
-          <p class="notice-recipient-line">发送给：${escapeHtml(noticeAudienceLabel(notice))} · ${notice.notify !== false ? "发送铃铛消息" : "不发送铃铛消息"}</p>
-          <div class="tools">
-            <button data-act="go" data-hash="#/ops?section=notices&mode=edit&id=${notice.id}">编辑</button>
-            <button data-act="ops-delete" data-section="notices" data-id="${notice.id}">删除</button>
-          </div>
-        </div>
-      `).join("") : `<p class="empty">暂无通知</p>`}
+      <section class="ops-list" aria-label="通知列表">
+        <header class="ops-list-head"><div><h3>全部通知</h3><span>共 ${items.length} 条，按发布时间排序</span></div></header>
+        ${items.length ? items.map((notice) => `
+          <article class="card ops-item-card ${notice.tone === "urgent" ? "is-urgent" : ""}">
+            <div class="ops-item-main">
+              <div class="ops-item-eyebrow"><span class="ops-tag">${notice.tone === "urgent" ? "重要" : "一般"}</span><time>${renderDateLabel(notice.createdAt)}</time></div>
+              <h3>${escapeHtml(notice.title)}</h3>
+              <p>${escapeHtml(notice.kicker)} · ${escapeHtml(notice.detail)}</p>
+              <div class="ops-meta-list"><span>发送给 ${escapeHtml(noticeAudienceLabel(notice))}</span><span>${notice.notify !== false ? "发送消息提醒" : "静默发布"}</span></div>
+            </div>
+            <div class="ops-item-actions">
+              <button data-act="go" data-hash="#/ops?section=notices&mode=edit&id=${notice.id}">编辑</button>
+              <button class="danger-text" data-act="ops-delete" data-section="notices" data-id="${notice.id}">删除</button>
+            </div>
+          </article>
+        `).join("") : `<p class="empty ops-empty">暂无通知。使用右上角“新建通知”发布第一条消息。</p>`}
+      </section>
     `;
   }
 
@@ -2267,12 +2390,18 @@
 
   function renderOpsLessonList() {
     return `
-      <section class="card course-group-manager">
-        <div class="course-group-head">
-          <div><p class="kicker">课程分组</p><h3>管理发布分组</h3><span>分组可自定义名称；发布课程时可同时勾选多个。</span></div>
-          <div class="course-group-create"><input id="ops-group-new-name" maxlength="30" placeholder="输入新分组名称" aria-label="新分组名称"><button type="button" class="primary" data-act="ops-group-add">新增分组</button></div>
-        </div>
-        <div class="course-group-list">${DATA.courseGroups.map((group) => {
+      <details class="card course-group-manager">
+        <summary class="course-group-summary">
+          <span class="course-group-symbol" aria-hidden="true">${svgIcon("group")}</span>
+          <span><strong>课程分组</strong><small>${DATA.courseGroups.length} 个分组 · 管理课程的发布范围</small></span>
+          <i aria-hidden="true"></i>
+        </summary>
+        <div class="course-group-panel">
+          <div class="course-group-head">
+            <div><h3>管理发布分组</h3><span>分组可自定义名称；一门课程可以发布到多个分组。</span></div>
+            <div class="course-group-create"><input id="ops-group-new-name" maxlength="30" placeholder="新分组名称" aria-label="新分组名称"><button type="button" class="primary" data-act="ops-group-add">新增分组</button></div>
+          </div>
+          <div class="course-group-list">${DATA.courseGroups.map((group) => {
           const count = DATA.lessons.filter((lesson) => lesson.groupIds?.includes(group.id)).length;
           return `<div class="course-group-row" data-group-id="${escapeHtml(group.id)}">
             <input data-group-name value="${escapeHtml(group.name)}" maxlength="30" aria-label="分组名称">
@@ -2280,21 +2409,25 @@
             <button type="button" data-act="ops-group-rename" data-id="${escapeHtml(group.id)}">保存名称</button>
             <button type="button" class="danger" data-act="ops-group-delete" data-id="${escapeHtml(group.id)}">删除</button>
           </div>`;
-        }).join("")}</div>
+        }).join("")}</div></div>
+      </details>
+      <section class="ops-list" aria-label="课程列表">
+        <header class="ops-list-head"><div><h3>全部课程</h3><span>共 ${DATA.lessons.length} 门课程</span></div></header>
+        ${DATA.lessons.length ? DATA.lessons.map((lesson) => `
+          <article class="card ops-item-card">
+            <div class="ops-item-main">
+              <div class="ops-item-eyebrow"><span class="ops-tag">${TYPE_LABEL[lesson.type] || lesson.type}</span><span>${minutesLabel(lesson.minutes)}</span></div>
+              <h3>${escapeHtml(lesson.title)}</h3>
+              <p>${escapeHtml(lesson.summary)}</p>
+              <div class="ops-meta-list"><span>${escapeHtml(lessonGroupNames(lesson).join("、") || "未分组")}</span><span>${escapeHtml(lessonCompletionLabel(lesson))}</span><span>${lesson.notify !== false ? "发布后提醒" : "静默发布"}</span></div>
+            </div>
+            <div class="ops-item-actions">
+              <button data-act="go" data-hash="#/ops?section=lessons&mode=edit&id=${lesson.id}">编辑</button>
+              <button class="danger-text" data-act="ops-delete" data-section="lessons" data-id="${lesson.id}">删除</button>
+            </div>
+          </article>
+        `).join("") : `<p class="empty ops-empty">暂无课程。使用右上角“新建课程”开始创建。</p>`}
       </section>
-      <button class="primary ops-create-button" data-act="go" data-hash="#/ops?section=lessons&mode=add">新建课程</button>
-      ${DATA.lessons.length ? DATA.lessons.map((lesson) => `
-        <div class="card lesson-card">
-          <div class="top"><span class="ops-tag">${TYPE_LABEL[lesson.type] || lesson.type}</span><span>${minutesLabel(lesson.minutes)}</span></div>
-          <strong>${escapeHtml(lesson.title)}</strong>
-          <p class="muted">${escapeHtml(lesson.summary)}</p>
-          <p class="ops-content-meta">发布分组：${escapeHtml(lessonGroupNames(lesson).join("、") || "未分组")} · 完成条件：${escapeHtml(lessonCompletionLabel(lesson))} · ${lesson.notify !== false ? "发送铃铛消息" : "不发送铃铛消息"}</p>
-          <div class="tools">
-            <button data-act="go" data-hash="#/ops?section=lessons&mode=edit&id=${lesson.id}">编辑</button>
-            <button data-act="ops-delete" data-section="lessons" data-id="${lesson.id}">删除</button>
-          </div>
-        </div>
-      `).join("") : `<p class="empty">暂无课程</p>`}
     `;
   }
 
@@ -2340,19 +2473,23 @@
 
   function renderOpsExamList() {
     return `
-      <button class="primary ops-create-button" data-act="go" data-hash="#/ops?section=exams&mode=add">新建考试</button>
-      ${DATA.exams.length ? DATA.exams.map((exam) => `
-        <div class="card lesson-card">
-          <div class="top"><span class="ops-tag">${exam.pass}分</span><span>${minutesLabel(exam.minutes)}</span></div>
-          <strong>${escapeHtml(exam.title)}</strong>
-          <p class="muted">${escapeHtml(exam.summary)}</p>
-          <p class="ops-content-meta">${exam.notify !== false ? "发布时发送铃铛消息" : "发布时不发送铃铛消息"}</p>
-          <div class="tools">
-            <button data-act="go" data-hash="#/ops?section=exams&mode=edit&id=${exam.id}">编辑</button>
-            <button data-act="ops-delete" data-section="exams" data-id="${exam.id}">删除</button>
-          </div>
-        </div>
-      `).join("") : `<p class="empty">暂无考试</p>`}
+      <section class="ops-list" aria-label="考试列表">
+        <header class="ops-list-head"><div><h3>全部考试</h3><span>共 ${DATA.exams.length} 场考试</span></div></header>
+        ${DATA.exams.length ? DATA.exams.map((exam) => `
+          <article class="card ops-item-card">
+            <div class="ops-item-main">
+              <div class="ops-item-eyebrow"><span class="ops-tag">${exam.pass} 分及格</span><span>${minutesLabel(exam.minutes)}</span></div>
+              <h3>${escapeHtml(exam.title)}</h3>
+              <p>${escapeHtml(exam.summary)}</p>
+              <div class="ops-meta-list"><span>${exam.questions?.length || 0} 道题</span><span>${exam.notify !== false ? "发布后提醒" : "静默发布"}</span></div>
+            </div>
+            <div class="ops-item-actions">
+              <button data-act="go" data-hash="#/ops?section=exams&mode=edit&id=${exam.id}">编辑</button>
+              <button class="danger-text" data-act="ops-delete" data-section="exams" data-id="${exam.id}">删除</button>
+            </div>
+          </article>
+        `).join("") : `<p class="empty ops-empty">暂无考试。使用右上角“新建考试”开始创建。</p>`}
+      </section>
     `;
   }
 
@@ -2460,7 +2597,7 @@
         <div class="card notice clear">
           <strong>只有店长可以进入运营事务。</strong>
           <p class="muted">请先用店长账号登录后重试。</p>
-          <button class="ghost" data-act="go" data-hash="#/home">返回运营首页</button>
+          <button class="ghost" data-act="back">返回上一页</button>
         </div>
       `;
       return;
@@ -2477,6 +2614,11 @@
       exams: "维护考试、题目和合格标准",
       notices: "发布门店事务、重要消息与学习提醒",
       staff: "查看成员状态并管理学习权限"
+    };
+    const actionMap = {
+      lessons: { label: "新建课程", hash: "#/ops?section=lessons&mode=add" },
+      exams: { label: "新建考试", hash: "#/ops?section=exams&mode=add" },
+      notices: { label: "新建通知", hash: "#/ops?section=notices&mode=add" }
     };
     setTop("运营事务", true);
     setTab("me");
@@ -2513,6 +2655,7 @@
           ${isEditing ? `<div class="ops-breadcrumb"><button data-act="ops-cancel" data-section="${active}">← 返回${titleMap[active]}</button><span>${route.mode === "add" ? "新建" : "编辑"}</span></div>` : `
             <header class="ops-workspace-head">
               <div><p>运营事务</p><h2>${titleMap[active]}</h2><span>${subtitleMap[active]}</span></div>
+              ${actionMap[active] ? `<button class="primary ops-header-action" data-act="go" data-hash="${actionMap[active].hash}" aria-label="${actionMap[active].label}">${svgIcon("add")}<span>${actionMap[active].label}</span></button>` : ""}
             </header>
           `}
           <div class="ops-content">${content}</div>
@@ -2550,7 +2693,7 @@
         <p class="kicker">权限不足</p>
         <strong>这份内容需要店长授权</strong>
         <p class="muted">当前账号暂未开通这项内容。如需学习，请联系店长。</p>
-        <button class="primary" data-act="go" data-hash="#/home">返回首页</button>
+        <button class="primary" data-act="back">返回上一页</button>
       </div>
     `;
   }
@@ -3118,7 +3261,7 @@
         <div class="card notice clear">
           <strong>这条帖子不可查看</strong>
           <p class="muted">帖子可能已删除，或没有发送给当前账号。</p>
-          <button class="ghost" data-act="go" data-hash="#/home">返回首页</button>
+          <button class="ghost" data-act="back">返回上一页</button>
         </div>`;
       return;
     }
@@ -3131,7 +3274,7 @@
         </header>
         <p class="kicker">${notice.tone === "urgent" ? "重要帖子" : "事务帖子"}</p>
         <h2>${escapeHtml(notice.title)}</h2>
-        <div class="post-detail-body">${escapeHtml(notice.detail)}</div>
+        <div class="post-detail-body">${renderNoticeDetail(notice.detail)}</div>
         <footer><span>发送给</span><b>${escapeHtml(noticeAudienceLabel(notice))}</b></footer>
       </article>`;
   }
@@ -3147,20 +3290,31 @@
         <button class="card notice ${messageUnread(item) ? "unread-message" : "read-message"} ${item.tone === "urgent" ? "urgent" : ""}" data-act="${item.act}" data-message-key="${escapeHtml(item.key)}" ${item.id ? `data-id="${item.id}"` : ""} ${item.hash ? `data-hash="${item.hash}"` : ""}>
           <div class="kicker">${messageUnread(item) ? `<span class="message-alarm">${svgIcon("bell")}</span>` : ""}${escapeHtml(item.kicker)}<time>${renderDateLabel(item.createdAt)}</time></div>
           <strong>${escapeHtml(item.title)}</strong>
-          <p class="muted">${escapeHtml(item.detail)}</p>
+          ${renderNoticePreview(item.detail)}
         </button>`).join("") : `<div class="card notice clear"><strong>当前没有发布消息</strong><p class="muted">新课程、新考试和运营通知发布后会显示在这里。</p></div>`}
     `;
   }
 
   function renderEmbeddedApp(appName) {
-    if (appName !== "notes") return go("#/home");
-    setTop("今岭笔记", true);
+    const apps = {
+      notes: {
+        title: "今岭笔记",
+        src: "https://hldhlh.github.io/web/apps/notes/index.html"
+      },
+      jlhcdh: {
+        title: "今岭每日订货表",
+        src: "https://hldhlh.github.io/web/apps/jlhcdh/index.html"
+      }
+    };
+    const app = apps[appName];
+    if (!app) return go("#/home", { replace: true });
+    setTop(app.title, true);
     setTab("home");
     view().innerHTML = `
       <iframe
         class="embedded-app-frame"
-        src="https://hldhlh.github.io/web/apps/notes/index.html"
-        title="今岭笔记"
+        src="${app.src}"
+        title="${app.title}"
         referrerpolicy="strict-origin-when-cross-origin"
       ></iframe>`;
   }
@@ -3313,7 +3467,8 @@
     if (!btn || btn.disabled) return;
     if (btn.dataset.messageKey) markMessageRead(btn.dataset.messageKey);
     const act = btn.dataset.act;
-    if (act === "ops-tab") return go(`#/ops?section=${btn.dataset.section}`);
+    if (act === "ops-tab") return go(`#/ops?section=${btn.dataset.section}`, { replace: true });
+    if (act === "back") return goToParentPage();
     if (act === "theme-toggle") {
       setTheme(state.theme === "dark" ? "light" : "dark");
       return renderMe();
@@ -3759,12 +3914,6 @@
       Auth.logout();
       return showGate();
     }
-    if (act === "reset") {
-      if (!confirm("清除云端学习进度、考试记录和错题本？所有设备会一起清空。")) return;
-      state.progress = defaults();
-      save();
-      return renderMe();
-    }
   }
 
   function onInput(event) {
@@ -3954,6 +4103,7 @@
   }
 
   async function init() {
+    initializeNavigationState();
     setTheme(state.theme);
     document.getElementById("back-btn").innerHTML = svgIcon("back");
     document.getElementById("notification-btn").innerHTML = svgIcon("bell");
