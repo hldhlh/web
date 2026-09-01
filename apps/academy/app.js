@@ -1476,22 +1476,9 @@
       const locked = !Gate.canLesson(lesson);
       const done = isDone(lesson.id);
       const groupBadges = lessonGroupNames(lesson).map((name) => `<span>${escapeHtml(name)}</span>`).join("");
-      const completeBadge = done ? `<span class="course-complete-badge" role="img" aria-label="已通过，优秀">
-        <svg viewBox="0 0 560 370" aria-hidden="true" focusable="false">
-          <rect class="course-pass-bg" width="560" height="370" rx="28"/>
-          <g class="course-pass-stamp" transform="rotate(-13 218 218)">
-            <path class="course-pass-ring course-pass-ring-strong" d="M218 70C128 70 72 132 72 218c0 80 50 133 119 145m31 2c83 0 144-57 144-147 0-82-59-142-148-148"/>
-            <path class="course-pass-ring course-pass-ring-soft" d="M126 214c14-58 53-93 105-96 47-2 86 22 108 61M139 286c39 39 101 47 151 16"/>
-            <text class="course-pass-label" x="218" y="238" text-anchor="middle">已通过</text>
-          </g>
-          <g class="course-excellent-medal">
-            <path class="course-medal-ribbon-red" d="M424 5h42l-7 91h-30zM477 5h42l-5 91h-31z"/>
-            <path class="course-medal-ribbon-yellow" d="M417 4h110v15H417z"/>
-            <path class="course-medal-face" d="M472 59l23 11 25-2 13 21 21 14-3 25 11 23-17 18-4 25-25 7-18 18-24-9-24 9-18-18-25-7-4-25-17-18 11-23-3-25 21-14 13-21 25 2z"/>
-            <path class="course-medal-highlight" d="M472 71l20 10 22-2 11 18 18 12-2 22 9 20-15 16-3 21-21 6-15 15-21-8-20 8-15-15-21-6-3-21-15-16 9-20-2-22 18-12 11-18 22 2z"/>
-            <text class="course-medal-label" x="472" y="154" text-anchor="middle">优秀</text>
-          </g>
-        </svg>
+      const completeBadge = done ? `<span class="course-complete-badge" role="img" aria-label="已通过，成绩优秀">
+        <span class="course-pass-label" aria-hidden="true">已通过</span>
+        <span class="course-excellent-label" aria-hidden="true">优秀</span>
       </span>` : "";
       return `<button class="card lesson-card course-result ${done ? "is-complete" : ""}" data-act="open-lesson" data-id="${lesson.id}">
         ${completeBadge}

@@ -58,7 +58,9 @@
   document.head.appendChild(style);
 
   const statusLeaves = () => Array.from(document.querySelectorAll("span,strong,p,div"))
-    .filter((node) => node.children.length === 0 && /^(已通过|通过)$/.test(node.textContent.trim()));
+    .filter((node) => !node.closest(".course-complete-badge")
+      && node.children.length === 0
+      && /^(已通过|通过)$/.test(node.textContent.trim()));
 
   const findItem = (status) => {
     let node = status.parentElement;
