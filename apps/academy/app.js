@@ -3265,10 +3265,8 @@
     view().innerHTML = `
       <article class="card post-detail ${notice.tone === "urgent" ? "urgent" : ""}">
         <header>
-          <span class="ops-tag">${escapeHtml(notice.kicker)}</span>
           <time>${renderDateLabel(notice.createdAt)}</time>
         </header>
-        <p class="kicker">${notice.tone === "urgent" ? "重要通知" : "事务通知"}</p>
         <h2>${escapeHtml(notice.title)}</h2>
         <div class="post-detail-body">${renderNoticeDetail(notice.detail)}</div>
         <footer><span>发送给</span><b>${escapeHtml(noticeAudienceLabel(notice))}</b></footer>
