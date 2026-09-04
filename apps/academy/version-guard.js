@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const CHECK_INTERVAL_MS = 5 * 60 * 1000;
+  const CHECK_INTERVAL_MS = 30 * 1000;
   const DISMISSED_KEY = 'academy-version-dismissed';
   const REALTIME_ROW_ID = 'app-version';
   const VERSION_PATTERN = /^[0-9a-f]{7,40}$/i;
@@ -169,7 +169,7 @@
   }
 
   async function checkForUpdate() {
-    if (!isVersion(currentVersion) || updating || modal || !navigator.onLine) return false;
+    if (document.visibilityState !== 'visible' || !isVersion(currentVersion) || updating || modal || !navigator.onLine) return false;
     if (checking) return checking;
     checking = (async () => {
       try {
