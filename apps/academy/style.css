@@ -1346,13 +1346,14 @@ code, pre, .mono {
 }
 
 .post-detail header time,
+.post-detail-category,
 .post-detail footer span {
   color: var(--muted);
   font-size: 13px;
 }
 
-.post-detail header {
-  justify-content: flex-end;
+.post-detail-category {
+  font-weight: 600;
 }
 
 .post-detail h2 {

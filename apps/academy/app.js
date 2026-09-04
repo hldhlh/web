@@ -3265,6 +3265,7 @@
     view().innerHTML = `
       <article class="card post-detail ${notice.tone === "urgent" ? "urgent" : ""}">
         <header>
+          <span class="post-detail-category">${escapeHtml(notice.kicker)}</span>
           <time>${renderDateLabel(notice.createdAt)}</time>
         </header>
         <h2>${escapeHtml(notice.title)}</h2>
