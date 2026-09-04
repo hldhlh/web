@@ -6178,6 +6178,186 @@ textarea:focus-visible {
   margin-top: 0;
 }
 
+.ops-editor.task-board-editor:not(.lesson-editor) {
+  max-width: 960px;
+  padding: 0;
+  gap: 18px;
+}
+
+.task-board-settings {
+  padding: 22px;
+}
+
+.task-board-settings .editor-field {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.task-board-editor-head,
+.task-board-editor-footer,
+.task-board-stage-editor > header,
+.task-board-item-add,
+.task-board-editor-item {
+  display: flex;
+  align-items: center;
+}
+
+.task-board-editor-head {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.task-board-editor-head > div {
+  display: grid;
+  gap: 3px;
+}
+
+.task-board-editor-head strong {
+  font-size: 18px;
+}
+
+.task-board-editor-head span,
+.task-board-editor-footer > span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.task-board-editor-head .ghost {
+  width: auto;
+  margin: 0;
+  padding-inline: 16px;
+}
+
+.task-board-stage-list {
+  display: grid;
+  gap: 14px;
+}
+
+.task-board-stage-editor {
+  padding: 20px;
+}
+
+.task-board-stage-editor > header {
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.task-board-stage-number {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.task-board-stage-actions,
+.task-board-editor-item > div {
+  display: flex;
+  gap: 4px;
+}
+
+.task-board-stage-actions button,
+.task-board-editor-item button {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0 9px;
+  border-radius: 10px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.task-board-stage-actions button:hover,
+.task-board-editor-item button:hover {
+  background: var(--accent-soft);
+}
+
+.task-board-stage-actions .danger-text,
+.task-board-editor-item .danger-text {
+  color: var(--bad);
+}
+
+.task-board-editor-items {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.task-board-editor-item {
+  min-height: 54px;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+
+.task-board-editor-item > strong {
+  min-width: 0;
+  flex: 1;
+  font-size: 14px;
+}
+
+.task-board-item-type {
+  min-width: 42px;
+  padding: 4px 7px;
+  border-radius: 7px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.task-board-stage-empty {
+  padding: 18px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.task-board-item-add {
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.task-board-item-add select {
+  min-width: 0;
+  flex: 1;
+}
+
+.task-board-item-add button {
+  min-height: 44px;
+  padding: 0 15px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--accent);
+  font-weight: 650;
+}
+
+.task-board-editor-footer {
+  position: sticky;
+  z-index: 10;
+  bottom: 12px;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.task-board-editor-footer .primary {
+  width: auto;
+  min-width: 150px;
+  margin: 0;
+}
+
 @media (max-width: 900px) {
   .ops-mode .view {
     padding: calc(var(--topbar-h) + 10px) 16px 32px;
@@ -6205,7 +6385,7 @@ textarea:focus-visible {
   .ops-sidebar .ops-subtabs {
     margin: 0;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 5px;
   }
 
@@ -6307,6 +6487,22 @@ textarea:focus-visible {
   .ops-item-actions button {
     flex: 1;
   }
+
+  .task-board-editor-item {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .task-board-editor-item > strong {
+    padding-top: 4px;
+  }
+
+  .task-board-editor-item > div {
+    width: 100%;
+    justify-content: flex-end;
+    padding-top: 7px;
+    border-top: 1px solid var(--line);
+  }
 }
 
 @media (max-width: 520px) {
@@ -6362,6 +6558,19 @@ textarea:focus-visible {
 
   .ops-editor:not(.lesson-editor) > .actions .primary,
   .ops-editor:not(.lesson-editor) > .actions .ghost {
+    width: 100%;
+  }
+
+  .task-board-editor-head,
+  .task-board-editor-footer,
+  .task-board-item-add {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .task-board-editor-head .ghost,
+  .task-board-editor-footer .primary,
+  .task-board-item-add button {
     width: 100%;
   }
 }

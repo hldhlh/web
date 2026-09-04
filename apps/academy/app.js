@@ -22,7 +22,7 @@
   };
   const OPS_STORAGE_KEY = "academy-ops-content-v1";
   const OPS_LESSON_DRAFT_KEY = "academy-ops-lesson-draft-v1";
-  const OPS_TABS = ["lessons", "exams", "notices", "staff"];
+  const OPS_TABS = ["lessons", "exams", "notices", "tasks", "staff"];
   const NAVIGATION_STATE_KEY = "academyNavigation";
   let contentRevision = 0;
 
@@ -66,6 +66,64 @@
       id: coerceId("group", item?.id),
       name: coerceString(item?.name || item?.title, `课程分组 ${index + 1}`)
     })).filter((item) => !seen.has(item.id) && seen.add(item.id));
+  }
+
+  function taskBoardEntryKey(kind, id) {
+    return `${kind}:${id}`;
+  }
+
+  function taskBoardEntries(lessons = DATA.lessons, exams = DATA.exams) {
+    return [
+      ...lessons.map((item) => ({ kind: "lesson", id: item.id, title: item.title })),
+      ...exams.map((item) => ({ kind: "exam", id: item.id, title: item.title }))
+    ];
+  }
+
+  function defaultTaskBoard(lessons = DATA.lessons, exams = DATA.exams) {
+    const trackIds = [];
+    [...lessons, ...exams].forEach((item) => {
+      if (item?.track && !trackIds.includes(item.track)) trackIds.push(item.track);
+    });
+    const trackNames = Object.fromEntries(DATA.tracks.map((track) => [track.id, track.title]));
+    const stages = trackIds.map((track, index) => ({
+      id: coerceId("task-stage", track),
+      title: coerceString(trackNames[track], `阶段 ${index + 1}`),
+      items: [
+        ...lessons.filter((item) => item.track === track).map((item) => ({ kind: "lesson", id: item.id })),
+        ...exams.filter((item) => item.track === track).map((item) => ({ kind: "exam", id: item.id }))
+      ]
+    }));
+    return {
+      title: "任务面板",
+      stages: stages.length ? stages : [{ id: "task-stage-1", title: "阶段 1", items: [] }]
+    };
+  }
+
+  function normalizeTaskBoard(raw, lessons = DATA.lessons, exams = DATA.exams) {
+    const fallback = defaultTaskBoard(lessons, exams);
+    const source = raw && Array.isArray(raw.stages) && raw.stages.length ? raw : fallback;
+    const validEntries = new Set(taskBoardEntries(lessons, exams).map((item) => taskBoardEntryKey(item.kind, item.id)));
+    const used = new Set();
+    const stages = source.stages.map((stage, index) => {
+      const items = (Array.isArray(stage?.items) ? stage.items : []).map((item) => ({
+        kind: item?.kind === "exam" ? "exam" : "lesson",
+        id: coerceString(item?.id, "")
+      })).filter((item) => {
+        const key = taskBoardEntryKey(item.kind, item.id);
+        if (!item.id || !validEntries.has(key) || used.has(key)) return false;
+        used.add(key);
+        return true;
+      });
+      return {
+        id: coerceId("task-stage", stage?.id),
+        title: coerceString(stage?.title, `阶段 ${index + 1}`),
+        items
+      };
+    });
+    return {
+      title: coerceString(source.title, "任务面板"),
+      stages: stages.length ? stages : fallback.stages
+    };
   }
 
   function normalizeLessonGroupIds(groupIds, fallbackTrack = "onboard") {
@@ -329,11 +387,13 @@
         }))
       : fallbackExams;
     const notices = Array.isArray(raw?.notices) ? raw.notices.map(normalizeNotice) : [];
+    const taskBoard = normalizeTaskBoard(raw?.taskBoard || DATA.taskBoard, lessons, exams);
     return {
       courseGroups,
       lessons,
       exams: rebuildMixExam(exams),
-      notices
+      notices,
+      taskBoard
     };
   }
 
@@ -346,6 +406,7 @@
     DATA.lessons = snapshot.lessons;
     DATA.exams = snapshot.exams;
     DATA.notices = snapshot.notices;
+    DATA.taskBoard = normalizeTaskBoard(snapshot.taskBoard, DATA.lessons, DATA.exams);
     if (before) {
       const afterIds = JSON.stringify({
         lessons: DATA.lessons.map((item) => item.id),
@@ -370,7 +431,8 @@
       courseGroups: DATA.courseGroups,
       lessons: DATA.lessons,
       exams: DATA.exams,
-      notices: DATA.notices
+      notices: DATA.notices,
+      taskBoard: DATA.taskBoard
     };
     localStorage.setItem(OPS_STORAGE_KEY, JSON.stringify(payload));
   }
@@ -551,7 +613,7 @@
     },
     refreshView() {
       const stay = state.route?.name;
-      const editingOps = stay === "ops" && ["add", "edit"].includes(currentOpsRoute().mode);
+      const editingOps = stay === "ops" && (["add", "edit"].includes(currentOpsRoute().mode) || currentOpsRoute().section === "tasks");
       if (editingOps) {
         updateNotificationButton();
         return;
@@ -731,7 +793,8 @@
         courseGroups: DATA.courseGroups,
         lessons: DATA.lessons,
         exams: DATA.exams,
-        notices: DATA.notices || []
+        notices: DATA.notices || [],
+        taskBoard: DATA.taskBoard
       };
     },
     apply(payload) {
@@ -744,15 +807,17 @@
         courseGroups,
         lessons: source.lessons.map(normalizeLesson),
         exams: source.exams.map(normalizeExam),
-        notices: Array.isArray(source.notices) ? source.notices.map(normalizeNotice) : []
+        notices: Array.isArray(source.notices) ? source.notices.map(normalizeNotice) : [],
+        taskBoard: source.taskBoard
       });
       DATA.courseGroups = normalized.courseGroups;
       DATA.lessons = normalized.lessons;
       DATA.exams = normalized.exams;
       DATA.notices = normalized.notices;
+      DATA.taskBoard = normalizeTaskBoard(normalized.taskBoard, DATA.lessons, DATA.exams);
       contentRevision = rev || Date.now();
       saveOpsStore();
-      const editing = state.route?.name === "ops" && ["add", "edit"].includes(currentOpsRoute().mode);
+      const editing = state.route?.name === "ops" && (["add", "edit"].includes(currentOpsRoute().mode) || currentOpsRoute().section === "tasks");
       if (Auth.session && !editing && state.route?.name !== "exam") render();
       return true;
     },
@@ -1335,28 +1400,26 @@
       .filter((exam) => Gate.canExam(exam) && (isUrgentTrack(exam.track) || bestScore(exam.id) < exam.pass))
       .sort((a, b) => Number(isUrgentTrack(b.track)) - Number(isUrgentTrack(a.track)));
     const importantMessages = box.unreadNotices.slice(0, 5);
-    const tracks = [];
-    [...DATA.lessons, ...DATA.exams].forEach((item) => {
-      if (!tracks.includes(item.track)) tracks.push(item.track);
-    });
-    const trackNames = Object.fromEntries(DATA.tracks.map((track) => [track.id, track.title]));
-    const stages = tracks.map((track, index) => {
-      const tasks = [
-        ...DATA.lessons.filter((lesson) => lesson.track === track).map((lesson) => ({ kind: "lesson", data: lesson })),
-        ...DATA.exams.filter((exam) => exam.track === track).map((exam) => ({ kind: "exam", data: exam }))
-      ];
+    const taskBoard = normalizeTaskBoard(DATA.taskBoard, DATA.lessons, DATA.exams);
+    const stages = taskBoard.stages.map((stage) => {
+      const tasks = stage.items.map((item) => ({
+        kind: item.kind,
+        data: item.kind === "exam" ? examById(item.id) : lessonById(item.id)
+      })).filter((item) => item.data);
       const done = tasks.filter((task) => task.kind === "lesson" ? isDone(task.data.id) : bestScore(task.data.id) >= task.data.pass).length;
       const available = tasks.some((task) => task.kind === "lesson" ? Gate.canLesson(task.data) : Gate.canExam(task.data));
       return {
-        track,
+        id: stage.id,
         tasks,
         done,
         available,
-        title: trackNames[track] || `学习阶段 ${index + 1}`,
+        title: stage.title,
         percent: tasks.length ? Math.round((done / tasks.length) * 100) : 0
       };
     });
     const activeStage = Math.max(0, stages.findIndex((stage) => stage.available && stage.done < stage.tasks.length));
+    const taskBoardTotal = stages.reduce((sum, stage) => sum + stage.tasks.length, 0);
+    const taskBoardDone = stages.reduce((sum, stage) => sum + stage.done, 0);
 
     view().innerHTML = `
       <header class="hello home-hello">
@@ -1408,8 +1471,8 @@
       </div>
       <section class="learning-plan">
         <header class="learning-plan-head">
-          <h3>任务面板</h3>
-          <strong><small>已完成</small><b>${learnedCount}/${learnableLessons.length}</b></strong>
+          <h3>${escapeHtml(taskBoard.title)}</h3>
+          <strong><small>已完成</small><b>${taskBoardDone}/${taskBoardTotal}</b></strong>
         </header>
         <div class="stage-tabs" role="tablist" aria-label="学习阶段">
           ${stages.map((stage, index) => `
@@ -1700,7 +1763,7 @@
           </button>
           ${Auth.isManager(Auth.session) ? `<button class="account-setting-row" data-act="go" data-hash="#/ops">
             <span class="account-setting-icon">${svgIcon("group")}</span>
-            <span class="account-setting-copy"><strong>运营事务管理</strong><small>管理课程、考试与员工</small></span>
+            <span class="account-setting-copy"><strong>运营事务管理</strong><small>管理课程、考试、任务与员工</small></span>
             <span class="account-setting-chevron" aria-hidden="true">›</span>
           </button>` : ""}
         </div>
@@ -1722,6 +1785,7 @@
       { key: "lessons", icon: "learn", label: "课程", fullLabel: "课程内容", count: DATA.lessons.length },
       { key: "exams", icon: "exam", label: "考试", fullLabel: "考试题库", count: DATA.exams.length },
       { key: "notices", icon: "bell", label: "通知", fullLabel: "事务通知", count: (DATA.notices || []).length },
+      { key: "tasks", icon: "group", label: "任务", fullLabel: "任务面板", count: (DATA.taskBoard?.stages || []).length },
       { key: "staff", icon: "me", label: "员工", fullLabel: "员工与权限", count: Auth.list().length }
     ];
     return `<nav class="ops-subtabs" aria-label="运营事务导航">${sections.map((item) => `
@@ -2287,6 +2351,105 @@
     `;
   }
 
+  function taskBoardEntry(kind, id) {
+    return taskBoardEntries().find((item) => item.kind === kind && item.id === id) || null;
+  }
+
+  function renderTaskBoardItemEditor(item) {
+    const entry = taskBoardEntry(item.kind, item.id);
+    if (!entry) return "";
+    return `
+      <div class="task-board-editor-item" data-task-kind="${entry.kind}" data-task-id="${escapeHtml(entry.id)}">
+        <span class="task-board-item-type">${entry.kind === "exam" ? "考试" : "课程"}</span>
+        <strong>${escapeHtml(entry.title)}</strong>
+        <div>
+          <button type="button" data-act="ops-task-item-move" data-direction="up" title="上移">↑</button>
+          <button type="button" data-act="ops-task-item-move" data-direction="down" title="下移">↓</button>
+          <button type="button" class="danger-text" data-act="ops-task-item-remove">移除</button>
+        </div>
+      </div>`;
+  }
+
+  function renderTaskBoardStageEditor(stage, index) {
+    const entries = taskBoardEntries();
+    return `
+      <section class="card task-board-stage-editor" data-task-stage-id="${escapeHtml(stage.id)}">
+        <header>
+          <span class="task-board-stage-number">阶段 ${index + 1}</span>
+          <div class="task-board-stage-actions">
+            <button type="button" data-act="ops-task-stage-move" data-direction="up" title="阶段上移">↑</button>
+            <button type="button" data-act="ops-task-stage-move" data-direction="down" title="阶段下移">↓</button>
+            <button type="button" class="danger-text" data-act="ops-task-stage-remove">删除阶段</button>
+          </div>
+        </header>
+        <label class="editor-field"><span>阶段名称</span><input data-task-stage-title maxlength="40" value="${escapeHtml(stage.title)}" placeholder="例如：入职基础"></label>
+        <div class="task-board-editor-items">
+          ${stage.items.map(renderTaskBoardItemEditor).join("")}
+          <p class="task-board-stage-empty" ${stage.items.length ? "hidden" : ""}>当前阶段还没有任务</p>
+        </div>
+        <div class="task-board-item-add">
+          <select data-task-item-select aria-label="选择课程或考试">
+            <option value="">选择课程或考试</option>
+            ${entries.map((entry) => `<option value="${escapeHtml(taskBoardEntryKey(entry.kind, entry.id))}">${entry.kind === "exam" ? "考试" : "课程"} · ${escapeHtml(entry.title)}</option>`).join("")}
+          </select>
+          <button type="button" data-act="ops-task-item-add">添加任务</button>
+        </div>
+      </section>`;
+  }
+
+  function renderOpsTaskBoard() {
+    const board = normalizeTaskBoard(DATA.taskBoard, DATA.lessons, DATA.exams);
+    return `
+      <form class="ops-editor task-board-editor" id="ops-task-board-editor">
+        <section class="card editor-section task-board-settings">
+          <div class="editor-section-head"><span>01</span><div><h3>面板设置</h3><p>员工首页显示的任务面板名称与阶段内容</p></div></div>
+          <label class="editor-field editor-field-main"><span>面板名称</span><input id="ops-task-board-title" maxlength="40" value="${escapeHtml(board.title)}" placeholder="任务面板"></label>
+        </section>
+        <div class="task-board-editor-head">
+          <div><strong>阶段与任务</strong><span>课程和考试只能在任务面板中出现一次，可调整阶段与任务顺序。</span></div>
+          <button type="button" class="ghost" data-act="ops-task-stage-add">新增阶段</button>
+        </div>
+        <div class="task-board-stage-list">
+          ${board.stages.map(renderTaskBoardStageEditor).join("")}
+        </div>
+        <div class="lesson-editor-footer task-board-editor-footer">
+          <span>保存后会同步更新所有员工首页</span>
+          <button class="primary" type="button" data-act="ops-save" data-section="tasks">发布任务面板</button>
+        </div>
+      </form>`;
+  }
+
+  function collectTaskBoardEditor() {
+    const stages = Array.from(document.querySelectorAll(".task-board-stage-editor")).map((stage, index) => ({
+      id: coerceId("task-stage", stage.dataset.taskStageId),
+      title: coerceString(stage.querySelector("[data-task-stage-title]")?.value, `阶段 ${index + 1}`),
+      items: Array.from(stage.querySelectorAll(".task-board-editor-item")).map((item) => ({
+        kind: item.dataset.taskKind === "exam" ? "exam" : "lesson",
+        id: coerceString(item.dataset.taskId, "")
+      }))
+    }));
+    return normalizeTaskBoard({
+      title: coerceString(document.getElementById("ops-task-board-title")?.value, "任务面板"),
+      stages
+    }, DATA.lessons, DATA.exams);
+  }
+
+  function refreshTaskBoardEditor() {
+    const stages = Array.from(document.querySelectorAll(".task-board-stage-editor"));
+    const used = new Set(Array.from(document.querySelectorAll(".task-board-editor-item")).map((item) =>
+      taskBoardEntryKey(item.dataset.taskKind, item.dataset.taskId)
+    ));
+    stages.forEach((stage, index) => {
+      const number = stage.querySelector(".task-board-stage-number");
+      if (number) number.textContent = `阶段 ${index + 1}`;
+      const empty = stage.querySelector(".task-board-stage-empty");
+      if (empty) empty.hidden = Boolean(stage.querySelector(".task-board-editor-item"));
+      stage.querySelectorAll("[data-task-item-select] option").forEach((option) => {
+        option.disabled = Boolean(option.value && used.has(option.value));
+      });
+    });
+  }
+
   function renderOpsLessonEditor(item) {
     const savedDraft = loadLessonDraft();
     const data = lessonForEditor(savedDraft ? { ...item, ...savedDraft, id: item?.id || "" } : item);
@@ -2603,12 +2766,14 @@
       lessons: "课程管理",
       exams: "考试管理",
       notices: "通知",
+      tasks: "任务面板",
       staff: "员工与权限"
     };
     const subtitleMap = {
       lessons: "创建、更新并安排员工需要学习的课程",
       exams: "维护考试、题目和合格标准",
       notices: "发布门店事务、重要消息与学习提醒",
+      tasks: "安排员工首页的阶段、课程与考试任务",
       staff: "查看成员状态并管理学习权限"
     };
     const actionMap = {
@@ -2627,6 +2792,7 @@
       lessons: active === "lessons" ? (route.mode === "edit" ? renderOpsLessonEditor(editLesson) : renderOpsLessonList()) : "",
       exams: active === "exams" ? (route.mode === "edit" ? renderOpsExamEditor(editExam) : renderOpsExamList()) : "",
       notices: active === "notices" ? (route.mode === "edit" ? renderOpsNoticeEditor(editNotice) : renderOpsNoticeList()) : "",
+      tasks: active === "tasks" ? renderOpsTaskBoard() : "",
       staff: active === "staff" ? renderOpsStaff() : ""
     };
     const content = route.mode === "add"
@@ -2659,6 +2825,7 @@
       </div>
     `;
     if (isEditing && active === "lessons") resizeLessonEditorFields(view());
+    if (active === "tasks") refreshTaskBoardEditor();
     if (active === "staff") {
       StaffProgress.load();
       view().querySelector("[data-staff-refresh]")?.addEventListener("click", (event) => {
@@ -3473,6 +3640,68 @@
       return go(`#/ops?section=${currentOpsRoute().section}`);
     }
     if (act === "ops-message") return go("#/ops?section=notices");
+    if (act === "ops-task-stage-add") {
+      const list = document.querySelector(".task-board-stage-list");
+      if (!list) return;
+      const index = list.querySelectorAll(".task-board-stage-editor").length;
+      const stage = { id: coerceId("task-stage", ""), title: `阶段 ${index + 1}`, items: [] };
+      list.insertAdjacentHTML("beforeend", renderTaskBoardStageEditor(stage, index));
+      refreshTaskBoardEditor();
+      list.lastElementChild?.querySelector("[data-task-stage-title]")?.focus();
+      return;
+    }
+    if (act === "ops-task-stage-move") {
+      const stage = btn.closest(".task-board-stage-editor");
+      const list = stage?.parentElement;
+      if (!stage || !list) return;
+      if (btn.dataset.direction === "up" && stage.previousElementSibling) list.insertBefore(stage, stage.previousElementSibling);
+      if (btn.dataset.direction === "down" && stage.nextElementSibling) list.insertBefore(stage.nextElementSibling, stage);
+      refreshTaskBoardEditor();
+      return;
+    }
+    if (act === "ops-task-stage-remove") {
+      const stage = btn.closest(".task-board-stage-editor");
+      const stages = document.querySelectorAll(".task-board-stage-editor");
+      if (!stage) return;
+      if (stages.length <= 1) return alert("任务面板至少需要保留一个阶段。");
+      if (stage.querySelector(".task-board-editor-item") && !confirm("删除阶段会同时移除其中的任务，确定继续吗？")) return;
+      stage.remove();
+      refreshTaskBoardEditor();
+      return;
+    }
+    if (act === "ops-task-item-add") {
+      const stage = btn.closest(".task-board-stage-editor");
+      const select = stage?.querySelector("[data-task-item-select]");
+      const key = select?.value || "";
+      const separator = key.indexOf(":");
+      if (!stage || !select || separator < 1) return;
+      const kind = key.slice(0, separator) === "exam" ? "exam" : "lesson";
+      const id = key.slice(separator + 1);
+      const entry = taskBoardEntry(kind, id);
+      const duplicate = Array.from(document.querySelectorAll(".task-board-editor-item")).some((item) =>
+        item.dataset.taskKind === kind && item.dataset.taskId === id
+      );
+      if (!entry || duplicate) return;
+      stage.querySelector(".task-board-editor-items")?.insertAdjacentHTML("beforeend", renderTaskBoardItemEditor({ kind, id }));
+      select.value = "";
+      refreshTaskBoardEditor();
+      return;
+    }
+    if (act === "ops-task-item-move") {
+      const item = btn.closest(".task-board-editor-item");
+      const list = item?.parentElement;
+      if (!item || !list) return;
+      const sibling = btn.dataset.direction === "up" ? item.previousElementSibling : item.nextElementSibling;
+      if (!sibling?.classList.contains("task-board-editor-item")) return;
+      if (btn.dataset.direction === "up") list.insertBefore(item, sibling);
+      else list.insertBefore(sibling, item);
+      return;
+    }
+    if (act === "ops-task-item-remove") {
+      btn.closest(".task-board-editor-item")?.remove();
+      refreshTaskBoardEditor();
+      return;
+    }
     if (act === "ops-group-add") {
       const input = document.getElementById("ops-group-new-name");
       const name = coerceString(input?.value, "");
@@ -3517,6 +3746,9 @@
       if (source === "lessons") DATA.lessons = list.filter((item) => item.id !== id);
       else if (source === "exams") DATA.exams = list.filter((item) => item.id !== id);
       else if (source === "notices") DATA.notices = list.filter((item) => item.id !== id);
+      if (source === "lessons" || source === "exams") {
+        DATA.taskBoard = normalizeTaskBoard(DATA.taskBoard, DATA.lessons, DATA.exams);
+      }
       saveOpsStore();
       ContentSync.publish().catch(() => alert("内容已暂存，请检查网络后重新发布。"));
       return go(`#/ops?section=${source}`);
@@ -3675,6 +3907,23 @@
       (async () => {
         const section = btn.dataset.section;
         const id = coerceString(btn.dataset.id, "");
+        if (section === "tasks") {
+          const title = coerceString(document.getElementById("ops-task-board-title")?.value, "");
+          const stageNodes = document.querySelectorAll(".task-board-stage-editor");
+          const itemNodes = document.querySelectorAll(".task-board-editor-item");
+          if (!title) return alert("任务面板名称不能为空。");
+          if (!stageNodes.length) return alert("任务面板至少需要一个阶段。");
+          if (!itemNodes.length) return alert("请至少添加一项课程或考试任务。");
+          DATA.taskBoard = collectTaskBoardEditor();
+          saveOpsStore();
+          try {
+            await publishWithState(btn, "任务面板");
+          } catch (error) {
+            alert(`任务面板已暂存，暂时无法发布：${error?.message || "请检查网络后重试"}。`);
+            return;
+          }
+          return go("#/ops?section=tasks");
+        }
         if (section === "lessons") {
           const list = DATA.lessons.slice();
           setPublishState(btn, "preparing", `<span class="ops-publish-state"><i class="ops-publish-spinner" aria-hidden="true"></i>准备发布</span>`);
