@@ -2225,7 +2225,7 @@
     ];
     return `
       <form class="card ops-editor" id="ops-editor">
-        <p class="kicker">${data.id ? "编辑帖子" : "新增帖子"}</p>
+        <p class="kicker">${data.id ? "编辑通知" : "新增通知"}</p>
         <label>标题<input id="ops-notice-title" value="${escapeHtml(data.title)}"></label>
         <label>标签<input id="ops-notice-kicker" value="${escapeHtml(data.kicker)}"></label>
         <label>内容<textarea id="ops-notice-detail">${escapeHtml(data.detail)}</textarea></label>
@@ -2257,7 +2257,7 @@
           ${renderPublishToggle("ops-notice-notify", data.notify, "发送铃铛消息", "发布后进入成员消息列表并显示未读铃铛")}
         </fieldset>
         <div class="actions">
-          <button class="primary" type="button" data-act="ops-save" data-section="notices" data-id="${data.id}">${data.id ? "保存帖子" : "发布帖子"}</button>
+          <button class="primary" type="button" data-act="ops-save" data-section="notices" data-id="${data.id}">${data.id ? "保存通知" : "发布通知"}</button>
           <button class="ghost" type="button" data-act="ops-cancel" data-section="notices">取消</button>
         </div>
       </form>
@@ -2602,7 +2602,7 @@
     const titleMap = {
       lessons: "课程管理",
       exams: "考试管理",
-      notices: "通知与帖子",
+      notices: "通知",
       staff: "员工与权限"
     };
     const subtitleMap = {
@@ -3250,13 +3250,13 @@
 
   function renderNotice(id) {
     const notice = (DATA.notices || []).find((item) => item.id === id);
-    setTop("帖子详情", true);
+    setTop("通知详情", true);
     setTab("home");
     if (!notice || !noticeVisibleTo(notice)) {
       view().innerHTML = `
         <div class="card notice clear">
-          <strong>这条帖子不可查看</strong>
-          <p class="muted">帖子可能已删除，或没有发送给当前账号。</p>
+          <strong>这条通知不可查看</strong>
+          <p class="muted">通知可能已删除，或没有发送给当前账号。</p>
           <button class="ghost" data-act="back">返回上一页</button>
         </div>`;
       return;
@@ -3268,7 +3268,7 @@
           <span class="ops-tag">${escapeHtml(notice.kicker)}</span>
           <time>${renderDateLabel(notice.createdAt)}</time>
         </header>
-        <p class="kicker">${notice.tone === "urgent" ? "重要帖子" : "事务帖子"}</p>
+        <p class="kicker">${notice.tone === "urgent" ? "重要通知" : "事务通知"}</p>
         <h2>${escapeHtml(notice.title)}</h2>
         <div class="post-detail-body">${renderNoticeDetail(notice.detail)}</div>
         <footer><span>发送给</span><b>${escapeHtml(noticeAudienceLabel(notice))}</b></footer>
