@@ -294,7 +294,12 @@ code, pre, .mono {
   min-height: calc(100dvh - var(--topbar-h));
   flex: 1;
   border: 0;
-  background: #000c18;
+  background: var(--bg);
+  color-scheme: light;
+}
+
+[data-theme="dark"] .embedded-app-frame {
+  color-scheme: dark;
 }
 
 .app.gated {
@@ -508,20 +513,21 @@ code, pre, .mono {
   line-height: 1.35;
 }
 
-.home-hello {
+/* 首页“今日状态”：问候、日期与总体完成度。 */
+.home-status {
   align-items: flex-end;
   justify-content: space-between;
   gap: 20px;
   margin: 8px 0 20px;
 }
 
-.home-hello-copy {
+.home-status-copy {
   min-width: 0;
   display: grid;
   gap: 4px;
 }
 
-.home-hello h2 {
+.home-status h2 {
   color: var(--text);
   font-size: var(--type-title-1);
   font-weight: 700;
@@ -529,16 +535,33 @@ code, pre, .mono {
   line-height: 1.2;
 }
 
-.home-hello time {
-  display: block;
+.home-status-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
   color: var(--muted);
   font-size: var(--type-footnote);
   font-weight: 500;
   line-height: 1.35;
+}
+
+.home-status-meta time {
+  display: block;
   white-space: nowrap;
 }
 
-.home-hello .home-rest-reminder {
+.home-status-meta span {
+  white-space: nowrap;
+}
+
+.home-status-meta span::before {
+  content: "·";
+  margin-right: 6px;
+  color: var(--tertiary);
+}
+
+.home-status .home-rest-reminder {
   display: block;
   margin: 0;
   color: var(--muted);
@@ -548,12 +571,12 @@ code, pre, .mono {
 }
 
 @media (max-width: 480px) {
-  .home-hello {
+  .home-status {
     align-items: center;
     gap: 12px;
   }
 
-  .home-hello h2 {
+  .home-status h2 {
     font-size: 26px;
   }
 
@@ -5040,37 +5063,37 @@ textarea:focus-visible {
   font-weight: 700;
 }
 
-.home-hello .ring-wrap {
+.home-status .ring-wrap {
   width: 72px;
   height: 72px;
   flex: 0 0 72px;
   color: var(--muted);
 }
 
-.home-hello .ring-wrap svg {
+.home-status .ring-wrap svg {
   width: 72px;
   height: 72px;
 }
 
-.home-hello .ring-wrap span {
+.home-status .ring-wrap span {
   color: var(--text);
   font-size: var(--type-subhead);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
-.home-hello .ring-wrap svg circle:last-child {
+.home-status .ring-wrap svg circle:last-child {
   filter: drop-shadow(0 1px 2px color-mix(in srgb, var(--accent) 26%, transparent));
 }
 
 @media (max-width: 480px) {
-  .home-hello .ring-wrap,
-  .home-hello .ring-wrap svg {
+  .home-status .ring-wrap,
+  .home-status .ring-wrap svg {
     width: 64px;
     height: 64px;
   }
 
-  .home-hello .ring-wrap {
+  .home-status .ring-wrap {
     flex-basis: 64px;
   }
 }

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f2f2f7">
+  <title>每日问题反馈 · Auto Office</title>
+  <style>
+    html, body { min-height: 100%; margin: 0; background: #f2f2f7; }
+    html[data-theme="dark"], html[data-theme="dark"] body { background: #000; }
+  </style>
+  <script>
+    const feedbackTheme = localStorage.getItem("app-theme") || "light";
+    document.documentElement.dataset.theme = feedbackTheme;
+    document.querySelector('meta[name="theme-color"]').content = feedbackTheme === "dark" ? "#000000" : "#f2f2f7";
+    window.ACADEMY_CONFIG = {
+      url: "https://fmxddvjgkykuqwmasigo.supabase.co",
+      key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo",
+      bucket: "cloud-files",
+      object: "academy/state.json",
+      table: "academy_progress"
+    };
+    window.APP_NETWORK_ENDPOINTS = Array.isArray(window.ACADEMY_NETWORK_ENDPOINTS)
+      ? window.ACADEMY_NETWORK_ENDPOINTS
+      : (Array.isArray(window.APP_NETWORK_ENDPOINTS) ? window.APP_NETWORK_ENDPOINTS : []);
+  </script>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="feedback-shell" id="feedback-app" aria-busy="true">
+    <header class="page-header">
+      <div>
+        <span class="visibility-label">公开透明 · 全员可见</span>
+        <h1>每日问题反馈</h1>
+        <p id="sync-status" role="status" aria-live="polite">正在同步最新问题…</p>
+      </div>
+      <button class="primary-action" id="open-compose" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        反馈问题
+      </button>
+    </header>
+
+    <main class="feedback-content">
+      <section class="overview-card" aria-label="问题概览">
+        <div><strong id="today-count">0</strong><span>今日反馈</span></div>
+        <div><strong id="pending-count">0</strong><span>待处理</span></div>
+        <div><strong id="resolved-count">0</strong><span>已解决</span></div>
+      </section>
+
+      <section class="feedback-board" aria-labelledby="board-title">
+        <header class="board-header">
+          <div><span>问题清单</span><h2 id="board-title">大家反馈的问题</h2></div>
+          <div class="view-filter" role="group" aria-label="问题筛选">
+            <button class="active" type="button" data-filter="pending">待处理</button>
+            <button type="button" data-filter="all">全部</button>
+            <button type="button" data-filter="resolved">已解决</button>
+          </div>
+        </header>
+        <div class="feedback-list" id="feedback-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="sheet-backdrop" id="compose-backdrop" hidden></div>
+  <section class="compose-sheet" id="compose-sheet" role="dialog" aria-modal="true" aria-labelledby="compose-title" hidden>
+    <header>
+      <button class="text-button" id="cancel-compose" type="button">取消</button>
+      <div><span>全员可见</span><h2 id="compose-title">反馈问题</h2></div>
+      <button class="text-button strong" id="submit-feedback" type="button">提交</button>
+    </header>
+    <form id="feedback-form">
+      <label class="field-label" for="feedback-category">问题分类</label>
+      <select id="feedback-category">
+        <option value="service">服务</option>
+        <option value="product">产品</option>
+        <option value="environment">环境</option>
+        <option value="equipment">设备</option>
+        <option value="wish">愿望</option>
+        <option value="other">其他</option>
+      </select>
+
+      <label class="field-label" for="feedback-title">问题标题</label>
+      <input id="feedback-title" type="text" maxlength="40" autocomplete="off" placeholder="一句话说明发现的问题" required>
+
+      <label class="field-label" for="feedback-detail">具体情况</label>
+      <textarea id="feedback-detail" maxlength="500" rows="6" placeholder="请说明发生位置、现象和影响，方便大家快速处理。" required></textarea>
+      <p class="form-note">提交后，您的姓名、反馈时间和问题内容会向所有 Auto Office 用户公开。</p>
+    </form>
+  </section>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <script src="./bootstrap.js"></script>
+</body>
+</html>

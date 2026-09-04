@@ -883,6 +883,71 @@
     }
   };
 
+  const ScheduleStatus = {
+    path: "academy/schedule.json",
+    cacheKey: "academy-schedule-cache-v1",
+    data: { rev: 0, updatedAt: 0, assignments: {} },
+    channel: null,
+    pullPromise: null,
+    poll: 0,
+    loadCache() {
+      try {
+        this.apply(JSON.parse(localStorage.getItem(this.cacheKey) || "null"), false);
+      } catch (_) { }
+    },
+    normalize(raw) {
+      const assignments = raw?.assignments && typeof raw.assignments === "object" ? raw.assignments : {};
+      return {
+        rev: Number(raw?.rev) || 0,
+        updatedAt: Number(raw?.updatedAt) || 0,
+        assignments
+      };
+    },
+    apply(raw, refresh = true) {
+      if (!raw || typeof raw !== "object") return false;
+      const next = this.normalize(raw);
+      if (next.rev && next.rev <= this.data.rev) return false;
+      this.data = next;
+      try { localStorage.setItem(this.cacheKey, JSON.stringify(next)); } catch (_) { }
+      if (refresh && Auth.session && state.route?.name === "home") renderHome();
+      return true;
+    },
+    async pull() {
+      if (this.pullPromise) return this.pullPromise;
+      this.pullPromise = window.AcademyStore.getJSON(this.path)
+        .then((raw) => raw ? this.apply(raw) : false)
+        .finally(() => { this.pullPromise = null; });
+      return this.pullPromise;
+    },
+    nextRestLabel(userId, from = new Date()) {
+      if (!userId) return "下次休息待安排";
+      const start = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}-${String(from.getDate()).padStart(2, "0")}`;
+      const nextKey = Object.keys(this.data.assignments || {}).sort().find((key) => {
+        if (key < start || !/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
+        return (this.data.assignments[key] || []).some((item) => item?.userId === userId && item?.shift === "off");
+      });
+      if (!nextKey) return "下次休息待安排";
+      if (nextKey === start) return "今天是您的休息日";
+      const [year, month, day] = nextKey.split("-").map(Number);
+      const date = new Date(year, month - 1, day);
+      const weekday = new Intl.DateTimeFormat("zh-CN", { weekday: "short" }).format(date);
+      return `下次休息 ${month}月${day}日 ${weekday}`;
+    },
+    connect() {
+      if (!this.channel) {
+        this.channel = window.AcademyStore.channel("academy-schedule-live", {
+          "schedule-version": (payload) => {
+            if (Number(payload?.rev) > this.data.rev) this.pull().catch(() => { });
+          }
+        });
+      }
+      this.pull().catch(() => { });
+      if (!this.poll) this.poll = setInterval(() => this.pull().catch(() => { }), 30000);
+      return this.channel;
+    }
+  };
+  ScheduleStatus.loadCache();
+
   const Presence = {
     timer: 0,
     userId: "",
@@ -1138,7 +1203,7 @@
     new URLSearchParams(query || "").forEach((value, key) => { params[key] = value; });
     if (!parts.length || parts[0] === "home") return { name: "home" };
     if (parts[0] === "messages") return { name: "messages" };
-    if (parts[0] === "apps" && ["notes", "jlhcdh", "schedule"].includes(parts[1])) return { name: "embedded-app", app: parts[1] };
+    if (parts[0] === "apps" && ["notes", "jlhcdh", "schedule", "feedback"].includes(parts[1])) return { name: "embedded-app", app: parts[1] };
     if (parts[0] === "learn") return { name: "learn", type: params.type || "all", group: params.group || "all" };
     if (parts[0] === "exams") return { name: "exams" };
     if (parts[0] === "me") return { name: "me" };
@@ -1374,13 +1439,13 @@
     });
   }
 
-  function greetingForHour(hour) {
-    if (hour < 5) return { text: "晚上好", rest: true };
-    if (hour < 11) return { text: "早上好", rest: false };
-    if (hour < 13) return { text: "中午好", rest: false };
-    if (hour < 18) return { text: "下午好", rest: false };
-    if (hour < 22) return { text: "晚上好", rest: false };
-    return { text: "晚上好", rest: true };
+  function todayStatusForHour(hour) {
+    if (hour < 5) return { greeting: "晚上好", restReminder: true };
+    if (hour < 11) return { greeting: "早上好", restReminder: false };
+    if (hour < 13) return { greeting: "中午好", restReminder: false };
+    if (hour < 18) return { greeting: "下午好", restReminder: false };
+    if (hour < 22) return { greeting: "晚上好", restReminder: false };
+    return { greeting: "晚上好", restReminder: true };
   }
 
   function renderHome() {
@@ -1389,7 +1454,7 @@
     const box = inbox();
     const next = box.urgentLessons[0] || nextLesson();
     const now = new Date();
-    const greeting = greetingForHour(now.getHours());
+    const todayStatus = todayStatusForHour(now.getHours());
     const date = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "short" }).format(now);
     const dateTime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const memberName = escapeHtml(Auth.session?.name || "学员");
@@ -1422,11 +1487,14 @@
     const taskBoardDone = stages.reduce((sum, stage) => sum + stage.done, 0);
 
     view().innerHTML = `
-      <header class="hello home-hello">
-        <div class="home-hello-copy">
-          <h2>${greeting.text}，${memberName}</h2>
-          ${greeting.rest ? `<p class="home-rest-reminder">夜深了，早点休息</p>` : ""}
-          <time datetime="${dateTime}">${date}</time>
+      <header class="hello home-status" aria-label="今日状态">
+        <div class="home-status-copy">
+          <h2>${todayStatus.greeting}，${memberName}</h2>
+          ${todayStatus.restReminder ? `<p class="home-rest-reminder">夜深了，早点休息</p>` : ""}
+          <div class="home-status-meta">
+            <time datetime="${dateTime}">${date}</time>
+            <span>${escapeHtml(ScheduleStatus.nextRestLabel(Auth.session?.id, now))}</span>
+          </div>
         </div>
         ${progressRing(completionRate())}
       </header>
@@ -1448,6 +1516,11 @@
           <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/schedule" aria-label="在 Auto Office 内打开排班">
             <img src="./pages/schedule/icon.svg" width="54" height="54" alt="">
             <span class="home-app-shortcut-copy"><strong>排班</strong><small>查看班次与休息安排</small></span>
+            <span class="home-app-shortcut-action">打开</span>
+          </button>
+          <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/feedback" aria-label="在 Auto Office 内打开每日问题反馈">
+            <img src="./pages/feedback/icon.svg" width="54" height="54" alt="">
+            <span class="home-app-shortcut-copy"><strong>每日问题反馈</strong><small>公开反馈并跟进门店问题</small></span>
             <span class="home-app-shortcut-action">打开</span>
           </button>
         </div>
@@ -3475,6 +3548,10 @@
       schedule: {
         title: "排班",
         src: "./pages/schedule/index.html"
+      },
+      feedback: {
+        title: "每日问题反馈",
+        src: "./pages/feedback/index.html"
       }
     };
     const app = apps[appName];
@@ -4332,6 +4409,7 @@
     Live.hydrated = false;
     onRoute();
     ContentSync.pull().catch(() => { });
+    ScheduleStatus.pull().catch(() => { });
     Live.connect().finally(() => Presence.start());
   }
 
@@ -4340,6 +4418,7 @@
       window.APP_NETWORK?.patchSupabase();
       Auth.connectRealtime?.();
       ContentSync.connect();
+      ScheduleStatus.connect();
       Live.scheduleReconnect();
     };
     if (window.supabase?.createClient) {
@@ -4380,17 +4459,22 @@
     window.addEventListener("app-network-change", () => {
       Live.scheduleReconnect(true);
       ContentSync.pull().catch(() => { });
+      ScheduleStatus.pull().catch(() => { });
     }, { passive: true });
     window.addEventListener("online", () => {
       Live.scheduleReconnect(true);
       ContentSync.pull().catch(() => { });
+      ScheduleStatus.pull().catch(() => { });
     }, { passive: true });
     window.addEventListener("offline", () => Live.setStatus("offline", "离线可用"), { passive: true });
     window.addEventListener("hashchange", onRoute);
     window.addEventListener("keydown", onKey);
     document.addEventListener("visibilitychange", () => {
       Presence.visibility();
-      if (document.visibilityState === "visible") ContentSync.pull().catch(() => { });
+      if (document.visibilityState === "visible") {
+        ContentSync.pull().catch(() => { });
+        ScheduleStatus.pull().catch(() => { });
+      }
     });
     window.addEventListener("pagehide", () => {
       saveLessonDraft();
