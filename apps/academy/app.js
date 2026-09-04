@@ -1393,7 +1393,7 @@
         <button class="ops-card" data-act="go" data-hash="#/exams">
           <span class="ops-tag">考试跟踪</span>
           <b>${box.pendingExams.length}</b>
-          <small>待完成考试（含需补考）</small>
+          <small>待完成考试</small>
         </button>
         <button class="ops-card" data-act="${next ? "open-lesson" : "go"}" ${next ? `data-id="${next.id}"` : 'data-hash="#/learn"'}>
           <span class="ops-tag">待学习课程</span>
