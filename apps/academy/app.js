@@ -1138,7 +1138,7 @@
     new URLSearchParams(query || "").forEach((value, key) => { params[key] = value; });
     if (!parts.length || parts[0] === "home") return { name: "home" };
     if (parts[0] === "messages") return { name: "messages" };
-    if (parts[0] === "apps" && ["notes", "jlhcdh"].includes(parts[1])) return { name: "embedded-app", app: parts[1] };
+    if (parts[0] === "apps" && ["notes", "jlhcdh", "schedule"].includes(parts[1])) return { name: "embedded-app", app: parts[1] };
     if (parts[0] === "learn") return { name: "learn", type: params.type || "all", group: params.group || "all" };
     if (parts[0] === "exams") return { name: "exams" };
     if (parts[0] === "me") return { name: "me" };
@@ -1443,6 +1443,11 @@
           <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/jlhcdh" aria-label="在 Auto Office 内打开今岭每日订货表">
             <img src="https://hldhlh.github.io/web/apps/jlhcdh/icon.svg" width="54" height="54" alt="">
             <span class="home-app-shortcut-copy"><strong>今岭每日订货表</strong><small>完成每日订货与采购核对</small></span>
+            <span class="home-app-shortcut-action">打开</span>
+          </button>
+          <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/schedule" aria-label="在 Auto Office 内打开排班">
+            <img src="./pages/schedule/icon.svg" width="54" height="54" alt="">
+            <span class="home-app-shortcut-copy"><strong>排班</strong><small>查看班次与休息安排</small></span>
             <span class="home-app-shortcut-action">打开</span>
           </button>
         </div>
@@ -3466,6 +3471,10 @@
       jlhcdh: {
         title: "今岭每日订货表",
         src: "https://hldhlh.github.io/web/apps/jlhcdh/index.html"
+      },
+      schedule: {
+        title: "排班",
+        src: "./pages/schedule/index.html"
       }
     };
     const app = apps[appName];

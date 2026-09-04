@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f2f2f7">
+  <title>排班 · Auto Office</title>
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("app-theme") || "light";
+    window.ACADEMY_CONFIG = {
+      url: "https://fmxddvjgkykuqwmasigo.supabase.co",
+      key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo",
+      bucket: "cloud-files",
+      object: "academy/state.json",
+      table: "academy_progress"
+    };
+    window.APP_NETWORK_ENDPOINTS = Array.isArray(window.ACADEMY_NETWORK_ENDPOINTS)
+      ? window.ACADEMY_NETWORK_ENDPOINTS
+      : (Array.isArray(window.APP_NETWORK_ENDPOINTS) ? window.APP_NETWORK_ENDPOINTS : []);
+  </script>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="schedule-shell" id="schedule-app" aria-busy="true">
+    <header class="schedule-header">
+      <div>
+        <span class="permission-label" id="permission-label">正在读取权限</span>
+        <h1>排班日历</h1>
+        <p id="sync-status" role="status" aria-live="polite">正在同步最新排班…</p>
+      </div>
+      <button class="primary-action" id="edit-day" type="button" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        安排当天
+      </button>
+    </header>
+
+    <main class="schedule-content">
+      <section class="calendar-card" aria-labelledby="month-title">
+        <header class="calendar-toolbar">
+          <div class="month-navigation">
+            <button class="icon-button" id="previous-month" type="button" aria-label="上个月">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <button class="month-title" id="month-title" type="button" aria-label="回到本月"></button>
+            <button class="icon-button" id="next-month" type="button" aria-label="下个月">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+          </div>
+          <div class="view-filter" role="group" aria-label="排班筛选">
+            <button class="active" type="button" data-filter="all">全部</button>
+            <button type="button" data-filter="mine">我的</button>
+            <button type="button" data-filter="off">休息</button>
+          </div>
+        </header>
+
+        <div class="schedule-summary" id="schedule-summary"></div>
+        <div class="weekday-row" aria-hidden="true">
+          <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+        </div>
+        <div class="calendar-grid" id="calendar-grid" role="grid" aria-label="月度排班"></div>
+      </section>
+
+      <aside class="day-panel" aria-labelledby="selected-day-title">
+        <header class="day-panel-header">
+          <div>
+            <span>当天安排</span>
+            <h2 id="selected-day-title"></h2>
+          </div>
+          <span class="day-count" id="selected-day-count"></span>
+        </header>
+        <div class="day-schedule" id="day-schedule"></div>
+      </aside>
+    </main>
+  </div>
+
+  <div class="sheet-backdrop" id="editor-backdrop" hidden></div>
+  <section class="editor-sheet" id="editor-sheet" role="dialog" aria-modal="true" aria-labelledby="editor-title" hidden>
+    <header>
+      <button class="text-button" id="cancel-edit" type="button">取消</button>
+      <div><span>店长排班</span><h2 id="editor-title"></h2></div>
+      <button class="text-button strong" id="save-edit" type="button">保存</button>
+    </header>
+    <div class="editor-help">为每位员工选择当天班次；选择“未安排”会清除该员工当天记录。</div>
+    <div class="people-editor" id="people-editor"></div>
+  </section>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="../../../network.js"></script>
+  <script src="../../../vendor/supabase.min.js"></script>
+  <script src="../../framework/store.js"></script>
+  <script src="../../framework/auth.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
