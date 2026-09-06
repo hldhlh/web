@@ -22,7 +22,8 @@
   };
   const OPS_STORAGE_KEY = "academy-ops-content-v1";
   const OPS_LESSON_DRAFT_KEY = "academy-ops-lesson-draft-v1";
-  const OPS_TABS = ["lessons", "exams", "notices", "tasks", "status", "staff"];
+  const HomeLayout = window.AcademyHomeLayout;
+  const OPS_TABS = ["layout", "lessons", "exams", "notices", "tasks", "status", "staff"];
   const NAVIGATION_STATE_KEY = "academyNavigation";
   let contentRevision = 0;
 
@@ -202,11 +203,24 @@
     return `${cfg.url}/storage/v1/object/public/${encodeURIComponent(cfg.bucket)}/${encodedPath}?v=${version}`;
   }
 
+  let uploadSdkPromise;
+  function loadUploadSdk() {
+    if (window.tus?.Upload) return Promise.resolve();
+    if (!uploadSdkPromise) uploadSdkPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = '../vendor/cloud/tus.min.js';
+      script.onload = resolve;
+      script.onerror = () => { uploadSdkPromise = null; script.remove(); reject(new Error('上传组件加载失败，请重试')); };
+      document.head.appendChild(script);
+    });
+    return uploadSdkPromise;
+  }
+
   function uploadLessonVideo(file, lessonId, onProgress) {
     validateVideoFile(file);
     const cfg = window.ACADEMY_CONFIG;
     if (!cfg?.url || !cfg?.key || !cfg?.bucket) throw new Error("视频服务暂不可用，请稍后重试。");
-    if (!window.tus?.Upload) throw new Error("上传服务尚未就绪，请刷新页面后重试。");
+    if (!window.tus?.Upload) throw new Error("上传服务尚未就绪，请稍后重试。");
 
     const safeLessonId = String(lessonId || "lesson").replace(/[^a-zA-Z0-9_-]/g, "-");
     const objectPath = `academy/videos/${safeLessonId}`;
@@ -393,7 +407,8 @@
       lessons,
       exams: rebuildMixExam(exams),
       notices,
-      taskBoard
+      taskBoard,
+      homeLayout: HomeLayout.normalize(raw?.homeLayout || DATA.homeLayout)
     };
   }
 
@@ -407,6 +422,7 @@
     DATA.exams = snapshot.exams;
     DATA.notices = snapshot.notices;
     DATA.taskBoard = normalizeTaskBoard(snapshot.taskBoard, DATA.lessons, DATA.exams);
+    DATA.homeLayout = HomeLayout.normalize(snapshot.homeLayout);
     if (before) {
       const afterIds = JSON.stringify({
         lessons: DATA.lessons.map((item) => item.id),
@@ -432,9 +448,10 @@
       lessons: DATA.lessons,
       exams: DATA.exams,
       notices: DATA.notices,
+      homeLayout: HomeLayout.normalize(DATA.homeLayout),
       taskBoard: DATA.taskBoard
     };
-    localStorage.setItem(OPS_STORAGE_KEY, JSON.stringify(payload));
+    try { localStorage.setItem(OPS_STORAGE_KEY, JSON.stringify(payload)); } catch (_) {}
   }
 
   function canonicalOpsSection(section) {
@@ -563,6 +580,8 @@
     connecting: false,
     hydrated: false,
     statusTimer: 0,
+    base: defaults(),
+    pending: false,
     setStatus(name, label) {
       const el = document.getElementById("live-status");
       if (!el) return;
@@ -591,18 +610,19 @@
       return progressTable();
     },
     applyRow(row) {
-      if (!row || typeof row !== "object") return false;
+      if (this.pending || !row || typeof row !== "object") return false;
       const ts = Number(row.ts) || 0;
       if (ts && ts < this.rev) return false;
       const next = row.payload && typeof row.payload === "object" ? row.payload : null;
       if (!next) return false;
       this.rev = ts || Date.now();
       state.progress = normalizeProgress(next);
+      this.base = JSON.parse(JSON.stringify(state.progress));
       try { localStorage.setItem(`academy-progress-cache-${Auth.session?.id}`, JSON.stringify(state.progress)); } catch (_) { }
       return true;
     },
     ingestStaff(row) {
-      if (!row?.user_id) return;
+      if (!row?.user_id || row.user_id.startsWith("doc:")) return;
       const progress = normalizeProgress(row.payload);
       StaffProgress.rows.set(row.user_id, {
         progress,
@@ -613,7 +633,7 @@
     },
     refreshView() {
       const stay = state.route?.name;
-      const editingOps = stay === "ops" && (["add", "edit"].includes(currentOpsRoute().mode) || ["tasks", "status"].includes(currentOpsRoute().section));
+      const editingOps = stay === "ops" && (["add", "edit"].includes(currentOpsRoute().mode) || ["tasks", "status", "layout"].includes(currentOpsRoute().section));
       if (editingOps) {
         updateNotificationButton();
         return;
@@ -627,10 +647,14 @@
     async pull() {
       const id = Auth.session?.id;
       if (!id) return false;
+      const pending = await window.AcademyStore.reliable.status();
+      this.pending = pending.entries.some(op => op.path === `progress:${id}`);
+      if (this.pending) return true;
       const rows = await window.AcademyStore.restSelect(this.table(), {
         select: "user_id,payload,ts,updated_at",
         user_id: `eq.${id}`
       });
+      if (Auth.session?.id !== id) return false;
       const row = Array.isArray(rows) ? rows[0] : null;
       if (!row) return true;
       if (this.applyRow(row)) this.refreshView();
@@ -640,35 +664,20 @@
       return window.AcademyStore.restUpsert(this.table(), row, "user_id");
     },
     push() {
-      if (!this.hydrated || !Auth.session?.id) return;
-      clearTimeout(this.timer);
-      this.timer = setTimeout(() => this.flush(), 50);
-    },
-    async flush() {
       const id = Auth.session?.id;
-      if (!this.hydrated || !id) return;
-      const ts = Date.now();
-      this.skipUntil = ts + 800;
-      this.rev = ts;
-      try {
-        const ok = await this.persist({
-          user_id: id,
-          payload: state.progress,
-          ts,
-          updated_at: new Date().toISOString()
-        });
-        try { localStorage.setItem(`academy-progress-cache-${id}`, JSON.stringify(state.progress)); } catch (_) { }
-        if (this.socketLive) this.setStatus("live", "实时在线");
-        else if (ok) this.setStatus("online", "在线同步");
-        else this.setStatus(navigator.onLine ? "connecting" : "offline", navigator.onLine ? "正在重连" : "离线可用");
-      } catch (_) {
-        this.setStatus(this.socketLive ? "live" : navigator.onLine ? "connecting" : "offline", this.socketLive ? "实时在线" : navigator.onLine ? "正在重连" : "离线可用");
-        if (!this.socketLive) this.scheduleReconnect();
-      }
+      if (!id) return;
+      const snapshot = JSON.parse(JSON.stringify(state.progress));
+      const base = this.base;
+      this.pending = true;
+      window.AcademyStore.saveProgress(id, snapshot, base).then(() => {
+        this.base = snapshot;
+        try { localStorage.setItem(`academy-progress-cache-${id}`, JSON.stringify(snapshot)); } catch (_) {}
+      }).catch(error => { this.setStatus('offline', error.message); });
     },
+    flush() { return window.AcademyStore.reliable.flush(); },
     startPoll() {
       if (this.poll) return;
-      const check = () => this.pull().then((ok) => {
+      const check = () => { if (document.hidden) return; return this.pull().then((ok) => {
         if (!this.socketLive) {
           this.setStatus(ok ? "online" : navigator.onLine ? "connecting" : "offline", ok ? "在线同步" : navigator.onLine ? "正在重连" : "离线可用");
           this.scheduleReconnect();
@@ -678,9 +687,9 @@
           this.setStatus(navigator.onLine ? "connecting" : "offline", navigator.onLine ? "正在重连" : "离线可用");
           this.scheduleReconnect();
         }
-      });
+      }); };
       check();
-      this.poll = setInterval(check, 5000);
+      this.poll = setInterval(check, 15000);
     },
     stopPoll() {
       if (!this.poll) return;
@@ -707,6 +716,7 @@
         this.ingestStaff(record);
         if (record.user_id !== Auth.session?.id) return;
         if (eventType === "DELETE") {
+          if (this.pending) return;
           state.progress = defaults();
           this.rev = Date.now();
           this.refreshView();
@@ -771,11 +781,7 @@
         this.scheduleReconnect();
         return;
       }
-      this.sb = window.supabase.createClient(this.realtimeOrigin(), cfg.key, {
-        appNetworkRealtimeDirect: true,
-        auth: { persistSession: false, autoRefreshToken: false },
-        realtime: { params: { eventsPerSecond: 20 } }
-      });
+      this.sb = window.AcademyStore.realtimeClient();
       this.connecting = false;
       this.subscribe();
     }
@@ -786,6 +792,7 @@
     channel: null,
     pullPromise: null,
     poll: 0,
+    base: null,
     snapshot() {
       return {
         rev: contentRevision,
@@ -794,14 +801,18 @@
         lessons: DATA.lessons,
         exams: DATA.exams,
         notices: DATA.notices || [],
-        taskBoard: DATA.taskBoard
+        homeLayout: HomeLayout.normalize(DATA.homeLayout),
+      taskBoard: DATA.taskBoard
       };
     },
     apply(payload) {
+      const editing = state.route?.name === "ops" && (["add", "edit"].includes(currentOpsRoute().mode) || ["tasks", "status", "layout"].includes(currentOpsRoute().section));
+      if (editing && !(currentOpsRoute().section === "layout" && !this.base)) return false;
+      if (!this.base && payload) this.base = JSON.parse(JSON.stringify(payload));
       const source = payload?.data && typeof payload.data === "object" ? payload.data : payload;
       if (!source || !Array.isArray(source.lessons) || !Array.isArray(source.exams)) return false;
       const rev = Number(payload?.rev || source.rev) || 0;
-      if (rev && rev <= contentRevision) return false;
+      if (rev && rev < contentRevision) return false;
       const courseGroups = normalizeCourseGroups(source.courseGroups);
       const normalized = stripUnrelatedCurriculum({
         courseGroups,
@@ -810,6 +821,7 @@
         notices: Array.isArray(source.notices) ? source.notices.map(normalizeNotice) : [],
         taskBoard: source.taskBoard
       });
+      DATA.homeLayout = HomeLayout.normalize(source.homeLayout);
       DATA.courseGroups = normalized.courseGroups;
       DATA.lessons = normalized.lessons;
       DATA.exams = normalized.exams;
@@ -817,8 +829,8 @@
       DATA.taskBoard = normalizeTaskBoard(normalized.taskBoard, DATA.lessons, DATA.exams);
       contentRevision = rev || Date.now();
       saveOpsStore();
-      const editing = state.route?.name === "ops" && (["add", "edit"].includes(currentOpsRoute().mode) || ["tasks", "status"].includes(currentOpsRoute().section));
-      if (Auth.session && !editing && state.route?.name !== "exam") render();
+      this.base = JSON.parse(JSON.stringify(payload));
+      if (Auth.session && (!editing || currentOpsRoute().section === "layout") && state.route?.name !== "exam") render();
       return true;
     },
     async pull() {
@@ -841,25 +853,8 @@
       contentRevision = Date.now();
       saveOpsStore();
       const payload = { rev: contentRevision, data: this.snapshot() };
-      try {
-        await window.AcademyStore.putJSON(this.path, payload);
-      } catch (routeError) {
-        const cfg = window.ACADEMY_CONFIG;
-        if (!cfg?.url || !cfg?.key || !cfg?.bucket) throw routeError;
-        const response = await window.fetch(`${cfg.url}/storage/v1/object/${cfg.bucket}/${this.path}`, {
-          method: "POST",
-          headers: {
-            apikey: cfg.key,
-            Authorization: `Bearer ${cfg.key}`,
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            "x-upsert": "true",
-            "cache-control": "max-age=0"
-          },
-          body: JSON.stringify(payload)
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      }
+      await window.AcademyStore.putJSON(this.path, payload, { base: this.base });
+      this.base = JSON.parse(JSON.stringify(payload));
       if (this.channel) {
         this.channel.send({
           type: "broadcast",
@@ -878,7 +873,7 @@
         });
       }
       this.pull().catch(() => { });
-      if (!this.poll) this.poll = setInterval(() => this.pull().catch(() => { }), 30000);
+      if (!this.poll) this.poll = setInterval(() => { if (!document.hidden) this.pull().catch(() => { }); }, 30000);
       return this.channel;
     }
   };
@@ -942,7 +937,7 @@
         });
       }
       this.pull().catch(() => { });
-      if (!this.poll) this.poll = setInterval(() => this.pull().catch(() => { }), 30000);
+      if (!this.poll) this.poll = setInterval(() => { if (!document.hidden) this.pull().catch(() => { }); }, 30000);
       return this.channel;
     }
   };
@@ -1006,6 +1001,7 @@
       const people = Auth.list();
       try {
         const rows = await window.AcademyStore.restSelect(progressTable(), {
+          user_id: "not.like.doc:*",
           select: "user_id,payload,ts,updated_at"
         });
         const byId = new Map((Array.isArray(rows) ? rows : []).map((row) => [row.user_id, row]));
@@ -1100,7 +1096,7 @@
     const total = DATA.lessons.length + DATA.exams.length;
     const examDone = DATA.exams.filter((exam) => bestScore(exam.id) >= exam.pass).length;
     const done = DATA.lessons.filter((lesson) => isDone(lesson.id)).length + examDone;
-    return Math.round((done / total) * 100);
+    return total ? Math.round((done / total) * 100) : 0;
   }
 
   function bestScore(examId) {
@@ -1448,9 +1444,9 @@
     return { greeting: "晚上好", restReminder: true };
   }
 
-  function renderHome() {
-    setTop("运营事务看板", false);
-    setTab("home");
+  function renderHome(target = view(), preview = false) {
+    if (!preview) setTop("运营事务看板", false);
+    if (!preview) setTab("home");
     const box = inbox();
     const next = box.urgentLessons[0] || nextLesson();
     const now = new Date();
@@ -1486,8 +1482,8 @@
     const taskBoardTotal = stages.reduce((sum, stage) => sum + stage.tasks.length, 0);
     const taskBoardDone = stages.reduce((sum, stage) => sum + stage.done, 0);
 
-    view().innerHTML = `
-      <header class="hello home-status" aria-label="今日状态">
+    target.innerHTML = `
+      <header data-home-block="status" class="hello home-status" aria-label="今日状态">
         <div class="home-status-copy">
           <h2>${todayStatus.greeting}，${memberName}</h2>
           ${todayStatus.restReminder ? `<p class="home-rest-reminder">夜深了，早点休息</p>` : ""}
@@ -1499,7 +1495,7 @@
         ${progressRing(completionRate())}
         <div id="home-daily-status" class="home-daily-status" hidden></div>
       </header>
-      <section class="home-shortcuts" aria-labelledby="home-shortcuts-title">
+      <section data-home-block="shortcuts" class="home-shortcuts" aria-labelledby="home-shortcuts-title">
         <header class="home-shortcuts-head">
           <div><h3 id="home-shortcuts-title">快捷访问</h3></div>
         </header>
@@ -1526,7 +1522,7 @@
           </button>
         </div>
       </section>
-      <div class="ops-kpi">
+      <section data-home-block="workbench"><div class="ops-kpi">
         <button class="ops-card" data-act="go" data-hash="#/learn">
           <span class="ops-tag">学习进度</span>
           <b>${learnedCount} / ${learnableLessons.length}</b>
@@ -1548,7 +1544,7 @@
           <small>未读发布消息</small>
         </button>
       </div>
-      <section class="learning-plan">
+      </section><section data-home-block="tasks" class="learning-plan">
         <header class="learning-plan-head">
           <h3>${escapeHtml(taskBoard.title)}</h3>
           <strong><small>已完成</small><b>${taskBoardDone}/${taskBoardTotal}</b></strong>
@@ -1590,14 +1586,14 @@
             </section>`).join("")}
         </div>
       </section>
-      <div class="sec-title"><h3>重要消息</h3><span>${importantMessages.length}</span></div>
+      <section data-home-block="messages"><div class="sec-title"><h3>重要消息</h3><span>${importantMessages.length}</span></div>
       ${importantMessages.length ? importantMessages.map((item) => `
         <button class="card notice unread-message ${item.tone === "urgent" ? "urgent" : ""}" data-act="${item.act}" data-message-key="${escapeHtml(item.key)}" ${item.id ? `data-id="${item.id}"` : ""} ${item.hash ? `data-hash="${item.hash}"` : ""}>
           <div class="kicker"><span class="message-alarm">${svgIcon("bell")}</span>${escapeHtml(item.kicker)}</div>
           <strong>${escapeHtml(item.title)}</strong>
           <p class="muted">${escapeHtml(item.detail)}</p>
         </button>`).join("") : `<div class="card notice clear"><strong>当前无待处理消息</strong><p class="muted">新消息和考试更新会推送到这里。</p></div>`}
-      <div class="sec-title"><h3>重要考试</h3><span>${importantExams.length}</span></div>
+      </section><section data-home-block="exams"><div class="sec-title"><h3>重要考试</h3><span>${importantExams.length}</span></div>
       ${importantExams.length ? importantExams.slice(0, 4).map((exam) => {
           const best = bestScore(exam.id);
           return `<button class="card lesson-card" data-act="go" data-hash="#/exam/${exam.id}">
@@ -1606,22 +1602,25 @@
             <p class="muted">${escapeHtml(exam.summary)}</p>
           </button>`;
         }).join("") : `<div class="card notice clear"><strong>重要考试项已完成</strong><p class="muted">当前暂无关键考试待过。</p></div>`}
-    `;
+    </section>`;
+    HomeLayout.apply(target, DATA.homeLayout, preview);
+    window.AcademyWorkbench?.render(target);
+    if (preview) return;
     window.AcademyDailyStatus.connect();
-    view().querySelectorAll("[data-stage-target]").forEach((button) => {
+    target.querySelectorAll("[data-stage-target]").forEach((button) => {
       button.addEventListener("click", () => {
-        view().querySelectorAll(".stage-tab").forEach((item) => {
+        target.querySelectorAll(".stage-tab").forEach((item) => {
           const selected = item === button;
           item.classList.toggle("on", selected);
           item.setAttribute("aria-selected", String(selected));
           item.tabIndex = selected ? 0 : -1;
         });
-        view().querySelectorAll(".learning-stage").forEach((stage) => {
+        target.querySelectorAll(".learning-stage").forEach((stage) => {
           stage.hidden = stage.id !== button.dataset.stageTarget;
         });
       });
       button.addEventListener("keydown", (event) => {
-        const tabs = [...view().querySelectorAll(".stage-tab")];
+        const tabs = [...target.querySelectorAll(".stage-tab")];
         const index = tabs.indexOf(button);
         const targetIndex = event.key === "ArrowRight" ? (index + 1) % tabs.length
           : event.key === "ArrowLeft" ? (index - 1 + tabs.length) % tabs.length
@@ -1862,6 +1861,7 @@
 
   function renderOpsTabs(section) {
     const sections = [
+      { key: "layout", icon: "home", label: "首页布局", fullLabel: "首页布局", count: 6 },
       { key: "lessons", icon: "learn", label: "课程", fullLabel: "课程内容", count: DATA.lessons.length },
       { key: "exams", icon: "exam", label: "考试", fullLabel: "考试题库", count: DATA.exams.length },
       { key: "notices", icon: "bell", label: "通知", fullLabel: "事务通知", count: (DATA.notices || []).length },
@@ -2843,7 +2843,20 @@
       return;
     }
     const route = currentOpsRoute();
+    if (route.section === "layout" && !ContentSync.base) {
+      setTop("首页布局", true);
+      view().innerHTML = '<div class="card"><p role="status">正在读取已保存的首页配置…</p></div>';
+      ContentSync.pull().then(() => {
+        if (state.route?.name === "ops" && currentOpsRoute().section === "layout" && !view().querySelector(".home-layout-editor")) renderOps();
+      }).catch(() => {
+        if (state.route?.name !== "ops" || currentOpsRoute().section !== "layout") return;
+        view().innerHTML = '<div class="card"><p>暂时无法读取首页配置，请联网后重试。</p><button type="button" id="retry-home-layout">重新加载</button></div>';
+        view().querySelector("#retry-home-layout").onclick = renderOps;
+      });
+      return;
+    }
     const titleMap = {
+      layout: "首页布局",
       lessons: "课程管理",
       exams: "考试管理",
       notices: "通知",
@@ -2852,6 +2865,7 @@
       staff: "员工与权限"
     };
     const subtitleMap = {
+      layout: "拖拽调整运营首页，保存后应用到所有员工",
       status: "设置首页问候区域中的今日安排与每周固定内容",
       lessons: "创建、更新并安排员工需要学习的课程",
       exams: "维护考试、题目和合格标准",
@@ -2872,6 +2886,7 @@
     const editExam = editId && active === "exams" ? DATA.exams.find((item) => item.id === editId) : null;
     const editNotice = editId && active === "notices" ? DATA.notices.find((item) => item.id === editId) : null;
     const listMap = {
+      layout: active === "layout" ? HomeLayout.editorHTML() : "",
       lessons: active === "lessons" ? (route.mode === "edit" ? renderOpsLessonEditor(editLesson) : renderOpsLessonList()) : "",
       exams: active === "exams" ? (route.mode === "edit" ? renderOpsExamEditor(editExam) : renderOpsExamList()) : "",
       notices: active === "notices" ? (route.mode === "edit" ? renderOpsNoticeEditor(editNotice) : renderOpsNoticeList()) : "",
@@ -2909,6 +2924,12 @@
       </div>
     `;
     if (isEditing && active === "lessons") resizeLessonEditorFields(view());
+    if (active === "layout") HomeLayout.mount(view(), DATA.homeLayout, renderHome, async (layout) => {
+      const previous = DATA.homeLayout;
+      DATA.homeLayout = layout;
+      try { await ContentSync.publish(); }
+      catch (error) { DATA.homeLayout = previous; saveOpsStore(); throw error; }
+    });
     if (active === "status") window.AcademyDailyStatus.mountEditor();
     if (active === "tasks") refreshTaskBoardEditor();
     if (active === "staff") {
@@ -2948,7 +2969,7 @@
 
   function lessonCompletionPanel(lesson, unlocked = true) {
     if (isDone(lesson.id)) {
-      return `<footer class="lesson-completion-panel is-done"><div><strong>本课已完成</strong><span>学习记录已保存</span></div><button class="primary" data-act="complete" data-id="${lesson.id}">继续学习</button></footer>`;
+      return `<footer class="lesson-completion-panel is-done"><div><strong>本课已完成</strong><span>学习记录后台同步中</span></div><button class="primary" data-act="complete" data-id="${lesson.id}">继续学习</button></footer>`;
     }
     const linkedExam = lesson.requiredExamId ? examById(lesson.requiredExamId) : null;
     if (lesson.requiredExamId) {
@@ -2975,7 +2996,7 @@
       window.removeEventListener("scroll", check);
       completeLesson(lesson.id);
       panel.classList.add("is-done");
-      panel.innerHTML = `<div><strong>本课已自动完成</strong><span>学习记录已保存</span></div><span class="lesson-complete-check" aria-hidden="true">✓</span>`;
+      panel.innerHTML = `<div><strong>本课已自动完成</strong><span>学习记录后台同步中</span></div><span class="lesson-complete-check" aria-hidden="true">✓</span>`;
     };
     const check = () => requestAnimationFrame(finish);
     window.addEventListener("scroll", check, { passive: true });
@@ -3734,8 +3755,8 @@
     setPublishState(button, "publishing", `<span class="ops-publish-state"><i class="ops-publish-spinner" aria-hidden="true"></i>${contentLabel}发布中</span>`);
     try {
       await ContentSync.publish();
-      setPublishState(button, "success", `<span class="ops-publish-state"><svg class="ops-publish-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>发布成功</span>`);
-      await new Promise((resolve) => setTimeout(resolve, 620));
+      setPublishState(button, "success", `<span class="ops-publish-state"><svg class="ops-publish-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>已存本机，正在同步</span>`);
+      await new Promise((resolve) => setTimeout(resolve, 120));
       return true;
     } catch (error) {
       setPublishFailed(button);
@@ -4089,6 +4110,7 @@
           const pickedFile = document.getElementById("ops-lesson-media")?.files?.[0];
           try {
             if (pickedFile) {
+              await loadUploadSdk();
               raw.mediaUrl = await uploadLessonVideo(pickedFile, raw.id, (percent) => setVideoUploadProgress(btn, percent));
               raw.scenes = raw.scenes.map((scene) => scene?.stage?.kind === "media"
                 ? { ...scene, stage: { ...scene.stage, src: raw.mediaUrl } }
@@ -4417,7 +4439,7 @@
         else await Auth.login(data.get("name"), data.get("password"));
         form.classList.remove("is-loading");
         form.classList.add("is-success");
-        await new Promise((resolve) => setTimeout(resolve, 620));
+        await new Promise((resolve) => setTimeout(resolve, 120));
         enterApp();
       } catch (error) {
         form.classList.remove("is-loading");
@@ -4438,13 +4460,20 @@
     });
   }
 
-  function enterApp() {
+  async function enterApp() {
     document.querySelector(".app").classList.remove("gated");
-    state.progress = loadProgress();
+    const userId = Auth.session?.id;
+    if (!userId) return;
+    const cachedProgress = loadProgress();
+    const pendingProgress = await window.AcademyStore.reliable.read(`progress:${userId}`, { cached: true }).catch(() => null);
+    if (Auth.session?.id !== userId) return;
+    state.progress = pendingProgress ? normalizeProgress(pendingProgress) : cachedProgress;
+    Live.base = JSON.parse(JSON.stringify(state.progress));
     Live.rev = 0;
     Live.hydrated = false;
     onRoute();
-    ContentSync.pull().catch(() => { });
+    if (!performance.getEntriesByName("academy-first-view").length) performance.mark("academy-first-view");
+    window.AcademyStore.reliable.read(ContentSync.path, { cached: true }).then(payload => { ContentSync.apply(payload); return ContentSync.pull(); }).catch(() => {});
     ScheduleStatus.pull().catch(() => { });
     Live.connect().finally(() => Presence.start());
   }
@@ -4520,8 +4549,13 @@
       if (!user) return showGate();
       if (!gateBusy) enterApp();
     });
+    window.addEventListener("academy-data-updated", () => {
+      Live.pull().catch(() => {});
+      ContentSync.pull().catch(() => {});
+      ScheduleStatus.pull().catch(() => {});
+    });
     await Auth.start();
-    if (!Auth.session) showGate();
+    if (!Auth.session) { showGate(); performance.mark("academy-first-view"); }
     else enterApp();
     loadRealtimeSdk();
     requestAnimationFrame(loop);

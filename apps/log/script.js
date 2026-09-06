@@ -19,7 +19,7 @@ const status = {
         const textEl = el.querySelector('.status-text');
         if (textEl) textEl.textContent = text;
     },
-    online() { this.update('online', '实时同步'); },
+    online() { this.update('online', '已同步到云端'); },
     offline() { this.update('offline', '离线模式'); },
     loading(text) { this.update('loading', text || '同步中...'); }
 };
@@ -44,7 +44,9 @@ const network = {
         for (let i = 1; i <= this.maxRetries; i++) {
             try {
                 if (!navigator.onLine) throw new Error('离线');
-                return await fn();
+                const result = await fn();
+                if (result?.error) throw result.error;
+                return result;
             } catch (e) {
                 if (i === this.maxRetries) throw e;
                 await new Promise(r => setTimeout(r, 1000 * i));
@@ -124,6 +126,7 @@ class LogManager {
         this.bindEvents();
         this.loadCache();
         this.loadPending();
+        this.restorePendingView();
         this.render();
         status.update(navigator.onLine ? 'loading' : 'offline', navigator.onLine ? '本地就绪' : '离线模式');
 
@@ -157,13 +160,25 @@ class LogManager {
         try {
             const data = localStorage.getItem(PENDING_KEY);
             if (data) this.pendingOps = JSON.parse(data);
+            this.pendingOps.forEach(op => { if (op.type === "insert" && !op.remoteId) op.remoteId = this.makeRemoteId(); });
         } catch (e) {
             this.pendingOps = [];
         }
     }
 
+    restorePendingView() {
+        for (const op of this.pendingOps) {
+            const id = op.localId || op.id;
+            const index = this.logs.findIndex(log => log.id === id);
+            if (op.type === 'delete') this.logs = this.logs.filter(log => log.id !== id);
+            else if (index !== -1) this.logs[index] = { ...this.logs[index], content: op.content, isPreview: false };
+            else if (op.type === 'insert') this.logs.unshift({ id, content: op.content, created_at: op.createdAt || new Date().toISOString() });
+        }
+    }
+
     savePending() {
-        try { localStorage.setItem(PENDING_KEY, JSON.stringify(this.pendingOps)); } catch (e) { }
+        try { localStorage.setItem(PENDING_KEY, JSON.stringify(this.pendingOps)); }
+        catch (e) { status.update('offline', '本机存储已满，尚未保存'); throw new Error('本机存储已满，请保留编辑内容并释放空间'); }
     }
 
     connect(client) {
@@ -174,7 +189,7 @@ class LogManager {
         }
 
         dbClient = client;
-        if (this.isConnected) return;
+        if (this.isConnected) { this.flushPending(); return; }
         this.isConnected = true;
         status.loading('后台同步');
         this.setupRealtime();
@@ -248,17 +263,46 @@ class LogManager {
         }
     }
 
-    processImage(blob) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const base64 = e.target.result;
-            // 在光标处插入图片
-            // 使用 execCommand 兼容性好，虽已废弃但仍稳健
-            // 或者用 Range API
-            const imgHtml = `<img src="${base64}"><div><br></div>`;
-            document.execCommand('insertHTML', false, imgHtml);
-        };
-        reader.readAsDataURL(blob);
+    async processImage(blob) {
+        try {
+            let imageBlob = blob;
+            if (window.createImageBitmap && blob.type !== 'image/gif') {
+                const bitmap = await createImageBitmap(blob);
+                const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+                canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+                canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+                bitmap.close();
+                const compressed = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.82));
+                if (compressed && compressed.size < blob.size) imageBlob = compressed;
+            }
+            const reader = new FileReader();
+            reader.onload = e => document.execCommand('insertHTML', false, `<img src="${e.target.result}" decoding="async"><div><br></div>`);
+            reader.readAsDataURL(imageBlob);
+        } catch (_) { status.update('offline', '图片处理失败，请重新粘贴'); }
+    }
+
+    makeRemoteId() {
+        return window.crypto?.randomUUID?.() || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+            const n = Math.random() * 16 | 0; return (c === 'x' ? n : (n & 3 | 8)).toString(16);
+        });
+    }
+
+    async uploadImages(content, id) {
+        const sources = [...new Set(content.match(/data:image\/[^"'<>\s]+/g) || [])];
+        for (const src of sources) {
+            const blob = await (await fetch(src)).blob();
+            const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
+            const hash = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+            const path = `logs/images/${id}/${hash}`;
+            const bucket = dbClient.storage.from('cloud-files');
+            const result = await bucket.upload(path, blob, { upsert: true, contentType: blob.type, cacheControl: '31536000' });
+            if (result.error) throw result.error;
+            const url = bucket.getPublicUrl(path).data.publicUrl;
+            content = content.split(src).join(url);
+        }
+        return content;
     }
 
     makeLocalId() {
@@ -270,10 +314,11 @@ class LogManager {
     }
 
     makeOp(type, payload) {
-        return Object.assign({ opId: 'op-' + Date.now() + '-' + Math.random().toString(36).slice(2), type }, payload);
+        return Object.assign({ opId: 'op-' + Date.now() + '-' + Math.random().toString(36).slice(2), type, createdAt: new Date().toISOString(), ...(type === 'insert' ? { remoteId: this.makeRemoteId() } : {}) }, payload);
     }
 
     queueOp(op) {
+        const previous = JSON.stringify(this.pendingOps);
         if (op.type === 'insert') {
             const existing = this.pendingOps.findIndex(item => item.type === 'insert' && item.localId === op.localId);
             if (existing !== -1) this.pendingOps[existing] = op;
@@ -281,20 +326,27 @@ class LogManager {
         } else if (op.type === 'update') {
             if (this.isLocalId(op.id)) {
                 const insertOp = this.pendingOps.find(item => item.type === 'insert' && item.localId === op.id);
-                if (insertOp) insertOp.content = op.content;
+                if (insertOp && this.activeOp?.opId === insertOp.opId) {
+                    this.pendingOps.push(this.makeOp('update', { id: insertOp.remoteId, content: op.content, dependsOn: insertOp.opId }));
+                } else if (insertOp) insertOp.content = op.content;
             } else {
-                this.pendingOps = this.pendingOps.filter(item => !(item.type === 'update' && item.id === op.id));
+                const previousUpdate = this.pendingOps.find(item => item.type === 'update' && item.id === op.id);
+                if (this.activeOp?.id === op.id) { op.dependsOn = this.activeOp.opId; delete op.baseUpdatedAt; }
+                else if (previousUpdate) op.baseUpdatedAt = previousUpdate.baseUpdatedAt;
+                this.pendingOps = this.pendingOps.filter(item => !(item.type === 'update' && item.id === op.id && item.opId !== this.activeOp?.opId));
                 this.pendingOps.push(op);
             }
         } else if (op.type === 'delete') {
             if (this.isLocalId(op.id)) {
-                this.pendingOps = this.pendingOps.filter(item => item.localId !== op.id && item.id !== op.id);
+                const active = this.activeOp?.localId === op.id ? this.activeOp : null;
+                this.pendingOps = this.pendingOps.filter(item => item.localId !== op.id && item.id !== op.id && item.id !== active?.remoteId);
+                if (active) this.pendingOps.push(this.makeOp('delete', { id: active.remoteId }));
             } else {
-                this.pendingOps = this.pendingOps.filter(item => !(item.id === op.id && item.type === 'update'));
+                this.pendingOps = this.pendingOps.filter(item => !(item.id === op.id && ['update', 'delete'].includes(item.type) && item.opId !== this.activeOp?.opId));
                 this.pendingOps.push(op);
             }
         }
-        this.savePending();
+        try { this.savePending(); status.update('offline', '已存本机，待同步'); } catch (e) { this.pendingOps = JSON.parse(previous); throw e; }
     }
 
     removeQueuedOp(op) {
@@ -302,34 +354,34 @@ class LogManager {
         this.savePending();
     }
 
-    async syncOp(op, fromQueue) {
-        if (!dbClient || !navigator.onLine) {
-            if (!fromQueue) this.queueOp(op);
-            status.update('offline', '待同步');
-            return;
-        }
-
-        try {
-            const data = await this.executeOp(op);
-            if (fromQueue) this.removeQueuedOp(op);
-            this.applyRemoteResult(op, data);
-            status.online();
-        } catch (err) {
-            console.error('Sync op error:', err);
-            if (!fromQueue) this.queueOp(op);
-            status.update('offline', '待同步');
-        }
+    async syncOp(op) {
+        this.queueOp(op);
+        status.update('offline', '已存本机，待同步');
+        return this.flushPending();
     }
 
     async executeOp(op) {
         if (op.type === 'insert') {
-            const res = await network.retry(() => dbClient.from('logs').insert([{ content: op.content }]).select());
-            return res.data;
+            op.content = await this.uploadImages(op.content, op.remoteId);
+            const res = await network.retry(() => dbClient.from('logs').upsert([{ id: op.remoteId, content: op.content }], { onConflict: 'id', ignoreDuplicates: true }).select());
+            if (res.data?.length) return res.data;
+            const existing = await network.retry(() => dbClient.from('logs').select('*').eq('id', op.remoteId));
+            return existing.data;
         }
 
         if (op.type === 'update') {
             if (this.isLocalId(op.id)) return null;
-            const res = await network.retry(() => dbClient.from('logs').update({ content: op.content }).eq('id', op.id).select());
+            op.content = await this.uploadImages(op.content, op.id);
+            const res = await network.retry(() => {
+                let query = dbClient.from('logs').update({ content: op.content }).eq('id', op.id);
+                if (op.baseUpdatedAt) query = query.eq('updated_at', op.baseUpdatedAt);
+                return query.select();
+            });
+            if (!res.data?.length) {
+                const latest = await network.retry(() => dbClient.from('logs').select('*').eq('id', op.id));
+                if (latest.data?.[0]?.content === op.content) return latest.data;
+                const error = new Error('云端日志已修改，本机编辑已保留'); error.conflict = true; throw error;
+            }
             return res.data;
         }
 
@@ -367,6 +419,7 @@ class LogManager {
             if (i !== -1) this.logs[i] = data[0];
         }
 
+        this.restorePendingView();
         this.saveCache();
         this.render();
     }
@@ -374,17 +427,49 @@ class LogManager {
     async flushPending() {
         if (this.isSyncing || !this.pendingOps.length || !dbClient || !navigator.onLine) return;
         this.isSyncing = true;
-        status.loading('后台同步');
-
-        const ops = [...this.pendingOps];
-        for (const op of ops) {
-            if (!this.pendingOps.some(item => item.opId === op.opId)) continue;
-            await this.syncOp(op, true);
+        status.loading('已存本机，正在同步');
+        try {
+            while (this.pendingOps.length) {
+                const op = JSON.parse(JSON.stringify(this.pendingOps[0]));
+                if (op.conflict) { status.update('offline', '修改冲突，请处理后继续同步'); break; }
+                this.activeOp = op;
+                const data = await this.executeOp(op);
+                for (const next of this.pendingOps) {
+                    if (next.dependsOn === op.opId && data?.[0]?.updated_at) {
+                        next.baseUpdatedAt = data[0].updated_at;
+                        delete next.dependsOn;
+                    }
+                }
+                this.removeQueuedOp(op);
+                this.applyRemoteResult(op, data);
+            }
+            if (!this.pendingOps.length) status.online();
+        } catch (error) {
+            if (error.conflict && this.activeOp) {
+                const entry = this.pendingOps.find(op => op.opId === this.activeOp.opId);
+                if (entry) { entry.conflict = true; this.savePending(); }
+                status.update('offline', '修改冲突，本机编辑已保留'); this.render(); return;
+            }
+            status.update('offline', '已存本机，待重试');
+            clearTimeout(this.retryTimer);
+            this.retryTimer = setTimeout(() => this.flushPending(), 5000);
+        } finally {
+            this.activeOp = null;
+            this.isSyncing = false;
         }
+    }
 
-        this.isSyncing = false;
-        if (this.pendingOps.length) status.update('offline', '待同步');
-        else status.online();
+    async resolveConflict(id) {
+        const op = this.pendingOps.find(item => item.id === id && item.conflict);
+        if (!op) return;
+        try {
+            const latest = await network.retry(() => dbClient.from('logs').select('*').eq('id', id));
+            const remote = latest.data?.[0];
+            if (!remote) { status.update('offline', '云端记录已删除，请复制本机内容后另存'); return; }
+            const useLocal = window.confirm('云端日志已被修改。确定：保留本机编辑并覆盖当前云端版本；取消：采用云端内容。');
+            if (useLocal) { op.baseUpdatedAt = remote.updated_at; op.conflict = false; this.savePending(); this.flushPending(); }
+            else { this.removeQueuedOp(op); const index = this.logs.findIndex(log => log.id === id); if (index !== -1) this.logs[index] = remote; this.saveCache(); this.render(); this.flushPending(); }
+        } catch (error) { status.update('offline', error.message); }
     }
 
     async submit(e) {
@@ -400,6 +485,8 @@ class LogManager {
 
         if (this.editingId) {
             const id = this.editingId;
+            const op = this.makeOp('update', { id, content, baseUpdatedAt: this.logs.find(log => log.id === id)?.updated_at });
+            try { this.queueOp(op); } catch (_) { return; }
             const i = this.logs.findIndex(l => l.id === id);
             if (i !== -1) {
                 this.logs[i] = Object.assign({}, this.logs[i], { content: content, updated_at: new Date().toISOString() });
@@ -407,21 +494,21 @@ class LogManager {
             this.resetForm();
             this.saveCache();
             this.render();
-            const op = this.makeOp('update', { id, content });
-            this.syncOp(op, false);
+            this.flushPending();
             return;
         }
 
         const now = new Date().toISOString();
         const localId = this.makeLocalId();
+        const op = this.makeOp('insert', { localId, content });
+        try { this.queueOp(op); } catch (_) { return; }
         const log = { id: localId, content, created_at: now, updated_at: now };
         this.logs.unshift(log);
         this.resetForm();
         this.saveCache();
         this.render();
 
-        const op = this.makeOp('insert', { localId, content });
-        this.syncOp(op, false);
+        this.flushPending();
     }
 
     setSubmitting(loading) {
@@ -466,7 +553,9 @@ class LogManager {
             if (data) {
                 const localLogs = targetPage === 1 ? this.logs.filter(log => this.isLocalId(log.id)) : [];
                 const localIds = new Set(localLogs.map(log => log.id));
-                this.logs = localLogs.concat(data.filter(log => !localIds.has(log.id)));
+                const pending = new Map(this.pendingOps.filter(op => op.type !== 'insert').map(op => [op.id, op]));
+                this.logs = localLogs.concat(data.filter(log => !localIds.has(log.id) && pending.get(log.id)?.type !== 'delete').map(log =>
+                    pending.get(log.id)?.type === 'update' ? { ...log, content: pending.get(log.id).content, isPreview: false } : log));
                 this.oldestRemoteCreatedAt = data.length ? data[data.length - 1].created_at : null;
                 this.currentPage = targetPage;
                 this.totalLogs = Number.isFinite(result.count) ? result.count : Math.max(this.totalLogs, (targetPage - 1) * PAGE_SIZE + data.length);
@@ -687,14 +776,15 @@ class LogManager {
         if (!this.deleteId || this.isDeleting) return;
 
         const id = this.deleteId;
+        const op = this.makeOp('delete', { id });
+        try { this.queueOp(op); } catch (_) { return; }
         if (this.isLocalId(id)) this.deletedLocalIds.add(id);
         this.logs = this.logs.filter(l => l.id !== id);
         this.hideModal();
         this.saveCache();
         this.render();
 
-        const op = this.makeOp('delete', { id });
-        this.syncOp(op, false);
+        this.flushPending();
     }
 
     setDeleting(loading) {
@@ -770,6 +860,8 @@ class LogManager {
         if (!log.isPreview && log.content && log.content.includes('|||IMG|||')) {
             contentHtml = this.convertOldFormat(log.content);
         }
+        contentHtml = contentHtml.replace(/<img\b(?![^>]*\bloading=)/gi, '<img loading="lazy" decoding="async"');
+        const conflictButton = this.pendingOps.some(op => op.id === log.id && op.conflict) ? `<button onclick="logManager.resolveConflict('${log.id}')" class="timeline-action">处理冲突</button>` : "";
         const expandBtn = log.isPreview ? `<button onclick="logManager.expand('${log.id}')" class="timeline-action">展开</button>` : '';
 
         return `
@@ -779,7 +871,7 @@ class LogManager {
                     <div class="timeline-header">
                         <div style="flex:1" class="timeline-body">${contentHtml}</div>
                         <div class="timeline-actions">
-                            ${expandBtn}
+                            ${conflictButton}${expandBtn}
                             <button onclick="logManager.edit('${log.id}')" class="timeline-action">编辑</button>
                             <button onclick="logManager.showModal('${log.id}')" class="timeline-action">删除</button>
                         </div>

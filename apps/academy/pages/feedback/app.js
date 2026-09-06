@@ -148,12 +148,11 @@
   }
 
   async function readLatest() {
-    const raw = await window.AcademyStore.getJSON(FILE);
-    return normalizeData(raw || state.data);
+    return JSON.parse(JSON.stringify(state.data));
   }
 
   async function writeData(next) {
-    await window.AcademyStore.putJSON(FILE, next);
+    await window.AcademyStore.putJSON(FILE, next, { base: state.data });
     state.data = next;
     cacheData();
     state.channel?.send({ type: "broadcast", event: "feedback-version", payload: { rev: next.rev } });
@@ -188,8 +187,8 @@
       closeCompose();
       state.filter = "pending";
       render();
-      $("#sync-status").textContent = "问题已公开，所有人均可查看";
-      showToast("问题已提交");
+      $("#sync-status").textContent = "已存本机，正在同步到云端";
+      showToast("问题已存本机，后台同步中");
     } catch (error) {
       showToast(`提交失败：${error?.message || "请检查网络"}`);
     } finally {
@@ -267,8 +266,10 @@
       const inheritedRuntime = window.FEEDBACK_USES_PARENT_RUNTIME === true;
       if (!inheritedRuntime) {
         await window.AcademyAuth.start();
-        await window.AcademyAuth.pull(true);
+        // Background account refresh is started by Auth.start().
       }
+      const cached = await window.AcademyStore.getJSON(FILE, { cached: true });
+      if (cached) state.data = normalizeData(cached);
       state.session = window.AcademyAuth.session;
       if (!state.session) {
         app.innerHTML = `<div class="empty-state"><strong>请先登录</strong><span>返回 Auto Office 登录后即可反馈和查看问题。</span></div>`;
@@ -283,15 +284,17 @@
         }
       });
       await pullFeedback();
-      setInterval(() => pullFeedback(true), 30000);
+      setInterval(() => { if (!document.hidden) pullFeedback(true); }, 30000);
+      window.addEventListener("academy-data-updated", () => pullFeedback(true));
       document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") pullFeedback(true);
       });
-      window.AcademyAuth.onChange((session) => {
+      const stopAuth = window.AcademyAuth.onChange((session) => {
         state.session = session;
         if (!session) location.reload();
         else render();
       });
+      window.addEventListener("pagehide", event => { if (!event.persisted) { stopAuth(); state.channel?.unsubscribe?.(); } });
     } catch (error) {
       $("#sync-status").textContent = "暂时无法连接问题反馈服务";
       showToast(error?.message || "加载失败");

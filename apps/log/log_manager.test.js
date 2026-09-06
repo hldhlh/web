@@ -133,6 +133,7 @@ function createHarness(options = {}) {
                 return storage.has(key) ? storage.get(key) : null;
             },
             setItem(key, value) {
+                if (options.quotaError) throw new Error("QuotaExceededError");
                 storage.set(key, String(value));
             }
         },
@@ -292,7 +293,7 @@ function createMockClient(initialLogs = []) {
                     };
                     return builder;
                 },
-                insert(rows) {
+                upsert(rows) {
                     calls.inserts.push(rows);
                     return {
                         select() {
@@ -535,7 +536,7 @@ test('queues a new log when the database client is not ready, then flushes later
     assert.equal(client.calls.inserts.length, 1);
     assert.equal(client.calls.inserts[0][0].content, 'queued before cdn');
     assert.equal(manager.pendingOps.length, 0);
-    assert.equal(manager.logs[0].id, 'inserted-0');
+    assert.match(manager.logs[0].id, /^[0-9a-f-]{36}$/);
 });
 
 test('deleting a local queued log removes the pending insert without a database call', async () => {
@@ -603,4 +604,62 @@ test('old image format conversion escapes text content', () => {
 
     assert.match(html, /&lt;b&gt;x&lt;\/b&gt;/);
     assert.match(html, /<img src="data:image\/png;base64,abc">/);
+});
+
+
+test('storage failure preserves editor content and does not enqueue a false success', async () => {
+    const h = createHarness({ quotaError: true });
+    const manager = new h.LogManager();
+    h.element('logContent').innerHTML = '<p>must not disappear</p>';
+    await manager.submit();
+    assert.equal(h.element('logContent').innerHTML, '<p>must not disappear</p>');
+    assert.equal(manager.pendingOps.length, 0);
+    assert.equal(manager.logs.length, 0);
+});
+
+test('SDK error response retains the durable operation', async () => {
+    const h = createHarness();
+    const manager = new h.LogManager();
+    h.network.maxRetries = 1;
+    h.setClient({ from() { return { upsert() { return { select: async () => ({ error: new Error('failed') }) }; } }; } });
+    const op = manager.makeOp('insert', { localId: 'local-test', content: 'draft' });
+    await manager.syncOp(op);
+    assert.equal(manager.pendingOps.length, 1);
+    assert.equal(JSON.parse(h.storage.get('logs_pending_ops'))[0].content, 'draft');
+});
+
+test('lost insert acknowledgement reuses the persisted UUID with ignore-duplicates', async () => {
+    const h = createHarness();
+    const manager = new h.LogManager();
+    h.network.maxRetries = 1;
+    const saved = new Map();
+    const ids = [];
+    let lose = true;
+    h.setClient({ from() { return {
+        upsert(rows, options) {
+            assert.equal(options.ignoreDuplicates, true);
+            const row = rows[0]; ids.push(row.id);
+            const duplicate = saved.has(row.id);
+            if (!duplicate) saved.set(row.id, { ...row, updated_at: '2026-01-01' });
+            return { select: async () => {
+                if (lose) { lose = false; throw new Error('lost response'); }
+                return { data: duplicate ? [] : [saved.get(row.id)] };
+            } };
+        },
+        select() { return { eq: async (_, id) => ({ data: [saved.get(id)] }) }; }
+    }; } });
+    const op = manager.makeOp('insert', { localId: 'local-retry', content: 'only once' });
+    await manager.syncOp(op);
+    assert.equal(manager.pendingOps.length, 1);
+    await manager.flushPending();
+    assert.equal(saved.size, 1);
+    assert.equal(ids[0], ids[1]);
+    assert.equal(manager.pendingOps.length, 0);
+});
+
+test('pending insert is reconstructed even if the list cache was never written', () => {
+    const h = createHarness();
+    h.storage.set('logs_pending_ops', JSON.stringify([{ opId: 'op-recover', type: 'insert', localId: 'local-recover', remoteId: 'stable-id', content: 'recovered draft' }]));
+    const manager = new h.LogManager();
+    assert.equal(manager.logs[0].content, 'recovered draft');
 });

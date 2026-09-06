@@ -1,5 +1,5 @@
 // 部署时由 scripts/generate-build-meta.mjs 替换为当前 Git 提交版本。
-const CACHE_NAME = 'web-shell-__BUILD_VERSION__-academy-network-first-v3';
+const CACHE_NAME = 'web-shell-__BUILD_VERSION__-local-first-v4';
 const SHELL = [
   './',
   './index.html',
@@ -16,6 +16,12 @@ const SHELL = [
   './apps/jlhcdh/icon.svg',
   './apps/academy/icon.svg',
   './apps/academy/version-guard.js',
+  './apps/academy/home-layout.js',
+  './apps/academy/dashboard-workbench.js',
+  './apps/academy/framework/reliable-store.js',
+  './apps/academy/framework/store.js',
+  './apps/academy/framework/save-status.js',
+  './apps/academy/framework/save-status.css',
   './apps/vista/icon.svg',
   './apps/svg/icon.svg',
   './apps/vista/index.html',
@@ -52,6 +58,7 @@ function canCache(request) {
   if (request.method !== 'GET' || request.headers.has('range')) return false;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return false;
+  if (/\/(rest|auth|storage|functions|realtime)\/v1(?:\/|$)/.test(url.pathname)) return false;
   if (url.pathname.endsWith('/version.json')) return false;
   return !/\.(?:mp4|mov|mp3|zip|pptx?|xlsx?|xls|csv)$/i.test(url.pathname);
 }
@@ -68,8 +75,12 @@ async function staleWhileRevalidate(request) {
 
 async function networkFirst(request, cacheMode = 'no-cache') {
   const cache = await caches.open(CACHE_NAME);
+  const cached = await cache.match(request);
+  const controller = new AbortController();
+  // Cached pages remain usable on slow connections; first visits have no cutoff.
+  const timer = cached ? setTimeout(() => controller.abort(), 1800) : null;
   try {
-    const response = await fetch(request, { cache: cacheMode });
+    const response = await fetch(request, { cache: cacheMode, signal: controller.signal });
     if (response.ok && response.type === 'basic') await cache.put(request, response.clone());
     return response;
   } catch (_) {
@@ -77,6 +88,8 @@ async function networkFirst(request, cacheMode = 'no-cache') {
     if (cached) return cached;
     if (request.mode === 'navigate') return cache.match('./index.html');
     throw _;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -84,7 +97,7 @@ self.addEventListener('fetch', (event) => {
   if (!canCache(event.request)) return;
   const url = new URL(event.request.url);
   if (url.pathname.includes('/apps/academy/')) {
-    event.respondWith(networkFirst(event.request, 'reload'));
+    event.respondWith(networkFirst(event.request, 'no-cache'));
     return;
   }
   if (event.request.mode === 'navigate') {
@@ -92,4 +105,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   event.respondWith(staleWhileRevalidate(event.request));
+});
+
+self.addEventListener('message', event => {
+  if (event.data?.type !== 'CACHE_PAGE' || !Array.isArray(event.data.urls)) return;
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    await Promise.allSettled(event.data.urls.slice(0, 100).map(async value => {
+      const url = new URL(value, self.location.origin);
+      const request = new Request(url.href);
+      if (!canCache(request)) return;
+      if (!(url.pathname.endsWith('/') || /\.(html|js|css|svg|ico|woff2?|ttf)$/.test(url.pathname))) return;
+      if (!await cache.match(request)) await cache.add(request);
+    }));
+  })());
 });

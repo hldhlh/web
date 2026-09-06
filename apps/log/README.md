@@ -70,7 +70,7 @@ npm run check
 
 ## 已知技术债
 
-- 当前为性能优先：保存、删除会先更新本地 UI，再后台同步数据库；如果数据库脚本未加载或网络离线，操作会保存在 `localStorage` 的待同步队列里。
+- 保存、删除先将操作写入 `localStorage` 队列，再更新 UI；确认服务端成功后移除队列。失败自动重试，新增使用固定 UUID 去重，编辑使用 `updated_at` 检查冲突。本机存储失败时保留编辑内容并显示错误。
 - `content` 当前存 HTML，渲染时会插入 DOM；如果允许不可信写入，需要增加 HTML allowlist 清理。
-- 粘贴图片会以内联 base64 写进 `content`，大图片会拖慢首屏读取、Realtime payload 和 localStorage 缓存。后续更适合迁到 Supabase Storage。
+- 新粘贴的图片会先缩放压缩；队列暂存内联数据，联网保存时上传到 `cloud-files/logs/images/`，正文改存链接。历史内联图片在重新保存时转换，未批量改写旧记录。图片或队列超过本机存储容量时会提示保存失败。
 - 列表已按 20 条分页并只传 800 字符预览；数据量很大时仍建议给 `created_at desc` 增加索引。

@@ -23,6 +23,7 @@
   </script>
   <link rel="stylesheet" href="./style.css?v=20260830-1">
   <link rel="preload" href="../vendor/supabase.min.js" as="script">
+  <link rel="stylesheet" href="./framework/save-status.css">
 </head>
 <body>
   <div class="app gated" id="app">
@@ -33,10 +34,12 @@
     </header>
     <main class="view" id="view"></main>
   </div>
-  <script src="../vendor/supabase.min.js"></script>
-  <script src="../network.js?v=20260827-8"></script>
-  <script src="./framework/store.js?v=20260827-4"></script>
-  <script src="./framework/auth.js?v=20260827-2"></script>
-  <script src="./admin.js"></script>
+  <script defer src="../vendor/supabase.min.js"></script>
+  <script defer src="../network.js?v=20260827-8"></script>
+  <script defer src="./framework/reliable-store.js"></script>
+  <script defer src="./framework/store.js?v=20260827-4"></script>
+  <script defer src="./framework/auth.js?v=20260827-2"></script>
+  <script defer src="./admin.js"></script>
+  <script defer src="./framework/save-status.js"></script>
 </body>
 </html>

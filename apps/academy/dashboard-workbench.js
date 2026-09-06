@@ -60,11 +60,11 @@
   `;
   document.head.appendChild(style);
 
-  const leafWithText = (text) => Array.from(document.querySelectorAll("h1,h2,h3,h4,h5,p,span,strong,div"))
+  const leafWithText = (scope, text) => Array.from(scope.querySelectorAll("h1,h2,h3,h4,h5,p,span,strong,div"))
     .find((node) => node.children.length === 0 && node.textContent.trim() === text);
 
-  const findCard = (title) => {
-    const leaf = leafWithText(title);
+  const findCard = (scope, title) => {
+    const leaf = leafWithText(scope, title);
     if (!leaf) return null;
     const clickable = leaf.closest("a, button, [role='button']");
     if (clickable) return clickable;
@@ -106,9 +106,9 @@
     complete: '<svg viewBox="0 0 24 24"><path d="m6 12 4 4 8-9"/></svg>'
   }[type]);
 
-  const render = () => {
-    if (document.querySelector(".ao-workbench")) return;
-    const cards = labels.map(findCard);
+  const render = (scope = document) => {
+    if (scope.querySelector(".ao-workbench")) return;
+    const cards = labels.map(title => findCard(scope, title));
     if (cards.some((card) => !card)) return;
     const host = commonParent(cards);
     if (!host || host.dataset.aoWorkbenchSource === "true") return;
@@ -162,6 +162,7 @@
     });
   };
 
+  window.AcademyWorkbench = { render };
   schedule();
   new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
 })();

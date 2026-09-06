@@ -1,5 +1,6 @@
-.git
-.DS_Store
-.playwright-cli
-output
-node_modules
+**
+!_site/
+!_site/**
+!deploy/
+!deploy/nginx.conf
+!Dockerfile

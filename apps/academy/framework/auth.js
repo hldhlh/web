@@ -5,6 +5,7 @@ window.AcademyAuth = (() => {
   const DEVICE_KEY = "academy-device-id-v1";
   const listeners = new Set();
   let users = [];
+  try { users = JSON.parse(localStorage.getItem("academy-people-cache-v1") || "[]"); } catch (_) {}
   let rev = 0;
   let session = readSession();
   let channel = null;
@@ -171,6 +172,7 @@ window.AcademyAuth = (() => {
       lastPullAt = Date.now();
       if (Number(data.rev) < rev) return users;
       users = data.users;
+      try { localStorage.setItem("academy-people-cache-v1", JSON.stringify(users.map(publicUser))); } catch (_) {}
       rev = Number(data.rev) || Date.now();
       refreshSession();
       return users;
@@ -317,9 +319,9 @@ window.AcademyAuth = (() => {
   function start() {
     connectRealtime();
     pull(true).then(() => session ? verifySession() : null).catch(() => { });
-    setInterval(() => pull().catch(() => { }), 15000);
+    setInterval(() => { if (!document.hidden) pull().catch(() => { }); }, 30000);
     clearInterval(sessionCheckTimer);
-    sessionCheckTimer = setInterval(() => verifySession(), 5000);
+    sessionCheckTimer = setInterval(() => { if (!document.hidden) verifySession(); }, 15000);
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") verifySession();
     });

@@ -11,12 +11,23 @@
 
 ## 容器部署
 
+先生成发布产物，再构建容器（本机需要 Node.js 和 Git）：
+
 ```bash
+node scripts/build-site.mjs
 docker build -t web-static .
 docker run --rm -p 8080:8080 web-static
 ```
 
 `deploy/nginx.conf` 已配置压缩、ETag、Service Worker 更新策略，以及长期缓存的站内 vendor 资源。
+
+## 发布范围
+
+GitHub Pages 和 Docker 均只发布 `_site/`。`deploy/public-files.json` 是逐文件白名单；新增页面、图片或脚本时，需将需要公开的文件加入清单，再运行 `node scripts/build-site.mjs`。构建会清空旧产物，校验清单文件存在且不是符号链接，并生成 `version.json` 和页面更新版本。
+
+SQL、文档、测试、依赖清单、开发脚本、原始流水数据，以及 `apps/jlhcdh/add_frontdesk_products.html`、`apps/jlhcdh/update_tags.html` 两个维护页面不发布。维护页面仍保留在仓库，必要时通过本地开发服务使用。构建脚本不会扫描目录自动公开新文件。
+
+已删除未被页面引用的旧版 Supabase、拼音、XLSX 副本，以及旧流水 XLS/CSV 和三个硬编码 Windows 路径的分析脚本。页面继续使用 `apps/vendor/` 内的共享依赖。Git 历史不受此清理影响。
 
 ## 后端代理要求
 

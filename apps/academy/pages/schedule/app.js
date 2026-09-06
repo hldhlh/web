@@ -187,6 +187,8 @@
 
   function openEditor() {
     if (!isManager()) return showToast("只有店长可以编辑排班");
+    state.editBase = JSON.parse(JSON.stringify(state.data));
+    state.editDay = state.selected;
     const current = new Map((state.data.assignments[state.selected] || []).map((item) => [item.userId, item.shift]));
     $("#people-editor").innerHTML = state.people.map((person) => `
       <label class="person-editor-row" style="--person-color:${personColor(person.id)}">
@@ -217,23 +219,23 @@
     saveButton.disabled = true;
     saveButton.textContent = "保存中";
     try {
-      const latestRaw = await window.AcademyStore.getJSON(FILE);
-      const latest = normalizeData(latestRaw || state.data);
+      const latest = state.editBase || state.data;
       const now = Date.now();
       const list = Array.from(document.querySelectorAll("#people-editor select"))
         .filter((select) => SHIFTS[select.value])
         .map((select) => ({ userId: select.dataset.userId, shift: select.value, updatedAt: now, updatedBy: state.session.id }));
       const assignments = { ...latest.assignments };
-      if (list.length) assignments[state.selected] = list;
-      else delete assignments[state.selected];
-      state.data = { rev: now, updatedAt: now, assignments };
-      await window.AcademyStore.putJSON(FILE, state.data);
+      if (list.length) assignments[state.editDay] = list;
+      else delete assignments[state.editDay];
+      const next = { rev: now, updatedAt: now, assignments };
+      await window.AcademyStore.putJSON(FILE, next, { base: latest });
+      state.data = next;
       writeCachedData(state.data);
       state.channel?.send({ type: "broadcast", event: "schedule-version", payload: { rev: now } });
-      $("#sync-status").textContent = `刚刚由${state.session.name}更新`;
+      $("#sync-status").textContent = "已存本机，正在同步";
       closeEditor();
       render();
-      showToast("排班已保存");
+      showToast("排班已存本机，后台同步中");
     } catch (error) {
       showToast(`保存失败：${error?.message || "请检查网络"}`);
     } finally {
@@ -311,8 +313,10 @@
       const inheritedRuntime = window.SCHEDULE_USES_PARENT_RUNTIME === true;
       if (!inheritedRuntime) {
         await window.AcademyAuth.start();
-        await window.AcademyAuth.pull(true);
+        // Cached people render first; refresh follows below.
       }
+      const cached = await window.AcademyStore.getJSON(FILE, { cached: true });
+      if (cached) state.data = normalizeData(cached);
       state.session = window.AcademyAuth.session;
       if (!state.session) {
         app.innerHTML = `<div class="empty-state">请先返回 Auto Office 登录，再打开排班。</div>`;
@@ -327,22 +331,22 @@
           if (Number(payload?.rev) > state.data.rev) pullSchedule(true);
         }
       });
-      const peopleRefresh = inheritedRuntime
-        ? window.AcademyAuth.pull().then(() => {
+      const peopleRefresh = window.AcademyAuth.pull().then(() => {
           state.people = window.AcademyAuth.list().filter((person) => person.access !== "blocked");
           render();
-        }).catch(() => { })
-        : Promise.resolve();
+        }).catch(() => { });
       await Promise.all([pullSchedule(), peopleRefresh]);
-      setInterval(() => pullSchedule(true), 30000);
+      setInterval(() => { if (!document.hidden) pullSchedule(true); }, 30000);
+      window.addEventListener("academy-data-updated", () => pullSchedule(true));
       document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") pullSchedule(true);
       });
-      window.AcademyAuth.onChange((session) => {
+      const stopAuth = window.AcademyAuth.onChange((session) => {
         state.session = session;
         if (!session) location.reload();
         else render();
       });
+      window.addEventListener("pagehide", event => { if (!event.persisted) { stopAuth(); state.channel?.unsubscribe?.(); } });
     } catch (error) {
       $("#sync-status").textContent = "暂时无法连接排班服务";
       showToast(error?.message || "加载失败");

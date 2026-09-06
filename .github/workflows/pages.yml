@@ -27,18 +27,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Prepare static site
+      - name: Test save and network behavior
+        run: npm test
+
+      - name: Prepare and validate static site
         run: |
-          mkdir -p _site
-          rsync -a \
-            --exclude='.git/' \
-            --exclude='.github/' \
-            --exclude='node_modules/' \
-            --exclude='output/' \
-            --exclude='_site/' \
-            --exclude='scripts/' \
-            ./ _site/
-          node scripts/generate-build-meta.mjs _site
+          npm run build
+          npm run check
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

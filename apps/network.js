@@ -4,6 +4,7 @@
  * endpoint must proxy /rest, /auth, /storage, /functions and /realtime paths.
  */
 (function () {
+  const scriptUrl = document.currentScript?.src;
   const PROJECT_ORIGIN = 'https://fmxddvjgkykuqwmasigo.supabase.co';
   const sameOriginGateway = location.protocol === 'https:'
     && location.origin !== PROJECT_ORIGIN
@@ -24,6 +25,9 @@
   const FAILURE_COOLDOWN = 30 * 1000;
   const nativeFetch = window.fetch.bind(window);
   let benchmarking = false;
+  let benchmarkPromise;
+  const inflightReads = new Map();
+  const metrics = [];
   const unhealthyUntil = new Map();
 
   const normalize = (value) => String(value || '').replace(/\/+$/, '');
@@ -136,8 +140,10 @@
   }
 
   async function benchmark() {
-    if (benchmarking || nodes.length < 2 || !navigator.onLine) return currentOrigin;
+    if (benchmarking) return benchmarkPromise;
+    if (nodes.length < 2 || !navigator.onLine) return currentOrigin;
     benchmarking = true;
+    benchmarkPromise = (async () => {
     try {
       const results = (await Promise.all(nodes.map(probe))).filter((result) => Number.isFinite(result.latency));
       results.sort((a, b) => a.latency - b.latency);
@@ -146,6 +152,8 @@
     } finally {
       benchmarking = false;
     }
+    })();
+    return benchmarkPromise;
   }
 
   function addEndpoints(extraEndpoints = []) {
@@ -160,7 +168,15 @@
 
   async function discoverSameOriginGateway() {
     if (!sameOriginGateway || nodes.some((node) => node.origin === sameOriginGateway.origin)) return false;
+    try {
+      const cached = JSON.parse(localStorage.getItem('app-network-gateway-v1') || 'null');
+      if (cached?.origin === sameOriginGateway.origin && Date.now() - cached.at < CACHE_TTL) {
+        if (cached.available) nodes.push(sameOriginGateway);
+        return !!cached.available;
+      }
+    } catch (_) {}
     const result = await probe(sameOriginGateway);
+    try { localStorage.setItem('app-network-gateway-v1', JSON.stringify({ origin: sameOriginGateway.origin, at: Date.now(), available: Number.isFinite(result.latency) })); } catch (_) {}
     if (!Number.isFinite(result.latency)) return false;
     nodes.push({ name: sameOriginGateway.name, origin: sameOriginGateway.origin });
     addConnectionHint(sameOriginGateway.origin);
@@ -207,7 +223,7 @@
     });
   }
 
-  async function routeFetch(input, init = {}) {
+  async function performFetch(input, init = {}) {
     const method = String(init.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
     const readable = method === 'GET' || method === 'HEAD';
     const requireSuccess = init.appNetworkRequireSuccess === true;
@@ -227,7 +243,7 @@
       }
     }
 
-    if (!safeWrite) return nativeFetch(replaceOrigin(input, PROJECT_ORIGIN), requestInit);
+    if (!safeWrite) return fetchWithTimeout(replaceOrigin(input, PROJECT_ORIGIN), requestInit, 30000);
 
     const origins = getOrderedOrigins();
     let lastError;
@@ -243,6 +259,7 @@
         const response = await fetchWithTimeout(replaceOrigin(input, origin), requestInit, writeTimeout);
         // Safe writes are idempotent upserts. Any failed gateway response can
         // therefore fall back to the next route without creating duplicates.
+        if (!response.ok && !isRetryableResponse(response)) return response;
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         unhealthyUntil.delete(origin);
         if (origin !== currentOrigin) remember(origin, null);
@@ -254,6 +271,37 @@
       }
     }
     throw lastError || new Error('All backend routes failed');
+  }
+
+  async function routeFetch(input, init = {}) {
+    if (input instanceof Request) {
+      const original = input;
+      input = original.url;
+      init = { method: original.method, headers: original.headers, credentials: original.credentials,
+        cache: original.cache, signal: original.signal,
+        ...(!['GET', 'HEAD'].includes(original.method) ? { body: await original.clone().arrayBuffer() } : {}), ...init };
+    }
+    const method = String(init.method || 'GET').toUpperCase();
+    const read = method === 'GET' || method === 'HEAD';
+    // Only identical simultaneous reads share transport. Each consumer gets its
+    // own Response body, and callers with cancellation retain independent work.
+    const pathname = new URL(input, location.href).pathname;
+    const streaming = new Headers(init.headers).has('range') || (pathname.includes('/storage/v1/') && !pathname.endsWith('.json'));
+    const key = read && !init.signal && !streaming ? JSON.stringify([input, method,
+      [...new Headers(init.headers).entries()].sort(), init.cache, init.credentials, !!init.appNetworkRequireSuccess]) : null;
+    if (key && inflightReads.has(key)) return (await inflightReads.get(key)).clone();
+    if (!read) inflightReads.clear();
+    const started = performance.now();
+    const promise = performFetch(input, init);
+    if (key) inflightReads.set(key, promise);
+    try {
+      const response = await promise;
+      metrics.push({ method, path: new URL(input, location.href).pathname, ms: Math.round(performance.now() - started), status: response.status });
+      if (metrics.length > 100) metrics.shift();
+      return key ? response.clone() : response;
+    } finally {
+      if (key && inflightReads.get(key) === promise) inflightReads.delete(key);
+    }
   }
 
   function enhanceOptions(options = {}) {
@@ -276,6 +324,7 @@
     };
     patched.__appNetworkPatched = true;
     sdk.createClient = patched;
+    window.dispatchEvent(new CustomEvent("app-sdk-ready"));
     return true;
   }
 
@@ -284,17 +333,40 @@
     get projectOrigin() { return PROJECT_ORIGIN; },
     get endpoints() { return nodes.map((node) => ({ ...node })); },
     benchmark,
+    get metrics() { return metrics.map(item => ({ ...item })); },
     addEndpoints,
     request: routeFetch,
     patchSupabase,
     rewriteUrl(url) { return replaceOrigin(url, currentOrigin); }
   };
 
+  // Direct visits to a sub-app also install the shared offline shell. Cache
+  // resources after load/idle so the first screen retains network priority.
+  if (scriptUrl && 'serviceWorker' in navigator && location.protocol !== 'file:') {
+    const cachePage = () => {
+      const idle = window.requestIdleCallback || (fn => setTimeout(fn, 1200));
+      idle(async () => {
+        try {
+          await navigator.serviceWorker.register(new URL('../sw.js', scriptUrl));
+          const registration = await navigator.serviceWorker.ready;
+          const urls = [location.href, ...performance.getEntriesByType('resource').map(entry => entry.name)]
+            .filter(value => { const url = new URL(value); return url.origin === location.origin && (value === location.href || /\.(js|css|svg|ico|woff2?|ttf)$/.test(url.pathname)); });
+          registration.active?.postMessage({ type: 'CACHE_PAGE', urls: [...new Set(urls)] });
+        } catch (_) {}
+      });
+    };
+    if (document.readyState === 'complete') cachePage();
+    else window.addEventListener('load', cachePage, { once: true });
+  }
+
   patchSupabase();
   window.addEventListener('online', benchmark, { passive: true });
   const schedule = window.requestIdleCallback || ((callback) => setTimeout(callback, 1200));
   schedule(async () => {
     await discoverSameOriginGateway();
-    benchmark();
+    try {
+      const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+      if (!cached || Date.now() - cached.savedAt >= CACHE_TTL) benchmark();
+    } catch (_) { benchmark(); }
   });
 })();

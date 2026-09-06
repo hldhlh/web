@@ -1,0 +1,9 @@
+.save-status { margin: 8px 16px; padding: 8px 12px; border: 1px solid var(--separator, #8e8e9360); border-radius: 12px; background: var(--surface, Canvas); color: var(--text, CanvasText); font: 13px/1.5 system-ui; }
+.save-status[hidden] { display: none; }
+.save-status summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+.save-status button { min-height: 44px; margin: 4px; padding: 8px 12px; border: 1px solid currentColor; border-radius: 8px; color: var(--accent, #007aff); background: transparent; font: inherit; cursor: pointer; }
+.save-status pre { max-height: 180px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.app > .save-status { margin-top: calc(var(--topbar-h) + 8px); }
+.app > .save-status:not([hidden]) + .view { padding-top: 8px; }
+.app.gated > .save-status { display: none; }
+@media (prefers-contrast: more) { .save-status { border-color: currentColor; } }

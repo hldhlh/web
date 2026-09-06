@@ -26,14 +26,20 @@
   async function start() {
     // 子程序嵌入 Auto Office 时复用主程序运行时，保持快速打开。
     if (!inheritAutoOfficeRuntime()) {
-      await Promise.all([
-        loadScript("../../../network.js"),
-        loadScript("../../../vendor/supabase.min.js"),
-        loadScript("../../framework/store.js"),
-        loadScript("../../framework/auth.js")
-      ]);
+      await loadScript("../../../network.js");
+      await loadScript("../../framework/reliable-store.js");
+      await loadScript("../../framework/store.js");
+      await loadScript("../../framework/auth.js");
     }
     await loadScript("./app.js");
+    await loadScript("../../framework/save-status.js");
+    if (!window.parent?.supabase && !window.supabase) {
+      loadScript("../../../vendor/supabase.min.js").then(() => {
+        window.APP_NETWORK?.patchSupabase();
+        window.AcademyAuth.connectRealtime?.();
+        window.dispatchEvent(new Event('academy-sdk-ready'));
+      }).catch(() => {});
+    }
   }
 
   start().catch((error) => {
