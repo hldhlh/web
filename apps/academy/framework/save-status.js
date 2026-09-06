@@ -40,19 +40,33 @@
   }
   let hadPending = false;
   let saveError = '';
+  let hideTimer = 0;
   window.addEventListener('academy-save-error', event => {
+    clearTimeout(hideTimer);
+    hideTimer = 0;
     saveError = event.detail;
+    box.dataset.state = 'error';
     box.hidden = false; summary.textContent = saveError;
   });
   const unsubscribe = sync.subscribe(state => {
     if (state.pending) saveError = '';
     if (saveError) { box.hidden = false; summary.textContent = saveError; return; }
-    box.hidden = !state.pending && !hadPending;
+    if (state.pending) {
+      clearTimeout(hideTimer);
+      hideTimer = 0;
+      box.hidden = false;
+    } else if (hadPending) {
+      box.hidden = false;
+      box.open = false;
+      hideTimer = setTimeout(() => { box.hidden = true; hideTimer = 0; }, 2500);
+    } else if (!hideTimer) {
+      box.hidden = true;
+    }
+    box.dataset.state = state.conflicts ? 'error' : state.pending ? 'pending' : 'success';
+    const conflictText = state.conflicts ? `，${state.conflicts} 项修改冲突` : '';
     summary.textContent = state.pending
-      ? `已存本机 · ${state.pending} 项待同步${state.conflicts ? `，${state.conflicts} 项修改冲突` : ''}`
+      ? `已存本机 · ${state.pending} 项待同步` + conflictText
       : '已同步到云端';
-    const pageStatus = document.getElementById('sync-status');
-    if (pageStatus && (state.pending || hadPending)) pageStatus.textContent = state.pending ? `已存本机 · ${state.pending} 项待同步` : '已同步到云端';
     content.replaceChildren();
     if (state.pending) content.append(button('立即重试', () => sync.flush()));
     for (const entry of state.entries.filter(e => e.conflict)) {
@@ -68,5 +82,5 @@
     if (hadPending && !state.pending) window.dispatchEvent(new CustomEvent('academy-data-updated'));
     hadPending = !!state.pending;
   });
-  window.addEventListener("pagehide", event => { if (!event.persisted) unsubscribe(); });
+  window.addEventListener("pagehide", event => { if (!event.persisted) { clearTimeout(hideTimer); unsubscribe(); } });
 })();

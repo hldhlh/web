@@ -1,9 +1,42 @@
-.save-status { margin: 8px 16px; padding: 8px 12px; border: 1px solid var(--separator, #8e8e9360); border-radius: 12px; background: var(--surface, Canvas); color: var(--text, CanvasText); font: 13px/1.5 system-ui; }
+/* Floating save feedback never participates in document layout. */
+.save-status {
+  position: fixed;
+  z-index: 200;
+  inset-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right));
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  width: fit-content;
+  max-width: min(440px, calc(100% - 32px));
+  max-height: min(60dvh, 480px);
+  overflow: auto;
+  margin: 0 auto;
+  padding: 2px 14px;
+  border: 1px solid var(--line, #8e8e9360);
+  border-radius: 22px;
+  background: var(--nav-bg, var(--surface, Canvas));
+  color: var(--text, CanvasText);
+  box-shadow: 0 6px 28px #0000001a;
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  font: .8125rem/1.5 system-ui;
+  animation: save-status-appear 180ms ease-out;
+}
 .save-status[hidden] { display: none; }
-.save-status summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
-.save-status button { min-height: 44px; margin: 4px; padding: 8px 12px; border: 1px solid currentColor; border-radius: 8px; color: var(--accent, #007aff); background: transparent; font: inherit; cursor: pointer; }
+.save-status summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; gap: 10px; list-style: none; overflow-wrap: anywhere; }
+.save-status summary::-webkit-details-marker { display: none; }
+.save-status summary::before { content: '\21bb'; color: var(--accent, #007aff); font-size: 20px; flex: 0 0 auto; }
+.save-status[data-state="success"] summary::before { content: '\2713'; }
+.save-status[data-state="error"] summary::before { content: '!'; color: var(--bad, #ff3b30); }
+.save-status[data-state="pending"] summary::after { content: '\2303'; margin-left: auto; color: var(--muted, GrayText); }
+.save-status[open] { width: 440px; border-radius: 18px; }
+.save-status > div:not(:empty) { padding: 8px 0 12px; border-top: 1px solid var(--line, #8e8e9360); }
+.save-status button { min-height: 44px; margin: 4px; padding: 8px 12px; border: 1px solid var(--line, #8e8e9360); border-radius: 12px; color: var(--accent, #007aff); background: var(--surface, Canvas); font: inherit; cursor: pointer; }
+.save-status button:disabled { opacity: .5; cursor: wait; }
 .save-status pre { max-height: 180px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
-.app > .save-status { margin-top: calc(var(--topbar-h) + 8px); }
-.app > .save-status:not([hidden]) + .view { padding-top: 8px; }
+.save-status summary:focus-visible, .save-status button:focus-visible { outline: 2px solid var(--accent, #007aff); outline-offset: -2px; }
+.app > .save-status { bottom: calc(var(--tab-h, 58px) + env(safe-area-inset-bottom) + 12px); }
+.app.focus > .save-status, .app.ops-mode > .save-status, .admin-page .app > .save-status { bottom: calc(env(safe-area-inset-bottom) + 16px); }
 .app.gated > .save-status { display: none; }
 @media (prefers-contrast: more) { .save-status { border-color: currentColor; } }
+@media (prefers-reduced-transparency: reduce) { .save-status { background: var(--surface, Canvas); backdrop-filter: none; -webkit-backdrop-filter: none; } }
+@media (prefers-reduced-motion: reduce) { .save-status { animation: none; } }
+@keyframes save-status-appear { from { opacity: 0; translate: 0 6px; } to { opacity: 1; translate: 0 0; } }
