@@ -22,7 +22,7 @@
   };
   const OPS_STORAGE_KEY = "academy-ops-content-v1";
   const OPS_LESSON_DRAFT_KEY = "academy-ops-lesson-draft-v1";
-  const OPS_TABS = ["lessons", "exams", "notices", "tasks", "staff"];
+  const OPS_TABS = ["lessons", "exams", "notices", "tasks", "status", "staff"];
   const NAVIGATION_STATE_KEY = "academyNavigation";
   let contentRevision = 0;
 
@@ -613,7 +613,7 @@
     },
     refreshView() {
       const stay = state.route?.name;
-      const editingOps = stay === "ops" && (["add", "edit"].includes(currentOpsRoute().mode) || currentOpsRoute().section === "tasks");
+      const editingOps = stay === "ops" && (["add", "edit"].includes(currentOpsRoute().mode) || ["tasks", "status"].includes(currentOpsRoute().section));
       if (editingOps) {
         updateNotificationButton();
         return;
@@ -817,7 +817,7 @@
       DATA.taskBoard = normalizeTaskBoard(normalized.taskBoard, DATA.lessons, DATA.exams);
       contentRevision = rev || Date.now();
       saveOpsStore();
-      const editing = state.route?.name === "ops" && (["add", "edit"].includes(currentOpsRoute().mode) || currentOpsRoute().section === "tasks");
+      const editing = state.route?.name === "ops" && (["add", "edit"].includes(currentOpsRoute().mode) || ["tasks", "status"].includes(currentOpsRoute().section));
       if (Auth.session && !editing && state.route?.name !== "exam") render();
       return true;
     },
@@ -1497,20 +1497,21 @@
           </div>
         </div>
         ${progressRing(completionRate())}
+        <div id="home-daily-status" class="home-daily-status" hidden></div>
       </header>
       <section class="home-shortcuts" aria-labelledby="home-shortcuts-title">
         <header class="home-shortcuts-head">
           <div><h3 id="home-shortcuts-title">快捷访问</h3></div>
         </header>
         <div class="home-shortcut-grid">
-          <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/notes" aria-label="在 Auto Office 内打开今岭笔记">
+          <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/notes" aria-label="在 Auto Office 内打开门店笔记">
             <img src="https://hldhlh.github.io/web/apps/notes/icon.svg" width="54" height="54" alt="">
-            <span class="home-app-shortcut-copy"><strong>今岭笔记</strong><small>快速记录和查找门店笔记</small></span>
+            <span class="home-app-shortcut-copy"><strong>门店笔记</strong><small>快速记录和查找门店笔记</small></span>
             <span class="home-app-shortcut-action">打开</span>
           </button>
-          <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/jlhcdh" aria-label="在 Auto Office 内打开今岭每日订货表">
+          <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/jlhcdh" aria-label="在 Auto Office 内打开门店订货表">
             <img src="https://hldhlh.github.io/web/apps/jlhcdh/icon.svg" width="54" height="54" alt="">
-            <span class="home-app-shortcut-copy"><strong>今岭每日订货表</strong><small>完成每日订货与采购核对</small></span>
+            <span class="home-app-shortcut-copy"><strong>门店订货表</strong><small>完成每日订货与采购核对</small></span>
             <span class="home-app-shortcut-action">打开</span>
           </button>
           <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/schedule" aria-label="在 Auto Office 内打开排班">
@@ -1606,6 +1607,7 @@
           </button>`;
         }).join("") : `<div class="card notice clear"><strong>重要考试项已完成</strong><p class="muted">当前暂无关键考试待过。</p></div>`}
     `;
+    window.AcademyDailyStatus.connect();
     view().querySelectorAll("[data-stage-target]").forEach((button) => {
       button.addEventListener("click", () => {
         view().querySelectorAll(".stage-tab").forEach((item) => {
@@ -1864,6 +1866,7 @@
       { key: "exams", icon: "exam", label: "考试", fullLabel: "考试题库", count: DATA.exams.length },
       { key: "notices", icon: "bell", label: "通知", fullLabel: "事务通知", count: (DATA.notices || []).length },
       { key: "tasks", icon: "group", label: "任务", fullLabel: "任务面板", count: (DATA.taskBoard?.stages || []).length },
+      { key: "status", icon: "bell", label: "今日状态", fullLabel: "今日状态", count: 7 },
       { key: "staff", icon: "me", label: "员工", fullLabel: "员工与权限", count: Auth.list().length }
     ];
     return `<nav class="ops-subtabs" aria-label="运营事务导航">${sections.map((item) => `
@@ -2845,9 +2848,11 @@
       exams: "考试管理",
       notices: "通知",
       tasks: "任务面板",
+      status: "今日状态",
       staff: "员工与权限"
     };
     const subtitleMap = {
+      status: "设置首页问候区域中的今日安排与每周固定内容",
       lessons: "创建、更新并安排员工需要学习的课程",
       exams: "维护考试、题目和合格标准",
       notices: "发布门店事务、重要消息与学习提醒",
@@ -2871,6 +2876,7 @@
       exams: active === "exams" ? (route.mode === "edit" ? renderOpsExamEditor(editExam) : renderOpsExamList()) : "",
       notices: active === "notices" ? (route.mode === "edit" ? renderOpsNoticeEditor(editNotice) : renderOpsNoticeList()) : "",
       tasks: active === "tasks" ? renderOpsTaskBoard() : "",
+      status: active === "status" ? window.AcademyDailyStatus.editorHTML() : "",
       staff: active === "staff" ? renderOpsStaff() : ""
     };
     const content = route.mode === "add"
@@ -2903,6 +2909,7 @@
       </div>
     `;
     if (isEditing && active === "lessons") resizeLessonEditorFields(view());
+    if (active === "status") window.AcademyDailyStatus.mountEditor();
     if (active === "tasks") refreshTaskBoardEditor();
     if (active === "staff") {
       StaffProgress.load();
@@ -3136,11 +3143,56 @@
     bindLessonVideo();
   }
 
-  function startExam(id) {
+  function renderExamHistory(exam, activeAt = 0) {
+    const records = state.progress.examHistory[exam.id];
+    const history = (Array.isArray(records) ? records : []).map((record) => ({
+      score: Number(record?.score ?? record) || 0,
+      correct: record?.correct == null ? null : Number(record.correct),
+      total: Number(record?.total) || exam.questions.length,
+      at: Number(record?.at) || 0
+    })).sort((a, b) => b.at - a.at);
+    if (!history.length) return "";
+    return `<section class="exam-attempt-history" aria-label="考试记录">
+      <div class="sec-title"><h3>考试记录</h3><span>最近 ${history.length} 次</span></div>
+      <div class="exam-records">${history.map((record) => {
+        const passed = record.score >= exam.pass;
+        const active = activeAt && record.at === activeAt;
+        const tag = record.at ? "button" : "div";
+        const action = record.at ? `type="button" data-act="go" data-hash="#/exam/${exam.id}/result?at=${record.at}"` : "";
+        return `<${tag} class="exam-record ${passed ? "passed" : "failed"} ${active ? "current" : ""}" ${action}>
+          <span class="exam-record-state">${passed ? "已通过" : "未通过"}</span>
+          <span class="exam-record-main"><strong>${record.at ? renderDateLabel(record.at) : "历史记录"}</strong><small>${record.correct == null ? "已完成考试" : `答对 ${record.correct}/${record.total}`}</small></span>
+          <span class="exam-record-score"><b>${record.score}</b><small>分</small></span>
+          ${record.at ? '<span class="exam-record-arrow" aria-hidden="true">›</span>' : ""}
+        </${tag}>`;
+      }).join("")}</div>
+    </section>`;
+  }
+
+  function renderExamRetake(exam) {
+    state.exam = null;
+    setTop(exam.title, true);
+    setTab("exams");
+    view().innerHTML = `
+      <section class="card lesson-card" aria-labelledby="exam-retake-title">
+        <h2 id="exam-retake-title">是否再考一次？</h2>
+        <p class="muted">你已完成这项考试。再次考试将重新计时，已有成绩会保留在考试记录中。</p>
+        <p class="muted">${exam.questions.length} 题 · ${minutesLabel(exam.minutes)} · 合格线 ${exam.pass} 分</p>
+        <div class="actions">
+          <button type="button" class="primary" data-act="exam-retake">再考一次</button>
+          <button type="button" class="ghost" data-act="go" data-hash="#/exams">暂不考试</button>
+        </div>
+      </section>
+      ${renderExamHistory(exam)}
+    `;
+  }
+
+  function startExam(id, confirmed = false) {
     const exam = examById(id);
     if (!exam) return go("#/exams");
     if (!Gate.canExam(exam)) return renderLocked(exam.title);
     markPublishedContentRead("exam", exam);
+    if (!confirmed && state.progress.examHistory[id]?.length) return renderExamRetake(exam);
     if (!exam.questions.length) {
       alert("这项考试正在准备中，请稍后再试。");
       return go("#/exams");
@@ -3255,12 +3307,6 @@
     const best = bestScore(exam.id);
     const score = result?.score ?? best;
     const pass = score >= exam.pass;
-    const history = (state.progress.examHistory[exam.id] || []).map((record) => ({
-      score: Number(record?.score ?? record) || 0,
-      correct: Number(record?.correct) || 0,
-      total: Number(record?.total) || exam.questions.length,
-      at: Number(record?.at) || 0
-    }));
     const celebrationToken = result?.at ? `${exam.id}:${result.at}` : "";
     let playCelebrationIntro = false;
     if (pass && currentResult && !state.route.at && celebrationToken) {
@@ -3454,24 +3500,11 @@
           <div class="kicker">未通过</div>
           <div class="score">${score < 0 ? "--" : score}</div>
           <div class="pass" style="color:var(--bad)">还需 ${exam.pass} 分</div>
-          <p class="muted">${result ? `对 ${result.correct} / ${result.total}` : "这是历史最好成绩。点下方重考。"}</p>
+          <p class="muted">${result ? `对 ${result.correct} / ${result.total}` : "这是历史最好成绩。"}</p>
         </div>`}
       ${result?.wrong?.length ? `<div class="sec-title"><h3>错题解析</h3></div>${result.wrong.map((item) =>
         `<div class="card lesson-card"><strong>${escapeHtml(item.stem)}</strong><p class="muted">${escapeHtml(item.explain)}</p></div>`).join("")}` : ""}
-      ${history.length ? `
-        <div class="exam-attempt-history">
-          <div class="sec-title"><h3>历次成绩</h3><span>最近 ${history.length} 次</span></div>
-          <div class="exam-records">${history.map((record, index) => {
-            const passed = record.score >= exam.pass;
-            const active = result?.at && record.at === result.at;
-            return `<button class="exam-record ${passed ? "passed" : "failed"} ${active ? "current" : ""}" data-act="go" data-hash="#/exam/${exam.id}/result?at=${record.at}">
-              <span class="exam-record-state">${passed ? "已通过" : "未通过"}</span>
-              <span class="exam-record-main"><strong>第 ${history.length - index} 次考试</strong><small>${record.at ? renderDateLabel(record.at) : "历史记录"} · 答对 ${record.correct}/${record.total}</small></span>
-              <span class="exam-record-score"><b>${record.score}</b><small>分</small></span>
-              <span class="exam-record-arrow" aria-hidden="true">›</span>
-            </button>`;
-          }).join("")}</div>
-        </div>` : ""}
+      ${renderExamHistory(exam, result?.at)}
       <button class="primary" data-act="go" data-hash="#/exam/${exam.id}">再考一次</button>
       <button class="ghost" data-act="go" data-hash="#/exams">返回考试列表</button>
     `;
@@ -3538,11 +3571,11 @@
   function renderEmbeddedApp(appName) {
     const apps = {
       notes: {
-        title: "今岭笔记",
+        title: "门店笔记",
         src: "https://hldhlh.github.io/web/apps/notes/index.html"
       },
       jlhcdh: {
-        title: "今岭每日订货表",
+        title: "门店订货表",
         src: "https://hldhlh.github.io/web/apps/jlhcdh/index.html"
       },
       schedule: {
@@ -4169,6 +4202,9 @@
     if (act === "gate-mode") {
       gateMode = btn.dataset.mode;
       return showGate();
+    }
+    if (act === "exam-retake" && state.route.name === "exam" && !state.exam) {
+      return startExam(state.route.id, true);
     }
     if (act === "go") return go(btn.dataset.hash);
     if (act === "open-lesson") return go(`#/lesson/${btn.dataset.id}`);

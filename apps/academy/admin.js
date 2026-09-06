@@ -86,6 +86,7 @@
           <h2>${pending ? `${pending} 人待授权` : "账号已全部处理"}</h2>
         </div>
       </div>
+      <a class="ghost" href="./index.html#/ops?section=status">设置今日状态</a>
       <div class="counts">
         <div class="count"><b>${people.length}</b><span>注册人数</span></div>
         <div class="count ${pending ? "hot" : ""}"><b>${pending}</b><span>待授权</span></div>
