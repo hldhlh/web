@@ -7,9 +7,10 @@
 
   const TYPE_LABEL = { article: "图文", video: "视频" };
   const DROPPED_LESSON_IDS = new Set(["a-html-what", "g-tags", "v-html-page", "a-tags", "g-card", "g-fix", "v-css", "g-box"]);
-  const DROPPED_EXAM_IDS = new Set(["e-html"]);
+  // Retired built-in exams must not return from cached or older cloud content.
+  const DROPPED_EXAM_IDS = new Set(["e-html", "e-mix"]);
   const BUNDLED_LESSON_IDS = new Set(["a-day", "a-product", "v-order", "a-safety", "a-tools"]);
-  const BUNDLED_EXAM_IDS = new Set(["e-onboard", "e-mix"]);
+  const BUNDLED_EXAM_IDS = new Set(["e-onboard"]);
 
   const state = {
     route: { name: "home" },
@@ -357,27 +358,14 @@
     return /\bHTML\b|\bCSS\b|盒模型|DOCTYPE|语义标签|标签的职责|<\/?(html|head|body|div|span|h[1-6]|p|a|img|button|ul|ol|li|input|label|header)\b/i.test(text);
   }
 
-  function rebuildMixExam(exams) {
-    const mix = exams.find((item) => item.id === "e-mix");
-    if (!mix) return exams;
-    const source = exams.filter((item) => item.id !== "e-mix");
-    mix.summary = "开市、锅底、出品、卫生、门店工具。按正式考试节奏计时。";
-    const extras = (DATA.exams.find((item) => item.id === "e-mix")?.questions || []).filter((question) => /^m\d/.test(question.id));
-    const fromSource = source.flatMap((exam) => exam.questions || []);
-    mix.questions = fromSource.concat(extras.filter((extra) => !fromSource.some((question) => question.id === extra.id)));
-    return exams;
-  }
-
   function stripUnrelatedCurriculum(snapshot) {
     const lessons = snapshot.lessons.filter((item) => !isDroppedLesson(item));
-    const exams = rebuildMixExam(
-      snapshot.exams
+    const exams = snapshot.exams
         .filter((item) => !isDroppedExam(item))
         .map((exam) => ({
           ...exam,
           questions: (exam.questions || []).filter((question) => !isOffTopicQuestion(question))
-        }))
-    );
+        }));
     return { ...snapshot, lessons, exams };
   }
 
@@ -387,7 +375,7 @@
     contentRevision = Number(raw?.rev) || 0;
     const courseGroups = normalizeCourseGroups(raw?.courseGroups || DATA.courseGroups);
     const fallbackLessons = DATA.lessons.filter((item) => !isDroppedLesson(item)).map(normalizeLesson);
-    const fallbackExams = rebuildMixExam(DATA.exams.filter((item) => !isDroppedExam(item)).map(normalizeExam));
+    const fallbackExams = DATA.exams.filter((item) => !isDroppedExam(item)).map(normalizeExam);
     const lessons = Array.isArray(raw?.lessons)
       ? raw.lessons.filter((item) => !isDroppedLesson(item)).map(normalizeLesson)
       : fallbackLessons;
@@ -405,7 +393,7 @@
     return {
       courseGroups,
       lessons,
-      exams: rebuildMixExam(exams),
+      exams,
       notices,
       taskBoard,
       homeLayout: HomeLayout.normalize(raw?.homeLayout || DATA.homeLayout)
@@ -830,7 +818,13 @@
       contentRevision = rev || Date.now();
       saveOpsStore();
       this.base = JSON.parse(JSON.stringify(payload));
-      if (Auth.session && (!editing || currentOpsRoute().section === "layout") && state.route?.name !== "exam") render();
+      // Sync updates the data model, not an active lesson/player, exam or embedded app.
+      // Rebuilding these views would discard playback, answers or subprogram state.
+      const keepActiveView = ["lesson", "exam", "embedded-app"].includes(state.route?.name);
+      if (Auth.session && (!editing || currentOpsRoute().section === "layout")) {
+        if (keepActiveView) updateNotificationButton();
+        else render();
+      }
       return true;
     },
     async pull() {
@@ -1800,21 +1794,30 @@
   function renderMe() {
     setTop("我的", false);
     setTab("me");
-    const done = Object.keys(state.progress.completed).length;
+    const done = DATA.lessons.filter(lesson => isDone(lesson.id)).length;
     const passed = DATA.exams.filter((exam) => bestScore(exam.id) >= exam.pass).length;
+    const remainingLessons = DATA.lessons.length - done;
+    const remainingExams = DATA.exams.length - passed;
     view().innerHTML = `
-      <div class="hello">
+      <header class="account-overview">
         <div>
-          <p>${escapeHtml(Auth.session?.name || "学员")} · ${Auth.canFull(Auth.session) ? "全部权限" : "基本权限"}</p>
-          <h2>${Auth.canFull(Auth.session) ? "可以学全部课程" : "等待店长授权全部权限"}</h2>
+          <h2>${escapeHtml(Auth.session?.name || "学员")}</h2>
+          <p>${Auth.isManager(Auth.session) ? "店长" : "员工"} · ${Auth.canFull(Auth.session) ? "全部学习权限" : "基础学习权限"}</p>
         </div>
-        ${progressRing(completionRate())}
-      </div>
-      <div class="stats">
-        <div class="stat"><b>${done}</b><span>已完成课程</span></div>
-        <div class="stat"><b>${passed}</b><span>通过考试</span></div>
-        <div class="stat"><b>${state.progress.streak}</b><span>连续学习</span></div>
-      </div>
+        <div class="account-progress">${progressRing(completionRate())}<span>总体学习进度</span></div>
+      </header>
+      <section class="account-learning" aria-label="学习概览">
+        <div class="account-metrics">
+          <button class="account-metric" data-act="go" data-hash="#/learn" aria-label="课程已完成 ${done} 门，共 ${DATA.lessons.length} 门，查看课程">
+            <span>课程完成</span><strong>${done}<small> / ${DATA.lessons.length} 门</small></strong>
+            <span class="metric-note">${remainingLessons ? `还差 ${remainingLessons} 门` : DATA.lessons.length ? "全部完成" : "暂无课程"}<i aria-hidden="true">›</i></span>
+          </button>
+          <button class="account-metric" data-act="go" data-hash="#/exams" aria-label="考试已通过 ${passed} 场，共 ${DATA.exams.length} 场，查看考试">
+            <span>考试通过</span><strong>${passed}<small> / ${DATA.exams.length} 场</small></strong>
+            <span class="metric-note">${remainingExams ? `还差 ${remainingExams} 场` : DATA.exams.length ? "全部通过" : "暂无考试"}<i aria-hidden="true">›</i></span>
+          </button>
+        </div>
+      </section>
       <div class="sec-title"><h3>错题本</h3><span>${state.progress.wrong.length}</span></div>
       ${state.progress.wrong.length ? state.progress.wrong.slice(0, 8).map((item, index) =>
         `<button class="card lesson-card wrong-item" data-act="practice-wrong" data-index="${index}">
@@ -3167,21 +3170,23 @@
     </section>`;
   }
 
-  function renderExamRetake(exam) {
+  function renderExamIntro(exam) {
+    const retake = Boolean(state.progress.examHistory[exam.id]?.length);
     state.exam = null;
     setTop(exam.title, true);
     setTab("exams");
     view().innerHTML = `
-      <section class="card lesson-card" aria-labelledby="exam-retake-title">
-        <h2 id="exam-retake-title">是否再考一次？</h2>
-        <p class="muted">你已完成这项考试。再次考试将重新计时，已有成绩会保留在考试记录中。</p>
-        <p class="muted">${exam.questions.length} 题 · ${minutesLabel(exam.minutes)} · 合格线 ${exam.pass} 分</p>
+      <section class="card lesson-card exam-intro" aria-labelledby="exam-intro-title">
+        <h2 id="exam-intro-title">${retake ? "是否再考一次？" : "准备开始考试"}</h2>
+        <p class="exam-intro-name">${escapeHtml(exam.title)}</p>
+        <p class="muted">${exam.questions.length} 题 · ${minutesLabel(exam.minutes)} · ${exam.pass} 分及格</p>
+        <p class="muted">确认后开始计时，时间结束自动交卷。${retake ? "已有成绩会保留在考试记录中。" : ""}</p>
         <div class="actions">
-          <button type="button" class="primary" data-act="exam-retake">再考一次</button>
+          <button type="button" class="primary" data-act="exam-start">${retake ? "再考一次" : "开始考试"}</button>
           <button type="button" class="ghost" data-act="go" data-hash="#/exams">暂不考试</button>
         </div>
       </section>
-      ${renderExamHistory(exam)}
+      ${retake ? renderExamHistory(exam) : ""}
     `;
   }
 
@@ -3190,11 +3195,11 @@
     if (!exam) return go("#/exams");
     if (!Gate.canExam(exam)) return renderLocked(exam.title);
     markPublishedContentRead("exam", exam);
-    if (!confirmed && state.progress.examHistory[id]?.length) return renderExamRetake(exam);
     if (!exam.questions.length) {
       alert("这项考试正在准备中，请稍后再试。");
       return go("#/exams");
     }
+    if (!confirmed) return renderExamIntro(exam);
     state.exam = {
       id,
       index: 0,
@@ -4202,7 +4207,7 @@
       gateMode = btn.dataset.mode;
       return showGate();
     }
-    if (act === "exam-retake" && state.route.name === "exam" && !state.exam) {
+    if (act === "exam-start" && state.route.name === "exam" && !state.exam) {
       return startExam(state.route.id, true);
     }
     if (act === "go") return go(btn.dataset.hash);

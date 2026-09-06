@@ -215,9 +215,6 @@
       heading.textContent = "必做考试";
     }
 
-    const repeatedMock = examCard("综合模拟", "待复查");
-    if (repeatedMock) repeatedMock.classList.add("ao-redundant-exam");
-
     const required = examCard("岗前通关", "关键考核");
     if (!required || required.dataset.aoExamClear === "true") return;
     required.dataset.aoExamClear = "true";

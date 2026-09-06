@@ -122,28 +122,6 @@ window.ACADEMY_CONTENT = {
         { id: "o9", type: "judge", stem: "处理完生食、用过卫生间或用过手机后，都要洗手消毒。", answer: true, explain: "笔记「洗手消毒」明确列出这些情况，上岗前也要洗。" },
         { id: "o10", type: "single", stem: "虾滑出品是？", options: ["50 克一管", "75 克两管", "150 克圆黑盘", "8 个圆盘"], answer: 1, explain: "出品 SOP：虾滑 75 克（两管）。牛肉丸才是 8 个圆盘。" }
       ]
-    },
-    {
-      id: "e-mix",
-      title: "综合模拟",
-      track: "tools",
-      minutes: 12,
-      pass: 80,
-      summary: "开市、锅底、出品、卫生、门店工具。按正式考试节奏计时。",
-      questions: []
     }
   ]
 };
-
-(function mixExam() {
-  const exams = window.ACADEMY_CONTENT.exams;
-  const mix = exams.find((item) => item.id === "e-mix");
-  const source = exams.filter((item) => item.id !== "e-mix");
-  const extra = [
-    { id: "m1", type: "single", stem: "每日补货必须从哪里下单？", options: ["微信报货", "口头跟后厨说一声", "锅底备货，按库位加车后提交", "晚上凭记忆补记"], answer: 2, explain: "一件事只进一个应用。备货走锅底备货，方便对账复查。" },
-    { id: "m2", type: "single", stem: "客诉结论、炉头故障、缺货，应该记在哪？", options: ["锅底备货", "翻台笔记", "翻台流水里改账单", "不用记"], answer: 1, explain: "翻台笔记写给明天的自己。短句，能搜到。" },
-    { id: "m3", type: "judge", stem: "翻台流水用来看高峰和异常，不在这里改账单。", answer: true, explain: "流水是观察，不是结账入口。" },
-    { id: "m4", type: "single", stem: "门店记账的原则是？", options: ["晚上凭记忆补", "发生即记，分类选对，备注写清", "和备货写在一起", "只记大额"], answer: 1, explain: "发生即记。分类选对，备注写清。" }
-  ];
-  mix.questions = source.flatMap((exam) => exam.questions).concat(extra);
-})();

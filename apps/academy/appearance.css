@@ -100,6 +100,29 @@
 .app .home-app-shortcut-copy strong, .pending-row strong { font-size: 1.0625rem; }
 .pending-action { font-size: .9375rem; white-space: normal; }
 .app .tab { font-size: .75rem; }
+.account-overview { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 12px 0 24px; }
+.account-overview h2 { font-size: 1.75rem; line-height: 1.3; overflow-wrap: anywhere; }
+.account-overview p { color: var(--muted); margin-top: 6px; font-size: .9375rem; }
+.account-progress { flex-shrink: 0; display: grid; justify-items: center; gap: 8px; }
+.account-progress > span { color: var(--muted); font-size: .8125rem; }
+.account-learning { margin-bottom: 28px; }
+.app .exam-intro { padding: 24px; }
+.exam-intro h2 { font-size: 1.375rem; margin-bottom: 12px; }
+.exam-intro-name { font-size: 1.0625rem; margin-bottom: 8px; }
+.exam-intro .muted { margin-top: 8px; line-height: 1.6; }
+.exam-intro .actions { margin-top: 24px; gap: 12px; }
+.account-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.account-metric { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 20px; text-align: left; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--text); }
+.account-metric > span { font-size: .9375rem; color: var(--muted); }
+.account-metric strong { font-size: 1.875rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.account-metric small { font-size: .875rem; font-weight: 400; color: var(--muted); white-space: nowrap; }
+.account-metric .metric-note { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; font-size: .8125rem; }
+.metric-note i { font-style: normal; font-size: 20px; color: var(--accent); }
+@media (hover: hover) and (pointer: fine) { button.account-metric:hover { border-color: var(--accent); background: var(--priority-surface); } }
+@media (max-width: 600px) {
+  .account-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+  .account-metric { padding: 16px; }
+}
 button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 @media (min-width: 900px) {
   .app .home-shortcut-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
