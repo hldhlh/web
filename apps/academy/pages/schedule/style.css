@@ -87,6 +87,8 @@ button { color: inherit; }
   font-size: 13px;
 }
 
+#sync-status:empty { margin: 0; }
+
 .primary-action,
 .icon-button,
 .month-title,

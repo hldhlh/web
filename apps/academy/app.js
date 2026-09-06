@@ -1306,7 +1306,7 @@
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("app-theme", theme);
     const color = document.querySelector("meta[name='theme-color']");
-    if (color) color.content = theme === "dark" ? "#000000" : "#f2f2f7";
+    if (color) color.content = theme === "dark" ? "#111315" : "#f2f2f7";
   }
 
   function svgIcon(name) {
@@ -1315,9 +1315,12 @@
       sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.2 4.2l1.4 1.4m12.8 12.8 1.4 1.4M2 12h2m16 0h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>',
       moon: '<path d="M20 12.6A8 8 0 1 1 11.4 4 6.2 6.2 0 0 0 20 12.6Z"/>',
       bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"/><path d="M10 21h4"/>',
-      home: '<path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-8Z"/>',
-      learn: '<path d="M4 7.5 12 4l8 3.5M4 7.5v9L12 20l8-3.5v-9M4 7.5 12 11l8-3.5"/>',
-      exam: '<path d="M8 4h8v16H8z"/><path d="M10.5 9h5M10.5 13h3"/>',
+      home: '<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
+      learn: '<path d="M12 5v15M12 5C9 3 5 3 3 4v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-2-1-6-1-9 1Z"/>',
+      exam: '<rect x="5" y="4" width="14" height="17" rx="2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M9 11h6M9 15h6"/>',
+      notes: '<path d="M18 10V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5M8 7h6M8 11h4"/><path d="m14 16 5-5 3 3-5 5-4 1Z" stroke="var(--accent)"/>',
+      schedule: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 11h18"/><path d="M7 15h3M14 15h3M7 18h3" stroke="var(--accent)"/>',
+      feedback: '<path d="M5 3h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7l-5 3v-3H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M7 8h10M7 12h7" stroke="var(--accent)"/>',
       me: '<circle cx="12" cy="8" r="3"/><path d="M5 19c1.4-3 3.8-4.5 7-4.5S17.6 16 19 19"/>',
       add: '<path d="M12 5v14M5 12h14"/>',
       group: '<rect x="4" y="5" width="16" height="5" rx="2"/><rect x="4" y="14" width="16" height="5" rx="2"/>'
@@ -1445,7 +1448,7 @@
   }
 
   function renderHome(target = view(), preview = false) {
-    if (!preview) setTop("运营事务看板", false);
+    if (!preview) setTop("Auto Office", false);
     if (!preview) setTab("home");
     const box = inbox();
     const next = box.urgentLessons[0] || nextLesson();
@@ -1454,9 +1457,12 @@
     const date = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "short" }).format(now);
     const dateTime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const memberName = escapeHtml(Auth.session?.name || "学员");
-    const learnableLessons = DATA.lessons.filter((item) => Gate.canLesson(item));
-    const learnedCount = learnableLessons.filter((item) => isDone(item.id)).length;
-    const unlearnedCount = learnableLessons.length - learnedCount;
+    // Render actionable items directly, avoiding post-render dashboard replacement.
+    const pendingItems = [
+      { count: box.pendingExams.length, icon: "exam", title: "项考试待完成", action: "去考试", hash: "#/exams" },
+      { count: box.pendingLessons.length, icon: "learn", title: "门课程待学习", action: "继续学习", lessonId: next?.id, hash: "#/learn" },
+      { count: box.unreadNotices.length, icon: "bell", title: "条未读消息", action: "查看消息", hash: "#/messages" }
+    ].filter(item => item.count > 0);
     const importantExams = DATA.exams
       .filter((exam) => Gate.canExam(exam) && (isUrgentTrack(exam.track) || bestScore(exam.id) < exam.pass))
       .sort((a, b) => Number(isUrgentTrack(b.track)) - Number(isUrgentTrack(a.track)));
@@ -1501,49 +1507,32 @@
         </header>
         <div class="home-shortcut-grid">
           <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/notes" aria-label="在 Auto Office 内打开门店笔记">
-            <img src="https://hldhlh.github.io/web/apps/notes/icon.svg" width="54" height="54" alt="">
-            <span class="home-app-shortcut-copy"><strong>门店笔记</strong><small>快速记录和查找门店笔记</small></span>
-            <span class="home-app-shortcut-action">打开</span>
+            <span class="shortcut-icon" aria-hidden="true">${svgIcon("notes")}</span>
+            <span class="home-app-shortcut-copy"><strong>门店笔记</strong></span>
           </button>
           <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/jlhcdh" aria-label="在 Auto Office 内打开门店订货表">
-            <img src="https://hldhlh.github.io/web/apps/jlhcdh/icon.svg" width="54" height="54" alt="">
-            <span class="home-app-shortcut-copy"><strong>门店订货表</strong><small>完成每日订货与采购核对</small></span>
-            <span class="home-app-shortcut-action">打开</span>
+            <span class="shortcut-icon" aria-hidden="true">${svgIcon("exam")}</span>
+            <span class="home-app-shortcut-copy"><strong>订货表</strong></span>
           </button>
           <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/schedule" aria-label="在 Auto Office 内打开排班">
-            <img src="./pages/schedule/icon.svg" width="54" height="54" alt="">
-            <span class="home-app-shortcut-copy"><strong>排班</strong><small>查看班次与休息安排</small></span>
-            <span class="home-app-shortcut-action">打开</span>
+            <span class="shortcut-icon" aria-hidden="true">${svgIcon("schedule")}</span>
+            <span class="home-app-shortcut-copy"><strong>排班</strong></span>
           </button>
           <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/feedback" aria-label="在 Auto Office 内打开每日问题反馈">
-            <img src="./pages/feedback/icon.svg" width="54" height="54" alt="">
-            <span class="home-app-shortcut-copy"><strong>每日问题反馈</strong><small>公开反馈并跟进门店问题</small></span>
-            <span class="home-app-shortcut-action">打开</span>
+            <span class="shortcut-icon" aria-hidden="true">${svgIcon("feedback")}</span>
+            <span class="home-app-shortcut-copy"><strong>每日反馈</strong></span>
           </button>
         </div>
       </section>
-      <section data-home-block="workbench"><div class="ops-kpi">
-        <button class="ops-card" data-act="go" data-hash="#/learn">
-          <span class="ops-tag">学习进度</span>
-          <b>${learnedCount} / ${learnableLessons.length}</b>
-          <small>已学习课程 · 还差 ${unlearnedCount} 课</small>
-        </button>
-        <button class="ops-card" data-act="go" data-hash="#/exams">
-          <span class="ops-tag">考试跟踪</span>
-          <b>${box.pendingExams.length}</b>
-          <small>待完成考试</small>
-        </button>
-        <button class="ops-card" data-act="${next ? "open-lesson" : "go"}" ${next ? `data-id="${next.id}"` : 'data-hash="#/learn"'}>
-          <span class="ops-tag">待学习课程</span>
-          <b>${box.pendingLessons.length}</b>
-          <small>${box.pendingLessons.length ? "今日有课程可继续学习" : "当前课程已全部完成"}</small>
-        </button>
-        <button class="ops-card" data-act="go" data-hash="#/messages">
-          <span class="ops-tag">重要消息</span>
-          <b>${box.unreadNotices.length}</b>
-          <small>未读发布消息</small>
-        </button>
-      </div>
+      <section data-home-block="workbench" class="home-pending" aria-labelledby="home-pending-title">
+        <h3 id="home-pending-title">待办</h3>
+        <div class="pending-list">
+          ${pendingItems.length ? pendingItems.map((item, index) => `<button type="button" class="pending-row ${index === 0 ? "is-priority" : ""}" data-act="${item.lessonId ? "open-lesson" : "go"}" ${item.lessonId ? `data-id="${escapeHtml(item.lessonId)}"` : `data-hash="${item.hash}"`}>
+            <span class="pending-icon" aria-hidden="true">${svgIcon(item.icon)}</span>
+            <strong>${item.count} ${item.title}</strong>
+            <span class="pending-action">${item.action}</span>
+          </button>`).join("") : `<div class="pending-empty">当前待办已完成 <span aria-hidden="true">✓</span></div>`}
+        </div>
       </section><section data-home-block="tasks" class="learning-plan">
         <header class="learning-plan-head">
           <h3>${escapeHtml(taskBoard.title)}</h3>
@@ -1592,7 +1581,7 @@
           <div class="kicker"><span class="message-alarm">${svgIcon("bell")}</span>${escapeHtml(item.kicker)}</div>
           <strong>${escapeHtml(item.title)}</strong>
           <p class="muted">${escapeHtml(item.detail)}</p>
-        </button>`).join("") : `<div class="card notice clear"><strong>当前无待处理消息</strong><p class="muted">新消息和考试更新会推送到这里。</p></div>`}
+        </button>`).join("") : `<div class="card notice clear"><strong>暂无待处理消息</strong></div>`}
       </section><section data-home-block="exams"><div class="sec-title"><h3>重要考试</h3><span>${importantExams.length}</span></div>
       ${importantExams.length ? importantExams.slice(0, 4).map((exam) => {
           const best = bestScore(exam.id);
@@ -1601,7 +1590,7 @@
             <strong>${escapeHtml(exam.title)}</strong>
             <p class="muted">${escapeHtml(exam.summary)}</p>
           </button>`;
-        }).join("") : `<div class="card notice clear"><strong>重要考试项已完成</strong><p class="muted">当前暂无关键考试待过。</p></div>`}
+        }).join("") : `<div class="card notice clear"><strong>暂无待完成的重要考试</strong></div>`}
     </section>`;
     HomeLayout.apply(target, DATA.homeLayout, preview);
     window.AcademyWorkbench?.render(target);
@@ -1717,7 +1706,7 @@
     }
   };
 
-  function renderCourseCards(items, keyword) {
+  function renderCourseCards(items) {
     if (!items.length) return `
       <div class="course-search-empty">
         <strong>没有找到相关课程</strong>
@@ -1734,7 +1723,6 @@
           ${groupBadges ? `<div class="course-group-badges" aria-label="课程分组">${groupBadges}</div>` : ""}
           <strong>${escapeHtml(lesson.title)}</strong>
           <p class="muted">${locked ? "店长授权后可学" : escapeHtml(lesson.summary)}</p>
-          ${keyword ? `<small class="course-match-hint">匹配“${escapeHtml(keyword)}”</small>` : ""}
         </div>
       </button>`;
     }).join("");
@@ -1762,7 +1750,7 @@
         ${DATA.courseGroups.map((group) => `<button class="chip ${groupId === group.id ? "on" : ""}" data-act="go" data-hash="#/learn?type=${type}&group=${encodeURIComponent(group.id)}">${escapeHtml(group.name)}</button>`).join("")}
       </div>
       ${!Auth.canFull(Auth.session) ? `<p class="muted" style="margin-bottom:12px">当前是基本权限。视频和进阶课需要店长授权。</p>` : ""}
-      <div id="course-search-results">${renderCourseCards(items, "")}</div>
+      <div id="course-search-results">${renderCourseCards(items)}</div>
     `;
     const input = document.getElementById("course-search-input");
     const clear = document.getElementById("course-search-clear");
@@ -1776,7 +1764,7 @@
           .sort((a, b) => b.score - a.score || a.index - b.index)
           .map((item) => item.lesson)
         : items;
-      results.innerHTML = renderCourseCards(matches, keyword);
+      results.innerHTML = renderCourseCards(matches);
       count.textContent = keyword ? `找到 ${matches.length} 门课程` : `共 ${items.length} 门课程`;
       clear.hidden = !keyword;
     };
@@ -1832,17 +1820,17 @@
         `<button class="card lesson-card wrong-item" data-act="practice-wrong" data-index="${index}">
           <strong>${escapeHtml(item.stem)}</strong>
           <p class="muted">${escapeHtml(item.explain)}</p>
-        </button>`).join("") : `<p class="empty">还没有错题。考试里答错的会出现在这里。</p>`}
+        </button>`).join("") : `<p class="empty">暂无错题</p>`}
       <section class="account-settings" aria-label="设置与账号">
         <div class="account-setting-group">
           <button class="account-setting-row" data-act="theme-toggle" role="switch" aria-checked="${state.theme === "dark"}">
             <span class="account-setting-icon">${svgIcon(state.theme === "dark" ? "moon" : "sun")}</span>
-            <span class="account-setting-copy"><strong>深色模式</strong><small>当前为${state.theme === "dark" ? "深色" : "浅色"}外观</small></span>
+            <span class="account-setting-copy"><strong>深色模式</strong></span>
             <span class="account-switch" aria-hidden="true"><i></i></span>
           </button>
           ${Auth.isManager(Auth.session) ? `<button class="account-setting-row" data-act="go" data-hash="#/ops">
             <span class="account-setting-icon">${svgIcon("group")}</span>
-            <span class="account-setting-copy"><strong>运营事务管理</strong><small>管理课程、考试、任务与员工</small></span>
+            <span class="account-setting-copy"><strong>运营事务管理</strong></span>
             <span class="account-setting-chevron" aria-hidden="true">›</span>
           </button>` : ""}
         </div>
@@ -2483,7 +2471,7 @@
     return `
       <form class="ops-editor task-board-editor" id="ops-task-board-editor">
         <section class="card editor-section task-board-settings">
-          <div class="editor-section-head"><span>01</span><div><h3>面板设置</h3><p>员工首页显示的任务面板名称与阶段内容</p></div></div>
+          <div class="editor-section-head"><span>01</span><div><h3>面板设置</h3></div></div>
           <label class="editor-field editor-field-main"><span>面板名称</span><input id="ops-task-board-title" maxlength="40" value="${escapeHtml(board.title)}" placeholder="任务面板"></label>
         </section>
         <div class="task-board-editor-head">
@@ -2633,12 +2621,12 @@
       <details class="card course-group-manager">
         <summary class="course-group-summary">
           <span class="course-group-symbol" aria-hidden="true">${svgIcon("group")}</span>
-          <span><strong>课程分组</strong><small>${DATA.courseGroups.length} 个分组 · 管理课程的发布范围</small></span>
+          <span><strong>课程分组</strong><small>${DATA.courseGroups.length} 个分组</small></span>
           <i aria-hidden="true"></i>
         </summary>
         <div class="course-group-panel">
           <div class="course-group-head">
-            <div><h3>管理发布分组</h3><span>分组可自定义名称；一门课程可以发布到多个分组。</span></div>
+            <div><span>一门课程可以发布到多个分组。</span></div>
             <div class="course-group-create"><input id="ops-group-new-name" maxlength="30" placeholder="新分组名称" aria-label="新分组名称"><button type="button" class="primary" data-act="ops-group-add">新增分组</button></div>
           </div>
           <div class="course-group-list">${DATA.courseGroups.map((group) => {
@@ -2696,7 +2684,7 @@
           <legend>消息提醒</legend>
           ${renderPublishToggle("ops-exam-notify", data.notify, "发送铃铛消息", "发布后进入成员消息列表并显示未读铃铛")}
         </fieldset>
-        <label>题目（可视化编辑）
+        <label>题目
           <div class="actions">
             <button type="button" class="ghost" data-act="ops-exam-add-question">新增题目</button>
           </div>
@@ -2768,7 +2756,6 @@
       : "尚未产生记录";
     return `
       <div class="staff-toolbar">
-        <span class="staff-sync-note"><i aria-hidden="true"></i>学习状态每 30 秒自动更新</span>
         <button type="button" class="ghost" data-staff-refresh>刷新</button>
       </div>
       <div class="counts staff-counts" aria-label="成员数据摘要">
@@ -2779,7 +2766,6 @@
       </div>
       <div class="staff-list-title">
         <div><strong>成员</strong><span>${people.length} 人</span></div>
-        <span>学习进度与权限</span>
       </div>
       <div class="staff-list">
         ${memberData.map((item) => {
@@ -2864,15 +2850,6 @@
       status: "今日状态",
       staff: "员工与权限"
     };
-    const subtitleMap = {
-      layout: "拖拽调整运营首页，保存后应用到所有员工",
-      status: "设置首页问候区域中的今日安排与每周固定内容",
-      lessons: "创建、更新并安排员工需要学习的课程",
-      exams: "维护考试、题目和合格标准",
-      notices: "发布门店事务、重要消息与学习提醒",
-      tasks: "安排员工首页的阶段、课程与考试任务",
-      staff: "查看成员状态并管理学习权限"
-    };
     const actionMap = {
       lessons: { label: "新建课程", hash: "#/ops?section=lessons&mode=add" },
       exams: { label: "新建考试", hash: "#/ops?section=exams&mode=add" },
@@ -2907,7 +2884,7 @@
         <aside class="ops-sidebar">
           <div class="ops-brand">
             <span>AO</span>
-            <div><strong>运营工作台</strong><small>门店学习与事务</small></div>
+            <div><strong>运营工作台</strong></div>
           </div>
           ${renderOpsTabs(active)}
           <div class="ops-account"><span>${escapeHtml((Auth.session.name || "店长").slice(0, 1))}</span><div><strong>${escapeHtml(Auth.session.name || "店长")}</strong><small>店长账号</small></div></div>
@@ -2915,7 +2892,7 @@
         <main class="ops-workspace ${isEditing ? "is-editing" : ""} ${active === "staff" ? "is-staff" : ""}">
           ${isEditing ? `<div class="ops-breadcrumb"><button data-act="ops-cancel" data-section="${active}">← 返回${titleMap[active]}</button><span>${route.mode === "add" ? "新建" : "编辑"}</span></div>` : `
             <header class="ops-workspace-head">
-              <div><p>运营事务</p><h2>${titleMap[active]}</h2><span>${subtitleMap[active]}</span></div>
+              <div><h2>${titleMap[active]}</h2></div>
               ${actionMap[active] ? `<button class="primary ops-header-action" data-act="go" data-hash="${actionMap[active].hash}" aria-label="${actionMap[active].label}">${svgIcon("add")}<span>${actionMap[active].label}</span></button>` : ""}
             </header>
           `}
@@ -2969,7 +2946,7 @@
 
   function lessonCompletionPanel(lesson, unlocked = true) {
     if (isDone(lesson.id)) {
-      return `<footer class="lesson-completion-panel is-done"><div><strong>本课已完成</strong><span>学习记录后台同步中</span></div><button class="primary" data-act="complete" data-id="${lesson.id}">继续学习</button></footer>`;
+      return `<footer class="lesson-completion-panel is-done"><div><strong>本课已完成</strong></div><button class="primary" data-act="complete" data-id="${lesson.id}">继续学习</button></footer>`;
     }
     const linkedExam = lesson.requiredExamId ? examById(lesson.requiredExamId) : null;
     if (lesson.requiredExamId) {
@@ -2981,7 +2958,7 @@
     if (lesson.requireConfirmation) {
       return `<footer class="lesson-completion-panel"><div><strong>确认学习结果</strong><span>${unlocked ? "确认后，本课将计入已完成" : "视频播放结束后即可确认"}</span></div><button class="primary" data-act="complete" data-id="${lesson.id}" ${unlocked ? "" : "disabled"}>${unlocked ? "确认完成本课" : "看完视频后可确认"}</button></footer>`;
     }
-    return `<footer class="lesson-completion-panel is-auto" data-auto-complete role="status" aria-live="polite"><div><strong>${unlocked ? "正在记录学习结果" : "看完视频后自动完成"}</strong><span>${unlocked ? "阅读到本页末尾后自动完成，无需再次确认" : "播放结束时会自动保存完成状态"}</span></div><i aria-hidden="true"></i></footer>`;
+    return `<footer class="lesson-completion-panel is-auto" data-auto-complete role="status" aria-live="polite"><div><strong>${unlocked ? "阅读到末尾后自动完成" : "看完视频后自动完成"}</strong></div><i aria-hidden="true"></i></footer>`;
   }
 
   function bindArticleAutoCompletion(lesson) {
@@ -2996,7 +2973,7 @@
       window.removeEventListener("scroll", check);
       completeLesson(lesson.id);
       panel.classList.add("is-done");
-      panel.innerHTML = `<div><strong>本课已自动完成</strong><span>学习记录后台同步中</span></div><span class="lesson-complete-check" aria-hidden="true">✓</span>`;
+      panel.innerHTML = `<div><strong>本课已完成</strong></div><span class="lesson-complete-check" aria-hidden="true">✓</span>`;
     };
     const check = () => requestAnimationFrame(finish);
     window.addEventListener("scroll", check, { passive: true });
@@ -3149,7 +3126,7 @@
         </section>
 
         <section class="video-key-card">
-          <header><div><span>课程重点</span><h3>边看边掌握关键信息</h3></div><small>${lesson.blocks.length} 项内容</small></header>
+          <header><div><h3>课程重点</h3></div><small>${lesson.blocks.length} 项内容</small></header>
           <div class="video-key-content">${renderBlocks(lesson.blocks)}</div>
         </section>
 
@@ -3585,7 +3562,7 @@
           <div class="kicker">${messageUnread(item) ? `<span class="message-alarm">${svgIcon("bell")}</span>` : ""}${escapeHtml(item.kicker)}<time>${renderDateLabel(item.createdAt)}</time></div>
           <strong>${escapeHtml(item.title)}</strong>
           ${renderNoticePreview(item.detail)}
-        </button>`).join("") : `<div class="card notice clear"><strong>当前没有发布消息</strong><p class="muted">新课程、新考试和运营通知发布后会显示在这里。</p></div>`}
+        </button>`).join("") : `<div class="card notice clear"><strong>暂无消息</strong></div>`}
     `;
   }
 

@@ -4463,26 +4463,9 @@ textarea:focus-visible {
   min-height: 44px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
   margin-bottom: 12px;
-}
-
-.staff-sync-note {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.staff-sync-note i {
-  width: 8px;
-  height: 8px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--ok);
-  box-shadow: 0 0 0 4px var(--ok-soft);
 }
 
 .staff-toolbar .ghost {
@@ -5292,13 +5275,6 @@ textarea:focus-visible {
   gap: 6px;
 }
 
-.course-match-hint {
-  display: block;
-  margin-top: 9px;
-  color: var(--accent);
-  font-size: 12px;
-}
-
 .course-search-empty {
   display: grid;
   justify-items: center;
@@ -5661,8 +5637,7 @@ textarea:focus-visible {
 .staff-percent span,
 .learning-task.locked .task-status,
 .task-main i,
-.task-main em,
-.course-match-hint {
+.task-main em {
   font-size: 12px;
 }
 

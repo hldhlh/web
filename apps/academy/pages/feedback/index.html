@@ -7,12 +7,12 @@
   <title>每日问题反馈 · Auto Office</title>
   <style>
     html, body { min-height: 100%; margin: 0; background: #f2f2f7; }
-    html[data-theme="dark"], html[data-theme="dark"] body { background: #000; }
+    html[data-theme="dark"], html[data-theme="dark"] body { background: var(--bg, #111315); }
   </style>
   <script>
     const feedbackTheme = localStorage.getItem("app-theme") || "light";
     document.documentElement.dataset.theme = feedbackTheme;
-    document.querySelector('meta[name="theme-color"]').content = feedbackTheme === "dark" ? "#000000" : "#f2f2f7";
+    document.querySelector('meta[name="theme-color"]').content = feedbackTheme === "dark" ? "#111315" : "#f2f2f7";
     window.ACADEMY_CONFIG = {
       url: "https://fmxddvjgkykuqwmasigo.supabase.co",
       key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo",
@@ -25,13 +25,14 @@
       : (Array.isArray(window.APP_NETWORK_ENDPOINTS) ? window.APP_NETWORK_ENDPOINTS : []);
   </script>
   <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="../../appearance.css?v=20260907">
   <link rel="stylesheet" href="../../framework/save-status.css">
 </head>
 <body>
   <div class="feedback-shell" id="feedback-app" aria-busy="true">
     <header class="page-header">
       <div>
-        <span class="visibility-label">公开透明 · 全员可见</span>
+        <span class="visibility-label">全员可见</span>
         <h1>每日问题反馈</h1>
         <p id="sync-status" role="status" aria-live="polite">正在同步最新问题…</p>
       </div>
@@ -50,7 +51,7 @@
 
       <section class="feedback-board" aria-labelledby="board-title">
         <header class="board-header">
-          <div><span>问题清单</span><h2 id="board-title">大家反馈的问题</h2></div>
+          <div><h2 id="board-title">问题清单</h2></div>
           <div class="view-filter" role="group" aria-label="问题筛选">
             <button class="active" type="button" data-filter="pending">待处理</button>
             <button type="button" data-filter="all">全部</button>

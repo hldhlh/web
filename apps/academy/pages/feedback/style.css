@@ -52,6 +52,7 @@ button { cursor: pointer; }
 .visibility-label { display: block; margin-bottom: 5px; color: var(--accent); font-size: 13px; font-weight: 650; }
 .page-header h1 { margin: 0; font-size: clamp(28px, 4vw, 34px); line-height: 1.08; letter-spacing: -0.04em; }
 .page-header p { margin: 7px 0 0; color: var(--muted); font-size: 13px; }
+#sync-status:empty { margin: 0; }
 
 .primary-action,
 .text-button,

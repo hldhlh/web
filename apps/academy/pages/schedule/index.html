@@ -7,12 +7,12 @@
   <title>排班 · Auto Office</title>
   <style>
     html, body { min-height: 100%; margin: 0; background: #f2f2f7; }
-    html[data-theme="dark"], html[data-theme="dark"] body { background: #000; }
+    html[data-theme="dark"], html[data-theme="dark"] body { background: var(--bg, #111315); }
   </style>
   <script>
     const scheduleTheme = localStorage.getItem("app-theme") || "light";
     document.documentElement.dataset.theme = scheduleTheme;
-    document.querySelector('meta[name="theme-color"]').content = scheduleTheme === "dark" ? "#000000" : "#f2f2f7";
+    document.querySelector('meta[name="theme-color"]').content = scheduleTheme === "dark" ? "#111315" : "#f2f2f7";
     window.ACADEMY_CONFIG = {
       url: "https://fmxddvjgkykuqwmasigo.supabase.co",
       key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo",
@@ -25,6 +25,7 @@
       : (Array.isArray(window.APP_NETWORK_ENDPOINTS) ? window.APP_NETWORK_ENDPOINTS : []);
   </script>
   <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="../../appearance.css?v=20260907">
   <link rel="stylesheet" href="../../framework/save-status.css">
 </head>
 <body>

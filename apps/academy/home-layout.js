@@ -18,7 +18,7 @@
     return `<section class="home-layout-editor" aria-label="首页布局编辑器">
       <div class="home-layout-toolbar"><p>按住拖动手柄排序，也可使用上移、下移。预览内容以当前账号为例。</p>
       <div><button type="button" data-layout-action="reset">恢复默认</button><button type="button" data-layout-action="cancel">撤销修改</button><button type="button" class="primary" data-layout-action="save">保存布局</button></div></div>
-      <p class="home-layout-feedback" role="status" aria-live="polite">布局已加载</p>
+      <p class="home-layout-feedback" role="status" aria-live="polite"></p>
       <div class="home-layout-preview"></div></section>`;
   }
   function mount(root, value, renderHome, save) {

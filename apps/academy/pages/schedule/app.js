@@ -261,7 +261,7 @@
         state.data = normalizeData(raw);
         writeCachedData(state.data);
       }
-      if (!silent) $("#sync-status").textContent = raw ? "已同步最新排班" : "暂无排班，等待店长安排";
+      $("#sync-status").textContent = "";
       render();
     } catch (_) {
       if (!silent) $("#sync-status").textContent = "当前离线，显示上次读取的排班";

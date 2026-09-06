@@ -103,8 +103,8 @@
   function renderList() {
     const items = visibleItems();
     if (!items.length) {
-      const message = state.filter === "resolved" ? "暂时没有已解决的问题" : state.filter === "pending" ? "当前没有待处理问题" : "今天还没有人反馈问题";
-      $("#feedback-list").innerHTML = `<div class="empty-state"><strong>${message}</strong><span>发现问题时及时反馈，所有人都能看见处理进度。</span></div>`;
+      const message = state.filter === "resolved" ? "暂无已解决的问题" : state.filter === "pending" ? "暂无待处理问题" : "暂无反馈";
+      $("#feedback-list").innerHTML = `<div class="empty-state"><strong>${message}</strong></div>`;
       return;
     }
     $("#feedback-list").innerHTML = items.map((item) => `
@@ -225,7 +225,7 @@
         if (!next.rev || next.rev >= state.data.rev) state.data = next;
         cacheData();
       }
-      if (!silent) $("#sync-status").textContent = raw ? "已同步所有人的问题" : "暂无反馈，发现问题可立即提交";
+      $("#sync-status").textContent = "";
       render();
     } catch (_) {
       if (!silent) $("#sync-status").textContent = "当前离线，显示上次同步的问题";

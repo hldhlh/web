@@ -90,9 +90,6 @@
   };
 
   const numberFrom = (card) => card.innerText.match(/\d+\s*\/\s*\d+|\d+/)?.[0] || "0";
-  const subtitleFrom = (card, title, value) => card.innerText.split("\n")
-    .map((line) => line.trim())
-    .find((line) => line && line !== title && line !== value) || "查看详情";
 
   const activate = (card) => {
     const target = card.matches("a, button, [role='button']") ? card : card.querySelector("a, button, [role='button']");
@@ -119,9 +116,9 @@
     const messageCount = Number(numberFrom(messageCard).match(/\d+/)?.[0] || 0);
     const today = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "short" }).format(new Date());
     const pending = [
-      { type: "learn", count: learningCount, title: `${learningCount} 门课程待学习`, note: subtitleFrom(learningCard, "待学习课程", String(learningCount)), action: "继续学习" },
-      { type: "exam", count: examCount, title: `${examCount} 项考试待处理`, note: subtitleFrom(examCard, "考试跟踪", String(examCount)), action: "去考试" },
-      { type: "message", count: messageCount, title: `${messageCount} 条新消息`, note: subtitleFrom(messageCard, "重要消息", String(messageCount)), action: "查看消息" }
+      { type: "learn", count: learningCount, title: `${learningCount} 门课程待学习`, action: "继续学习" },
+      { type: "exam", count: examCount, title: `${examCount} 项考试待处理`, action: "去考试" },
+      { type: "message", count: messageCount, title: `${messageCount} 条新消息`, action: "查看消息" }
     ].filter((item) => item.count > 0);
     const primary = pending[0] || null;
     const totalPending = pending.reduce((sum, item) => sum + item.count, 0);
@@ -135,7 +132,6 @@
         <div class="ao-workbench-copy">
           <p class="ao-workbench-meta">${today}${totalPending ? ` · 共 ${totalPending} 项待处理` : ""}</p>
           <h2>${primary?.title || "今日已完成"}</h2>
-          <span>${primary?.note || "没有需要立即处理的学习事务。"}</span>
         </div>
         ${primary ? `<button class="ao-workbench-action" type="button" data-action="${primary.type}">${primary.action}</button>` : ""}
       </div>`;
