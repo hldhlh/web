@@ -41,8 +41,12 @@
   let hadPending = false;
   let saveError = '';
   let hideTimer = 0;
+  let pendingTimer = 0;
+  let contentSignature = '';
   window.addEventListener('academy-save-error', event => {
     clearTimeout(hideTimer);
+    clearTimeout(pendingTimer);
+    pendingTimer = 0;
     hideTimer = 0;
     saveError = event.detail;
     box.dataset.state = 'error';
@@ -54,11 +58,19 @@
     if (state.pending) {
       clearTimeout(hideTimer);
       hideTimer = 0;
-      box.hidden = false;
+      if (state.conflicts || state.entries.some(entry => entry.error)) {
+        clearTimeout(pendingTimer);
+        pendingTimer = 0;
+        box.hidden = false;
+      } else if (!hadPending && box.hidden) {
+        // Quick acknowledgements stay silent; persistent pending writes remain visible.
+        pendingTimer = setTimeout(() => { box.hidden = false; pendingTimer = 0; }, 1800);
+      }
     } else if (hadPending) {
-      box.hidden = false;
+      clearTimeout(pendingTimer);
+      pendingTimer = 0;
       box.open = false;
-      hideTimer = setTimeout(() => { box.hidden = true; hideTimer = 0; }, 2500);
+      if (!box.hidden) hideTimer = setTimeout(() => { box.hidden = true; hideTimer = 0; }, 1800);
     } else if (!hideTimer) {
       box.hidden = true;
     }
@@ -67,9 +79,12 @@
     summary.textContent = state.pending
       ? `已存本机 · ${state.pending} 项待同步` + conflictText
       : '已同步到云端';
-    content.replaceChildren();
-    if (state.pending) content.append(button('立即重试', () => sync.flush()));
-    for (const entry of state.entries.filter(e => e.conflict)) {
+    const signature = JSON.stringify([!!state.pending, state.entries.filter(e => e.conflict)]);
+    if (signature !== contentSignature) {
+      contentSignature = signature;
+      content.replaceChildren();
+      if (state.pending) content.append(button('立即重试', () => sync.flush()));
+      for (const entry of state.entries.filter(e => e.conflict)) {
       const row = document.createElement('div');
       const title = document.createElement('p'); title.textContent = `${label(entry)}：其他设备也修改了此内容，请选择要保留的修改。`;
       const draft = document.createElement('pre'); draft.textContent = `本机内容\n${preview(entry, entry.next)}`;
@@ -78,9 +93,9 @@
         button('保留本机修改', () => sync.resolveConflict(entry.key, 'local')),
         button('采用云端内容', () => sync.resolveConflict(entry.key, 'remote')));
       content.append(row);
+      }
     }
-    if (hadPending && !state.pending) window.dispatchEvent(new CustomEvent('academy-data-updated'));
     hadPending = !!state.pending;
   });
-  window.addEventListener("pagehide", event => { if (!event.persisted) { clearTimeout(hideTimer); unsubscribe(); } });
+  window.addEventListener("pagehide", event => { if (!event.persisted) { clearTimeout(hideTimer); clearTimeout(pendingTimer); unsubscribe(); } });
 })();

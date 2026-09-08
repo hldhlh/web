@@ -1,11 +1,14 @@
 async page => {
-  await page.goto('http://localhost:8765/apps/avatar/');
+  await page.route('**/reliable-test-fixture', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><meta charset="utf-8"><main></main>' }));
+  await page.goto('http://127.0.0.1:8772/reliable-test-fixture');
   await page.addScriptTag({ url: '/apps/academy/framework/reliable-store.js' });
   const result = await page.evaluate(async () => {
     const sync = window.AcademyReliable;
     const remote = new Map();
     const copy = v => v == null ? v : JSON.parse(JSON.stringify(v));
     const passed = [];
+    const updates = [];
+    window.addEventListener('academy-data-updated', event => updates.push(event.detail));
     const assert = (value, message) => { if (!value) throw new Error(message); passed.push(message); };
     let fail = false, loseResponse = false, writes = 0, collide = false;
     const adapter = {
@@ -40,11 +43,16 @@ async page => {
     await sync.flush();
     assert(remote.get(id).value.a === 3 && remote.get(id).value.b === 2, 'independent edits merge without overwriting remote fields');
     assert(!(await sync.status()).entries.some(op => op.path === id), 'acknowledged operation is removed');
+    assert(updates.some(update => update.paths.includes(id)), 'core announces acknowledged writes without save-status UI');
     await sync.enqueue(id, { a: 4, b: 2 }, { a: 3, b: 2 });
     remote.set(id, { key: id, value: { a: 5, b: 2 }, version: 2 });
     await sync.flush();
     assert((await sync.status()).entries.find(op => op.path === id)?.conflict, 'same-field conflict retains local draft');
     assert(remote.get(id).value.a === 5, 'conflict does not overwrite cloud data');
+    const independent = id + '-independent';
+    await sync.enqueue(independent, {saved:true}, {});
+    await sync.flush();
+    assert(updates.some(update => update.paths.includes(independent)), 'successful writes notify even while another record is conflicted');
     await sync.resolveConflict(id, 'local'); await sync.flush();
     assert(remote.get(id).value.a === 4, 'explicit local conflict resolution saves selected content');
     const before = writes;
@@ -64,6 +72,11 @@ async page => {
     const schedule = await sync.read(path);
     assert(schedule.assignments['2026-09-01'][0].userId === 'a', 'migration preserves legacy schedule');
     assert(schedule.assignments['2026-09-02'][0].userId === 'b', 'schedule updates only changed day');
+    const recordKey = 'doc:academy/schedule.json:2026-09-02';
+    const currentRecord = copy(remote.get(recordKey));
+    remote.set(recordKey, {...currentRecord, version: currentRecord.version - 1, value: [{userId:'b',shift:'morning'}]});
+    assert((await sync.read(path)).assignments['2026-09-02'][0].shift === 'off', 'older remote snapshot cannot downgrade acknowledged cache');
+    remote.set(recordKey, currentRecord);
     remote.delete('doc:academy/schedule.json:2026-09-01');
     assert(!(await sync.read(path)).assignments['2026-09-01'], 'authoritative refresh removes deleted cached records');
     const savedCompare = adapter.compareAndSet;

@@ -148,7 +148,7 @@
           ${assignments.length > 3 ? `<span class="more-events">另有 ${assignments.length - 3} 项</span>` : ""}
         </button>`);
     }
-    $("#calendar-grid").innerHTML = cells.join("");
+    window.AcademyStableView.html($("#calendar-grid"), cells.join(""));
   }
 
   function renderSelectedDay() {
@@ -159,22 +159,23 @@
     $("#selected-day-count").textContent = assignments.length ? `${assignments.length} 项` : "未安排";
     if (!assignments.length) {
       const message = state.filter === "mine" ? "你当天暂无排班" : state.filter === "off" ? "当天没有休息安排" : "当天还没有排班";
-      $("#day-schedule").innerHTML = `<div class="empty-state">${message}${isManager() ? "，可点击“安排当天”进行设置。" : "。"}</div>`;
+      window.AcademyStableView.html($("#day-schedule"), `<div class="empty-state">${message}${isManager() ? "，可点击“安排当天”进行设置。" : "。"}</div>`);
       return;
     }
-    $("#day-schedule").innerHTML = assignments.map((assignment) => {
+    window.AcademyStableView.html($("#day-schedule"), assignments.map((assignment) => {
       const person = personById(assignment.userId);
       if (!person) return "";
       const shift = SHIFTS[assignment.shift];
-      return `<article class="schedule-person" style="--person-color:${personColor(person.id)}">
+      return `<article class="schedule-person" data-sync-key="${escapeHtml(person.id)}" style="--person-color:${personColor(person.id)}">
         <span class="person-avatar">${escapeHtml(person.name.slice(0, 1))}</span>
         <span class="person-copy"><strong>${escapeHtml(person.name)}</strong><span>${person.role === "manager" ? "店长" : "员工"}</span></span>
         <span class="shift-badge ${assignment.shift === "off" ? "off" : ""}">${shift.label}</span>
       </article>`;
-    }).join("");
+    }).join(""));
   }
 
   function render() {
+    state.renderDay = new Date().toDateString();
     renderHeader();
     renderSummary();
     renderCalendar();
@@ -257,12 +258,17 @@
   async function pullSchedule(silent = false) {
     try {
       const raw = await window.AcademyStore.getJSON(FILE);
+      let changed = false;
       if (raw) {
-        state.data = normalizeData(raw);
-        writeCachedData(state.data);
+        const next = normalizeData(raw);
+        if ((!next.rev || next.rev >= state.data.rev) && JSON.stringify(next) !== JSON.stringify(state.data)) {
+          state.data = next;
+          writeCachedData(state.data);
+          changed = true;
+        }
       }
       $("#sync-status").textContent = "";
-      render();
+      if (changed || state.renderDay !== new Date().toDateString()) render();
     } catch (_) {
       if (!silent) $("#sync-status").textContent = "当前离线，显示上次读取的排班";
     }
@@ -337,7 +343,10 @@
         }).catch(() => { });
       await Promise.all([pullSchedule(), peopleRefresh]);
       setInterval(() => { if (!document.hidden) pullSchedule(true); }, 30000);
-      window.addEventListener("academy-data-updated", () => pullSchedule(true));
+      window.addEventListener("academy-data-updated", event => {
+        const paths = event.detail?.paths;
+        if (!Array.isArray(paths) || !paths.length || paths.includes(FILE)) pullSchedule(true);
+      });
       document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") pullSchedule(true);
       });

@@ -30,6 +30,44 @@
 
   const view = () => document.getElementById("view");
 
+  let backgroundRenderTimer = 0;
+  let lastScrollAt = 0;
+  window.addEventListener("scroll", () => { lastScrollAt = Date.now(); }, { passive: true });
+  function refreshBackgroundView() {
+    clearTimeout(backgroundRenderTimer);
+    const route = JSON.stringify(state.route);
+    const flush = () => {
+      if (JSON.stringify(state.route) !== route || !Auth.session) return;
+      // Never replace an active editor, player, exam or subprogram during sync.
+      const ops = state.route.name === "ops" ? currentOpsRoute() : null;
+      if (["lesson", "exam", "embedded-app"].includes(state.route.name) ||
+          (ops && (["add", "edit"].includes(ops.mode) || ["tasks", "status", "layout"].includes(ops.section)))) {
+        updateNotificationButton();
+        return;
+      }
+      if (Date.now() - lastScrollAt < 200 || view()?.contains(document.activeElement) && document.activeElement.matches("input,textarea,select,[contenteditable=true]")) {
+        backgroundRenderTimer = setTimeout(flush, 250);
+        return;
+      }
+      if (ops?.section === "staff") {
+        const content = view().querySelector(".ops-content");
+        if (content) window.AcademyStableView.html(content, renderOpsStaff());
+        return;
+      }
+      const query = document.getElementById("course-search-input")?.value;
+      window.AcademyStableView.preserveScroll(view(), () => {
+        render();
+        const input = document.getElementById("course-search-input");
+        if (input && query) {
+          input.value = query;
+          input.dispatchEvent(new Event("input"));
+        }
+      });
+    };
+    // Coalesce progress events from the same realtime batch.
+    backgroundRenderTimer = setTimeout(flush, 80);
+  }
+
   function coerceId(prefix, value) {
     const raw = String(value || "").trim();
     if (raw) return raw;
@@ -604,10 +642,12 @@
       const next = row.payload && typeof row.payload === "object" ? row.payload : null;
       if (!next) return false;
       this.rev = ts || Date.now();
-      state.progress = normalizeProgress(next);
+      const normalized = normalizeProgress(next);
+      const changed = JSON.stringify({ ...normalized, lastSeenAt: 0 }) !== JSON.stringify({ ...state.progress, lastSeenAt: 0 });
+      state.progress = normalized;
       this.base = JSON.parse(JSON.stringify(state.progress));
       try { localStorage.setItem(`academy-progress-cache-${Auth.session?.id}`, JSON.stringify(state.progress)); } catch (_) { }
-      return true;
+      return changed;
     },
     ingestStaff(row) {
       if (!row?.user_id || row.user_id.startsWith("doc:")) return;
@@ -617,7 +657,7 @@
         lastSeenAt: Number(progress.lastSeenAt) || Number(row.ts) || 0,
         available: true
       });
-      if (state.route?.name === "ops" && currentOpsRoute().section === "staff") renderOps();
+      if (state.route?.name === "ops" && currentOpsRoute().section === "staff") refreshBackgroundView();
     },
     refreshView() {
       const stay = state.route?.name;
@@ -627,7 +667,7 @@
         return;
       }
       if (stay === "home" || stay === "messages" || stay === "learn" || stay === "exams" || stay === "me" || stay === "result" || stay === "ops") {
-        render();
+        refreshBackgroundView();
       } else {
         updateNotificationButton();
       }
@@ -809,6 +849,7 @@
         notices: Array.isArray(source.notices) ? source.notices.map(normalizeNotice) : [],
         taskBoard: source.taskBoard
       });
+      const before = JSON.stringify([DATA.homeLayout, DATA.courseGroups, DATA.lessons, DATA.exams, DATA.notices, DATA.taskBoard]);
       DATA.homeLayout = HomeLayout.normalize(source.homeLayout);
       DATA.courseGroups = normalized.courseGroups;
       DATA.lessons = normalized.lessons;
@@ -818,12 +859,15 @@
       contentRevision = rev || Date.now();
       saveOpsStore();
       this.base = JSON.parse(JSON.stringify(payload));
+      const changed = before !== JSON.stringify([DATA.homeLayout, DATA.courseGroups, DATA.lessons, DATA.exams, DATA.notices, DATA.taskBoard]);
+      if (!changed) return false;
       // Sync updates the data model, not an active lesson/player, exam or embedded app.
       // Rebuilding these views would discard playback, answers or subprogram state.
       const keepActiveView = ["lesson", "exam", "embedded-app"].includes(state.route?.name);
       if (Auth.session && (!editing || currentOpsRoute().section === "layout")) {
         if (keepActiveView) updateNotificationButton();
-        else render();
+        else if (editing) render();
+        else refreshBackgroundView();
       }
       return true;
     },
@@ -898,7 +942,7 @@
       if (next.rev && next.rev <= this.data.rev) return false;
       this.data = next;
       try { localStorage.setItem(this.cacheKey, JSON.stringify(next)); } catch (_) { }
-      if (refresh && Auth.session && state.route?.name === "home") renderHome();
+      if (refresh && Auth.session && state.route?.name === "home") refreshBackgroundView();
       return true;
     },
     async pull() {
@@ -1021,7 +1065,7 @@
       }
       this.loading = false;
       this.loadedAt = Date.now();
-      if (state.route?.name === "ops" && currentOpsRoute().section === "staff") renderOps();
+      if (state.route?.name === "ops" && currentOpsRoute().section === "staff") refreshBackgroundView();
     }
   };
 
@@ -2774,7 +2818,7 @@
         ${memberData.map((item) => {
           const user = item.user;
           if (item.loading) return `
-            <article class="staff-member is-loading">
+            <article class="staff-member is-loading" data-sync-key="${escapeHtml(user.id)}">
               <div class="staff-member-head"><span class="staff-avatar">${escapeHtml(user.name.slice(0, 1))}</span><div><strong>${escapeHtml(user.name)}</strong><small>正在读取学习数据...</small></div></div>
               <div class="staff-loading-line"></div>
             </article>`;
@@ -2783,7 +2827,7 @@
           const passedExamIds = new Set(item.examDone.map((exam) => exam.id));
           const pendingExams = DATA.exams.filter((exam) => !passedExamIds.has(exam.id));
           return `
-            <article class="staff-member ${user.access === "blocked" ? "is-blocked" : ""}">
+            <article class="staff-member ${user.access === "blocked" ? "is-blocked" : ""}" data-sync-key="${escapeHtml(user.id)}">
               <div class="staff-member-head">
                 <span class="staff-avatar">${escapeHtml(user.name.slice(0, 1))}</span>
                 <div class="staff-identity">
@@ -4531,10 +4575,12 @@
       if (!user) return showGate();
       if (!gateBusy) enterApp();
     });
-    window.addEventListener("academy-data-updated", () => {
-      Live.pull().catch(() => {});
-      ContentSync.pull().catch(() => {});
-      ScheduleStatus.pull().catch(() => {});
+    window.addEventListener("academy-data-updated", (event) => {
+      const paths = event.detail?.paths;
+      const includes = path => !Array.isArray(paths) || !paths.length || paths.includes(path);
+      if (includes(`progress:${Auth.session?.id}`)) Live.pull().catch(() => {});
+      if (includes(ContentSync.path)) ContentSync.pull().catch(() => {});
+      if (includes(ScheduleStatus.path)) ScheduleStatus.pull().catch(() => {});
     });
     await Auth.start();
     if (!Auth.session) { showGate(); performance.mark("academy-first-view"); }

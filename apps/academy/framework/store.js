@@ -136,6 +136,13 @@ window.AcademyStore = (() => {
 
   const reliable = window.AcademyReliable;
   const bases = new Map();
+  const reads = new Map();
+  const generations = new Map();
+  function invalidateReads(path) {
+    generations.set(path, (generations.get(path) || 0) + 1);
+    reads.delete(`${path}:cached`);
+    reads.delete(`${path}:remote`);
+  }
   const cacheKeys = {
     "academy/content.json": "academy-ops-content-v1",
     "academy/schedule.json": "academy-schedule-cache-v1",
@@ -215,20 +222,34 @@ window.AcademyStore = (() => {
   });
   async function getJSON(path, options = {}) {
     if (!reliable?.tracked(path)) return getLegacyJSON(path, options);
-    let value;
-    try { value = await reliable.read(path, options); }
-    catch (error) {
-      if (!options.cached && navigator.onLine !== false) throw error;
-      value = await reliable.read(path, { cached: true });
+    const key = `${path}:${options.cached ? 'cached' : 'remote'}`;
+    let pending = reads.get(key);
+    if (!pending) {
+      const generation = generations.get(path) || 0;
+      pending = (async () => {
+        let value;
+        try { value = await reliable.read(path, options); }
+        catch (error) {
+          if (!options.cached && navigator.onLine !== false) throw error;
+          value = await reliable.read(path, { cached: true });
+        }
+        if (value == null || (options.cached && !value.rev)) value = localFallback(path) || value;
+        if ((generations.get(path) || 0) === generation) bases.set(path, copy(value));
+        return value;
+      })();
+      reads.set(key, pending);
+      const clear = () => { if (reads.get(key) === pending) reads.delete(key); };
+      pending.then(clear, clear);
     }
-    if (value == null || (options.cached && !value.rev)) value = localFallback(path) || value;
-    bases.set(path, copy(value));
-    return value;
+    // Share only in-flight work, never mutable objects or a stale time-based cache.
+    return copy(await pending);
   }
   async function putJSON(path, data, options = {}) {
     if (!reliable?.tracked(path)) return putLegacyJSON(path, data);
     const base = options.base !== undefined ? options.base : bases.get(path) ?? localFallback(path);
+    invalidateReads(path);
     const result = await reliable.enqueue(path, data, copy(base));
+    invalidateReads(path);
     bases.set(path, copy(data));
     return result;
   }

@@ -1979,27 +1979,30 @@
             }
 
             function render(list, showDate = false, searchKeyword = '') {
-                const expandedItemIds = new Set(
-                    Array.from(DOM.results.querySelectorAll('.list-item.expanded'))
-                        .map(element => String(element.dataset.itemId))
-                );
-                DOM.results.querySelectorAll('.list-item').forEach(cleanupWebapps);
-                DOM.results.innerHTML = '';
+                const previous = new Map(Array.from(DOM.results.querySelectorAll('.list-item'), element => [String(element.dataset.itemId), element]));
+                const anchor = Array.from(previous.values()).find(element => element.getBoundingClientRect().bottom > 0);
+                const anchorTop = anchor?.getBoundingClientRect().top;
+                const sameSearch = DOM.results.dataset.renderSearch === searchKeyword;
+                DOM.results.dataset.renderSearch = searchKeyword;
 
                 if (!list.length) {
+                    previous.forEach(cleanupWebapps);
                     DOM.results.innerHTML = '<div style="color:var(--muted);padding-top:20px;">暂无数据</div>';
                     return;
                 }
 
-                const fragment = document.createDocumentFragment();
-                const itemsToRestore = [];
+                const retained = new Set();
+                let cursor = DOM.results.firstElementChild;
 
                 list.forEach(item => {
-                    const listItem = document.createElement('div');
-                    listItem.className = 'list-item';
-                    listItem.onclick = () => toggleExpand(listItem);
-                    listItem.dataset.itemId = item.id;
-                    listItem.dataset.webappBlocks = '[]';
+                    const listItem = previous.get(String(item.id)) || document.createElement('div');
+                    const existing = previous.has(String(item.id));
+                    if (!existing) {
+                        listItem.className = 'list-item';
+                        listItem.onclick = () => toggleExpand(listItem);
+                        listItem.dataset.itemId = item.id;
+                        listItem.dataset.webappBlocks = '[]';
+                    }
 
                     const header = document.createElement('div');
                     header.className = 'item-header';
@@ -2035,17 +2038,27 @@
                     content.onclick = (event) => event.stopPropagation();
                     content.innerHTML = '<div style="color:var(--muted);padding:8px 0;">点击加载内容...</div>';
 
-                    listItem.appendChild(header);
-                    listItem.appendChild(content);
-                    fragment.appendChild(listItem);
-
-                    if (expandedItemIds.has(String(item.id))) {
-                        itemsToRestore.push(listItem);
+                    if (existing) {
+                        const oldHeader = listItem.querySelector('.item-header');
+                        if (!oldHeader.isEqualNode(header)) oldHeader.replaceWith(header);
+                        // Keep expanded media/webapps alive. Updated detail is read on next expansion.
+                    } else {
+                        listItem.appendChild(header);
+                        listItem.appendChild(content);
                     }
+                    if (listItem !== cursor) DOM.results.insertBefore(listItem, cursor);
+                    retained.add(listItem);
+                    cursor = listItem.nextElementSibling;
                 });
 
-                DOM.results.appendChild(fragment);
-                itemsToRestore.forEach(expandItem);
+                for (const element of Array.from(DOM.results.children)) {
+                    if (retained.has(element)) continue;
+                    if (element.classList.contains('list-item')) cleanupWebapps(element);
+                    element.remove();
+                }
+                if (sameSearch && anchor?.isConnected) {
+                    window.scrollBy({ top: anchor.getBoundingClientRect().top - anchorTop, behavior: 'instant' });
+                }
             }
 
             function renderItemContent(listItemElement, item, searchKeyword = '') {

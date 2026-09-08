@@ -104,11 +104,11 @@
     const items = visibleItems();
     if (!items.length) {
       const message = state.filter === "resolved" ? "暂无已解决的问题" : state.filter === "pending" ? "暂无待处理问题" : "暂无反馈";
-      $("#feedback-list").innerHTML = `<div class="empty-state"><strong>${message}</strong></div>`;
+      window.AcademyStableView.html($("#feedback-list"), `<div class="empty-state"><strong>${message}</strong></div>`);
       return;
     }
-    $("#feedback-list").innerHTML = items.map((item) => `
-      <article class="feedback-item status-${item.status}">
+    window.AcademyStableView.html($("#feedback-list"), items.map((item) => `
+      <article class="feedback-item status-${item.status}" data-sync-key="${escapeHtml(item.id)}">
         <header>
           <span class="category-label">${CATEGORIES[item.category]}</span>
           <span class="status-label">${STATUSES[item.status]}</span>
@@ -119,10 +119,11 @@
           <span><b>${escapeHtml(item.createdBy.name)}</b> · ${escapeHtml(timeLabel(item.createdAt))}</span>
           ${managerActions(item)}
         </footer>
-      </article>`).join("");
+      </article>`).join(""));
   }
 
   function render() {
+    state.renderDay = new Date().toDateString();
     renderOverview();
     renderList();
     document.querySelectorAll("[data-filter]").forEach((button) => {
@@ -220,13 +221,17 @@
   async function pullFeedback(silent = false) {
     try {
       const raw = await window.AcademyStore.getJSON(FILE);
+      let changed = false;
       if (raw) {
         const next = normalizeData(raw);
-        if (!next.rev || next.rev >= state.data.rev) state.data = next;
-        cacheData();
+        if ((!next.rev || next.rev >= state.data.rev) && JSON.stringify(next) !== JSON.stringify(state.data)) {
+          state.data = next;
+          cacheData();
+          changed = true;
+        }
       }
       $("#sync-status").textContent = "";
-      render();
+      if (changed || state.renderDay !== new Date().toDateString()) render();
     } catch (_) {
       if (!silent) $("#sync-status").textContent = "当前离线，显示上次同步的问题";
     }
@@ -285,7 +290,10 @@
       });
       await pullFeedback();
       setInterval(() => { if (!document.hidden) pullFeedback(true); }, 30000);
-      window.addEventListener("academy-data-updated", () => pullFeedback(true));
+      window.addEventListener("academy-data-updated", event => {
+        const paths = event.detail?.paths;
+        if (!Array.isArray(paths) || !paths.length || paths.includes(FILE)) pullFeedback(true);
+      });
       document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") pullFeedback(true);
       });

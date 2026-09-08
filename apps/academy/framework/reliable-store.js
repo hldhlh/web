@@ -9,6 +9,18 @@ window.AcademyReliable = (() => {
   let database, adapter, running, timer, attempts = 0;
   const subscribers = new Set();
   const migrated = new Set();
+  const updates = typeof BroadcastChannel === 'function' ? new BroadcastChannel('academy-reliable-updates') : null;
+  function notifyUpdated(paths, broadcast = true) {
+    window.dispatchEvent(new CustomEvent('academy-data-updated', { detail: { paths } }));
+    if (broadcast) updates?.postMessage({ paths });
+  }
+  if (updates) updates.onmessage = () => {
+    // Another tab acknowledged durable writes. Re-read locally and remotely;
+    // never trust broadcast payloads as document data.
+    emit().catch(() => {});
+    notifyUpdated([], false);
+    schedule();
+  };
   const keyFor = path => `doc:${path}:`;
   const tracked = path => ['academy/content.json', 'academy/schedule.json', 'academy/daily-feedback.json'].includes(path);
   function merge(base, local, remote, path = '', policy = 'conflict') {
@@ -69,7 +81,7 @@ window.AcademyReliable = (() => {
         }
         for (const row of rows) {
           const old = current.get(row.key);
-          if (old && (old.cachedAt || 0) > startedAt && Number(old.version) > Number(row.version)) continue;
+          if (old && Number(old.version) > Number(row.version)) continue;
           store.put({ ...row, path, cachedAt: Date.now() });
         }
       };
@@ -92,7 +104,9 @@ window.AcademyReliable = (() => {
   async function emit() {
     const queue = await all('queue');
     const detail = { pending: queue.length, conflicts: queue.filter(row => row.conflict).length, entries: queue };
-    subscribers.forEach(fn => fn(detail));
+    subscribers.forEach(fn => {
+      try { fn(detail); } catch (error) { console.warn('同步状态监听失败', error); }
+    });
     window.dispatchEvent(new CustomEvent('academy-save-status', { detail }));
     return detail;
   }
@@ -115,9 +129,18 @@ window.AcademyReliable = (() => {
         await reconcileCache(path, rows, startedAt);
       }
     }
-    const records = (await all('cache')).filter(row => row.path === path && !row.key.endsWith('$legacy') && !row.key.endsWith('$ready'));
+    // One atomic local snapshot avoids repeated IndexedDB transactions and keeps
+    // cache acknowledgement and pending edits consistent during startup reads.
+    const snapshot = await transaction(['cache', 'queue'], 'readonly', (tx, done) => {
+      const result = {};
+      for (const name of ['cache', 'queue']) tx.objectStore(name).getAll().onsuccess = event => {
+        result[name] = event.target.result.filter(row => row.path === path);
+        if (result.cache && result.queue) done(result);
+      };
+    });
+    const records = snapshot.cache.filter(row => !row.key.endsWith('$legacy') && !row.key.endsWith('$ready'));
     const map = new Map(records.map(row => [row.key, row]));
-    for (const op of await all('queue')) if (op.path === path) map.set(op.key, { ...op, value: op.next, updatedAt: op.createdAt });
+    for (const op of snapshot.queue) map.set(op.key, { ...op, value: op.next, updatedAt: op.createdAt });
     return join(path, [...map.values()]);
   }
   async function enqueue(path, next, base) {
@@ -187,11 +210,12 @@ window.AcademyReliable = (() => {
   }
   async function drain() {
     const queue = await all('queue');
+    const updatedPaths = new Set();
     let failed = false;
     for (const snapshot of queue) {
       const op = await get('queue', snapshot.key);
       if (!op || op.conflict) continue;
-      try { await flushOne(op); }
+      try { await flushOne(op); updatedPaths.add(op.path); }
       catch (error) {
         failed = true;
         await transaction(['queue'], 'readwrite', tx => {
@@ -204,6 +228,7 @@ window.AcademyReliable = (() => {
     }
     attempts = failed ? attempts + 1 : 0;
     const status = await emit();
+    if (updatedPaths.size) notifyUpdated([...updatedPaths]);
     if (status.pending > status.conflicts) schedule(Math.min(30000, 1000 * 2 ** Math.min(attempts, 5)));
   }
   function schedule(ms = 0) { clearTimeout(timer); timer = setTimeout(() => flush().catch(() => {}), ms); }
@@ -225,7 +250,7 @@ window.AcademyReliable = (() => {
       };
     });
     await emit(); schedule();
-    window.dispatchEvent(new CustomEvent('academy-data-updated'));
+    notifyUpdated([op.path]);
   }
   function configure(next) { adapter = next; schedule(); emit().catch(() => {}); }
   window.addEventListener('online', () => schedule());
