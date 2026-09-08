@@ -3299,7 +3299,51 @@
             renderProducts(); // renderProducts 会处理 renderTags 的更新
         };
 
+        // Keep unchanged cards (and the active quantity input) alive during sync.
+        function reconcileProductCards(list, html) {
+            if (!list.dataset.syncFocusBound) {
+                list.dataset.syncFocusBound = 'true';
+                list.addEventListener('focusout', () => {
+                    if (list.dataset.deferredSync !== 'true') return;
+                    delete list.dataset.deferredSync;
+                    requestAnimationFrame(() => renderProducts());
+                });
+            }
+            const template = document.createElement('template');
+            template.innerHTML = html;
+            const previous = new Map(Array.from(list.children, card => [card.dataset.id, card]));
+            const wanted = new Set();
+            let cursor = list.firstElementChild;
+            for (const next of Array.from(template.content.children)) {
+                const id = next.dataset.id;
+                wanted.add(id);
+                let card = previous.get(id);
+                if (!card) card = next;
+                else if (!card.isEqualNode(next) && !card.contains(document.activeElement)) {
+                    // Patch in place so the card remains a stable scroll anchor.
+                    card.innerHTML = next.innerHTML;
+                } else if (!card.isEqualNode(next)) {
+                    list.dataset.deferredSync = 'true';
+                }
+                if (card !== cursor) list.insertBefore(card, cursor);
+                cursor = card.nextElementSibling;
+            }
+            for (const [id, card] of previous) {
+                if (!wanted.has(id)) card.remove();
+            }
+        }
+
+        let renderedProductFilter = '';
         function renderProducts() {
+            const list = document.getElementById('productList');
+            const filter = JSON.stringify([state.searchQuery, state.currentLocation, Array.from(state.activeTags).sort(), state.sortBy]);
+            const preservePosition = renderedProductFilter === filter && document.getElementById('indexPage').classList.contains('active');
+            const anchor = preservePosition ? Array.from(list.children).find(card => card.getBoundingClientRect().bottom > 0) : null;
+            const anchorTop = anchor?.getBoundingClientRect().top;
+            const filterScroll = ['locationList', 'tagFilterList'].map(id => {
+                const element = document.getElementById(id);
+                return { element, left: element.scrollLeft };
+            });
             let base = [...state.products];
 
             // 1. 基础过滤 (搜索)
@@ -3347,7 +3391,7 @@
                 });
             }
 
-            document.getElementById('productList').innerHTML = f.map(p => {
+            const html = f.map(p => {
                 const qty = state.orders[p.id]?.qty || '';
                 const tagsHtml = (p.tags || []).map(t => `<span class="tag-badge">${t}</span>`).join('');
                 const historyLabel = getHistoryLabel(p.last_purchased_date);
@@ -3385,6 +3429,13 @@
                     <span style="margin-left:8px;font-size:14px;color:var(--text-sub);min-width:20px;">${p.unit || '斤'}</span>
                 </div>`;
             }).join('');
+            reconcileProductCards(list, html);
+            for (const { element, left } of filterScroll) element.scrollLeft = left;
+            if (anchor?.isConnected) {
+                const shift = anchor.getBoundingClientRect().top - anchorTop;
+                if (Math.abs(shift) > .5) window.scrollBy({ top: shift, behavior: 'instant' });
+            }
+            renderedProductFilter = filter;
         }
 
 
