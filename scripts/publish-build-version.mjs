@@ -12,4 +12,4 @@ if (!/^[0-9a-f]{7,40}$/i.test(version)) throw new Error('Invalid build version.'
 if (!url || !key) throw new Error('Realtime version publishing is not configured.');
 
 await publishVersion({manifest,url,key,siteUrl:process.env.AUTO_OFFICE_SITE_URL});
-console.log(`Confirmed public version ${version}; database notification and broadcast accepted by servers.`);
+console.log(`Confirmed public version ${version}; realtime broadcast accepted by server.`);

@@ -23,12 +23,8 @@ export async function publishVersion({manifest, url, key, siteUrl, request=fetch
       if(!response.ok) throw Error(`Version notification failed (${response.status}) at ${path}`);
     });
   }
-  // Independently retry both paths, including the durable row for old clients.
-  const results=await Promise.allSettled([
-    post('/rest/v1/academy_state?on_conflict=id',{id:'app-version',payload,updated_at:payload.publishedAt},{Prefer:'resolution=merge-duplicates,return=minimal'}),
-    post('/realtime/v1/api/broadcast',{messages:[{topic:'auto-office-version-live',event:'version-published',payload,private:false}]})
-  ]);
-  const failures=results.filter(result=>result.status==='rejected');
-  if(failures.length) throw new AggregateError(failures.map(result=>result.reason),'Some release notifications failed; retry this workflow step.');
+  // version.json is the durable source for disconnected/older clients. Do not
+  // depend on academy_state: that table does not exist in this deployment.
+  await post('/realtime/v1/api/broadcast',{messages:[{topic:'auto-office-version-live',event:'version-published',payload,private:false}]});
   return version;
 }

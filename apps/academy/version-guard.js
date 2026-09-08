@@ -6,7 +6,6 @@
   const FAILURE_BACKOFF_MAX_MS = 5 * 60 * 1000;
   const EVENT_COOLDOWN_MS = 1000;
   const DISMISSED_KEY = 'academy-version-dismissed';
-  const REALTIME_ROW_ID = 'app-version';
   const VERSION_PATTERN = /^[0-9a-f]{7,40}$/i;
   const currentVersion = document.querySelector('meta[name="app-build-version"]')?.content?.trim() || '';
   const manifestUrl = new URL('../../version.json', document.baseURI);
@@ -235,15 +234,6 @@
           broadcastCheckTimer = 0;
           checkForUpdate();
         }, Math.max(100, EVENT_COOLDOWN_MS - (Date.now() - lastAttempt)));
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'academy_state',
-        filter: `id=eq.${REALTIME_ROW_ID}`
-      }, (change) => {
-        const row = change?.new && Object.keys(change.new).length ? change.new : change?.old;
-        handleLatestVersion(row?.payload?.version);
       });
     realtimeChannel = channel;
     channel.subscribe((status) => {
