@@ -55,6 +55,10 @@
         return;
       }
       const query = document.getElementById("course-search-input")?.value;
+      if (state.route.name === 'home') {
+        preserveTaskPosition(view(), () => render());
+        return;
+      }
       window.AcademyStableView.preserveScroll(view(), () => {
         render();
         const input = document.getElementById("course-search-input");
@@ -1485,7 +1489,20 @@
     return { greeting: "晚上好", restReminder: true };
   }
 
+  function preserveTaskPosition(target, update) {
+    const x = window.scrollX, y = window.scrollY;
+    const documentTop = target.getBoundingClientRect().top + y;
+    update();
+    // A shorter stage near the page bottom must not clamp the document scroll
+    // offset. Any necessary spare space belongs below the content, never above it.
+    if (document.documentElement.scrollHeight < y + window.innerHeight) {
+      target.style.minHeight = `${Math.ceil(y + window.innerHeight - documentTop)}px`;
+    }
+    window.scrollTo({left:x, top:y, behavior:'instant'});
+  }
+
   function renderHome(target = view(), preview = false) {
+    const previousStage = target.querySelector('.learning-stage:not([hidden])')?.dataset.stageKey;
     if (!preview) setTop("Auto Office", false);
     if (!preview) setTab("home");
     const box = inbox();
@@ -1522,7 +1539,8 @@
         percent: tasks.length ? Math.round((done / tasks.length) * 100) : 0
       };
     });
-    const activeStage = Math.max(0, stages.findIndex((stage) => stage.available && stage.done < stage.tasks.length));
+    const retainedStage = stages.findIndex(stage => stage.id === previousStage);
+    const activeStage = retainedStage >= 0 ? retainedStage : Math.max(0, stages.findIndex((stage) => stage.available && stage.done < stage.tasks.length));
     const taskBoardTotal = stages.reduce((sum, stage) => sum + stage.tasks.length, 0);
     const taskBoardDone = stages.reduce((sum, stage) => sum + stage.done, 0);
 
@@ -1584,7 +1602,7 @@
         </div>
         <div class="learning-stages">
           ${stages.map((stage, stageIndex) => `
-            <section class="learning-stage" id="academy-stage-${stageIndex}" role="tabpanel" aria-labelledby="academy-stage-tab-${stageIndex}" ${stageIndex === activeStage ? "" : "hidden"}>
+            <section class="learning-stage" data-stage-key="${escapeHtml(stage.id)}" id="academy-stage-${stageIndex}" role="tabpanel" aria-labelledby="academy-stage-tab-${stageIndex}" ${stageIndex === activeStage ? "" : "hidden"}>
               <div class="learning-stage-head">
                 <div class="learning-stage-copy"><h4>${escapeHtml(stage.title)}</h4><small>已完成 ${stage.done}/${stage.tasks.length} 项</small></div>
               </div>
@@ -1636,14 +1654,16 @@
     window.AcademyDailyStatus.connect();
     target.querySelectorAll("[data-stage-target]").forEach((button) => {
       button.addEventListener("click", () => {
-        target.querySelectorAll(".stage-tab").forEach((item) => {
-          const selected = item === button;
-          item.classList.toggle("on", selected);
-          item.setAttribute("aria-selected", String(selected));
-          item.tabIndex = selected ? 0 : -1;
-        });
-        target.querySelectorAll(".learning-stage").forEach((stage) => {
-          stage.hidden = stage.id !== button.dataset.stageTarget;
+        preserveTaskPosition(target, () => {
+          target.querySelectorAll(".stage-tab").forEach((item) => {
+            const selected = item === button;
+            item.classList.toggle("on", selected);
+            item.setAttribute("aria-selected", String(selected));
+            item.tabIndex = selected ? 0 : -1;
+          });
+          target.querySelectorAll(".learning-stage").forEach((stage) => {
+            stage.hidden = stage.id !== button.dataset.stageTarget;
+          });
         });
       });
       button.addEventListener("keydown", (event) => {
@@ -1656,7 +1676,7 @@
                 : -1;
         if (targetIndex < 0) return;
         event.preventDefault();
-        tabs[targetIndex].focus();
+        tabs[targetIndex].focus({ preventScroll: true });
         tabs[targetIndex].click();
       });
     });
@@ -3659,6 +3679,7 @@
   function render() {
     if (state.video && state.route.name !== "lesson") state.video.playing = false;
     const route = state.route;
+    if (route.name !== 'home') view().style.removeProperty('min-height');
     document.querySelector(".app")?.classList.toggle("ops-mode", route.name === "ops");
     document.querySelector(".app")?.classList.toggle("embedded-mode", route.name === "embedded-app");
     updateNotificationButton();

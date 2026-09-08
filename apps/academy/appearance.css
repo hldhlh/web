@@ -85,6 +85,13 @@
 .app .stage-tab { border-radius: 0; min-height: 52px; border-bottom: 2px solid transparent; }
 .app .stage-tab.on { color: var(--accent); background: transparent; border-bottom-color: var(--accent); box-shadow: none; }
 .app .learning-stages { overflow: hidden; border: 1px solid var(--line); border-radius: 0 0 18px 18px; background: var(--surface); }
+/* All stages contribute their natural height to one grid track. Switching tabs
+   changes visibility only, so neither surrounding content nor scroll bounds move. */
+.app .learning-stages { display: grid; align-items: start; }
+.app .learning-stage { grid-area: 1 / 1; min-width: 0; }
+.app .learning-stage[hidden] { display: block !important; visibility: hidden; pointer-events: none; }
+/* Let tasks grow naturally, without anchoring the page to their moving content. */
+#view:has([data-home-block="tasks"]), .home-layout-preview:has(.learning-plan) { overflow-anchor: none; }
 .app .learning-stage-head { padding: 16px; }
 .app .learning-stage-head h4 { white-space: normal; }
 .app .task-list { padding-inline: 16px; }
