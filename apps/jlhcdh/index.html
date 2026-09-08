@@ -1691,6 +1691,7 @@
 
     <script src="../vendor/supabase.min.js"></script>
     <script src="../network.js?v=20260827-8"></script>
+    <script src="./cart-sync.js"></script>
     <script>
         const iconSvg = (name, className = '') => `<svg class="svg-icon${className ? ` ${className}` : ''}" aria-hidden="true"><use href="#icon-${name}"></use></svg>`;
         const SB_URL = window.JLHCDH_CONFIG.url;
@@ -1781,7 +1782,7 @@
 
         function restoreStartupCache() {
             const products = readCache(CACHE_KEYS.products, 24 * 60 * 60 * 1000);
-            const cart = readCache(`${CACHE_KEYS.cart}:${state.currentDate}`, 5 * 60 * 1000);
+            const cart = readCache(`${CACHE_KEYS.cart}:${state.currentDate}`, Infinity);
             const startupProducts = Array.isArray(products) && products.length
                 ? products
                 : window.JLHCDH_SEED_PRODUCTS;
@@ -1789,6 +1790,7 @@
                 state.products = startupProducts.map(product => ({ ...product }));
             }
             if (cart && typeof cart === 'object') state.orders = cart;
+            state.orders = window.OrderCartSync.overlay(state.currentDate, state.orders);
             return Boolean(state.products.length);
         }
 
@@ -1840,6 +1842,7 @@
         };
 
         function setGlobalSyncStatus(s) {
+            if (['online','polling'].includes(s) && window.OrderCartSync.pendingCount) s = navigator.onLine === false ? 'error' : 'syncing';
             const els = document.querySelectorAll('.sync-status');
             els.forEach(el => {
                 el.classList.remove('online', 'syncing', 'receiving', 'error', 'disconnected', 'connecting', 'polling');
@@ -1878,6 +1881,29 @@
         }
 
         async function init() {
+            let refreshTimer;
+            window.OrderCartSync.configure(sb, (op, status) => {
+                if (op?.date === state.currentDate) {
+                    const ui = status === 'pending' ? 'syncing' : status;
+                    updateSyncUI(op.id, ui);
+                    updateSyncUI(op.id, ui, true);
+                    if (status === 'saved') setTimeout(() => {
+                        if (op.date === state.currentDate && !window.OrderCartSync.has(op.date,op.id)) {
+                            updateSyncUI(op.id,null); updateSyncUI(op.id,null,true);
+                        }
+                    },1000);
+                }
+                if (status === 'error') setGlobalSyncStatus('error');
+                if (status === 'saved' || status === 'external') {
+                    invalidatePurchaseHistory();
+                    clearTimeout(refreshTimer);
+                    refreshTimer = setTimeout(async () => {
+                        state.orders = window.OrderCartSync.overlay(state.currentDate,state.orders);
+                        await fetchCart(); renderProducts();
+                        if (document.getElementById('ordersPage').classList.contains('active')) fetchDayData();
+                    },150);
+                }
+            });
             setGlobalSyncStatus('connecting');
             document.getElementById('dateInputIndex').value = state.currentDate;
             document.getElementById('dateInput').value = state.currentDate;
@@ -1911,7 +1937,7 @@
 
             // 首屏稳定后再加载非关键能力；拼音库改为用户输入拼音时按需加载。
             runAfterFirstPaint(initDatePickers, 800);
-            runAfterFirstPaint(fetchOrderPredictions, 6000);
+            runAfterFirstPaint(fetchOrderPredictions, 1500);
 
             // --- 中国区网络专项优化：页面唤醒同步 ---
             // 当用户切回系统或手机点亮屏幕时，立即强制刷一次数据，防止实时连接在后台断掉
@@ -1948,8 +1974,8 @@
                 if (state.fpOrders) state.fpOrders.setDate(dateStr, false);
 
                 state.predictions = {};
-                const cachedCart = readCache(`${CACHE_KEYS.cart}:${dateStr}`, 5 * 60 * 1000);
-                state.orders = cachedCart && typeof cachedCart === 'object' ? cachedCart : {};
+                const cachedCart = readCache(`${CACHE_KEYS.cart}:${dateStr}`, Infinity);
+                state.orders = window.OrderCartSync.overlay(dateStr, cachedCart && typeof cachedCart === 'object' ? cachedCart : {});
                 renderProducts();
                 await fetchCart();
                 renderProducts();
@@ -2125,7 +2151,12 @@
             document.getElementById('analyticsContainer').innerHTML = html;
         }
 
-        async function fetchProducts() {
+        let productsFlight = null;
+        function fetchProducts() {
+            if (!productsFlight) productsFlight = loadProducts().finally(() => { productsFlight = null; });
+            return productsFlight;
+        }
+        async function loadProducts() {
             startSync();
             try {
                 const { data, error } = await bootstrapOrFetch('products', state.currentDate, () =>
@@ -2158,9 +2189,25 @@
             if (state.searchQuery) renderProducts();
         }
 
-        async function fetchCart() {
+        const cartFlights = new Map();
+        let remoteCartRevision = 0;
+        function fetchCart() {
+            const date = state.currentDate;
+            const existing = cartFlights.get(date);
+            if (existing) { existing.again = true; return existing.promise; }
+            const job = {again:false};
+            job.promise = (async () => {
+                do { job.again = false; await loadCart(); }
+                while (job.again && state.currentDate === date && !document.hidden);
+            })().finally(() => cartFlights.delete(date));
+            cartFlights.set(date,job);
+            return job.promise;
+        }
+        async function loadCart() {
             startSync();
             const requestedDate = state.currentDate;
+            const revision = window.OrderCartSync.revision;
+            const remoteRevision = remoteCartRevision;
             const nextOrders = {};
             try {
                 const cartResult = await bootstrapOrFetch('cart', requestedDate, () =>
@@ -2174,9 +2221,9 @@
                     cartData.forEach(i => nextOrders[i.product_id] = { qty: parseFloat(i.quantity), purchased: i.is_purchased });
                 }
                 // 切换日期期间可能有旧请求晚返回，绝不能覆盖新日期。
-                if (requestedDate === state.currentDate && !cartError) {
-                    state.orders = nextOrders;
-                    writeCache(`${CACHE_KEYS.cart}:${requestedDate}`, nextOrders);
+                if (requestedDate === state.currentDate && !cartError && revision === window.OrderCartSync.revision && remoteRevision === remoteCartRevision) {
+                    state.orders = window.OrderCartSync.overlay(requestedDate,nextOrders);
+                    writeCache(`${CACHE_KEYS.cart}:${requestedDate}`, state.orders);
                     // 仅空购物车需要兼容旧表，并且不再阻塞首屏。
                     if (!cartData?.length) runAfterFirstPaint(() => fetchLegacyCart(requestedDate), 2500);
                 }
@@ -2187,7 +2234,7 @@
 
         async function fetchLegacyCart(requestedDate) {
             // 用户已输入或日期已切换时，不允许旧数据覆盖当前状态。
-            if (requestedDate !== state.currentDate || Object.keys(state.orders).length) return;
+            if (requestedDate !== state.currentDate || Object.keys(state.orders).length || window.OrderCartSync.wasEdited(requestedDate)) return;
             const start = `${requestedDate}T00:00:00+08:00`;
             const end = `${requestedDate}T23:59:59+08:00`;
             const { data, error } = await sb.from('jlhcdh_orders')
@@ -2196,7 +2243,7 @@
                 .lte('created_at', end)
                 .order('created_at', { ascending: false })
                 .limit(1);
-            if (error || requestedDate !== state.currentDate || Object.keys(state.orders).length) return;
+            if (error || requestedDate !== state.currentDate || Object.keys(state.orders).length || window.OrderCartSync.wasEdited(requestedDate)) return;
             const rec = data?.find(row => row.order_data);
             if (!rec) return;
             const raw = rec.order_data;
@@ -2254,17 +2301,44 @@
             return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1).replace(/\.0$/, '');
         }
 
+        let historyFlight = null;
+        let historyRevision = 0;
+        let historyLoadedAt = 0;
+        function invalidatePurchaseHistory() {
+            historyRevision++;
+            historyLoadedAt = 0;
+            runAfterFirstPaint(fetchOrderPredictions, 300);
+        }
+        async function readAllHistory(makeQuery) {
+            const rows = [];
+            for (let offset = 0; ; offset += 500) {
+                const {data,error} = await makeQuery().range(offset,offset+499);
+                if (error) throw error;
+                rows.push(...(data || []));
+                if (!data || data.length < 500) return rows;
+            }
+        }
         async function fetchOrderPredictions() {
+            if (historyFlight) return historyFlight;
+            historyFlight = loadOrderHistory().finally(() => { historyFlight = null; });
+            return historyFlight;
+        }
+        async function loadOrderHistory() {
             const requestedDate = state.currentDate;
-            if (state.predictionDate === requestedDate) return;
+            const revision = historyRevision;
+            if (state.predictionDate === requestedDate && Date.now()-historyLoadedAt < 60000) return;
+            const today = getLocalBusinessDate();
             const targetDate = parseDateOnly(requestedDate);
-            const startDate = addDays(targetDate, -365);
-            const endDate = addDays(targetDate, -1);
+            const startDate = addDays(parseDateOnly(requestedDate < today ? requestedDate : today), -365);
+            const endDate = parseDateOnly(requestedDate > today ? requestedDate : today);
             const startStr = formatDateOnly(startDate);
             const endStr = formatDateOnly(endDate);
             const targetWeekday = targetDate.getDay();
             const recentStart = formatDateOnly(addDays(targetDate, -45));
             const history = {};
+            const lastDates = {};
+            const cartDates = new Set();
+            const legacyDates = new Set();
             const cartKeys = new Set();
             const historyKeys = new Set();
 
@@ -2272,38 +2346,44 @@
                 const pid = parseInt(productId);
                 const value = parseFloat(qty);
                 if (!pid || !date || !Number.isFinite(value) || value <= 0) return;
-                if (date >= requestedDate) return;
                 const key = `${date}:${pid}`;
                 if (preferExisting && cartKeys.has(key)) return;
                 if (historyKeys.has(key)) return;
-                if (!history[pid]) history[pid] = [];
-                history[pid].push({ date, qty: value, weekday: parseDateOnly(date).getDay() });
                 historyKeys.add(key);
                 if (!preferExisting) cartKeys.add(key);
+                if (date <= today && (!lastDates[pid] || date > lastDates[pid])) lastDates[pid] = date;
+                // Today's purchases count for the badge, but not for forecasting today.
+                if (date >= requestedDate) return;
+                if (!history[pid]) history[pid] = [];
+                history[pid].push({ date, qty: value, weekday: parseDateOnly(date).getDay() });
             };
 
             try {
                 // 新旧两套历史来源彼此独立，并行读取；此任务不再阻塞首屏。
-                const [cartResult, legacyResult] = await Promise.all([
-                    sb.from('jlhcdh_cart')
+                const [cartRows, legacyRows] = await Promise.all([
+                    readAllHistory(() => sb.from('jlhcdh_cart')
                         .select('product_id,quantity,order_date')
                         .gte('order_date', startStr)
-                        .lte('order_date', endStr),
-                    sb.from('jlhcdh_orders')
+                        .lte('order_date', endStr)
+                        .order('order_date', {ascending:false}).order('product_id', {ascending:false})),
+                    readAllHistory(() => sb.from('jlhcdh_orders')
                         .select('created_at,order_data')
                         .gte('created_at', `${startStr}T00:00:00+08:00`)
                         .lte('created_at', `${endStr}T23:59:59+08:00`)
-                        .order('created_at', { ascending: false })
+                        .order('created_at', { ascending: false }))
                 ]);
-                const { data: cartRows, error: cartError } = cartResult;
-                if (cartError) throw cartError;
 
-                (cartRows || []).forEach(row => addHistory(row.product_id, row.order_date, row.quantity, false));
-
-                const { data: legacyRows } = legacyResult;
+                (cartRows || []).forEach(row => {
+                    cartDates.add(row.order_date);
+                    addHistory(row.product_id, row.order_date, row.quantity, false);
+                });
 
                 (legacyRows || []).forEach(row => {
                     const date = getLocalDateFromIso(row.created_at);
+                    // The live cart owns migrated days. For legacy days, use only
+                    // the latest snapshot, never resurrect removed items from older snapshots.
+                    if (cartDates.has(date) || legacyDates.has(date) || window.OrderCartSync?.wasEdited(date)) return;
+                    legacyDates.add(date);
                     const raw = row.order_data;
                     const items = Array.isArray(raw) ? raw : (raw?.order_data || []);
                     items.forEach(item => {
@@ -2316,10 +2396,6 @@
                 const predictions = {};
                 Object.entries(history).forEach(([pid, rows]) => {
                     rows.sort((a, b) => b.date.localeCompare(a.date));
-                    const product = state.products.find(item => item.id == pid);
-                    if (product && rows[0]?.date && (!product.last_purchased_date || rows[0].date > product.last_purchased_date)) {
-                        product.last_purchased_date = rows[0].date;
-                    }
                     const sameWeekday = rows.filter(r => r.weekday === targetWeekday).map(r => r.qty);
                     const recent = rows.filter(r => r.date >= recentStart).map(r => r.qty);
                     const all = rows.map(r => r.qty);
@@ -2351,18 +2427,22 @@
                     if (qty > 0) predictions[pid] = { qty, level };
                 });
 
-                if (state.currentDate !== requestedDate) return;
+                if (state.currentDate !== requestedDate || revision !== historyRevision) {
+                    runAfterFirstPaint(fetchOrderPredictions,300);
+                    return;
+                }
+                for (const product of state.products) product.last_purchased_date = lastDates[product.id] || '';
                 state.predictions = predictions;
                 state.predictionDate = requestedDate;
+                historyLoadedAt = Date.now();
                 writeCache(CACHE_KEYS.products, state.products);
                 console.log('建议预测完成:', Object.keys(predictions).length, predictions);
                 applyPredictionHintsToDOM();
+                renderProducts();
             } catch (e) {
                 console.warn('预测建议读取失败:', e);
                 if (state.currentDate !== requestedDate) return;
-                state.predictions = {};
-                state.predictionDate = requestedDate;
-                applyPredictionHintsToDOM();
+                // Keep the last good result and allow the next refresh to retry.
             }
         }
 
@@ -2431,24 +2511,30 @@
 
         async function checkTodayLock() { }
 
-        window.updateQty = async (id, change) => {
-            const current = state.orders[id] || { qty: 0, purchased: false };
-            const newQty = Math.max(0, current.qty + change);
-            updateLocalQty(id, newQty);
-            syncToSupabase(id, newQty);
+        function saveCartEdit(id, qty, purchased, mode = 'quantity') {
+            const current = state.orders[id];
+            if (current && current.qty === qty && current.purchased === purchased) return true;
+            try {
+                window.OrderCartSync.enqueue(state.currentDate, id, qty, purchased, mode);
+            } catch (error) {
+                showToast('本机保存失败，请勿关闭页面：' + (error.message || '存储不可用'));
+                renderProducts();
+                return false;
+            }
+            if (qty > 0) state.orders[id] = {qty, purchased};
+            else delete state.orders[id];
+            writeCache(`${CACHE_KEYS.cart}:${state.currentDate}`, state.orders);
+            updateLocalQty(id, qty);
+            return true;
+        }
+        window.updateQty = (id, change) => {
+            const current = state.orders[id] || {qty:0,purchased:false};
+            saveCartEdit(id, Math.max(0,current.qty + change), current.purchased);
         };
         window.onQtyChange = (id, val) => {
-            const newQty = Math.max(0, parseFloat(val) || 0);
-            updateLocalQty(id, newQty);
-            syncToSupabase(id, newQty);
+            saveCartEdit(id, Math.max(0,parseFloat(val) || 0), state.orders[id]?.purchased || false);
         };
         function updateLocalQty(id, qty) {
-            if (qty > 0) {
-                if (!state.orders[id]) state.orders[id] = { qty: 0, purchased: false };
-                state.orders[id].qty = qty;
-            } else {
-                delete state.orders[id];
-            }
             updateFooter();
             const input = document.querySelector(`.product-card[data-id="${id}"] input`);
             if (input && document.activeElement !== input) input.value = qty || '';
@@ -2456,120 +2542,25 @@
             if (hint) hint.remove();
             if (qty <= 0) applyPredictionHintsToDOM();
         }
-        const syncTimeouts = {};
-        function syncToSupabase(productId, quantity) {
-            clearTimeout(syncTimeouts[productId]);
-            const targetDate = state.currentDate;
-            const isPurchased = state.orders[productId]?.purchased || false;
-            updateSyncUI(productId, 'syncing');
-            syncTimeouts[productId] = setTimeout(async () => {
-                // 设置跳过实时事件的时间窗口（500ms内忽略自己的事件）
-                state.skipRealtimeUntil = Date.now() + 500;
-
-                startSync();
-                try {
-                    if (quantity > 0) {
-                        // 使用 upsert：存在则更新，不存在则插入
-                        await sb.from('jlhcdh_cart').upsert({
-                            product_id: productId,
-                            quantity,
-                            is_purchased: isPurchased,
-                            order_date: targetDate,
-                            updated_at: new Date().toISOString()
-                        }, {
-                            onConflict: 'product_id,order_date' // 基于唯一约束
-                        });
-                    } else {
-                        // 只有数量为0时才删除
-                        await sb.from('jlhcdh_cart')
-                            .delete()
-                            .eq('product_id', productId)
-                            .eq('order_date', targetDate);
-                    }
-                    updateSyncUI(productId, 'saved');
-                    setTimeout(() => updateSyncUI(productId, null), 1000);
-                    endSync();
-                } catch (e) {
-                    console.error('同步失败:', e);
-                    updateSyncUI(productId, 'error');
-                    endSync(true);
-                }
-            }, 100); // 减少 debounce 延迟提高实时性
-        }
-
-        window.togglePurchased = async (id, checked) => {
-            if (state.orders[id]) {
-                // 设置跳过实时事件的时间窗口（500ms内忽略自己的事件）
-                state.skipRealtimeUntil = Date.now() + 500;
-
-                state.orders[id].purchased = checked;
-
-                // 增量更新 UI：只更新相关元素的样式，不刷新整个列表
-                const aggItem = document.querySelector(`#check-${id}`)?.closest('.agg-item');
-                if (aggItem) {
-                    aggItem.classList.toggle('checked', checked);
-                }
-                // 同时更新 cartItems 状态
-                const cartItem = state.cartItems.find(item => item.id === id);
-                if (cartItem) cartItem.is_purchased = checked;
-
-                updateSyncUI(id, 'syncing', true);
-                startSync();
-                try {
-                    // 使用 order_date 精确更新
-                    await sb.from('jlhcdh_cart')
-                        .update({
-                            is_purchased: checked,
-                            updated_at: new Date().toISOString()
-                        })
-                        .eq('product_id', id)
-                        .eq('order_date', state.currentDate);
-                    updateSyncUI(id, 'saved', true);
-                    setTimeout(() => updateSyncUI(id, null, true), 1000);
-                    endSync();
-                } catch (e) {
-                    // 同步失败时回滚 UI
-                    state.orders[id].purchased = !checked;
-                    if (cartItem) cartItem.is_purchased = !checked;
-                    if (aggItem) aggItem.classList.toggle('checked', !checked);
-                    const checkbox = document.getElementById(`check-${id}`);
-                    if (checkbox) checkbox.checked = !checked;
-
-                    updateSyncUI(id, 'error', true);
-                    endSync(true);
-                    showToast('同步失败，已回滚');
-                }
+        window.togglePurchased = (id, checked) => {
+            const current = state.orders[id];
+            if (!current) return;
+            if (!saveCartEdit(id, current.qty, checked, 'purchase')) {
+                const checkbox = document.getElementById(`check-${id}`);
+                if (checkbox) checkbox.checked = current.purchased;
+                return false;
             }
+            document.getElementById(`check-${id}`)?.closest('.agg-item')?.classList.toggle('checked',checked);
+            const item = state.cartItems.find(item => item.id === id);
+            if (item) item.is_purchased = checked;
+            return true;
         };
-
-        // 删除购物车项目
-        window.deleteCartItem = async (id) => {
+        window.deleteCartItem = (id) => {
             if (!confirm('确定要删除此项吗？')) return;
-
-            // 设置跳过实时事件的时间窗口（2秒内忽略自己的事件）
-            state.skipRealtimeUntil = Date.now() + 2000;
-
-            // 更新本地状态
-            delete state.orders[id];
-            updateFooter();
-
-            // 同步到数据库
-            startSync();
-            try {
-                await sb.from('jlhcdh_cart')
-                    .delete()
-                    .eq('product_id', id)
-                    .eq('order_date', state.currentDate);
-                showToast('已删除');
-                endSync();
-            } catch (e) {
-                showToast('删除失败');
-                endSync(true);
-            }
-
-            // 刷新显示
+            if (!saveCartEdit(id,0,false)) return;
             fetchDayData();
             renderProducts();
+            showToast('已删除，后台同步');
         };
         function getDynamicLocations() {
             return [...new Set(state.products.map(p => p.location))].filter(l => l && l.trim());
@@ -3179,8 +3170,9 @@
         };
 
         async function fetchDayData() {
+            const productsById = new Map(state.products.map(product => [String(product.id),product]));
             state.cartItems = Object.entries(state.orders).map(([id, info]) => {
-                const p = state.products.find(x => x.id === parseInt(id));
+                const p = productsById.get(id);
                 return p ? { ...p, qty: info.qty, is_purchased: info.purchased } : null;
             }).filter(x => x);
             renderSummary();
@@ -3201,9 +3193,11 @@
             totalBar.style.display = 'flex';
             countDisplayTop.innerText = `${state.cartItems.length} 项品种`;
 
-            list.innerHTML = state.cartItems.map(item => {
+            const anchor = Array.from(list.children).find(item => item.getBoundingClientRect().bottom > 0);
+            const anchorTop = anchor?.getBoundingClientRect().top;
+            const html = state.cartItems.map(item => {
                 return `
-                <div class="agg-item ${item.is_purchased ? 'checked' : ''}"
+                <div class="agg-item ${item.is_purchased ? 'checked' : ''}" data-id="${item.id}"
                     onmousedown="startLongPress(${item.id}, event)"
                     onmouseup="cancelLongPress()"
                     onmouseleave="cancelLongPress()"
@@ -3236,6 +3230,8 @@
                     </div>
                 </div>`;
             }).join('');
+            reconcileProductCards(list,html);
+            if (anchor?.isConnected) window.scrollBy({top:anchor.getBoundingClientRect().top-anchorTop,behavior:'instant'});
         }
 
         window.toggleEditMode = () => {
@@ -3306,7 +3302,7 @@
                 list.addEventListener('focusout', () => {
                     if (list.dataset.deferredSync !== 'true') return;
                     delete list.dataset.deferredSync;
-                    requestAnimationFrame(() => renderProducts());
+                    requestAnimationFrame(() => list.id === 'summaryList' ? fetchDayData() : renderProducts());
                 });
             }
             const template = document.createElement('template');
@@ -3321,6 +3317,7 @@
                 if (!card) card = next;
                 else if (!card.isEqualNode(next) && !card.contains(document.activeElement)) {
                     // Patch in place so the card remains a stable scroll anchor.
+                    card.className = next.className;
                     card.innerHTML = next.innerHTML;
                 } else if (!card.isEqualNode(next)) {
                     list.dataset.deferredSync = 'true';
@@ -3456,13 +3453,7 @@
                 schema: 'public',
                 table: 'jlhcdh_cart'
             }, async (payload) => {
-                const now = Date.now();
-
-                // 如果在跳过时间窗口内，忽略此事件（自己的操作触发的）
-                if (now < state.skipRealtimeUntil) {
-                    console.log('📦 跳过自己的实时事件');
-                    return;
-                }
+                // Protect only locally pending records; unrelated remote edits remain live.
 
                 console.log('📦 收到远程购物车变化:', payload.eventType, payload.new || payload.old);
                 showReceiving();
@@ -3471,15 +3462,18 @@
                 const changedDate = payload.new?.order_date || payload.old?.order_date;
                 const changedProductId = payload.new?.product_id || payload.old?.product_id;
 
+                remoteCartRevision++;
+                invalidatePurchaseHistory();
+                if (!changedDate) { await fetchCart(); renderProducts(); if (document.getElementById('ordersPage').classList.contains('active')) fetchDayData(); return; }
+                if (window.OrderCartSync.has(changedDate,changedProductId)) return;
+
                 // 只有当变化的日期匹配当前选择的日期时，才处理
                 if (changedDate === state.currentDate) {
                     // 增量更新：只更新变化的商品，不重新加载整个列表
                     if (payload.eventType === 'UPDATE' && payload.new) {
                         // 更新本地状态
-                        if (state.orders[changedProductId]) {
-                            state.orders[changedProductId].qty = parseFloat(payload.new.quantity);
-                            state.orders[changedProductId].purchased = payload.new.is_purchased;
-                        }
+                        state.orders[changedProductId] = {qty:parseFloat(payload.new.quantity),purchased:payload.new.is_purchased};
+                        writeCache(`${CACHE_KEYS.cart}:${changedDate}`, state.orders);
 
                         // 更新 cartItems 状态
                         const cartItem = state.cartItems.find(item => item.id === changedProductId);
@@ -3680,6 +3674,7 @@
             setGlobalSyncStatus('polling');
             console.log('🔄 启动强制 8秒 HTTP 轮询同步机制');
             pollingInterval = setInterval(async () => {
+                if (document.hidden || navigator.onLine === false) return;
                 if (state.realtimeConnected) {
                     window.stopPollingFallback();
                     return;
@@ -3755,6 +3750,7 @@
         function setupStatusIndicatorClick() {
             document.querySelectorAll('.sync-status').forEach(el => {
                 el.onclick = async () => {
+                    window.OrderCartSync.flush();
                     if (!state.realtimeConnected || el.classList.contains('error') || el.classList.contains('disconnected')) {
                         showToast('正在重新连接...');
                         await reconnectRealtime(true); // 手动重试，重置计数器
@@ -3779,21 +3775,21 @@
         }
 
         function getLocalBusinessDate() {
-            const n = new Date();
-            const y = n.getFullYear();
-            const m = String(n.getMonth() + 1).padStart(2, '0');
-            const d = String(n.getDate()).padStart(2, '0');
-            return `${y}-${m}-${d}`;
+            const parts = new Intl.DateTimeFormat('en', {timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+            const value = type => parts.find(part => part.type === type).value;
+            return `${value('year')}-${value('month')}-${value('day')}`;
         }
 
         function getHistoryLabel(lastDateStr) {
-            if (!lastDateStr) return '';
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(lastDateStr || '')) return '';
             const todayStr = getLocalBusinessDate();
-            if (lastDateStr === todayStr) return '今天买过';
-            const today = new Date(todayStr);
-            const lastDate = new Date(lastDateStr);
-            const diffTime = today.getTime() - lastDate.getTime();
-            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+            const dayNumber = value => {
+                const [year,month,day] = value.split('-').map(Number);
+                const time = Date.UTC(year,month-1,day);
+                return new Date(time).toISOString().slice(0,10) === value ? time / 86400000 : NaN;
+            };
+            const diffDays = dayNumber(todayStr) - dayNumber(lastDateStr);
+            if (diffDays === 0) return '今天买过';
             if (diffDays === 1) return '昨天买过';
             if (diffDays === 2) return '前天买过';
             if (diffDays > 2) return `${diffDays}天前买过`;
@@ -3848,105 +3844,19 @@
         }
 
         // ========== 批量全选/取消 ==========
-        async function batchSelectAll() {
-            if (state.cartItems.length === 0) {
-                showToast('无订货项目');
-                return;
+        async function batchPurchased(checked) {
+            const items = state.cartItems.filter(item => item.is_purchased !== checked);
+            if (!items.length) return showToast('没有需要更改的项目');
+            let saved = 0;
+            for (const item of items) {
+                if (!window.togglePurchased(item.id,checked)) break;
+                saved++;
             }
-
-            const uncheckedItems = state.cartItems.filter(item => !item.is_purchased);
-            if (uncheckedItems.length === 0) {
-                showToast('所有项目已勾选');
-                return;
-            }
-
-            state.skipRealtimeUntil = Date.now() + 10000;
-            startSync();
-
-            const progress = document.getElementById('batchProgress');
-            let completed = 0;
-
-            try {
-                for (const item of uncheckedItems) {
-                    await sb.from('jlhcdh_cart')
-                        .update({
-                            is_purchased: true,
-                            updated_at: new Date().toISOString()
-                        })
-                        .eq('product_id', item.id)
-                        .eq('order_date', state.currentDate);
-
-                    // 更新本地状态
-                    if (state.orders[item.id]) {
-                        state.orders[item.id].purchased = true;
-                    }
-                    item.is_purchased = true;
-
-                    completed++;
-                    progress.style.width = `${(completed / uncheckedItems.length) * 100}%`;
-                }
-
-                renderSummary();
-                progress.style.width = '0%';
-                showToast(`已勾选 ${uncheckedItems.length} 项`);
-                endSync();
-            } catch (e) {
-                console.error('批量勾选失败:', e);
-                showToast('操作失败');
-                progress.style.width = '0%';
-                endSync(true);
-            }
+            renderSummary();
+            showToast(`已在本机保存 ${saved}/${items.length} 项，后台同步`);
         }
-
-        async function batchDeselectAll() {
-            if (state.cartItems.length === 0) {
-                showToast('无订货项目');
-                return;
-            }
-
-            const checkedItems = state.cartItems.filter(item => item.is_purchased);
-            if (checkedItems.length === 0) {
-                showToast('所有项目已取消勾选');
-                return;
-            }
-
-            state.skipRealtimeUntil = Date.now() + 10000;
-            startSync();
-
-            const progress = document.getElementById('batchProgress');
-            let completed = 0;
-
-            try {
-                for (const item of checkedItems) {
-                    await sb.from('jlhcdh_cart')
-                        .update({
-                            is_purchased: false,
-                            updated_at: new Date().toISOString()
-                        })
-                        .eq('product_id', item.id)
-                        .eq('order_date', state.currentDate);
-
-                    // 更新本地状态
-                    if (state.orders[item.id]) {
-                        state.orders[item.id].purchased = false;
-                    }
-                    item.is_purchased = false;
-
-                    completed++;
-                    progress.style.width = `${(completed / checkedItems.length) * 100}%`;
-                }
-
-                renderSummary();
-                progress.style.width = '0%';
-                showToast(`已取消 ${checkedItems.length} 项`);
-                endSync();
-            } catch (e) {
-                console.error('批量取消失败:', e);
-                showToast('操作失败');
-                progress.style.width = '0%';
-                endSync(true);
-            }
-        }
+        async function batchSelectAll() { return batchPurchased(true); }
+        async function batchDeselectAll() { return batchPurchased(false); }
 
         // ========== 导出订货单为图片 ==========
         async function exportOrderImage() {
