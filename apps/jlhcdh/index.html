@@ -1725,6 +1725,7 @@
             pollingFallbackActive: false, // 轮询降级状态
             predictions: {}, // 基于历史订货的低调参考量
             predictionDate: '',
+            cloudPurchaseDates: {}, // 仅保存本次会话查询到的云端购买日期，不读取本地商品缓存。
             historyDatesLoadedAt: 0,
             historyDatesPromise: null
         };
@@ -2169,7 +2170,6 @@
                     const existingProducts = new Map(state.products.map(product => [product.id, product]));
                     state.products = data.map(p => ({
                         ...p,
-                        last_purchased_date: p.last_purchased_date || existingProducts.get(p.id)?.last_purchased_date || '',
                         pinyin: p.pinyin || existingProducts.get(p.id)?.pinyin || (window.pinyinPro ? window.pinyinPro.pinyin(p.name, { pattern: 'first', toneType: 'none' }).replace(/\s/g, '') : '')
                     }));
                     writeCache(CACHE_KEYS.products, state.products);
@@ -2382,7 +2382,7 @@
                     const date = getLocalDateFromIso(row.created_at);
                     // The live cart owns migrated days. For legacy days, use only
                     // the latest snapshot, never resurrect removed items from older snapshots.
-                    if (cartDates.has(date) || legacyDates.has(date) || window.OrderCartSync?.wasEdited(date)) return;
+                    if (cartDates.has(date) || legacyDates.has(date)) return;
                     legacyDates.add(date);
                     const raw = row.order_data;
                     const items = Array.isArray(raw) ? raw : (raw?.order_data || []);
@@ -2431,7 +2431,8 @@
                     runAfterFirstPaint(fetchOrderPredictions,300);
                     return;
                 }
-                for (const product of state.products) product.last_purchased_date = lastDates[product.id] || '';
+                // 历史提示只使用云端查询结果；本地缓存、未同步编辑均不参与计算。
+                state.cloudPurchaseDates = lastDates;
                 state.predictions = predictions;
                 state.predictionDate = requestedDate;
                 historyLoadedAt = Date.now();
@@ -3391,7 +3392,7 @@
             const html = f.map(p => {
                 const qty = state.orders[p.id]?.qty || '';
                 const tagsHtml = (p.tags || []).map(t => `<span class="tag-badge">${t}</span>`).join('');
-                const historyLabel = getHistoryLabel(p.last_purchased_date);
+                const historyLabel = getHistoryLabel(state.cloudPurchaseDates[p.id]);
                 const historyBadgeHtml = historyLabel ? `<span class="history-badge">${iconSvg('history')} ${historyLabel}</span>` : '';
                 const prediction = state.predictions[p.id];
                 const predictionHtml = prediction && !qty ? getPredictionHintHtml(p, prediction) : '';
@@ -3544,12 +3545,10 @@
                     // 增量更新：更新本地产品数据
                     const productIndex = state.products.findIndex(p => p.id === changedProductId);
                     if (productIndex > -1) {
-                        // 保留 pinyin 字段和 last_purchased_date 字段，更新其他字段
+                        // 保留本地拼音索引；购买日期独立取自云端历史查询。
                         const oldPinyin = state.products[productIndex].pinyin;
-                        const oldLastPurchasedDate = state.products[productIndex].last_purchased_date;
                         state.products[productIndex] = {
                             ...payload.new,
-                            last_purchased_date: oldLastPurchasedDate,
                             pinyin: oldPinyin || (window.pinyinPro ? window.pinyinPro.pinyin(payload.new.name, { pattern: 'first', toneType: 'none' }).replace(/\s/g, '') : '')
                         };
 
