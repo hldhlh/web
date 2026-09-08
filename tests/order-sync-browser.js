@@ -25,6 +25,34 @@ async page => {
     assert(Math.abs(card.getBoundingClientRect().top-top)<1,'checklist scroll anchor stays fixed');
     assert(document.querySelector('[data-id="31"]').classList.contains('checked'),'changed purchase styling updates');
     assert(document.querySelector('[data-id="31"] input[type=number]').value==='9','remote quantity displayed');
+    state.cartItems=state.cartItems.filter(item=>item.id!==20);render();
+    assert(input.isConnected && document.activeElement===input && input.value==='12','remote deletion cannot discard the active draft');
+    input.blur();await new Promise(requestAnimationFrame);
+    assert(!card.isConnected,'remote deletion settles after editing ends');
+
+    document.body.insertAdjacentHTML('beforeend','<div id="locationList"></div><div id="tagFilterList"></div><select id="adminLocFilter"></select><select id="editLocationSelect"></select><div id="adminTableBody"></div>');
+    state.currentLocation='全部';state.activeTags=new Set();state.adminLoc='冷柜';state.adminSearch='';
+    state.products=[{id:1,name:'土豆',location:'冷柜',unit:'斤',tags:['日订']},{id:2,name:'洋葱',location:'冷柜',unit:'斤',tags:['日订']}];
+    const filters=html.slice(html.indexOf('        function renderLocations('),html.indexOf('        window.toggleTagFilter'));
+    const admin=html.slice(html.indexOf('        function syncSelectOptions('),html.indexOf('        window.updateTags'));
+    const ui=new Function('state','iconSvg','getAllLocations',`${reconcile}\n${filters}\n${admin}\nconst fetchDayData=()=>{}; const renderProducts=()=>{};return {locations:renderLocations,tags:renderTags,admin:renderAdminTable};`)(state,()=>'',()=>['冷柜','货架']);
+    ui.locations();ui.tags();ui.admin();
+    const loc=document.querySelector('#locationList button');const tag=document.querySelector('#tagFilterList .tag-chip');
+    loc.focus();ui.locations();ui.tags();
+    assert(loc===document.querySelector('#locationList button') && document.activeElement===loc,'unchanged location buttons keep identity and focus');
+    assert(tag===document.querySelector('#tagFilterList .tag-chip'),'unchanged tag chips keep identity');
+    state.currentLocation='冷柜';const coldButton=Array.from(document.querySelectorAll('#locationList button')).find(b=>b.textContent==='冷柜');coldButton.focus();ui.locations();
+    assert(coldButton.classList.contains('active') && document.activeElement===coldButton,'focused filter reflects new selection without replacement');
+    const select=document.getElementById('editLocationSelect');select.value='货架';
+    const adminInput=document.querySelector('#adminTableBody [data-id="1"] input');adminInput.focus();adminInput.value='未保存名称';
+    state.products[1].name='新洋葱';ui.admin();
+    assert(document.activeElement===adminInput && adminInput.value==='未保存名称','admin draft and focus survive unrelated remote changes');
+    assert(document.querySelector('#adminTableBody [data-id="2"] input').value==='新洋葱','other admin rows update normally');
+    assert(select.value==='货架' && document.getElementById('adminLocFilter').value==='冷柜','select values survive background render');
+    adminInput.blur();await new Promise(requestAnimationFrame);ui.admin();
+    assert(adminInput.isConnected && adminInput.value==='未保存名称','unacknowledged admin draft survives blur and sync');
+    state.products[0].name=adminInput.value;adminInput.defaultValue=adminInput.value;ui.admin();
+    assert(document.querySelector('#adminTableBody [data-id="1"] input').value==='未保存名称','acknowledged admin change settles');
     const writes=html.slice(html.indexOf('        function saveCartEdit('),html.indexOf('        function getDynamicLocations('));
     new Function('state','writeCache','updateFooter','showToast','renderProducts','applyPredictionHintsToDOM','fetchDayData',`const CACHE_KEYS={cart:'test-cart'};${writes}`)(state,()=>{},()=>{},()=>{},render,()=>{},render);
     window.onQtyChange(99999,'12');
@@ -33,7 +61,7 @@ async page => {
     assert(window.OrderCartSync.overlay('2026-09-09',{})[99999].qty===12,'date captured before switching');
     assert(window.OrderCartSync.overlay('2026-09-10',{})[99999].qty===4,'new date has separate pending quantity');
     assert(window.OrderCartSync.pendingCount===2,'failed writes retained');
-    return {passed:true,scenarios:['stable summary nodes','scroll anchor','active input','purchase styling','date isolation','failed-write retention']};
+    return {passed:true,scenarios:['stable summary nodes','scroll anchor','active input','purchase styling','remote deletion draft protection','stable filters','admin draft and dropdown preservation','date isolation','failed-write retention']};
   },{html,queue});
   await page.reload();
   const recovered=await page.evaluate(queue=>{

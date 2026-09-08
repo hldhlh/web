@@ -2818,13 +2818,25 @@
             renderLocations();
         }
 
+        function syncSelectOptions(select, html, selected = select?.value) {
+            if (!select) return;
+            if (document.activeElement === select) {
+                select.onblur = () => { select.onblur = null; syncSelectOptions(select, html, select.value); };
+                return;
+            }
+            if (select.dataset.optionsHtml === html) return;
+            select.innerHTML = html;
+            select.dataset.optionsHtml = html;
+            if (Array.from(select.options).some(option => option.value === selected)) select.value = selected;
+        }
+
         function renderAdminTable() {
             const locs = getAllLocations();
-            document.getElementById('adminLocFilter').innerHTML = '<option value="全部">全部定位</option>' + locs.map(c => `<option value="${c}">${c}</option>`).join('');
+            syncSelectOptions(document.getElementById('adminLocFilter'), '<option value="全部">全部定位</option>' + locs.map(c => `<option value="${c}">${c}</option>`).join(''), state.adminLoc);
 
             const locOptions = '<option value="">请选择商品定位</option>' + locs.map(c => `<option value="${c}">${c}</option>`).join('') + '<option value="_custom_">➕ 新增定位...</option>';
             const editLocSelect = document.getElementById('editLocationSelect');
-            if (editLocSelect) editLocSelect.innerHTML = locOptions;
+            syncSelectOptions(editLocSelect, locOptions);
 
             let filtered = state.products;
             if (state.adminLoc !== '全部') filtered = filtered.filter(p => p.location === state.adminLoc);
@@ -2839,10 +2851,13 @@
                 });
             }
 
-            document.getElementById('adminTableBody').innerHTML = filtered.map(p => {
+            const list = document.getElementById('adminTableBody');
+            const anchor = Array.from(list.children).find(row => row.getBoundingClientRect().bottom > 0);
+            const anchorTop = anchor?.getBoundingClientRect().top;
+            const html = filtered.map(p => {
                 const tags = Array.isArray(p.tags) ? p.tags : [];
                 return `
-                <div class="admin-row" style="grid-template-columns: 1.2fr 0.8fr 70px 1.5fr auto;">
+                <div class="admin-row" data-id="${p.id}" style="grid-template-columns: 1.2fr 0.8fr 70px 1.5fr auto;">
                     <div class="admin-cell">
                         <span class="card-label">商品名称</span>
                         <input type="text" class="admin-input-flat" value="${p.name}" onchange="updateField(${p.id}, 'name', this.value)">
@@ -2867,9 +2882,12 @@
                     </button>
                 </div>`;
             }).join('');
+            reconcileProductCards(list, html);
+            if (anchor?.isConnected) window.scrollBy({top: anchor.getBoundingClientRect().top - anchorTop, behavior: 'instant'});
         }
 
         window.updateTags = async (id, val) => {
+            const draft = document.querySelector(`#adminTableBody [data-id="${id}"] input[onchange*="updateTags"]`);
             const tags = val.split(/[，,]/).map(t => t.trim()).filter(t => t);
             // 设置跳过实时事件的时间窗口
             state.skipRealtimeUntil = Date.now() + 2000;
@@ -2881,6 +2899,7 @@
                     showToast('更新标签失败');
                 } else {
                     await fetchProducts();
+                    if (draft?.value === val) draft.defaultValue = val;
                     renderAdminTable();
                     renderTags();
                     showToast('标签已更新');
@@ -2894,6 +2913,7 @@
         };
 
         window.updateField = async (id, field, value) => {
+            const draft = Array.from(document.querySelectorAll(`#adminTableBody [data-id="${id}"] input`)).find(input => input.getAttribute('onchange')?.includes(`'${field}'`));
             document.getElementById('saveStatus').innerText = '正在保存...';
             // 设置跳过实时事件的时间窗口
             state.skipRealtimeUntil = Date.now() + 2000;
@@ -2910,8 +2930,9 @@
                 } else {
                     document.getElementById('saveStatus').innerText = '已保存';
                     await fetchProducts();
+                    if (draft?.value === value) draft.defaultValue = value;
+                    renderAdminTable();
                     if (field === 'location' || field === 'name') {
-                        renderAdminTable();
                         renderLocations();
                     }
                 }
@@ -3187,8 +3208,13 @@
             const countDisplayTop = document.getElementById('orderCountTop');
 
             if (state.cartItems.length === 0) {
+                if (list.contains(document.activeElement)) {
+                    list.dataset.deferredSync = 'true';
+                    return;
+                }
                 totalBar.style.display = 'none';
-                return list.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text-sub);font-weight:600;">⚠️ 暂无报货记录</div>`;
+                countDisplayTop.innerText = '0 项品种';
+                return reconcileProductCards(list, `<div data-id="empty" style="padding:40px;text-align:center;color:var(--text-sub);font-weight:600;">⚠️ 暂无报货记录</div>`);
             }
 
             totalBar.style.display = 'flex';
@@ -3252,9 +3278,9 @@
                 state.currentLocation = '全部';
             }
 
-            document.getElementById('locationList').innerHTML = locs.map(l =>
-                `<button class="loc-btn ${l === state.currentLocation ? 'active' : ''}" onclick="filterLoc('${l}')">${l}</button>`
-            ).join('');
+            reconcileProductCards(document.getElementById('locationList'), locs.map(l =>
+                `<button data-id="${encodeURIComponent(l)}" class="loc-btn ${l === state.currentLocation ? 'active' : ''}" onclick="filterLoc('${l}')">${l}</button>`
+            ).join(''));
         }
 
         window.filterLoc = cat => {
@@ -3283,11 +3309,11 @@
             }
             container.style.display = 'flex';
             if (titles[0]) titles[0].style.display = 'flex';
-            container.innerHTML = allTags.map(tag => `
-                <div class="tag-chip ${state.activeTags.has(tag) ? 'active' : ''}" onclick="toggleTagFilter('${tag}')">
+            reconcileProductCards(container, allTags.map(tag => `
+                <div data-id="${encodeURIComponent(tag)}" class="tag-chip ${state.activeTags.has(tag) ? 'active' : ''}" onclick="toggleTagFilter('${tag}')">
                     ${tag}
                 </div>
-            `).join('');
+            `).join(''));
         }
 
         window.toggleTagFilter = (tag) => {
@@ -3303,31 +3329,42 @@
                 list.addEventListener('focusout', () => {
                     if (list.dataset.deferredSync !== 'true') return;
                     delete list.dataset.deferredSync;
-                    requestAnimationFrame(() => list.id === 'summaryList' ? fetchDayData() : renderProducts());
+                    requestAnimationFrame(() => list.id === 'summaryList' ? fetchDayData() : list.id === 'adminTableBody' ? renderAdminTable() : renderProducts());
                 });
             }
             const template = document.createElement('template');
             template.innerHTML = html;
             const previous = new Map(Array.from(list.children, card => [card.dataset.id, card]));
+            // Keep focused rows and unacknowledged admin drafts, including remote deletions.
+            const protectedRow = card => card.contains(document.activeElement) ||
+                (list.id === 'adminTableBody' && Array.from(card.querySelectorAll('input')).some(input => input.value !== input.defaultValue));
             const wanted = new Set();
             let cursor = list.firstElementChild;
             for (const next of Array.from(template.content.children)) {
                 const id = next.dataset.id;
                 wanted.add(id);
                 let card = previous.get(id);
+                // Selection/checked appearance can update without replacing focused controls.
+                if (card) card.className = next.className;
                 if (!card) card = next;
-                else if (!card.isEqualNode(next) && !card.contains(document.activeElement)) {
+                else if (!card.isEqualNode(next) && !protectedRow(card)) {
                     // Patch in place so the card remains a stable scroll anchor.
                     card.className = next.className;
                     card.innerHTML = next.innerHTML;
                 } else if (!card.isEqualNode(next)) {
                     list.dataset.deferredSync = 'true';
                 }
-                if (card !== cursor) list.insertBefore(card, cursor);
+                if (card !== cursor) {
+                    if (protectedRow(card)) list.dataset.deferredSync = 'true';
+                    else list.insertBefore(card, cursor);
+                }
                 cursor = card.nextElementSibling;
             }
             for (const [id, card] of previous) {
-                if (!wanted.has(id)) card.remove();
+                if (!wanted.has(id)) {
+                    if (protectedRow(card)) list.dataset.deferredSync = 'true';
+                    else card.remove();
+                }
             }
         }
 
