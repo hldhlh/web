@@ -25,6 +25,12 @@
   };
   const $ = (selector) => document.querySelector(selector);
   const app = $("#feedback-app");
+  const timeFormat = new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
+  const dateFormat = new Intl.DateTimeFormat("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+  let hydrated = false;
+  let writeGeneration = 0;
+  let pullPromise = null;
+  let pullAgain = false;
 
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]);
@@ -74,9 +80,9 @@
     if (!value) return "时间未知";
     const date = new Date(value);
     if (localDateKey(value) === localDateKey()) {
-      return `今天 ${new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false }).format(date)}`;
+      return `今天 ${timeFormat.format(date)}`;
     }
-    return new Intl.DateTimeFormat("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
+    return dateFormat.format(date);
   }
 
   function visibleItems() {
@@ -94,7 +100,7 @@
   }
 
   function managerActions(item) {
-    if (!isManager()) return "";
+    if (!hydrated || !isManager()) return "";
     if (item.status === "open") return `<button type="button" data-status-action="processing" data-id="${escapeHtml(item.id)}">开始处理</button>`;
     if (item.status === "processing") return `<button type="button" data-status-action="resolved" data-id="${escapeHtml(item.id)}">标记解决</button>`;
     return `<button type="button" data-status-action="open" data-id="${escapeHtml(item.id)}">重新打开</button>`;
@@ -152,15 +158,16 @@
     return JSON.parse(JSON.stringify(state.data));
   }
 
-  async function writeData(next) {
-    await window.AcademyStore.putJSON(FILE, next, { base: state.data });
+  async function writeData(next, base) {
+    writeGeneration++;
+    await window.AcademyStore.putJSON(FILE, next, { base });
     state.data = next;
     cacheData();
-    state.channel?.send({ type: "broadcast", event: "feedback-version", payload: { rev: next.rev } });
+    // Broadcast/refresh follows the durable cloud acknowledgement, not enqueue.
   }
 
   async function submitFeedback() {
-    if (state.saving) return;
+    if (!hydrated || state.saving) return;
     const title = $("#feedback-title").value.trim();
     const detail = $("#feedback-detail").value.trim();
     const category = $("#feedback-category").value;
@@ -184,23 +191,25 @@
         updatedAt: now,
         updatedBy: state.session.id
       };
-      await writeData({ rev: now, updatedAt: now, items: [item, ...latest.items] });
+      await writeData({ rev: now, updatedAt: now, items: [item, ...latest.items] }, latest);
       closeCompose();
       state.filter = "pending";
       render();
-      $("#sync-status").textContent = "已存本机，正在同步到云端";
-      showToast("问题已存本机，后台同步中");
+      $("#sync-status").textContent = "";
+      showToast("反馈已保存");
     } catch (error) {
       showToast(`提交失败：${error?.message || "请检查网络"}`);
     } finally {
       state.saving = false;
+      writeGeneration++;
+      if (pullAgain) pullFeedback(true);
       button.disabled = false;
       button.textContent = "提交";
     }
   }
 
   async function updateStatus(id, status) {
-    if (!isManager() || !STATUSES[status] || state.saving) return;
+    if (!hydrated || !isManager() || !STATUSES[status] || state.saving) return;
     state.saving = true;
     try {
       const latest = await readLatest();
@@ -208,33 +217,45 @@
       const items = latest.items.map((item) => item.id === id
         ? { ...item, status, updatedAt: now, updatedBy: state.session.id }
         : item);
-      await writeData({ rev: now, updatedAt: now, items });
+      await writeData({ rev: now, updatedAt: now, items }, latest);
       render();
       showToast(`已改为“${STATUSES[status]}”`);
     } catch (error) {
       showToast(`更新失败：${error?.message || "请检查网络"}`);
     } finally {
       state.saving = false;
+      writeGeneration++;
+      if (pullAgain) pullFeedback(true);
     }
   }
 
   async function pullFeedback(silent = false) {
-    try {
-      const raw = await window.AcademyStore.getJSON(FILE);
-      let changed = false;
-      if (raw) {
-        const next = normalizeData(raw);
-        if ((!next.rev || next.rev >= state.data.rev) && JSON.stringify(next) !== JSON.stringify(state.data)) {
-          state.data = next;
-          cacheData();
-          changed = true;
+    if (state.saving) { pullAgain = true; return; }
+    if (pullPromise) { pullAgain = true; return pullPromise; }
+    pullPromise = (async () => {
+      do {
+        pullAgain = false;
+        const generation = writeGeneration;
+        try {
+          const raw = await window.AcademyStore.getJSON(FILE);
+          if (state.saving || generation !== writeGeneration) { pullAgain = true; continue; }
+          let changed = false;
+          if (raw) {
+            const next = normalizeData(raw);
+            if ((!next.rev || next.rev >= state.data.rev) && JSON.stringify(next) !== JSON.stringify(state.data)) {
+              state.data = next;
+              cacheData();
+              changed = true;
+            }
+          }
+          $("#sync-status").textContent = "";
+          if (changed || state.renderDay !== new Date().toDateString()) render();
+        } catch (_) {
+          if (!silent) $("#sync-status").textContent = "当前离线，显示上次同步的问题";
         }
-      }
-      $("#sync-status").textContent = "";
-      if (changed || state.renderDay !== new Date().toDateString()) render();
-    } catch (_) {
-      if (!silent) $("#sync-status").textContent = "当前离线，显示上次同步的问题";
-    }
+      } while (pullAgain && !state.saving && !document.hidden);
+    })();
+    try { await pullPromise; } finally { pullPromise = null; }
   }
 
   let toastTimer = 0;
@@ -273,23 +294,30 @@
         await window.AcademyAuth.start();
         // Background account refresh is started by Auth.start().
       }
-      const cached = await window.AcademyStore.getJSON(FILE, { cached: true });
-      if (cached) state.data = normalizeData(cached);
       state.session = window.AcademyAuth.session;
       if (!state.session) {
         app.innerHTML = `<div class="empty-state"><strong>请先登录</strong><span>返回 Auto Office 登录后即可反馈和查看问题。</span></div>`;
         return;
       }
-      $("#sync-status").textContent = state.data.rev ? "已显示上次问题，正在同步…" : "正在同步最新问题…";
+      // Paint the lightweight cache before waiting for IndexedDB hydration.
+      $("#submit-feedback").disabled = true;
+      $("#sync-status").textContent = "";
       render();
       app.setAttribute("aria-busy", "false");
+      const cached = await window.AcademyStore.getJSON(FILE, { cached: true });
+      if (window.AcademyAuth.session?.id !== state.session.id) { location.reload(); return; }
+      state.session = window.AcademyAuth.session;
+      if (cached) state.data = normalizeData(cached);
+      hydrated = true;
+      $("#submit-feedback").disabled = false;
+      render();
       state.channel = window.AcademyStore.channel("academy-feedback-live", {
         "feedback-version": (payload) => {
           if (Number(payload?.rev) > state.data.rev) pullFeedback(true);
         }
       });
-      await pullFeedback();
-      setInterval(() => { if (!document.hidden) pullFeedback(true); }, 30000);
+      const poll = setInterval(() => { if (!document.hidden) pullFeedback(true); }, 30000);
+      window.addEventListener("online", () => pullFeedback(true));
       window.addEventListener("academy-data-updated", event => {
         const paths = event.detail?.paths;
         if (!Array.isArray(paths) || !paths.length || paths.includes(FILE)) pullFeedback(true);
@@ -302,7 +330,8 @@
         if (!session) location.reload();
         else render();
       });
-      window.addEventListener("pagehide", event => { if (!event.persisted) { stopAuth(); state.channel?.unsubscribe?.(); } });
+      window.addEventListener("pagehide", event => { if (!event.persisted) { clearInterval(poll); stopAuth(); state.channel?.unsubscribe?.(); } });
+      pullFeedback();
     } catch (error) {
       $("#sync-status").textContent = "暂时无法连接问题反馈服务";
       showToast(error?.message || "加载失败");

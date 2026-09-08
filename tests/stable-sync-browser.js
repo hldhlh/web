@@ -69,7 +69,7 @@ async page => {
       const state = {data:{rev:10, items:[]}, renderDay:new Date().toDateString()};
       let incoming = structuredClone(state.data), renders = 0;
       window.AcademyStore = {getJSON:async () => incoming};
-      const pull = new Function('state','FILE','normalizeData',cache,'$','render', `${body};return ${fn};`)(state,'mock', value => value, () => {}, () => ({}), () => renders++);
+      const pull = new Function('state','FILE','normalizeData',cache,'$','render', `let pullPromise=null,pullAgain=false,writeGeneration=0; ${body};return ${fn};`)(state,'mock', value => value, () => {}, () => ({}), () => renders++);
       await pull();
       assert(renders === 0, `${name}: equal poll skipped`);
       incoming = {rev:9,items:['old']}; await pull();
