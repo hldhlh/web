@@ -5,9 +5,9 @@ import {readFileSync} from 'node:fs';
 
 const source=readFileSync('apps/academy/version-guard.js','utf8');
 function fixture(runtimeReady=true) {
-  let now=0,status,push,fetcher=async()=>new Response('{"version":"abcdef0"}');
+  let now=0,status,push,broadcast,fetcher=async()=>new Response('{"version":"abcdef0"}');
   const events={},timers=new Map(),intervals=[],requests=[],prompts=[];let timerId=0;
-  const channel={on(type,filter,fn){push=fn;return this},subscribe(fn){status=fn;return this}};
+  const channel={on(type,filter,fn){if(type==='broadcast')broadcast=fn;else push=fn;return this},subscribe(fn){status=fn;return this}};
   const document={readyState:'complete',visibilityState:'visible',baseURI:'https://example.test/web/apps/academy/index.html',
     querySelector:()=>({content:'abcdef0'}),addEventListener:(event,fn)=>events[event]=fn,
     getElementById:()=>true,createElement:()=>({setAttribute(){},querySelector:()=>({addEventListener(){},focus(){}}),remove(){}}),body:{appendChild:node=>prompts.push(node)}};
@@ -18,7 +18,7 @@ function fixture(runtimeReady=true) {
     addEventListener:(event,fn)=>events[event]=fn,AcademyStore:{realtimeClient:()=>runtimeReady?({channel:()=>channel,removeChannel(){}}):null}};
   context.window=context;vm.runInNewContext(source,context);
   const settle=async()=>{await new Promise(setImmediate)};
-  return {context,requests,prompts,timers,settle,ready:()=>runtimeReady=true,advance:ms=>now+=ms,event:name=>events[name]?.(),status:s=>status(s),push:version=>push({new:{payload:{version}}}),tick:()=>intervals[0].fn(),fetcher:fn=>fetcher=fn};
+  return {context,requests,prompts,timers,settle,broadcast:version=>broadcast({payload:{version}}),ready:()=>runtimeReady=true,advance:ms=>now+=ms,event:name=>events[name]?.(),status:s=>status(s),push:version=>push({new:{payload:{version}}}),tick:()=>intervals[0].fn(),fetcher:fn=>fetcher=fn};
 }
 test('checks immediately and combines startup, connection and visibility events',async()=>{
   const f=fixture();f.status('SUBSCRIBED');f.event('online');f.event('visibilitychange');await f.settle();
@@ -58,4 +58,10 @@ test('hung requests time out and do not lock future version checks',async()=>{
   [...f.timers.values()].find(t=>t.delay===8000).fn();await pending;
   f.fetcher(async()=>new Response('{"version":"abcdef0"}'));await f.context.AutoOfficeVersion.check();
   assert.equal(f.requests.length,3);
+});
+test('broadcast wakes a coalesced manifest check rather than trusting public metadata',async()=>{
+  const f=fixture();await f.settle();f.broadcast('abcdef9');f.broadcast('abcdef9');
+  assert.equal(f.prompts.length,0);assert.equal(f.timers.size,1);
+  await [...f.timers.values()][0].fn();await f.settle();
+  assert.equal(f.requests.length,2);assert.equal(f.prompts.length,0);
 });

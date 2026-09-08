@@ -19,6 +19,7 @@
   let realtimeConnected = false;
   let lastAttempt = -Infinity;
   let failedChecks = 0;
+  let broadcastCheckTimer = 0;
 
   function isVersion(value) {
     return VERSION_PATTERN.test(String(value || '').trim());
@@ -226,6 +227,15 @@
     realtimeRetryTimer = 0;
     const channel = client
       .channel('auto-office-version-live')
+      .on('broadcast', {event:'version-published'}, ({payload}) => {
+        // Public broadcasts only wake checks; the manifest determines the release.
+        if (!isVersion(payload?.version) || payload.version === currentVersion || broadcastCheckTimer) return;
+        broadcastCheckTimer = setTimeout(async () => {
+          if (checking) await checking;
+          broadcastCheckTimer = 0;
+          checkForUpdate();
+        }, Math.max(100, EVENT_COOLDOWN_MS - (Date.now() - lastAttempt)));
+      })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
