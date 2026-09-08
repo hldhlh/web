@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 
 const source=readFileSync('apps/academy/version-guard.js','utf8');
-function fixture() {
+function fixture(runtimeReady=true) {
   let now=0,status,push,fetcher=async()=>new Response('{"version":"abcdef0"}');
   const events={},timers=new Map(),intervals=[],requests=[],prompts=[];let timerId=0;
   const channel={on(type,filter,fn){push=fn;return this},subscribe(fn){status=fn;return this}};
@@ -15,10 +15,10 @@ function fixture() {
     sessionStorage:{getItem:()=>null,removeItem(){}},console:{debug(){}},
     fetch:(url,options)=>{requests.push({url:String(url),options});return fetcher(url,options)},
     setTimeout:(fn,delay)=>{timers.set(++timerId,{fn,delay});return timerId},clearTimeout:id=>timers.delete(id),setInterval:(fn,delay)=>intervals.push({fn,delay}),
-    addEventListener:(event,fn)=>events[event]=fn,AcademyStore:{realtimeClient:()=>({channel:()=>channel,removeChannel(){}})}};
+    addEventListener:(event,fn)=>events[event]=fn,AcademyStore:{realtimeClient:()=>runtimeReady?({channel:()=>channel,removeChannel(){}}):null}};
   context.window=context;vm.runInNewContext(source,context);
   const settle=async()=>{await new Promise(setImmediate)};
-  return {context,requests,prompts,timers,settle,advance:ms=>now+=ms,event:name=>events[name]?.(),status:s=>status(s),push:version=>push({new:{payload:{version}}}),tick:()=>intervals[0].fn(),fetcher:fn=>fetcher=fn};
+  return {context,requests,prompts,timers,settle,ready:()=>runtimeReady=true,advance:ms=>now+=ms,event:name=>events[name]?.(),status:s=>status(s),push:version=>push({new:{payload:{version}}}),tick:()=>intervals[0].fn(),fetcher:fn=>fetcher=fn};
 }
 test('checks immediately and combines startup, connection and visibility events',async()=>{
   const f=fixture();f.status('SUBSCRIBED');f.event('online');f.event('visibilitychange');await f.settle();
@@ -26,17 +26,23 @@ test('checks immediately and combines startup, connection and visibility events'
   assert.equal(new URL(f.requests[0].url).search,'');assert.equal(f.requests[0].options.cache,'no-cache');
   f.event('visibilitychange');await f.settle();assert.equal(f.requests.length,1);
 });
-test('healthy realtime uses five-minute HTTP fallback and pushes without another read',async()=>{
+test('healthy realtime checks every thirty seconds and pushes without another read',async()=>{
   const f=fixture();f.status('SUBSCRIBED');await f.settle();
-  f.advance(30000);f.tick();await f.settle();assert.equal(f.requests.length,1);
-  f.advance(270000);f.tick();await f.settle();assert.equal(f.requests.length,2);
+  f.advance(25000);f.tick();await f.settle();assert.equal(f.requests.length,1);
+  f.advance(5000);f.tick();await f.settle();assert.equal(f.requests.length,2);
   f.push('abcdef1');assert.equal(f.prompts.length,1);assert.equal(f.requests.length,2);
 });
-test('disconnected realtime polls every fifteen seconds and failures back off',async()=>{
-  const f=fixture();await f.settle();f.advance(15000);f.tick();await f.settle();assert.equal(f.requests.length,2);
-  f.fetcher(async()=>{throw Error('offline')});f.advance(15000);f.tick();await f.settle();assert.equal(f.requests.length,3);
-  f.advance(15000);f.tick();await f.settle();assert.equal(f.requests.length,3);
-  f.advance(15000);f.tick();await f.settle();assert.equal(f.requests.length,4);
+test('disconnected realtime polls every five seconds and failures back off',async()=>{
+  const f=fixture();await f.settle();f.advance(5000);f.tick();await f.settle();assert.equal(f.requests.length,2);
+  f.fetcher(async()=>{throw Error('offline')});f.advance(5000);f.tick();await f.settle();assert.equal(f.requests.length,3);
+  f.advance(5000);f.tick();await f.settle();assert.equal(f.requests.length,3);
+  f.advance(5000);f.tick();await f.settle();assert.equal(f.requests.length,4);
+});
+test('SDK readiness subscribes immediately and cancels delayed reconnect',async()=>{
+  const f=fixture(false);await f.settle();assert.equal(f.timers.size,1);
+  f.ready();f.event('app-sdk-ready');f.status('SUBSCRIBED');
+  assert.equal(f.timers.size,0);
+  f.push('abcdef1');assert.equal(f.prompts.length,1);assert.equal(f.requests.length,1);
 });
 test('hidden/offline checks pause; foreground and manual checks are immediate',async()=>{
   const f=fixture();f.status('SUBSCRIBED');await f.settle();f.advance(300000);

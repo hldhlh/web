@@ -1,9 +1,10 @@
 (() => {
   'use strict';
 
-  const FALLBACK_INTERVAL_MS = 15 * 1000;
-  const HEALTHY_INTERVAL_MS = 5 * 60 * 1000;
-  const EVENT_COOLDOWN_MS = 5 * 1000;
+  const FALLBACK_INTERVAL_MS = 5 * 1000;
+  const HEALTHY_INTERVAL_MS = 30 * 1000;
+  const FAILURE_BACKOFF_MAX_MS = 5 * 60 * 1000;
+  const EVENT_COOLDOWN_MS = 1000;
   const DISMISSED_KEY = 'academy-version-dismissed';
   const REALTIME_ROW_ID = 'app-version';
   const VERSION_PATTERN = /^[0-9a-f]{7,40}$/i;
@@ -221,6 +222,8 @@
       scheduleRealtimeReconnect();
       return null;
     }
+    clearTimeout(realtimeRetryTimer);
+    realtimeRetryTimer = 0;
     const channel = client
       .channel('auto-office-version-live')
       .on('postgres_changes', {
@@ -269,6 +272,10 @@
   // Do not wait for images, videos or the window load event before checking.
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startVersionChecks, {once:true});
   else startVersionChecks();
+  // Subscribe as soon as the lazy-loaded SDK is ready, without waiting for
+  // the next exponential reconnect timer (which can be up to 30 seconds away).
+  window.addEventListener('app-sdk-ready', startVersionChecks);
+  window.addEventListener('academy-sdk-ready', startVersionChecks);
   window.addEventListener('online', () => {
     connectRealtime();
     checkForUpdate(false);
@@ -281,7 +288,7 @@
   });
   setInterval(() => {
     const delay = failedChecks
-      ? Math.min(HEALTHY_INTERVAL_MS, FALLBACK_INTERVAL_MS * 2 ** Math.min(failedChecks, 5))
+      ? Math.min(FAILURE_BACKOFF_MAX_MS, FALLBACK_INTERVAL_MS * 2 ** Math.min(failedChecks, 6))
       : realtimeConnected ? HEALTHY_INTERVAL_MS : FALLBACK_INTERVAL_MS;
     if (Date.now() - lastAttempt >= delay) checkForUpdate(false);
   }, FALLBACK_INTERVAL_MS);
