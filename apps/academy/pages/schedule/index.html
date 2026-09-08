@@ -96,6 +96,20 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
+  <script>
+    // Paint date geometry immediately, without waiting for authentication or cloud reads.
+    (() => {
+      const today = new Date();
+      const first = new Date(today.getFullYear(), today.getMonth(), 1);
+      first.setDate(1 - (first.getDay() + 6) % 7);
+      document.getElementById('month-title').textContent = new Intl.DateTimeFormat('zh-CN', {year:'numeric', month:'long'}).format(today);
+      document.getElementById('selected-day-title').textContent = new Intl.DateTimeFormat('zh-CN', {month:'long', day:'numeric', weekday:'long'}).format(today);
+      document.getElementById('calendar-grid').innerHTML = Array.from({length:42}, (_, index) => {
+        const date = new Date(first); date.setDate(first.getDate() + index);
+        return `<div class="calendar-day skeleton ${date.getMonth() !== today.getMonth() ? 'outside' : ''}" aria-hidden="true"><span class="day-number">${date.getDate()}</span></div>`;
+      }).join('');
+    })();
+  </script>
   <script src="./bootstrap.js"></script>
 </body>
 </html>
