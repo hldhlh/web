@@ -1,7 +1,9 @@
 (() => {
   'use strict';
 
-  const CHECK_INTERVAL_MS = 30 * 1000;
+  const FALLBACK_INTERVAL_MS = 15 * 1000;
+  const HEALTHY_INTERVAL_MS = 5 * 60 * 1000;
+  const EVENT_COOLDOWN_MS = 5 * 1000;
   const DISMISSED_KEY = 'academy-version-dismissed';
   const REALTIME_ROW_ID = 'app-version';
   const VERSION_PATTERN = /^[0-9a-f]{7,40}$/i;
@@ -13,6 +15,9 @@
   let realtimeChannel = null;
   let realtimeRetryTimer = 0;
   let realtimeRetryAttempt = 0;
+  let realtimeConnected = false;
+  let lastAttempt = -Infinity;
+  let failedChecks = 0;
 
   function isVersion(value) {
     return VERSION_PATTERN.test(String(value || '').trim());
@@ -27,15 +32,25 @@
 
   async function fetchLatestVersion() {
     const url = new URL(manifestUrl);
-    url.searchParams.set('_', Date.now().toString());
-    const response = await fetch(url, {
-      cache: 'no-store',
-      credentials: 'same-origin',
-      headers: { Accept: 'application/json' }
-    });
-    if (!response.ok) throw new Error(`Version check failed: ${response.status}`);
-    const manifest = await response.json();
-    return String(manifest?.version || '').trim();
+    // Revalidate the same URL so HTTP ETag/Last-Modified can avoid downloading
+    // an unchanged manifest. The service worker already bypasses version.json.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    try {
+      const response = await fetch(url, {
+        cache: 'no-cache',
+        signal: controller.signal,
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' }
+      });
+      if (!response.ok) throw new Error(`Version check failed: ${response.status}`);
+      const manifest = await response.json();
+      const version = String(manifest?.version || '').trim();
+      if (!isVersion(version)) throw new Error('Invalid version manifest');
+      return version;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   function handleLatestVersion(latestVersion) {
@@ -168,14 +183,18 @@
     location.replace(url.href);
   }
 
-  async function checkForUpdate() {
+  async function checkForUpdate(force = true) {
     if (document.visibilityState !== 'visible' || !isVersion(currentVersion) || updating || modal || !navigator.onLine) return false;
     if (checking) return checking;
+    if (!force && Date.now() - lastAttempt < EVENT_COOLDOWN_MS) return false;
+    lastAttempt = Date.now();
     checking = (async () => {
       try {
         const latestVersion = await fetchLatestVersion();
+        failedChecks = 0;
         return handleLatestVersion(latestVersion);
       } catch (error) {
+        failedChecks += 1;
         console.debug('[Auto Office] 后台版本核对暂不可用。', error);
         return false;
       } finally {
@@ -186,7 +205,7 @@
   }
 
   function scheduleRealtimeReconnect() {
-    if (realtimeRetryTimer || realtimeChannel || updating || !navigator.onLine) return;
+    if (realtimeRetryTimer || realtimeChannel || updating || !navigator.onLine || document.visibilityState !== 'visible') return;
     const delay = Math.min(30000, 800 * (2 ** Math.min(realtimeRetryAttempt, 5)));
     realtimeRetryAttempt += 1;
     realtimeRetryTimer = setTimeout(() => {
@@ -196,7 +215,7 @@
   }
 
   function connectRealtime() {
-    if (realtimeChannel || updating || !navigator.onLine) return realtimeChannel;
+    if (realtimeChannel || updating || !navigator.onLine || document.visibilityState !== 'visible') return realtimeChannel;
     const client = window.AcademyStore?.realtimeClient?.();
     if (!client) {
       scheduleRealtimeReconnect();
@@ -217,15 +236,21 @@
     channel.subscribe((status) => {
       if (realtimeChannel !== channel) return;
       if (status === 'SUBSCRIBED') {
+        const wasConnected = realtimeConnected;
+        realtimeConnected = true;
         realtimeRetryAttempt = 0;
         clearTimeout(realtimeRetryTimer);
         realtimeRetryTimer = 0;
+        // Catch versions published while the subscription was disconnected.
+        if (!wasConnected) checkForUpdate(false);
         return;
       }
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        realtimeConnected = false;
         realtimeChannel = null;
         try { client.removeChannel(channel); } catch (_) {}
         scheduleRealtimeReconnect();
+        checkForUpdate(false);
       }
     });
     return channel;
@@ -237,19 +262,27 @@
     check: checkForUpdate,
     subscribe: connectRealtime
   });
-  window.addEventListener('load', () => {
+  function startVersionChecks() {
     connectRealtime();
-    setTimeout(checkForUpdate, 1200);
-  }, { once: true });
+    checkForUpdate(false);
+  }
+  // Do not wait for images, videos or the window load event before checking.
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startVersionChecks, {once:true});
+  else startVersionChecks();
   window.addEventListener('online', () => {
     connectRealtime();
-    checkForUpdate();
+    checkForUpdate(false);
   });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       connectRealtime();
-      checkForUpdate();
+      checkForUpdate(false);
     }
   });
-  setInterval(checkForUpdate, CHECK_INTERVAL_MS);
+  setInterval(() => {
+    const delay = failedChecks
+      ? Math.min(HEALTHY_INTERVAL_MS, FALLBACK_INTERVAL_MS * 2 ** Math.min(failedChecks, 5))
+      : realtimeConnected ? HEALTHY_INTERVAL_MS : FALLBACK_INTERVAL_MS;
+    if (Date.now() - lastAttempt >= delay) checkForUpdate(false);
+  }, FALLBACK_INTERVAL_MS);
 })();
