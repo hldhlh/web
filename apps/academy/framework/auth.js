@@ -1,4 +1,17 @@
 window.AcademyAuth = (() => {
+  const shortcuts = Object.freeze([
+    { id: "notes", title: "门店笔记", icon: "notes", src: "https://hldhlh.github.io/web/apps/notes/index.html" },
+    { id: "jlhcdh", title: "订货表", icon: "exam", src: "https://hldhlh.github.io/web/apps/jlhcdh/index.html" },
+    { id: "schedule", title: "排班", icon: "schedule", src: "./pages/schedule/index.html" },
+    { id: "feedback", title: "每日反馈", icon: "feedback", src: "./pages/feedback/index.html" },
+    { id: "meat-template", title: "报货模版", icon: "notes", src: "./pages/meat-template/index.html" }
+  ].map(Object.freeze));
+  function shortcutAccess(value) {
+    return Object.fromEntries(shortcuts.map(({ id }) => [id, value?.[id] !== false]));
+  }
+  function canShortcut(user, id) {
+    return shortcuts.some(item => item.id === id) && canEnter(user) && (isManager(user) || user.shortcutAccess?.[id] !== false);
+  }
   const FILE = "academy/accounts.json";
   const SESSION_KEY = "academy-session-v1";
   const NOTICE_KEY = "academy-auth-notice-v1";
@@ -117,6 +130,8 @@ window.AcademyAuth = (() => {
       name: user.name,
       role: user.role,
       access: user.access,
+      shortcutAccess: shortcutAccess(user.shortcutAccess),
+      hideRestrictedShortcuts: user.hideRestrictedShortcuts !== false,
       createdAt: user.createdAt,
       approvedAt: user.approvedAt,
       approvedBy: user.approvedBy
@@ -293,6 +308,24 @@ window.AcademyAuth = (() => {
     return publicUser(user);
   }
 
+  async function setShortcutAccess(userId, permissions, hideRestricted = true) {
+    if (!isManager(session)) throw new Error("只有店长可以管理快捷权限");
+    await pull(true);
+    if (!isManager(session)) throw new Error("店长权限已失效，请重新登录");
+    const user = findById(userId);
+    if (!user) throw new Error("找不到这个人");
+    if (user.role === "manager") throw new Error("店长始终可以访问全部快捷功能");
+    if (!permissions || shortcuts.some(({ id }) => typeof permissions[id] !== "boolean")) throw new Error("请选择每项快捷功能的访问权限");
+    const previous = { shortcutAccess: user.shortcutAccess, hideRestrictedShortcuts: user.hideRestrictedShortcuts };
+    user.shortcutAccess = shortcutAccess(permissions);
+    user.hideRestrictedShortcuts = hideRestricted !== false;
+    try { await push(); }
+    catch (error) { Object.assign(user, previous); throw error; }
+    try { localStorage.setItem("academy-people-cache-v1", JSON.stringify(users.map(publicUser))); } catch (_) {}
+    refreshSession();
+    return publicUser(user);
+  }
+
   function list() {
     return users.map(publicUser);
   }
@@ -330,6 +363,9 @@ window.AcademyAuth = (() => {
 
   return {
     get session() { return session; },
+    shortcuts,
+    canShortcut,
+    setShortcutAccess,
     canEnter,
     canFull,
     isManager,

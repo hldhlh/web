@@ -91,3 +91,18 @@
   .admin-members, .admin-destinations a, .admin-page .counts, .ops-mode .ops-content .card { outline: 1px solid var(--muted); }
   .admin-access, .admin-member-copy p { color: var(--text); }
 }
+
+.shortcut-permissions-dialog { width: min(560px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); color: var(--text); }
+.shortcut-permissions-dialog::backdrop { background: #0006; }
+.shortcut-permissions-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px; border-bottom: 1px solid var(--line); }
+.shortcut-permissions-dialog h2 { font-size: 1.0625rem; text-align: center; margin: 0; overflow-wrap: anywhere; }
+.shortcut-permissions-dialog button { min-width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--accent); font: inherit; padding: 8px; }
+.shortcut-permissions-dialog button:disabled { opacity: .5; }
+.shortcut-permissions-content { padding: 16px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+.shortcut-permission-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; min-height: 56px; border-bottom: 1px solid var(--line); font-size: 1.0625rem; cursor: pointer; }
+.shortcut-permission-row input { width: 24px; height: 24px; accent-color: var(--accent); margin: 10px; }
+.shortcut-visibility-label { display: block; margin: 24px 0 8px; font-size: .9375rem; }
+#restricted-visibility { width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); color: var(--text); font: inherit; padding: 8px; }
+#shortcut-permissions-status { margin: 12px 0 0; color: var(--muted); font-size: .8125rem; line-height: 1.5; }
+.shortcut-locked { display: block; color: var(--muted); font-size: .8125rem; margin-top: 6px; }
+.shortcut-permissions-dialog :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }

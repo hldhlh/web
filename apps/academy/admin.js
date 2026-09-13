@@ -5,6 +5,7 @@
   let busy = false;
   let query = "";
   let filter = "all";
+  let permissionUserId = null;
 
   function escapeHtml(value) {
     return String(value)
@@ -108,6 +109,7 @@
           <span class="admin-access">${user.role === "manager" ? "店长" : "员工"} · ${accessLabel(user)}</span>
           <p class="muted">注册于 ${escapeHtml((user.createdAt || "").replace("T", " ").slice(0, 16))}${user.approvedBy ? ` · ${escapeHtml(user.approvedBy)} 授权` : ""}</p>
           </div><div class="tools">
+            ${user.role !== "manager" ? `<button data-act="shortcut-permissions" data-id="${escapeHtml(user.id)}">快捷权限</button>` : '<span class="muted">快捷功能全部可用</span>'}
             ${user.access !== "full" && user.access !== "blocked" ? `<button data-act="full" data-id="${user.id}">授权全部</button>` : ""}
             ${user.access === "full" && user.id !== Auth.session.id ? `<button data-act="basic" data-id="${user.id}">收回全部</button>` : ""}
             ${user.access !== "blocked" && user.id !== Auth.session.id ? `<button data-act="blocked" data-id="${user.id}">停用</button>` : ""}
@@ -135,6 +137,7 @@
       if (filterButton) { filter = filterButton.dataset.filter; filterMembers(); return; }
       const btn = event.target.closest("[data-act]");
       if (!btn || busy) return;
+      if (btn.dataset.act === "shortcut-permissions") { openShortcutPermissions(btn.dataset.id); return; }
       busy = true;
       btn.disabled = true;
       const label = btn.textContent;
@@ -152,15 +155,49 @@
     };
   }
 
+  function openShortcutPermissions(userId) {
+    const user = Auth.list().find(item => item.id === userId);
+    if (!user || user.role === "manager") return;
+    permissionUserId = user.id;
+    const dialog = document.getElementById("shortcut-permissions-dialog");
+    document.getElementById("shortcut-permissions-title").textContent = `${user.name} · 快捷权限`;
+    document.getElementById("shortcut-permissions-options").innerHTML = Auth.shortcuts.map(item => `<label class="shortcut-permission-row"><span>${item.title}</span><input type="checkbox" name="${item.id}" ${Auth.canShortcut({ ...user, access: "full" }, item.id) ? "checked" : ""} aria-label="允许访问${item.title}"></label>`).join("");
+    document.getElementById("restricted-visibility").value = user.hideRestrictedShortcuts === false ? "locked" : "hidden";
+    document.getElementById("shortcut-permissions-status").textContent = user.access === "blocked" ? "该账号已停用，恢复账号后这些设置才会生效。" : "勾选后允许访问；未勾选则禁止进入。";
+    dialog.showModal();
+  }
+
+  async function saveShortcutPermissions(event) {
+    event.preventDefault();
+    if (busy || !permissionUserId) return;
+    busy = true;
+    const button = document.getElementById("save-shortcut-permissions");
+    const status = document.getElementById("shortcut-permissions-status");
+    button.disabled = true;
+    document.getElementById("cancel-shortcut-permissions").disabled = true;
+    button.textContent = "保存中…";
+    try {
+      const permissions = Object.fromEntries(Auth.shortcuts.map(({ id }) => [id, event.target.elements.namedItem(id).checked]));
+      await Auth.setShortcutAccess(permissionUserId, permissions, document.getElementById("restricted-visibility").value === "hidden");
+      document.getElementById("shortcut-permissions-dialog").close();
+      paint();
+      document.getElementById("member-result").textContent = "快捷权限已保存";
+    } catch (error) { status.textContent = error.message || "保存失败，请重试"; }
+    finally { busy = false; button.disabled = false; document.getElementById("cancel-shortcut-permissions").disabled = false; button.textContent = "保存"; }
+  }
+
   function paint() {
     view().onclick = null;
     document.getElementById("out-btn").hidden = !Auth.session;
-    if (!Auth.session) return renderGate();
-    if (!Auth.isManager(Auth.session)) return renderDenied();
+    if (!Auth.session) { document.getElementById("shortcut-permissions-dialog").close(); return renderGate(); }
+    if (!Auth.isManager(Auth.session)) { document.getElementById("shortcut-permissions-dialog").close(); return renderDenied(); }
     renderBoard();
   }
 
   async function init() {
+    document.getElementById("shortcut-permissions-form").onsubmit = saveShortcutPermissions;
+    document.getElementById("cancel-shortcut-permissions").onclick = () => document.getElementById("shortcut-permissions-dialog").close();
+    document.getElementById("shortcut-permissions-dialog").addEventListener("cancel", event => { if (busy) event.preventDefault(); });
     setTheme(localStorage.getItem("app-theme") || "light");
     document.getElementById("theme-btn").onclick = () => {
       const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";

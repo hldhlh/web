@@ -1241,7 +1241,7 @@
     new URLSearchParams(query || "").forEach((value, key) => { params[key] = value; });
     if (!parts.length || parts[0] === "home") return { name: "home" };
     if (parts[0] === "messages") return { name: "messages" };
-    if (parts[0] === "apps" && ["notes", "jlhcdh", "schedule", "feedback", "meat-template"].includes(parts[1])) return { name: "embedded-app", app: parts[1] };
+    if (parts[0] === "apps" && Auth.shortcuts.some(item => item.id === parts[1])) return { name: "embedded-app", app: parts[1] };
     if (parts[0] === "learn") return { name: "learn", type: params.type || "all", group: params.group || "all" };
     if (parts[0] === "exams") return { name: "exams" };
     if (parts[0] === "me") return { name: "me" };
@@ -1552,26 +1552,14 @@
           <div><h3 id="home-shortcuts-title">快捷访问</h3></div>
         </header>
         <div class="home-shortcut-grid">
-          <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/notes" aria-label="在 Auto Office 内打开门店笔记">
-            <span class="shortcut-icon" aria-hidden="true">${svgIcon("notes")}</span>
-            <span class="home-app-shortcut-copy"><strong>门店笔记</strong></span>
-          </button>
-          <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/jlhcdh" aria-label="在 Auto Office 内打开门店订货表">
-            <span class="shortcut-icon" aria-hidden="true">${svgIcon("exam")}</span>
-            <span class="home-app-shortcut-copy"><strong>订货表</strong></span>
-          </button>
-          <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/schedule" aria-label="在 Auto Office 内打开排班">
-            <span class="shortcut-icon" aria-hidden="true">${svgIcon("schedule")}</span>
-            <span class="home-app-shortcut-copy"><strong>排班</strong></span>
-          </button>
-          <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/feedback" aria-label="在 Auto Office 内打开每日问题反馈">
-            <span class="shortcut-icon" aria-hidden="true">${svgIcon("feedback")}</span>
-            <span class="home-app-shortcut-copy"><strong>每日反馈</strong></span>
-          </button>
-          <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/meat-template" aria-label="在 Auto Office 内打开报货模版">
-            <span class="shortcut-icon" aria-hidden="true">${svgIcon("notes")}</span>
-            <span class="home-app-shortcut-copy"><strong>报货模版</strong></span>
-          </button>
+          ${Auth.shortcuts.filter(item => Auth.canShortcut(Auth.session, item.id) || Auth.session?.hideRestrictedShortcuts === false).map(item => {
+            const allowed = Auth.canShortcut(Auth.session, item.id);
+            return `<button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/${item.id}" aria-label="${allowed ? "在 Auto Office 内打开" : "无访问权限："}${item.title}">
+              <span class="shortcut-icon" aria-hidden="true">${svgIcon(item.icon)}</span>
+              <span class="home-app-shortcut-copy"><strong>${item.title}</strong>${allowed ? "" : '<small class="shortcut-locked">🔒 无访问权限</small>'}</span>
+            </button>`;
+          }).join("")}
+          ${Auth.shortcuts.some(item => Auth.canShortcut(Auth.session, item.id)) || Auth.session?.hideRestrictedShortcuts === false ? "" : '<p class="muted">暂无可用快捷功能，请联系店长开放权限。</p>'}
         </div>
       </section>
       <section data-home-block="workbench" class="home-pending" aria-labelledby="home-pending-title">
@@ -3630,32 +3618,14 @@
   }
 
   function renderEmbeddedApp(appName) {
-    const apps = {
-      notes: {
-        title: "门店笔记",
-        src: "https://hldhlh.github.io/web/apps/notes/index.html"
-      },
-      jlhcdh: {
-        title: "门店订货表",
-        src: "https://hldhlh.github.io/web/apps/jlhcdh/index.html"
-      },
-      schedule: {
-        title: "排班",
-        src: "./pages/schedule/index.html"
-      },
-      feedback: {
-        title: "每日问题反馈",
-        src: "./pages/feedback/index.html"
-      },
-      "meat-template": {
-        title: "报货模版",
-        src: "./pages/meat-template/index.html"
-      }
-    };
-    const app = apps[appName];
+    const app = Auth.shortcuts.find(item => item.id === appName);
     if (!app) return go("#/home", { replace: true });
     setTop(app.title, true);
     setTab("home");
+    if (!Auth.canShortcut(Auth.session, appName)) {
+      view().innerHTML = `<section class="card" role="status"><h2>暂无访问权限</h2><p class="muted">${escapeHtml(app.title)}尚未向您的账号开放，请联系店长。</p><button class="primary" data-act="go" data-hash="#/home">返回首页</button></section>`;
+      return;
+    }
     view().innerHTML = `
       <iframe
         class="embedded-app-frame"

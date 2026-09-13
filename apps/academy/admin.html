@@ -37,6 +37,17 @@
     </header>
     <main class="view" id="view"></main>
   </div>
+  <dialog class="shortcut-permissions-dialog" id="shortcut-permissions-dialog" aria-labelledby="shortcut-permissions-title">
+    <form id="shortcut-permissions-form">
+      <header><button type="button" id="cancel-shortcut-permissions">取消</button><h2 id="shortcut-permissions-title">快捷权限</h2><button type="submit" id="save-shortcut-permissions">保存</button></header>
+      <div class="shortcut-permissions-content">
+        <div id="shortcut-permissions-options"></div>
+        <label class="shortcut-visibility-label" for="restricted-visibility">无权限时如何显示</label>
+        <select id="restricted-visibility"><option value="hidden">隐藏入口</option><option value="locked">显示入口，标记无权限</option></select>
+        <p id="shortcut-permissions-status" role="status" aria-live="polite"></p>
+      </div>
+    </form>
+  </dialog>
   <script defer src="../vendor/supabase.min.js"></script>
   <script defer src="../network.js?v=20260827-8"></script>
   <script defer src="./framework/reliable-store.js"></script>
