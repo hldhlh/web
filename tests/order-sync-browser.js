@@ -1,7 +1,7 @@
 async page => {
   const base='http://127.0.0.1:8772';
-  const html=await (await page.request.get(base+'/apps/jlhcdh/index.html')).text();
-  const queue=await (await page.request.get(base+'/apps/jlhcdh/cart-sync.js')).text();
+  const html=await (await page.request.get(base+'/apps/academy/pages/jlhcdh/index.html')).text();
+  const queue=await (await page.request.get(base+'/apps/academy/pages/jlhcdh/cart-sync.js')).text();
   await page.route('**/order-sync-fixture',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><body></body>'}));
   await page.goto(base+'/order-sync-fixture');
   const result=await page.evaluate(async ({html,queue})=>{

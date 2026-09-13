@@ -71,7 +71,7 @@
             };
         })();
     </script>
-    <link rel="preload" href="../vendor/supabase.min.js" as="script">
+    <link rel="preload" href="../../../vendor/supabase.min.js" as="script">
     <style>
         /* 全局变量与 Apple 风格重塑 */
         :root {
@@ -105,16 +105,9 @@
         }
 
         .svg-icon {
-            width: 1em;
-            height: 1em;
             display: inline-block;
             flex: 0 0 auto;
             vertical-align: -0.125em;
-            fill: none;
-            stroke: currentColor;
-            stroke-width: 2;
-            stroke-linecap: round;
-            stroke-linejoin: round;
         }
 
         .svg-icon.spin {
@@ -224,7 +217,7 @@
             flex-shrink: 1;
         }
 
-        /* 按钮重塑 */
+        /* 工具栏图标：统一视觉重量，保留符号周围的留白。 */
         .icon-btn {
             width: 38px;
             height: 38px;
@@ -236,12 +229,38 @@
             color: var(--text-main);
             border: none;
             cursor: pointer;
-            transition: all 0.2s;
+            flex-shrink: 0;
+            transition: background-color 0.2s, color 0.2s, transform 0.2s;
+        }
+
+        .icon-btn:focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 3px;
+        }
+
+        body.dark-mode .icon-btn:not(.primary):not(.active) {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        body.dark-mode .icon-btn:not(.primary):not(.active):hover {
+            background: rgba(255, 255, 255, 0.15);
         }
 
         .icon-btn:hover {
             background: rgba(0, 0, 0, 0.1);
-            transform: scale(1.05);
+        }
+
+        .icon-btn:active {
+            transform: scale(0.96);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .icon-btn {
+                transition: none;
+            }
+            .icon-btn:active {
+                transform: none;
+            }
         }
 
         .icon-btn.primary {
@@ -328,7 +347,6 @@
 
         .date-picker-container .svg-icon {
             color: var(--primary);
-            font-size: 14px;
         }
 
         /* 隐藏原生图标并覆盖点击区域 */
@@ -1376,13 +1394,13 @@
 
 <body>
     <svg aria-hidden="true" width="0" height="0" style="position:absolute;overflow:hidden">
-        <symbol id="icon-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></symbol>
-        <symbol id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/></symbol>
-        <symbol id="icon-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></symbol>
-        <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0 2 5M20 4v7h-7"/></symbol>
-        <symbol id="icon-list" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 10h6M9 14h6M9 18h4"/></symbol>
-        <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
-        <symbol id="icon-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.1A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.1A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.1A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.14.37.36.7.66.96.3.26.68.4 1.08.4H21v4h-.1A1.7 1.7 0 0 0 19.4 15Z"/></symbol>
+        <symbol id="icon-moon" viewBox="0 0 24 24"><path d="M20 14a8 8 0 0 1-10-10 8 8 0 1 0 10 10Z"/></symbol>
+        <symbol id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4m10.6 10.6 1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></symbol>
+        <symbol id="icon-calendar" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></symbol>
+        <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M19 8a7.5 7.5 0 1 0 .5 7M19 4v4h-4"/></symbol>
+        <symbol id="icon-list" viewBox="0 0 24 24"><path d="M5 6h14M5 12h8M5 18h6m4-2 2 2 4-5"/></symbol>
+        <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M6 19v-7M12 19V5M18 19V9"/></symbol>
+        <symbol id="icon-settings" viewBox="0 0 24 24"><path d="M4 8h5m4 0h7M4 16h9m4 0h3"/><circle cx="11" cy="8" r="2"/><circle cx="15" cy="16" r="2"/></symbol>
         <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
         <symbol id="icon-sort" viewBox="0 0 24 24"><path d="M3 6h12M3 12h9M3 18h6M19 5v14M16 16l3 3 3-3"/></symbol>
         <symbol id="icon-tags" viewBox="0 0 24 24"><path d="M20.6 13.6 11 4H4v7l9.6 9.6a2 2 0 0 0 2.8 0l4.2-4.2a2 2 0 0 0 0-2.8Z"/><circle cx="7.5" cy="7.5" r=".5"/></symbol>
@@ -1409,30 +1427,30 @@
                     <h1>门店订货表</h1>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
-                    <button id="darkModeBtn" onclick="toggleDarkMode()" class="icon-btn" title="切换深色模式"><svg class="svg-icon" aria-hidden="true"><use href="#icon-moon"></use></svg></button>
+                    <button id="darkModeBtn" onclick="toggleDarkMode()" class="icon-btn" title="切换深色模式" aria-label="切换深色模式"><svg class="svg-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-moon"></use></svg></button>
                     <div class="date-picker-container" id="datePickerIndex">
-                        <svg class="svg-icon" aria-hidden="true"><use href="#icon-calendar"></use></svg>
+                        <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>
                         <input type="text" id="dateInputIndex" readonly>
                     </div>
-                    <button onclick="location.reload()" class="icon-btn"><svg class="svg-icon" aria-hidden="true"><use href="#icon-refresh"></use></svg></button>
-                    <button onclick="goToPage('orders')" class="icon-btn" title="核对清单"><svg class="svg-icon" aria-hidden="true"><use href="#icon-list"></use></svg></button>
-                    <button onclick="goToPage('analytics')" class="icon-btn" title="周月分析"><svg class="svg-icon" aria-hidden="true"><use href="#icon-chart"></use></svg></button>
-                    <button onclick="goToPage('admin')" class="icon-btn" title="管理商品"><svg class="svg-icon" aria-hidden="true"><use href="#icon-settings"></use></svg></button>
+                    <button onclick="location.reload()" class="icon-btn" title="刷新数据" aria-label="刷新数据"><svg class="svg-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 8a7.5 7.5 0 1 0 .5 7M19 4v4h-4"/></svg></button>
+                    <button onclick="goToPage('orders')" class="icon-btn" title="核对清单" aria-label="核对清单"><svg class="svg-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 6h14M5 12h8M5 18h6m4-2 2 2 4-5"/></svg></button>
+                    <button onclick="goToPage('analytics')" class="icon-btn" title="周月分析" aria-label="周月分析"><svg class="svg-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 19v-7M12 19V5M18 19V9"/></svg></button>
+                    <button onclick="goToPage('admin')" class="icon-btn" title="管理商品" aria-label="管理商品"><svg class="svg-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h5m4 0h7M4 16h9m4 0h3"/><circle cx="11" cy="8" r="2"/><circle cx="15" cy="16" r="2"/></svg></button>
                 </div>
             </div>
         </header>
         <div class="toolbar">
             <div class="search-box">
-                <svg class="svg-icon" aria-hidden="true"><use href="#icon-search"></use></svg>
+                <svg class="svg-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-search"></use></svg>
                 <input type="text" id="searchInput" placeholder="搜索食材...">
             </div>
             <div style="display:flex; gap:8px;">
-                <button id="sortBtn" class="icon-btn" title="排序方式"><svg class="svg-icon" aria-hidden="true"><use href="#icon-sort"></use></svg></button>
+                <button id="sortBtn" class="icon-btn" title="排序方式" aria-label="排序方式"><svg class="svg-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-sort"></use></svg></button>
             </div>
         </div>
-        <div class="filter-section-title"><svg class="svg-icon" aria-hidden="true"><use href="#icon-tags"></use></svg> 常用标签</div>
+        <div class="filter-section-title"><svg class="svg-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-tags"></use></svg> 常用标签</div>
         <div id="tagFilterList" class="tag-row"></div>
-        <div class="filter-section-title"><svg class="svg-icon" aria-hidden="true"><use href="#icon-compass"></use></svg> 商品定位</div>
+        <div class="filter-section-title"><svg class="svg-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-compass"></use></svg> 商品定位</div>
         <div id="locationList"></div>
         <main class="product-grid" id="productList"></main>
     </div>
@@ -1442,14 +1460,14 @@
         <header class="app-header">
             <div class="header-content">
                 <div class="header-title-group">
-                    <button onclick="goToPage('index')" class="icon-btn"><svg class="svg-icon" aria-hidden="true"><use href="#icon-back"></use></svg></button>
+                    <button onclick="goToPage('index')" class="icon-btn"><svg class="svg-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-back"></use></svg></button>
                     <div class="sync-status online" title="实时同步中"></div>
                     <h1>订货核对</h1>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
-                    <button id="editModeBtn" class="icon-btn" onclick="toggleEditMode()" title="修订模式"><svg class="svg-icon" aria-hidden="true"><use href="#icon-edit"></use></svg></button>
+                    <button id="editModeBtn" class="icon-btn" onclick="toggleEditMode()" title="修订模式" aria-label="修订模式"><svg class="svg-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-edit"></use></svg></button>
                     <div class="date-picker-container" id="datePickerOrders">
-                        <svg class="svg-icon" aria-hidden="true"><use href="#icon-calendar"></use></svg>
+                        <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-calendar"></use></svg>
                         <input type="text" id="dateInput" readonly>
                     </div>
                 </div>
@@ -1458,13 +1476,13 @@
         <!-- 快捷操作栏 -->
         <div class="quick-actions">
             <button class="quick-action-btn" onclick="batchSelectAll()">
-                <svg class="svg-icon" aria-hidden="true"><use href="#icon-check-all"></use></svg> 全部勾选
+                <svg class="svg-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-check-all"></use></svg> 全部勾选
             </button>
             <button class="quick-action-btn" onclick="batchDeselectAll()">
-                <svg class="svg-icon" aria-hidden="true"><use href="#icon-close"></use></svg> 全部取消
+                <svg class="svg-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-close"></use></svg> 全部取消
             </button>
             <button class="quick-action-btn" onclick="exportOrderImage()">
-                <svg class="svg-icon" aria-hidden="true"><use href="#icon-image"></use></svg> 导出图片
+                <svg class="svg-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-image"></use></svg> 导出图片
             </button>
         </div>
         <main class="admin-main">
@@ -1484,7 +1502,7 @@
         <header class="app-header">
             <div class="header-content">
                 <div class="header-title-group">
-                    <button onclick="goToPage('index')" class="icon-btn"><svg class="svg-icon" aria-hidden="true"><use href="#icon-back"></use></svg></button>
+                    <button onclick="goToPage('index')" class="icon-btn"><svg class="svg-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-back"></use></svg></button>
                     <div class="sync-status online" title="实时同步中"></div>
                     <h1>管理后台</h1>
                 </div>
@@ -1494,17 +1512,17 @@
 
         <div class="toolbar">
             <div class="search-box">
-                <svg class="svg-icon" aria-hidden="true"><use href="#icon-search"></use></svg>
+                <svg class="svg-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-search"></use></svg>
                 <input type="text" id="adminSearchInput" placeholder="搜索名称或定位...">
             </div>
             <div style="display: flex; gap: 8px;">
                 <select id="adminLocFilter" class="select-custom" style="flex: 1;"></select>
                 <button class="select-custom"
                     style="padding: 0 12px; display: flex; align-items: center; justify-content: center;"
-                    onclick="openCategoryManager()" title="管理商品定位"><svg class="svg-icon" aria-hidden="true"><use href="#icon-settings"></use></svg></button>
+                    onclick="openCategoryManager()" title="管理商品定位"><svg class="svg-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-settings"></use></svg></button>
                 <button class="select-custom"
                     style="padding: 0 12px; display: flex; align-items: center; justify-content: center; background: rgba(255, 59, 48, 0.1); color: var(--accent);"
-                    onclick="openTrashBin()" title="回收站"><svg class="svg-icon" aria-hidden="true"><use href="#icon-trash"></use></svg></button>
+                    onclick="openTrashBin()" title="回收站"><svg class="svg-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-trash"></use></svg></button>
             </div>
         </div>
 
@@ -1512,7 +1530,7 @@
             <div id="adminTableBody" class="admin-grid"></div>
         </main>
 
-        <div class="fab-add" id="openAddModal"><svg class="svg-icon" aria-hidden="true"><use href="#icon-plus"></use></svg></div>
+        <div class="fab-add" id="openAddModal"><svg class="svg-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-plus"></use></svg></div>
     </div>
 
     <!-- 4. 分析页 -->
@@ -1520,7 +1538,7 @@
         <header class="app-header">
             <div class="header-content">
                 <div class="header-title-group">
-                    <button onclick="goToPage('index')" class="icon-btn"><svg class="svg-icon" aria-hidden="true"><use href="#icon-back"></use></svg></button>
+                    <button onclick="goToPage('index')" class="icon-btn"><svg class="svg-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-back"></use></svg></button>
                     <h1>周月数据分析</h1>
                 </div>
             </div>
@@ -1663,7 +1681,7 @@
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
                     <button type="button" class="btn-delete" onclick="deleteFromEditModal()"
                         style="font-size: 13px; padding: 0 4px;">
-                        <svg class="svg-icon" aria-hidden="true"><use href="#icon-trash"></use></svg> 移到回收站
+                        <svg class="svg-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-trash"></use></svg> 移到回收站
                     </button>
                     <button type="button" class="btn-delete" style="background:#f2f2f7;color:#1d1d1f;"
                         onclick="closeEditProductModal()">取消</button>
@@ -1689,11 +1707,11 @@
         </div>
     </div>
 
-    <script src="../vendor/supabase.min.js"></script>
-    <script src="../network.js?v=20260827-8"></script>
+    <script src="../../../vendor/supabase.min.js"></script>
+    <script src="../../../network.js?v=20260827-8"></script>
     <script src="./cart-sync.js"></script>
     <script>
-        const iconSvg = (name, className = '') => `<svg class="svg-icon${className ? ` ${className}` : ''}" aria-hidden="true"><use href="#icon-${name}"></use></svg>`;
+        const iconSvg = (name, className = '') => `<svg class="svg-icon${className ? ` ${className}` : ''}" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-${name}"></use></svg>`;
         const SB_URL = window.JLHCDH_CONFIG.url;
         const SB_KEY = window.JLHCDH_CONFIG.key;
         const sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: false } });
@@ -1963,9 +1981,9 @@
 
         async function initDatePickers() {
             if (state.fpIndex || state.fpOrders) return;
-            loadStylesheet('../vendor/flatpickr/flatpickr.min.css');
-            await loadScript('../vendor/flatpickr/flatpickr.min.js', 'flatpickr');
-            await loadScript('../vendor/flatpickr/zh.js');
+            loadStylesheet('../../../vendor/flatpickr/flatpickr.min.css');
+            await loadScript('../../../vendor/flatpickr/flatpickr.min.js', 'flatpickr');
+            await loadScript('../../../vendor/flatpickr/zh.js');
 
             const onDateChange = async (selectedDates, dateStr) => {
                 if (!dateStr || dateStr === state.currentDate) return;
@@ -2181,7 +2199,7 @@
         async function hydrateMissingPinyin() {
             const missing = state.products.filter(product => !product.pinyin && product.name);
             if (!missing.length) return;
-            await loadScript('../vendor/pinyin-pro.min.js', 'pinyinPro');
+            await loadScript('../../../vendor/pinyin-pro.min.js', 'pinyinPro');
             missing.forEach(product => {
                 product.pinyin = window.pinyinPro.pinyin(product.name, { pattern: 'first', toneType: 'none' }).replace(/\s/g, '');
             });
@@ -3864,6 +3882,9 @@
             const btn = document.getElementById('darkModeBtn');
             if (btn) {
                 const icon = btn.querySelector('use');
+                const label = document.body.classList.contains('dark-mode') ? '切换浅色模式' : '切换深色模式';
+                btn.title = label;
+                btn.setAttribute('aria-label', label);
                 if (document.body.classList.contains('dark-mode')) {
                     icon.setAttribute('href', '#icon-sun');
                 } else {
@@ -3903,7 +3924,7 @@
 
             showToast('正在生成图片...');
             try {
-                await loadScript('../vendor/html2canvas.min.js', 'html2canvas');
+                await loadScript('../../../vendor/html2canvas.min.js', 'html2canvas');
             } catch (e) {
                 console.error('导出组件加载失败:', e);
                 showToast('导出组件加载失败');

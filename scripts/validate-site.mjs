@@ -16,7 +16,7 @@ function check(file, reference) {
   count++;
 }
 for (const path of files) {
-  const file = relative(root, path);
+  const file = relative(root, path).replaceAll('\\', '/');
   if (!allowed.delete(file)) throw new Error(`Unexpected public file: ${file}`);
   const ext = extname(file);
   if (!['.html', '.css', '.js'].includes(ext)) continue;

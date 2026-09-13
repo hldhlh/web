@@ -4,7 +4,7 @@ async page => {
   const sources = {};
   for (const [name, path] of Object.entries({
     stable: 'apps/academy/framework/stable-view.js',
-    notes: 'apps/notes/index.html',
+    notes: 'apps/academy/pages/notes/index.html',
     app: 'apps/academy/app.js',
     schedule: 'apps/academy/pages/schedule/app.js',
     feedback: 'apps/academy/pages/feedback/app.js'

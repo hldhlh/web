@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 import {randomUUID} from 'node:crypto';
-const source=readFileSync('apps/jlhcdh/cart-sync.js','utf8');
+const source=readFileSync('apps/academy/pages/jlhcdh/cart-sync.js','utf8');
 function fixture(storage=new Map()) {
   const calls=[],statuses=[];
   let handler=async()=>({error:null}), failStorage=false;

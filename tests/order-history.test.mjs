@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-const source=readFileSync('apps/jlhcdh/index.html','utf8');
+const source=readFileSync('apps/academy/pages/jlhcdh/index.html','utf8');
 const history=source.slice(source.indexOf('        function parseDateOnly('),source.indexOf('        function getPredictionHintHtml('));
 const labelSource=source.slice(source.indexOf('        function getHistoryLabel('),source.indexOf('        function showToast('));
 const label=new Function('getLocalBusinessDate',`${labelSource};return getHistoryLabel;`)(()=> '2026-09-09');
