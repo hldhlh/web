@@ -10,9 +10,10 @@ function fixture(role = 'manager', fail = false) {
   const localStorage = storage(), sessionStorage = storage();
   localStorage.setItem('academy-people-cache-v1', JSON.stringify(remote.users));
   sessionStorage.setItem('academy-session-v1', JSON.stringify(remote.users[0]));
-  const window = { AcademyStore: { getJSON: async () => structuredClone(remote), putJSON: async (_, value) => { if (fail) throw new Error('offline'); remote = structuredClone(value); } } };
+  let handlers;
+  const window = { AcademyStore: { channel: (_, callbacks) => { handlers = callbacks; return { send: async () => "ok" }; }, getJSON: async () => structuredClone(remote), putJSON: async (_, value) => { if (fail) throw new Error('offline'); remote = structuredClone(value); } } };
   vm.runInNewContext(source, { window, localStorage, sessionStorage, crypto: webcrypto, setInterval, clearInterval, document: { addEventListener() {} } });
-  return { auth: window.AcademyAuth, remote: () => remote, localStorage };
+  return { auth: window.AcademyAuth, remote: () => remote, localStorage, store: window.AcademyStore, handlers: () => handlers };
 }
 test('legacy users retain access; denial overrides full access, blocked users and unknown apps cannot enter', () => {
   const { auth } = fixture();
@@ -43,4 +44,38 @@ test('failed save restores previous in-memory permissions and does not claim per
   await assert.rejects(auth.setShortcutAccess('staff', choices), /offline/);
   assert.equal(auth.canShortcut(auth.list()[1], 'notes'), true);
   assert.equal(remote().users[1].shortcutAccess, undefined);
+});
+
+test('account broadcast immediately refreshes current user permissions and visibility', async () => {
+  const f = fixture('staff');
+  f.auth.connectRealtime();
+  let changes = 0;
+  f.auth.onChange(() => changes++);
+  f.remote().rev = Date.now();
+  f.remote().users[0].shortcutAccess = { notes: false };
+  f.remote().users[0].hideRestrictedShortcuts = false;
+  await f.handlers().accounts();
+  assert.equal(f.auth.canShortcut(f.auth.session, 'notes'), false);
+  assert.equal(f.auth.session.hideRestrictedShortcuts, false);
+  assert.equal(changes, 1);
+  f.remote().rev++;
+  f.remote().users[0].shortcutAccess.notes = true;
+  await f.handlers().connected();
+  assert.equal(f.auth.canShortcut(f.auth.session, 'notes'), true);
+});
+test('broadcast during an old read triggers a fresh read before applying permissions', async () => {
+  const f = fixture('staff');
+  f.auth.connectRealtime();
+  const stale = structuredClone(f.remote());
+  let release;
+  let reads = 0;
+  f.store.getJSON = async () => ++reads === 1 ? new Promise(resolve => { release = () => resolve(stale); }) : structuredClone(f.remote());
+  const old = f.auth.pull(true);
+  f.remote().rev = Date.now();
+  f.remote().users[0].shortcutAccess = { notes: false };
+  const update = f.handlers().accounts();
+  release();
+  await Promise.all([old, update]);
+  assert.equal(reads, 2);
+  assert.equal(f.auth.canShortcut(f.auth.session, 'notes'), false);
 });

@@ -202,7 +202,7 @@ window.AcademyAuth = (() => {
   async function push() {
     rev = Date.now();
     await window.AcademyStore.putJSON(FILE, { rev, users });
-    if (channel) channel.send({ type: "broadcast", event: "accounts", payload: { rev } });
+    connectRealtime().send({ type: "broadcast", event: "accounts", payload: { rev } });
   }
 
   function refreshSession() {
@@ -335,10 +335,27 @@ window.AcademyAuth = (() => {
     return () => listeners.delete(fn);
   }
 
+  let accountSyncPending = false;
+  let accountSyncTask = null;
+  function syncAccounts() {
+    accountSyncPending = true;
+    if (accountSyncTask) return accountSyncTask;
+    accountSyncTask = (async () => {
+      // An in-flight read may predate the event; always read again after it.
+      if (pullPromise) await pullPromise.catch(() => {});
+      while (accountSyncPending) {
+        accountSyncPending = false;
+        await pull(true);
+      }
+    })().catch(() => {}).finally(() => { accountSyncTask = null; });
+    return accountSyncTask;
+  }
+
   function connectRealtime() {
     if (channel) return channel;
     channel = window.AcademyStore.channel("academy-auth", {
-      accounts: () => pull(true).catch(() => { }),
+      accounts: syncAccounts,
+      connected: syncAccounts,
       session: (lease) => {
         if (!session || !lease || lease.userId !== session.id) return;
         if (lease.token && lease.token !== session.sessionToken) {
@@ -356,8 +373,9 @@ window.AcademyAuth = (() => {
     clearInterval(sessionCheckTimer);
     sessionCheckTimer = setInterval(() => { if (!document.hidden) verifySession(); }, 15000);
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") verifySession();
+      if (document.visibilityState === "visible") { syncAccounts(); verifySession(); }
     });
+    window.addEventListener("online", syncAccounts);
     return Promise.resolve(session);
   }
 

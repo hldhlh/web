@@ -106,6 +106,8 @@ window.AcademyStore = (() => {
   window.addEventListener('app-sdk-ready', () => { for (const start of [...delayedChannels]) start(); });
   function channel(name, handlers) {
     let instance;
+    let subscribed = false;
+    const pending = new Map();
     const start = () => {
       if (instance) return;
       const sb = realtimeClient();
@@ -125,12 +127,22 @@ window.AcademyStore = (() => {
           }
         });
       }
-      instance.subscribe();
+      instance.subscribe(status => {
+        subscribed = status === 'SUBSCRIBED';
+        if (!subscribed) return;
+        for (const payload of pending.values()) instance.send(payload);
+        pending.clear();
+        handlers.connected?.();
+      });
     };
     start();
     return {
-      send: payload => instance?.send(payload) || Promise.resolve('not connected'),
-      unsubscribe() { delayedChannels.delete(start); if (instance) realtimeClient()?.removeChannel(instance); instance = null; }
+      send: payload => {
+        if (subscribed) return instance.send(payload);
+        pending.set(payload.event, payload);
+        return Promise.resolve('queued');
+      },
+      unsubscribe() { pending.clear(); subscribed = false; delayedChannels.delete(start); if (instance) realtimeClient()?.removeChannel(instance); instance = null; }
     };
   }
 
