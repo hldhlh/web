@@ -283,15 +283,21 @@ code, pre, .mono {
 }
 
 .app.embedded-mode .view {
-  min-height: 100dvh;
-  padding: var(--topbar-h) 0 0;
+  /* Keep the iframe inside the visible viewport, below the fixed top bar. */
+  position: fixed;
+  inset: var(--topbar-h) 0 0;
+  max-width: 760px;
+  margin-inline: auto;
+  min-height: 0;
+  padding: 0;
   display: flex;
   overflow: hidden;
 }
 
 .embedded-app-frame {
   width: 100%;
-  min-height: calc(100dvh - var(--topbar-h));
+  height: 100%;
+  min-height: 0;
   flex: 1;
   border: 0;
   background: var(--bg);
