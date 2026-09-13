@@ -3672,9 +3672,26 @@
     setTop(app.title, true);
     setTab("home");
     if (!Auth.canShortcut(Auth.session, appName)) {
-      view().innerHTML = `<section class="shortcut-access-state" aria-labelledby="shortcut-access-title">
+      // Ship this small empty-state layout with its markup so a cached global
+      // stylesheet cannot leave the SVG unbounded or the content uncentered.
+      view().innerHTML = `<style>.shortcut-access-state {
+  width: 100%;
+  min-width: 0;
+  overflow-y: auto;
+  display: flex;
+  padding: 32px max(24px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+}
+.shortcut-access-content { width: 100%; max-width: 340px; margin: auto; text-align: center; }
+.shortcut-access-symbol { display: grid; place-items: center; width: 72px; height: 72px; margin: 0 auto 24px; border-radius: 22px; background: var(--surface-2); color: var(--muted); }
+.shortcut-access-symbol svg { width: 44px; height: 44px; }
+.shortcut-access-content h2 { margin: 0 0 12px; font-size: 1.375rem; font-weight: 600; line-height: 1.35; letter-spacing: -.025em; }
+.shortcut-access-content p { margin: 0; font-size: .9375rem; line-height: 1.65; color: var(--muted); overflow-wrap: anywhere; }
+.shortcut-access-content .primary { display: block; width: auto; min-width: 160px; min-height: 48px; max-width: 100%; margin: 28px auto 16px; padding: 12px 28px; border-radius: 14px; font-size: 1.0625rem; font-weight: 600; }
+.shortcut-access-content small { display: block; color: var(--muted); font-size: .8125rem; line-height: 1.5; }
+
+</style><section class="shortcut-access-state" aria-labelledby="shortcut-access-title">
         <div class="shortcut-access-content">
-          <div class="shortcut-access-symbol" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="11" y="21" width="26" height="21" rx="6"/><path d="M16 21v-7a8 8 0 0 1 16 0v7M24 30v4"/></svg></div>
+          <div class="shortcut-access-symbol" aria-hidden="true"><svg width="44" height="44" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="11" y="21" width="26" height="21" rx="6"/><path d="M16 21v-7a8 8 0 0 1 16 0v7M24 30v4"/></svg></div>
           <div role="status"><h2 id="shortcut-access-title">此功能尚未开放</h2><p>您暂时无法使用「${escapeHtml(app.title)}」。<br>如需访问，请联系店长开通权限。</p></div>
           <button class="primary" data-act="go" data-hash="#/home">返回首页</button>
           <small>权限开通后，此页面会自动更新</small>
