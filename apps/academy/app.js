@@ -4610,9 +4610,21 @@
       saveLessonDraft();
       Presence.capture(true);
     });
+    let activeAccountId = Auth.session?.id;
     Auth.onChange((user) => {
+      const sameAccount = user && user.id === activeAccountId;
+      activeAccountId = user?.id;
       if (!user) return showGate();
-      if (!gateBusy) enterApp();
+      if (gateBusy) return;
+      if (!sameAccount) { enterApp(); return; }
+      // Permission changes must not wait for progress storage or reconnect sync.
+      if (state.route?.name === "embedded-app") {
+        const appId = state.route.app;
+        const frame = view().querySelector(".embedded-app-frame");
+        if (!Auth.canShortcut(user, appId) || !frame) renderEmbeddedApp(appId);
+      } else if (["home", "me", "ops"].includes(state.route?.name)) {
+        onRoute();
+      }
     });
     window.addEventListener("academy-data-updated", (event) => {
       const paths = event.detail?.paths;

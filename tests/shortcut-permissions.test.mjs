@@ -79,3 +79,17 @@ test('broadcast during an old read triggers a fresh read before applying permiss
   assert.equal(reads, 2);
   assert.equal(f.auth.canShortcut(f.auth.session, 'notes'), false);
 });
+
+test('already applied account broadcasts do not trigger redundant reads', async () => {
+  const f = fixture('staff');
+  f.auth.connectRealtime();
+  await f.auth.pull(true);
+  let reads = 0;
+  f.store.getJSON = async () => { reads++; return structuredClone(f.remote()); };
+  await f.handlers().accounts({ rev: 1 });
+  await f.handlers().accounts({ rev: 0 });
+  assert.equal(reads, 0);
+  f.remote().rev = 2;
+  await f.handlers().accounts({ rev: 2 });
+  assert.equal(reads, 1);
+});

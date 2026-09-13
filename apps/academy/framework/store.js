@@ -107,6 +107,9 @@ window.AcademyStore = (() => {
   function channel(name, handlers) {
     let instance;
     let subscribed = false;
+    let retryTimer;
+    let retryDelay = 1000;
+    let stopped = false;
     const pending = new Map();
     const start = () => {
       if (instance) return;
@@ -114,7 +117,7 @@ window.AcademyStore = (() => {
       if (!sb) { delayedChannels.add(start); return; }
       delayedChannels.delete(start);
       instance = sb.channel(name, { config: { broadcast: { self: false } } });
-      Object.entries(handlers || {}).forEach(([event, fn]) => instance.on('broadcast', { event }, ({ payload }) => fn(payload)));
+      Object.entries(handlers || {}).filter(([event]) => !['connected', 'connection'].includes(event)).forEach(([event, fn]) => instance.on('broadcast', { event }, ({ payload }) => fn(payload)));
       const documents = {
         'content-version': 'academy/content.json',
         'schedule-version': 'academy/schedule.json',
@@ -127,9 +130,26 @@ window.AcademyStore = (() => {
           }
         });
       }
+      const activeChannel = instance;
       instance.subscribe(status => {
+        if (stopped || instance !== activeChannel) return;
         subscribed = status === 'SUBSCRIBED';
-        if (!subscribed) return;
+        handlers.connection?.(subscribed);
+        if (!subscribed) {
+          if (["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(status) && !stopped) {
+            clearTimeout(retryTimer);
+            retryTimer = setTimeout(() => {
+              const previous = instance;
+              instance = null;
+              if (previous) sb.removeChannel(previous);
+              if (!stopped) start();
+            }, retryDelay);
+            retryDelay = Math.min(retryDelay * 2, 30000);
+          }
+          return;
+        }
+        clearTimeout(retryTimer);
+        retryDelay = 1000;
         for (const payload of pending.values()) instance.send(payload);
         pending.clear();
         handlers.connected?.();
@@ -142,7 +162,7 @@ window.AcademyStore = (() => {
         pending.set(payload.event, payload);
         return Promise.resolve('queued');
       },
-      unsubscribe() { pending.clear(); subscribed = false; delayedChannels.delete(start); if (instance) realtimeClient()?.removeChannel(instance); instance = null; }
+      unsubscribe() { stopped = true; clearTimeout(retryTimer); pending.clear(); subscribed = false; delayedChannels.delete(start); if (instance) realtimeClient()?.removeChannel(instance); instance = null; }
     };
   }
 

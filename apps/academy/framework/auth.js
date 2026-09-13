@@ -351,10 +351,15 @@ window.AcademyAuth = (() => {
     return accountSyncTask;
   }
 
+  let realtimeConnected = false;
   function connectRealtime() {
     if (channel) return channel;
     channel = window.AcademyStore.channel("academy-auth", {
-      accounts: syncAccounts,
+      accounts: payload => {
+        if (hasPulled && Number(payload?.rev) <= rev) return Promise.resolve();
+        return syncAccounts();
+      },
+      connection: connected => { realtimeConnected = connected; },
       connected: syncAccounts,
       session: (lease) => {
         if (!session || !lease || lease.userId !== session.id) return;
@@ -366,10 +371,20 @@ window.AcademyAuth = (() => {
     return channel;
   }
 
+  let started = false;
   function start() {
+    if (started) return Promise.resolve(session);
+    started = true;
     connectRealtime();
     pull(true).then(() => session ? verifySession() : null).catch(() => { });
-    setInterval(() => { if (!document.hidden) pull().catch(() => { }); }, 30000);
+    // Broadcasts drive normal updates; short polling only covers a broken socket.
+    const pollAccounts = () => {
+      // Timer ticks must not queue another request behind a slow read.
+      if (document.hidden || window.navigator?.onLine === false || accountSyncTask || pullPromise) return;
+      syncAccounts();
+    };
+    setInterval(() => { if (!realtimeConnected) pollAccounts(); }, 2000);
+    setInterval(() => { if (realtimeConnected) pollAccounts(); }, 30000);
     clearInterval(sessionCheckTimer);
     sessionCheckTimer = setInterval(() => { if (!document.hidden) verifySession(); }, 15000);
     document.addEventListener("visibilitychange", () => {
