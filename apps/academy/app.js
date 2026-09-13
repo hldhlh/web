@@ -2770,6 +2770,52 @@
     `;
   }
 
+  function openOpsShortcutPermissions(userId) {
+    if (!Auth.isManager(Auth.session)) return;
+    const user = Auth.list().find(item => item.id === userId);
+    if (!user || user.role === "manager") return;
+    document.getElementById("shortcut-permissions-dialog")?.remove();
+    document.body.insertAdjacentHTML("beforeend", `<dialog class="shortcut-permissions-dialog" id="shortcut-permissions-dialog" aria-labelledby="shortcut-permissions-title">
+    <form id="shortcut-permissions-form">
+      <header><button type="button" id="cancel-shortcut-permissions">取消</button><h2 id="shortcut-permissions-title">快捷权限</h2><button type="submit" id="save-shortcut-permissions">保存</button></header>
+      <div class="shortcut-permissions-content">
+        <div id="shortcut-permissions-options"></div>
+        <label class="shortcut-visibility-label" for="restricted-visibility">无权限时如何显示</label>
+        <select id="restricted-visibility"><option value="hidden">隐藏入口</option><option value="locked">显示入口，标记无权限</option></select>
+        <p id="shortcut-permissions-status" role="status" aria-live="polite"></p>
+      </div>
+    </form>
+  </dialog>`);
+    const dialog = document.getElementById("shortcut-permissions-dialog");
+    const form = dialog.querySelector("form");
+    const cancel = dialog.querySelector("#cancel-shortcut-permissions");
+    const save = dialog.querySelector("#save-shortcut-permissions");
+    const status = dialog.querySelector("#shortcut-permissions-status");
+    dialog.querySelector("h2").textContent = `${user.name} · 快捷权限`;
+    dialog.querySelector("#shortcut-permissions-options").innerHTML = Auth.shortcuts.map(item => `<label class="shortcut-permission-row"><span>${item.title}</span><input type="checkbox" name="${item.id}" ${user.shortcutAccess?.[item.id] !== false ? "checked" : ""} aria-label="允许访问${item.title}"></label>`).join("");
+    const visibility = dialog.querySelector("#restricted-visibility");
+    visibility.value = user.hideRestrictedShortcuts === false ? "locked" : "hidden";
+    status.textContent = user.access === "blocked" ? "该账号已停用，恢复账号后这些设置才会生效。" : "勾选后允许访问；未勾选则禁止进入。";
+    let saving = false;
+    cancel.onclick = () => dialog.close();
+    dialog.addEventListener("close", () => dialog.remove());
+    dialog.addEventListener("cancel", event => { if (saving) event.preventDefault(); });
+    form.onsubmit = async event => {
+      event.preventDefault();
+      if (saving) return;
+      saving = true;
+      save.disabled = cancel.disabled = true;
+      save.textContent = "保存中…";
+      try {
+        const permissions = Object.fromEntries(Auth.shortcuts.map(({ id }) => [id, form.elements.namedItem(id).checked]));
+        await Auth.setShortcutAccess(userId, permissions, visibility.value === "hidden");
+        dialog.close();
+      } catch (error) { status.textContent = error.message || "保存失败，请重试"; }
+      finally { saving = false; save.disabled = cancel.disabled = false; save.textContent = "保存"; }
+    };
+    dialog.showModal();
+  }
+
   function renderOpsStaff() {
     const people = Auth.list().sort((a, b) => Number(a.access !== "basic") - Number(b.access !== "basic") || a.name.localeCompare(b.name, "zh"));
     const pending = people.filter((user) => user.access === "basic" && user.role !== "manager").length;
@@ -2819,10 +2865,11 @@
       <div class="staff-list">
         ${memberData.map((item) => {
           const user = item.user;
+          const shortcutButton = user.role === "manager" ? '<p class="muted">快捷功能全部可用</p>' : `<div class="tools staff-actions"><button data-act="ops-shortcut-permissions" data-id="${escapeHtml(user.id)}">快捷权限</button></div>`;
           if (item.loading) return `
             <article class="staff-member is-loading" data-sync-key="${escapeHtml(user.id)}">
               <div class="staff-member-head"><span class="staff-avatar">${escapeHtml(user.name.slice(0, 1))}</span><div><strong>${escapeHtml(user.name)}</strong><small>正在读取学习数据...</small></div></div>
-              <div class="staff-loading-line"></div>
+              <div class="staff-loading-line"></div>${shortcutButton}
             </article>`;
           const isOnline = item.lastSeenAt && Date.now() - item.lastSeenAt < 90000;
           const pendingLessons = DATA.lessons.filter((lesson) => !lessonCompletedForProgress(lesson, item.progress));
@@ -2844,6 +2891,7 @@
                 <div><b>${item.examDone.length}<small> / ${DATA.exams.length}</small></b><span>通过考试</span></div>
                 <div><b>${formatDuration(item.progress.onlineSeconds)}</b><span>累计在线学习</span></div>
               </div>
+              ${shortcutButton}
               <details class="staff-detail">
                 <summary>查看学习明细 <span>${pendingLessons.length + pendingExams.length ? `${pendingLessons.length + pendingExams.length} 项待完成` : "已全部完成"}</span></summary>
                 <div class="staff-detail-body">
@@ -4047,6 +4095,7 @@
       syncLessonBlocksJson();
       return;
     }
+    if (act === "ops-shortcut-permissions") { openOpsShortcutPermissions(btn.dataset.id); return; }
     if (act === "ops-staff-auth") {
       (async () => {
         try {
