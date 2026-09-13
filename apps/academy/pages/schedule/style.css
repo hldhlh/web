@@ -115,17 +115,20 @@ button { color: inherit; }
 }
 
 .primary-action {
+  appearance: none;
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 0 17px;
-  border-radius: 13px;
+  gap: 8px;
+  min-width: 44px;
+  padding: 0 16px;
+  border-radius: 14px;
   background: var(--accent);
   color: #fff;
   font-size: 15px;
   font-weight: 650;
-  box-shadow: 0 8px 18px rgba(0, 122, 255, 0.2);
+  line-height: 1.2;
 }
 
 .primary-action svg,
@@ -138,6 +141,15 @@ button { color: inherit; }
   stroke-linejoin: round;
   stroke-width: 2;
 }
+
+.primary-action .schedule-add-icon {
+  display: block;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+}
+
+.primary-action-label { white-space: nowrap; }
 
 .schedule-content {
   display: grid;
@@ -544,7 +556,8 @@ select:focus-visible {
   .schedule-shell { padding-top: max(18px, env(safe-area-inset-top)); }
   .schedule-header { align-items: center; }
   .schedule-header h1 { font-size: 28px; }
-  .primary-action { width: 44px; padding: 0; font-size: 0; }
+  .primary-action { width: 44px; height: 44px; padding: 0; gap: 0; }
+  .primary-action-label { display: none; }
   .calendar-toolbar { align-items: stretch; flex-direction: column; padding: 12px 12px 10px; }
   .month-navigation { justify-content: space-between; }
   .month-title { flex: 1; min-width: 0; }
