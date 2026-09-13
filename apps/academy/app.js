@@ -1267,31 +1267,29 @@
     return current && typeof current === "object" ? current : {};
   }
 
-  function hasNavigationParent(current = navigationState()) {
-    return Boolean(
-      current[NAVIGATION_STATE_KEY]
-      && Number(current.academyDepth) > 0
-      && typeof current.academyFrom === "string"
-      && current.academyFrom.startsWith("#/")
-      && current.academyFrom !== currentHash()
-    );
+  function navigationTrail() {
+    const current = navigationState();
+    if (!current[NAVIGATION_STATE_KEY] || !Array.isArray(current.academyTrail)) return [];
+    return current.academyTrail.filter(hash => typeof hash === "string" && hash.startsWith("#/"));
+  }
+
+  function replaceNavigationState(hash, trail) {
+    const next = { ...navigationState(), [NAVIGATION_STATE_KEY]: true, academyTrail: trail };
+    delete next.academyDepth;
+    delete next.academyFrom;
+    // Keep in-app navigation in this document's state so browser Back leaves the app.
+    history.replaceState(next, "", hash);
   }
 
   function initializeNavigationState() {
     const current = navigationState();
-    const depth = Number(current.academyDepth);
-    const valid = current[NAVIGATION_STATE_KEY]
-      && Number.isInteger(depth)
-      && depth >= 0
-      && typeof current.academyFrom === "string"
-      && (depth === 0 || current.academyFrom.startsWith("#/"));
-    if (valid) return;
-    history.replaceState({
-      ...current,
-      [NAVIGATION_STATE_KEY]: true,
-      academyDepth: 0,
-      academyFrom: ""
-    }, "", currentHash());
+    const trail = navigationTrail();
+    if (!Array.isArray(current.academyTrail) && current[NAVIGATION_STATE_KEY]
+      && Number(current.academyDepth) > 0 && typeof current.academyFrom === "string"
+      && current.academyFrom.startsWith("#/") && current.academyFrom !== currentHash()) {
+      trail.push(current.academyFrom);
+    }
+    replaceNavigationState(currentHash(), trail);
   }
 
   function go(hash, options = {}) {
@@ -1302,21 +1300,12 @@
       return;
     }
 
-    const current = navigationState();
-    const depth = Number(current.academyDepth) || 0;
-    if (!options.replace && current[NAVIGATION_STATE_KEY] && depth > 0 && current.academyFrom === target) {
-      history.back();
-      return;
+    const trail = navigationTrail();
+    if (!options.replace) {
+      if (trail[trail.length - 1] === target) trail.pop();
+      else trail.push(source);
     }
-
-    const next = {
-      ...current,
-      [NAVIGATION_STATE_KEY]: true,
-      academyDepth: options.replace ? depth : depth + 1,
-      academyFrom: options.replace ? (current.academyFrom || "") : source
-    };
-    if (options.replace) history.replaceState(next, "", target);
-    else history.pushState(next, "", target);
+    replaceNavigationState(target, trail);
     onRoute();
   }
 
@@ -1335,9 +1324,10 @@
   }
 
   function goToParentPage() {
-    const current = navigationState();
-    if (hasNavigationParent(current)) {
-      history.back();
+    const trail = navigationTrail();
+    if (trail.length) {
+      replaceNavigationState(trail.pop(), trail);
+      onRoute();
       return;
     }
     go(parentHashForRoute(state.route), { replace: true });
