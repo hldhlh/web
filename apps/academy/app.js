@@ -2865,11 +2865,11 @@
       <div class="staff-list">
         ${memberData.map((item) => {
           const user = item.user;
-          const shortcutButton = user.role === "manager" ? '<p class="muted">快捷功能全部可用</p>' : `<div class="tools staff-actions"><button data-act="ops-shortcut-permissions" data-id="${escapeHtml(user.id)}">快捷权限</button></div>`;
+          const shortcutButton = user.role === "manager" ? '<p class="muted">快捷功能全部可用</p>' : `<button data-act="ops-shortcut-permissions" data-id="${escapeHtml(user.id)}">快捷权限</button>`;
           if (item.loading) return `
             <article class="staff-member is-loading" data-sync-key="${escapeHtml(user.id)}">
               <div class="staff-member-head"><span class="staff-avatar">${escapeHtml(user.name.slice(0, 1))}</span><div><strong>${escapeHtml(user.name)}</strong><small>正在读取学习数据...</small></div></div>
-              <div class="staff-loading-line"></div>${shortcutButton}
+              <div class="staff-loading-line"></div>
             </article>`;
           const isOnline = item.lastSeenAt && Date.now() - item.lastSeenAt < 90000;
           const pendingLessons = DATA.lessons.filter((lesson) => !lessonCompletedForProgress(lesson, item.progress));
@@ -2891,7 +2891,6 @@
                 <div><b>${item.examDone.length}<small> / ${DATA.exams.length}</small></b><span>通过考试</span></div>
                 <div><b>${formatDuration(item.progress.onlineSeconds)}</b><span>累计在线学习</span></div>
               </div>
-              ${shortcutButton}
               <details class="staff-detail">
                 <summary>查看学习明细 <span>${pendingLessons.length + pendingExams.length ? `${pendingLessons.length + pendingExams.length} 项待完成` : "已全部完成"}</span></summary>
                 <div class="staff-detail-body">
@@ -2899,6 +2898,7 @@
                   <section><strong>待通过考试</strong><p>${pendingExams.length ? pendingExams.map((exam) => escapeHtml(exam.title)).join("、") : "考试已全部通过"}</p></section>
                   <section><strong>账号权限</strong><p>${staffAccessLabel(user)}${user.approvedBy ? ` · 由 ${escapeHtml(user.approvedBy)} 授权` : ""}</p></section>
                   <div class="tools staff-actions">
+                    ${shortcutButton}
                     ${user.access !== "full" && user.access !== "blocked" ? `<button data-act="ops-staff-auth" data-id="${user.id}" data-access="full">开放全部学习内容</button>` : ""}
                     ${user.access === "full" && user.id !== Auth.session.id ? `<button data-act="ops-staff-auth" data-id="${user.id}" data-access="basic">改为基础权限</button>` : ""}
                     ${user.access !== "blocked" && user.id !== Auth.session.id ? `<button data-act="ops-staff-auth" data-id="${user.id}" data-access="blocked">停用账号</button>` : ""}
