@@ -1241,7 +1241,7 @@
     new URLSearchParams(query || "").forEach((value, key) => { params[key] = value; });
     if (!parts.length || parts[0] === "home") return { name: "home" };
     if (parts[0] === "messages") return { name: "messages" };
-    if (parts[0] === "apps" && ["notes", "jlhcdh", "schedule", "feedback"].includes(parts[1])) return { name: "embedded-app", app: parts[1] };
+    if (parts[0] === "apps" && ["notes", "jlhcdh", "schedule", "feedback", "meat-template"].includes(parts[1])) return { name: "embedded-app", app: parts[1] };
     if (parts[0] === "learn") return { name: "learn", type: params.type || "all", group: params.group || "all" };
     if (parts[0] === "exams") return { name: "exams" };
     if (parts[0] === "me") return { name: "me" };
@@ -1567,6 +1567,10 @@
           <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/feedback" aria-label="在 Auto Office 内打开每日问题反馈">
             <span class="shortcut-icon" aria-hidden="true">${svgIcon("feedback")}</span>
             <span class="home-app-shortcut-copy"><strong>每日反馈</strong></span>
+          </button>
+          <button type="button" class="home-app-shortcut" data-act="go" data-hash="#/apps/meat-template" aria-label="在 Auto Office 内打开报货模版">
+            <span class="shortcut-icon" aria-hidden="true">${svgIcon("notes")}</span>
+            <span class="home-app-shortcut-copy"><strong>报货模版</strong></span>
           </button>
         </div>
       </section>
@@ -3642,6 +3646,10 @@
       feedback: {
         title: "每日问题反馈",
         src: "./pages/feedback/index.html"
+      },
+      "meat-template": {
+        title: "报货模版",
+        src: "./pages/meat-template/index.html"
       }
     };
     const app = apps[appName];

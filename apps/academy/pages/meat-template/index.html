@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f2f2f7">
+  <title>报货模版 · Auto Office</title>
+  <link rel="icon" href="../../icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../appearance.css">
+  <link rel="stylesheet" href="./style.css">
+  <script>try { document.documentElement.dataset.theme = localStorage.getItem('app-theme') || 'light'; } catch {}</script>
+  <script defer src="./model.js"></script>
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <main class="count-shell">
+    <header class="page-header">
+      <div><p class="eyebrow">缦云店</p><h1>报货模版</h1></div>
+      <button class="text-button" id="new-round" type="button">新一轮</button>
+    </header>
+    <div class="scenario-switch" role="group" aria-label="报货场景">
+      <button type="button" data-kind="count" aria-pressed="true">盘肉报货</button>
+      <button type="button" data-kind="arrival" aria-pressed="false">牛肉到货</button>
+      <button type="button" data-kind="morning" aria-pressed="false">明早报货</button>
+    </div>
+    <section class="report-section" aria-labelledby="list-title">
+      <div class="progress-heading"><h2 id="list-title">剩余库存</h2><span id="progress-label">已盘 0 / 6</span></div>
+      <div class="item-list" id="item-grid" role="group" aria-labelledby="list-title"></div>
+    </section>
+    <section class="report-section" id="orders-section" aria-labelledby="orders-title">
+      <div class="progress-heading"><h2 id="orders-title">明日订货</h2><span>留空不订</span></div>
+      <div class="item-list" id="orders-list" role="group" aria-labelledby="orders-title"></div>
+    </section>
+    <p class="draft-status" id="draft-status" role="status">已带入模版数值，可直接修改。</p>
+  </main>
+  <footer class="overview-footer">
+    <div class="overview-actions">
+      <button class="secondary" id="preview-button" type="button">预览</button>
+      <button class="primary" id="overview-action" type="button">开始盘点</button>
+    </div>
+  </footer>
+
+  <dialog id="entry-dialog" aria-labelledby="entry-label">
+    <header class="sheet-header"><span id="editor-context">剩余库存</span><button class="text-button" id="close-entry" type="button">收起</button></header>
+    <div class="editor-body">
+      <div class="entry-heading">
+        <div><label id="entry-label" for="quantity">吊龙</label><span id="entry-hint">库存 · 1 / 6</span></div>
+        <div class="quantity-wrap">
+          <input id="quantity" type="text" inputmode="none" readonly placeholder="待输入" autocomplete="off" aria-describedby="entry-hint entry-status">
+          <span id="stock-unit">kg</span>
+          <select id="order-unit" aria-label="订货单位" hidden>
+            <option value="">无单位</option><option value="kg">kg</option><option value="斤">斤</option><option value="条">条</option><option value="件">件</option><option value="份">份</option>
+          </select>
+        </div>
+      </div>
+      <div class="quick-actions">
+        <button type="button" id="previous-item" aria-label="上一项">‹ 上一项</button>
+        <button type="button" id="zero-value">无库存 · 0</button>
+      </div>
+      <div class="keypad" role="group" aria-label="数量键盘">
+        <button type="button" data-key="1">1</button><button type="button" data-key="2">2</button><button type="button" data-key="3">3</button>
+        <button type="button" data-key="4">4</button><button type="button" data-key="5">5</button><button type="button" data-key="6">6</button>
+        <button type="button" data-key="7">7</button><button type="button" data-key="8">8</button><button type="button" data-key="9">9</button>
+        <button type="button" data-key="." aria-label="小数点">.</button><button type="button" data-key="0">0</button>
+        <button type="button" data-key="backspace" aria-label="退格"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5-7 7 7 7h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2ZM12 9l6 6m0-6-6 6"/></svg></button>
+      </div>
+      <div class="dock-actions">
+        <button class="primary" id="next-item" type="button">下一项 <span aria-hidden="true">›</span></button>
+      </div>
+      <p class="entry-status" id="entry-status" role="status" aria-live="polite"></p>
+    </div>
+  </dialog>
+
+  <dialog id="preview-dialog" aria-labelledby="preview-title">
+    <div class="sheet-header"><h2 id="preview-title">报货预览</h2><button class="text-button" id="close-preview" type="button">返回修改</button></div>
+    <div class="sheet-content">
+      <p class="preview-hint" id="preview-hint"></p>
+      <pre id="template-text"></pre>
+      <div id="manual-copy" hidden><label for="manual-text">长按文字或按 ⌘C / Ctrl+C 复制</label><textarea id="manual-text" readonly aria-label="手动复制报货文本"></textarea></div>
+    </div>
+    <div class="sheet-footer"><button class="primary" id="copy-button" type="button">复制报货文本</button><p id="copy-status" role="status" aria-live="polite">复制后可直接粘贴发送。</p></div>
+  </dialog>
+  <dialog id="reset-dialog" class="reset-dialog" aria-labelledby="reset-title">
+    <h2 id="reset-title">开始新一轮盘点？</h2><p>当前库存和订货会清空，六个部位重新盘点。</p>
+    <div class="reset-actions"><button class="secondary" id="cancel-reset" type="button" autofocus>取消</button><button class="primary" id="confirm-reset" type="button">开始新一轮</button></div>
+  </dialog>
+  <noscript>请启用 JavaScript 以录入库存并生成报货文本。</noscript>
+</body>
+</html>
