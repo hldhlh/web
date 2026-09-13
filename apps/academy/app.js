@@ -3672,7 +3672,14 @@
     setTop(app.title, true);
     setTab("home");
     if (!Auth.canShortcut(Auth.session, appName)) {
-      view().innerHTML = `<section class="card" role="status"><h2>暂无访问权限</h2><p class="muted">${escapeHtml(app.title)}尚未向您的账号开放，请联系店长。</p><button class="primary" data-act="go" data-hash="#/home">返回首页</button></section>`;
+      view().innerHTML = `<section class="shortcut-access-state" aria-labelledby="shortcut-access-title">
+        <div class="shortcut-access-content">
+          <div class="shortcut-access-symbol" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="11" y="21" width="26" height="21" rx="6"/><path d="M16 21v-7a8 8 0 0 1 16 0v7M24 30v4"/></svg></div>
+          <div role="status"><h2 id="shortcut-access-title">此功能尚未开放</h2><p>您暂时无法使用「${escapeHtml(app.title)}」。<br>如需访问，请联系店长开通权限。</p></div>
+          <button class="primary" data-act="go" data-hash="#/home">返回首页</button>
+          <small>权限开通后，此页面会自动更新</small>
+        </div>
+      </section>`;
       return;
     }
     view().innerHTML = `
