@@ -1351,6 +1351,7 @@
       learn: '<path d="M12 5v15M12 5C9 3 5 3 3 4v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-2-1-6-1-9 1Z"/>',
       exam: '<rect x="5" y="4" width="14" height="17" rx="2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M9 11h6M9 15h6"/>',
       notes: '<path d="M18 10V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5M8 7h6M8 11h4"/><path d="m14 16 5-5 3 3-5 5-4 1Z" stroke="var(--accent)"/>',
+      stockReport: '<path d="M3.5 8 6 3.5h12L20.5 8v10.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2ZM3.5 8h17M12 3.5V8M7 12h4M7 15.5h2"/><path d="m13 15.5 2 2 4-4" stroke="var(--accent)"/>',
       schedule: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 11h18"/><path d="M7 15h3M14 15h3M7 18h3" stroke="var(--accent)"/>',
       feedback: '<path d="M5 3h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7l-5 3v-3H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M7 8h10M7 12h7" stroke="var(--accent)"/>',
       me: '<circle cx="12" cy="8" r="3"/><path d="M5 19c1.4-3 3.8-4.5 7-4.5S17.6 16 19 19"/>',
@@ -2777,7 +2778,7 @@
     document.getElementById("shortcut-permissions-dialog")?.remove();
     document.body.insertAdjacentHTML("beforeend", `<dialog class="shortcut-permissions-dialog" id="shortcut-permissions-dialog" aria-labelledby="shortcut-permissions-title">
     <form id="shortcut-permissions-form">
-      <header><button type="button" id="cancel-shortcut-permissions">取消</button><h2 id="shortcut-permissions-title">快捷权限</h2><button type="submit" id="save-shortcut-permissions">保存</button></header>
+      <header><button type="button" id="cancel-shortcut-permissions">取消</button><h2 id="shortcut-permissions-title" tabindex="-1" autofocus>快捷权限</h2><button type="submit" id="save-shortcut-permissions">保存</button></header>
       <div class="shortcut-permissions-content">
         <div id="shortcut-permissions-options"></div>
         <label class="shortcut-visibility-label" for="restricted-visibility">无权限时如何显示</label>
@@ -2792,7 +2793,7 @@
     const save = dialog.querySelector("#save-shortcut-permissions");
     const status = dialog.querySelector("#shortcut-permissions-status");
     dialog.querySelector("h2").textContent = `${user.name} · 快捷权限`;
-    dialog.querySelector("#shortcut-permissions-options").innerHTML = Auth.shortcuts.map(item => `<label class="shortcut-permission-row"><span>${item.title}</span><input type="checkbox" name="${item.id}" ${user.shortcutAccess?.[item.id] !== false ? "checked" : ""} aria-label="允许访问${item.title}"></label>`).join("");
+    dialog.querySelector("#shortcut-permissions-options").innerHTML = Auth.shortcuts.map(item => `<label class="shortcut-permission-row"><span>${item.title}</span><input type="checkbox" role="switch" name="${item.id}" ${user.shortcutAccess?.[item.id] !== false ? "checked" : ""} aria-label="允许访问${item.title}"></label>`).join("");
     const visibility = dialog.querySelector("#restricted-visibility");
     visibility.value = user.hideRestrictedShortcuts === false ? "locked" : "hidden";
     status.textContent = user.access === "blocked" ? "该账号已停用，恢复账号后这些设置才会生效。" : "勾选后允许访问；未勾选则禁止进入。";

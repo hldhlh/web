@@ -4,7 +4,7 @@ window.AcademyAuth = (() => {
     { id: "jlhcdh", title: "订货表", icon: "exam", src: "https://hldhlh.github.io/web/apps/jlhcdh/index.html" },
     { id: "schedule", title: "排班", icon: "schedule", src: "./pages/schedule/index.html" },
     { id: "feedback", title: "每日反馈", icon: "feedback", src: "./pages/feedback/index.html" },
-    { id: "meat-template", title: "报货模版", icon: "notes", src: "./pages/meat-template/index.html" }
+    { id: "meat-template", title: "报货模版", icon: "stockReport", src: "./pages/meat-template/index.html" }
   ].map(Object.freeze));
   function shortcutAccess(value) {
     return Object.fromEntries(shortcuts.map(({ id }) => [id, value?.[id] !== false]));

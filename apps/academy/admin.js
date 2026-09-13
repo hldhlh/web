@@ -161,7 +161,7 @@
     permissionUserId = user.id;
     const dialog = document.getElementById("shortcut-permissions-dialog");
     document.getElementById("shortcut-permissions-title").textContent = `${user.name} · 快捷权限`;
-    document.getElementById("shortcut-permissions-options").innerHTML = Auth.shortcuts.map(item => `<label class="shortcut-permission-row"><span>${item.title}</span><input type="checkbox" name="${item.id}" ${Auth.canShortcut({ ...user, access: "full" }, item.id) ? "checked" : ""} aria-label="允许访问${item.title}"></label>`).join("");
+    document.getElementById("shortcut-permissions-options").innerHTML = Auth.shortcuts.map(item => `<label class="shortcut-permission-row"><span>${item.title}</span><input type="checkbox" role="switch" name="${item.id}" ${Auth.canShortcut({ ...user, access: "full" }, item.id) ? "checked" : ""} aria-label="允许访问${item.title}"></label>`).join("");
     document.getElementById("restricted-visibility").value = user.hideRestrictedShortcuts === false ? "locked" : "hidden";
     document.getElementById("shortcut-permissions-status").textContent = user.access === "blocked" ? "该账号已停用，恢复账号后这些设置才会生效。" : "勾选后允许访问；未勾选则禁止进入。";
     dialog.showModal();
