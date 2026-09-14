@@ -188,7 +188,9 @@
       const author = document.createElement('span'); author.className = 'project-byline';
       const avatar = document.createElement('span'); avatar.className = 'employee-avatar'; avatar.textContent = Array.from(meta.createdBy.name)[0]; avatar.setAttribute('aria-hidden', 'true');
       author.append(avatar, document.createTextNode(`制作：${meta.createdBy.name}`));
-      const date = document.createElement('small'); date.textContent = `${new Date(meta.updatedAt).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })} 更新`;
+      const date = document.createElement('small');
+      const mobileCount = document.createElement('span'); mobileCount.className = 'mobile-project-count'; mobileCount.textContent = `${meta.count || 0} 条标注 · `;
+      date.append(mobileCount, document.createTextNode(`${new Date(meta.updatedAt).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })} 更新`));
       info.append(name, author, date); button.append(preview, info);
       button.addEventListener('click', () => open(meta.id).catch(reportError));
       $('projectList').append(button);
@@ -227,6 +229,7 @@
     $('workspace').setAttribute('aria-busy', String(value));
     $('library').setAttribute('aria-busy', String(value));
     $('newProject').querySelector('span').textContent = value ? '正在准备…' : '新建标注';
+    $('newProject').setAttribute('aria-label', value ? '正在准备图片' : '新建标注');
     $('emptyCreate').disabled = value;
   }
   async function open(id) {
