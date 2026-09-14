@@ -23,7 +23,7 @@
     window.addEventListener('pagehide', () => observer.disconnect(), { once: true });
     if (!parent.supabase?.createClient) await load('../../../vendor/supabase.min.js');
     window.supabase = parent.supabase || window.supabase;
-    await load('model.js'); await load('editor.js'); await load('collaboration.js');
+    await load('model.js'); await load('image-processing.js'); await load('editor.js'); await load('collaboration.js');
   }
   start().catch(error => { document.getElementById('syncStatus').textContent = error.message; });
 })();

@@ -6664,3 +6664,8 @@ textarea:focus-visible {
 @media (max-width: 560px) { .home-layout-card-body { padding: 12px; } }
 @media (prefers-contrast: more) { .home-layout-card { border-width: 2px; } }
 .home-layout-toolbar button:not(.primary) { padding: 8px 14px; border: 1px solid var(--line); background: var(--surface); color: var(--text); }
+
+/* Give the dimension canvas a desktop workspace; other subprograms retain their layout. */
+.app.dimensions-mode { max-width: 1440px; }
+.app.dimensions-mode > .topbar { width: min(100%, 1440px); }
+.app.dimensions-mode.embedded-mode .view { max-width: 1440px; }

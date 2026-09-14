@@ -41,8 +41,8 @@
       return rows?.[0] || null;
     }
   };
-  function status(message) { $('syncStatus').textContent = message; }
-  function reportError(error) { status(error.message || String(error)); $('retryButton').hidden = false; }
+  function status(message, kind = 'connecting') { $('syncStatus').textContent = message; document.querySelector('.sync-bar').dataset.status = kind; }
+  function reportError(error) { status(error.message || String(error), 'error'); $('retryButton').hidden = false; }
   function schedule(delay = 450) {
     clearTimeout(timer);
     if (stopped) return;
@@ -61,11 +61,14 @@
     status(model.cacheError || (model.conflicts.size ? `${model.conflicts.size} 条标注需要处理冲突` :
       model.error ? `修改已保留在本机 · ${model.error}` :
       model.saving ? '正在保存团队标注…' : model.dirty ? '修改已保留在本机 · 等待同步' :
-      connected ? '已保存至云端 · 实时协作中' : '已保存至云端 · 正在恢复实时连接'));
+      connected ? '已保存至云端 · 实时协作中' : '已保存至云端 · 正在恢复实时连接'), model.conflicts.size ? 'conflict' : model.error || model.cacheError ? 'error' : model.dirty || model.saving ? 'saving' : connected ? 'saved' : 'connecting');
     const meta = model.row.payload.meta;
     $('projectTitle').textContent = meta.name;
     $('projectAuthor').textContent = `制作：${meta.createdBy.name} · 最近修改：${meta.updatedBy.name}`;
-    $('exportImage').title = model.dirty ? '导出包含尚未同步的本机修改' : '导出标注图';
+    const format = document.querySelector('.project-format');
+    format.textContent = meta.imageBytes ? `${(meta.imageFormat || '图片').toUpperCase()} · ${window.DimensionImages.formatBytes(meta.imageBytes)}` : '图片标注';
+    format.title = meta.sourceBytes ? `上传前 ${window.DimensionImages.formatBytes(meta.sourceBytes)} · 云端图片与预览共 ${window.DimensionImages.formatBytes(meta.storedBytes || meta.imageBytes)}` : '';
+    $('exportImage').title = !model.view().length ? '添加一条标注后即可导出' : model.dirty ? '导出包含尚未同步的本机修改' : '导出标注图';
   }
   function makeClient() {
     return window.supabase.createClient(window.APP_NETWORK?.projectOrigin || cfg.url, cfg.key, {
@@ -118,23 +121,84 @@
         if (catalogConnected && !session) loadProjects();
       });
   }
+  function icon(name) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.classList.add('icon'); svg.setAttribute('aria-hidden', 'true');
+    const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    use.setAttribute('href', `#${name}`); svg.append(use); return svg;
+  }
+  const previewCache = new Map(), previewQueue = [];
+  let previewActive = 0;
+  async function drainPreviews() {
+    while (previewActive < 2 && previewQueue.length && !stopped) {
+      const { img, path } = previewQueue.shift();
+      if (!img.isConnected) continue;
+      previewActive++;
+      (async () => {
+        try {
+          let cached = previewCache.get(path);
+          if (!cached) {
+            cached = (async () => {
+              const response = await request(store.objectUrl(path), { headers: store.headers() });
+              if (!response.ok) throw new Error('preview');
+              const blob = await response.blob();
+              if (stopped) return null;
+              return URL.createObjectURL(blob);
+            })();
+            previewCache.set(path, cached);
+            if (previewCache.size > 100) {
+              const oldest = previewCache.keys().next().value, previous = previewCache.get(oldest);
+              previewCache.delete(oldest);
+              previous.then(url => { if (url) URL.revokeObjectURL(url); }).catch(() => {});
+            }
+          }
+          const url = await cached;
+          if (url && img.isConnected && !stopped) { img.src = url; img.hidden = false; }
+        } catch (_) { previewCache.delete(path); }
+        finally { previewActive--; drainPreviews(); }
+      })();
+    }
+  }
+  const previewObserver = new IntersectionObserver(entries => {
+    for (const entry of entries) if (entry.isIntersecting) {
+      previewObserver.unobserve(entry.target);
+      previewQueue.push({ img: entry.target.querySelector('img'), path: entry.target.dataset.preview });
+    }
+    drainPreviews();
+  }, { rootMargin: '120px' });
   function renderLibrary() {
     const query = $('projectSearch').value.trim().toLocaleLowerCase();
+    const filtered = query || $('onlyMine').checked;
     const items = projects.filter(meta => (!$('onlyMine').checked || meta.createdBy.id === actor.id) &&
       `${meta.name} ${meta.createdBy.name}`.toLocaleLowerCase().includes(query));
+    previewObserver.disconnect(); previewQueue.length = 0;
     $('projectList').replaceChildren();
     for (const meta of items) {
       const button = document.createElement('button');
-      button.className = 'project-card';
-      const icon = document.createElement('span'); icon.className = 'project-symbol'; icon.textContent = '↔'; icon.setAttribute('aria-hidden', 'true');
-      const name = document.createElement('strong'); name.textContent = meta.name;
-      const author = document.createElement('span'); author.textContent = `制作：${meta.createdBy.name}`;
-      const detail = document.createElement('small'); detail.textContent = `${meta.count || 0} 条标注 · ${new Date(meta.updatedAt).toLocaleDateString('zh-CN')}`;
-      button.append(icon, name, author, detail);
+      button.type = 'button'; button.className = 'project-card';
+      button.setAttribute('aria-label', `${meta.name}，制作：${meta.createdBy.name}，${meta.count || 0} 条标注`);
+      const preview = document.createElement('span'); preview.className = 'project-preview'; preview.append(icon('photo'));
+      if (/^academy\/dimensions\/[a-f0-9-]{36}\/(?:preview|image)\.(?:webp|jpg|png)$/i.test(meta.thumbnailPath || '')) {
+        const img = document.createElement('img'); img.alt = ''; img.hidden = true; img.decoding = 'async'; img.onerror = () => { img.hidden = true; };
+        preview.append(img); preview.dataset.preview = meta.thumbnailPath; previewObserver.observe(preview);
+      }
+      const count = document.createElement('span'); count.className = 'project-count'; count.textContent = `${meta.count || 0} 条标注`; preview.append(count);
+      const info = document.createElement('span'); info.className = 'project-info';
+      const name = document.createElement('strong'); name.textContent = meta.name; name.title = meta.name;
+      const author = document.createElement('span'); author.className = 'project-byline';
+      const avatar = document.createElement('span'); avatar.className = 'employee-avatar'; avatar.textContent = Array.from(meta.createdBy.name)[0]; avatar.setAttribute('aria-hidden', 'true');
+      author.append(avatar, document.createTextNode(`制作：${meta.createdBy.name}`));
+      const date = document.createElement('small'); date.textContent = `${new Date(meta.updatedAt).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })} 更新`;
+      info.append(name, author, date); button.append(preview, info);
       button.addEventListener('click', () => open(meta.id).catch(reportError));
       $('projectList').append(button);
     }
-    $('libraryMessage').textContent = items.length ? `${items.length} 个共享项目` : query || $('onlyMine').checked ? '当前已加载项目中没有匹配结果' : '还没有共享标注。新建一张图片，和同事一起开始。';
+    $('libraryMessage').textContent = items.length ? `${items.length} 个项目` : filtered ? '没有匹配的项目' : '尚无项目';
+    $('libraryEmpty').hidden = items.length > 0;
+    $('emptyTitle').textContent = filtered ? '没有找到相关项目' : '从一张图片开始';
+    $('emptyDescription').textContent = filtered ? '试试其他关键词，或取消「我创建的」筛选。' : '上传需要标注的图片，和同事一起记录尺寸。';
+    $('emptyCreate').hidden = Boolean(filtered);
+    $('libraryEmpty').querySelector('small').hidden = Boolean(filtered);
   }
   async function loadProjects(more = false) {
     if (!allowed()) return;
@@ -148,8 +212,8 @@
       nextOffset = (more ? nextOffset : 0) + rows.length;
       $('moreProjects').hidden = rows.length < 100;
       renderLibrary();
-      if (!session) { status(catalogConnected ? `已连接团队空间 · ${actor.name}` : `团队空间 · ${actor.name} · 正在恢复实时连接`); $('retryButton').hidden = true; }
-    } catch (error) { $('libraryMessage').textContent = '项目加载失败，请重试；不会覆盖云端内容。'; reportError(error); }
+      if (!session) { status(catalogConnected ? `已连接团队空间 · ${actor.name}` : `团队空间 · ${actor.name} · 正在恢复实时连接`, catalogConnected ? 'saved' : 'connecting'); $('retryButton').hidden = true; }
+    } catch (error) { $('libraryEmpty').hidden = true; $('libraryMessage').textContent = '项目加载失败，请重试'; reportError(error); }
     finally { listLoading = false; if (listAgain) { listAgain = false; loadProjects(); } }
   }
   function setProjectLocation(id) {
@@ -161,6 +225,9 @@
     $('workspace').inert = value;
     $('newProject').disabled = value;
     $('workspace').setAttribute('aria-busy', String(value));
+    $('library').setAttribute('aria-busy', String(value));
+    $('newProject').querySelector('span').textContent = value ? '正在准备…' : '新建标注';
+    $('emptyCreate').disabled = value;
   }
   async function open(id) {
     if (opening || !allowed()) return;
@@ -176,10 +243,11 @@
       if (!response.ok) throw new Error('图片加载失败，请重试');
       const blob = await response.blob();
       if (!allowed()) return;
+      await editor.openImage(blob, meta.name);
+      document.body.dataset.view = 'editor';
       $('workspace').hidden = false;
       $('library').hidden = true;
       $('projectHeading').hidden = false;
-      await editor.openImage(blob, meta.name);
       const key = `academy-dimensions-outbox:${actor.id}:${id}`;
       let restored = [];
       try { restored = JSON.parse(localStorage.getItem(key) || '[]'); } catch (_) {}
@@ -195,18 +263,27 @@
     try {
       ensureAllowed();
       if (session?.dirty || session?.saving) throw new Error('请先同步或处理当前项目的冲突，再新建项目');
-      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('请选择 JPG、PNG 或 WebP 图片');
-      if (file.size > 15 * 1024 * 1024) throw new Error('图片请控制在 15 MB 以内');
-      setOpening(true); status('正在上传图片并创建共享项目…');
-      const image = await createImageBitmap(file);
-      const width = image.width, height = image.height; image.close();
-      if (width * height > 24000000) throw new Error('图片超过 2400 万像素，请缩小后上传');
+      setOpening(true);
+      const processed = await window.DimensionImages.prepare(file, message => status(message, 'saving'));
+      ensureAllowed();
+      const { main, preview, reusePreview, sourceBytes, sourceWidth, sourceHeight } = processed;
       const id = crypto.randomUUID(), now = new Date().toISOString();
-      const extension = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[file.type];
-      const imagePath = `academy/dimensions/${id}/original.${extension}`;
-      const upload = await request(store.objectUrl(imagePath), { method: 'POST', headers: store.headers({ 'Content-Type': file.type }), body: file });
+      const imagePath = `academy/dimensions/${id}/image.${main.extension}`;
+      status(`正在上传优化后的图片（${window.DimensionImages.formatBytes(main.blob.size)}）…`, 'saving');
+      const upload = await request(store.objectUrl(imagePath), { method: 'POST', headers: store.headers({ 'Content-Type': main.blob.type }), body: main.blob });
       if (!upload.ok) throw new Error(`图片上传失败（${upload.status}）`);
-      const payload = { schema: 1, meta: { id, name: file.name.slice(0, 180), imagePath, width, height,
+      let thumbnailPath = reusePreview ? imagePath : undefined, thumbnailBytes = 0;
+      if (preview) {
+        const path = `academy/dimensions/${id}/preview.${preview.extension}`;
+        try {
+          const result = await request(store.objectUrl(path), { method: 'POST', headers: store.headers({ 'Content-Type': preview.blob.type }), body: preview.blob });
+          if (result.ok) { thumbnailPath = path; thumbnailBytes = preview.blob.size; }
+        } catch (_) { /* A preview failure must not discard the optimized main image. */ }
+      }
+      const payload = { schema: 1, meta: { id, thumbnailPath, name: file.name.slice(0, 180), imagePath,
+        width: main.width, height: main.height, sourceWidth, sourceHeight, sourceBytes,
+        imageBytes: main.blob.size, imageFormat: main.extension, thumbnailBytes,
+        storedBytes: main.blob.size + thumbnailBytes,
         createdBy: actor, updatedBy: actor, createdAt: now, updatedAt: now, count: 0 }, annotations: {} };
       try {
         const result = await rest({}, { method: 'POST', body: JSON.stringify({ user_id: prefix + id, payload, ts: Date.now(), updated_at: now }) });
@@ -220,6 +297,7 @@
       setOpening(false);
       catalogChannel?.send({ type: 'broadcast', event: 'changed', payload: { id } });
       await open(id);
+      editor.notice(`图片已优化并共享 · ${window.DimensionImages.formatBytes(main.blob.size)}`);
     } catch (error) { reportError(error); }
     finally { setOpening(false); }
   }
@@ -232,15 +310,16 @@
     if (session?.dirty) { await session.flush(); if (session.dirty) return; }
     if (projectChannel) sb.removeChannel(projectChannel);
     projectChannel = null; session = null; connected = false; clearTimeout(retryTimer);
+    document.body.dataset.view = 'library';
     $('workspace').hidden = true; $('projectHeading').hidden = true; $('library').hidden = false;
     $('libraryButton').hidden = true; $('shareButton').hidden = true; $('presenceStatus').textContent = '';
     $('exportImage').disabled = true; setProjectLocation(null); loadProjects();
   });
+  $('emptyCreate').addEventListener('click', () => $('newProject').click());
   $('newProject').addEventListener('click', () => { $('fileInput').value = ''; $('fileInput').click(); });
   $('retryButton').addEventListener('click', () => { if (session) { refreshCurrent(); subscribeProject(); schedule(0); } else loadProjects(); });
-  $('refreshLibrary').addEventListener('click', () => loadProjects());
   $('moreProjects').addEventListener('click', () => loadProjects(true));
-  $('projectSearch').addEventListener('input', renderLibrary); $('onlyMine').addEventListener('change', renderLibrary);
+  $('projectSearch').addEventListener('input', renderLibrary); $('onlyMine').addEventListener('change', renderLibrary); $('allProjects').addEventListener('change', renderLibrary);
   $('copyConflict').addEventListener('click', () => { session.resolve('copy'); schedule(0); });
   $('discardConflict').addEventListener('click', () => { session.resolve('remote'); schedule(0); });
   $('shareButton').addEventListener('click', async () => {
@@ -255,6 +334,9 @@
   function stop() {
     stopped = true; clearTimeout(timer); clearTimeout(retryTimer); clearInterval(pollTimer);
     sb.removeAllChannels(); stopAuth?.();
+    previewObserver.disconnect(); previewQueue.length = 0;
+    for (const promise of previewCache.values()) promise.then(url => { if (url) URL.revokeObjectURL(url); }).catch(() => {});
+    previewCache.clear();
     document.removeEventListener('visibilitychange', resume); window.removeEventListener('online', resume);
   }
   const stopAuth = auth.onChange(() => {

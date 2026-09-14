@@ -46,10 +46,16 @@ async page => {
   await a.goto(origin + '/dimension-test?actor=A');
   const fa = a.frameLocator('iframe');
   await fa.locator('#newProject').waitFor();
-  const png = await a.evaluate(() => { const c=document.createElement('canvas');c.width=900;c.height=650;const x=c.getContext('2d');x.fillStyle='#e8e3da';x.fillRect(0,0,900,650);x.fillStyle='#b59b7d';x.fillRect(190,180,500,260);x.fillStyle='#7b624b';x.fillRect(210,440,22,135);x.fillRect(650,440,22,135);return c.toDataURL().split(',')[1]; });
+  const png = await a.evaluate(() => { const c=document.createElement('canvas');c.width=3600;c.height=2600;const x=c.getContext('2d');x.scale(4,4);x.fillStyle='#e8e3da';x.fillRect(0,0,900,650);x.fillStyle='#b59b7d';x.fillRect(190,180,500,260);x.fillStyle='#7b624b';x.fillRect(210,440,22,135);x.fillRect(650,440,22,135);return c.toDataURL().split(',')[1]; });
   await a.frames()[1].evaluate(png => { const file=new File([Uint8Array.from(atob(png),c=>c.charCodeAt(0))], '工作台尺寸.png', {type:'image/png'});const dt=new DataTransfer();dt.items.add(file);const input=document.getElementById('fileInput');input.files=dt.files;input.dispatchEvent(new Event('change')); }, png);
   await fa.locator('#projectTitle').waitFor();
-  const projectId = [...rows.values()][0].payload.meta.id;
+  const meta = [...rows.values()][0].payload.meta;
+  const projectId = meta.id;
+  if (meta.width !== 2560 || meta.height !== 1849 || meta.sourceWidth !== 3600 || meta.sourceHeight !== 2600) throw Error('Image dimensions did not reflect upload resizing');
+  if (meta.imageBytes > 1024 * 1024 || !meta.imagePath.includes('/image.') || [...files.keys()].some(path => path.includes('/original.'))) throw Error('Original or oversized image was uploaded');
+  const canvasSize = await a.frames()[1].evaluate(() => ({width:document.getElementById('measureCanvas').width,height:document.getElementById('measureCanvas').height}));
+  if (canvasSize.width !== meta.width || canvasSize.height !== meta.height) throw Error('Annotation coordinates do not match stored dimensions');
+  if (JSON.stringify([...rows.values()][0].payload).includes('data:image/')) throw Error('Image bytes leaked into database payload');
   await b.goto(origin + '/dimension-test?actor=B#/apps/dimensions?project=' + projectId);
   const fb = b.frameLocator('iframe'); await fb.locator('#measureCanvas').waitFor();
   const draw = async (p, f, start, end) => {
@@ -91,6 +97,10 @@ async page => {
   if(overflow)throw Error('Mobile horizontal overflow');
   await fa.locator('#libraryButton').click(); await fa.locator('#projectSearch').fill('员工A');
   await fa.locator('.project-card').waitFor();
+  await fa.locator('.project-preview img').waitFor();
+  await a.frames()[1].waitForFunction(() => document.querySelector('.project-preview img')?.naturalWidth > 0);
+  const previewSize = await fa.locator('.project-preview img').evaluate(img => img.naturalWidth);
+  if (!previewSize || previewSize > 480) throw Error('Thumbnail did not load at the expected size');
   await a.screenshot({path:'output/playwright/dimensions-library-mobile.png',fullPage:true});
   if(errors.length)throw Error(errors.join('\n'));
   const result = { passed:true, scenarios:['shared upload','line / circle / rectangle','employee attribution','two employee realtime','offline reopen and merge','same-annotation conflict copy','PNG export','390px dark theme','library employee search'], projects:rows.size,annotations:Object.keys([...rows.values()][0].payload.annotations).length,productionWrites:0 };

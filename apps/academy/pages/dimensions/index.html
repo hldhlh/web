@@ -1,156 +1,112 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="description" content="上传图片，手动绘制尺寸线、矩形和圆形标注。">
-    <meta name="theme-color" content="#f7f7f5">
-    <title>尺寸标注 · Auto Office</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="../../appearance.css">
-    <link rel="stylesheet" href="collaboration.css">
-    <script src="bootstrap.js" defer></script>
-  </head>
-  <body>
-    <main class="app-shell">
-      <header class="topbar">
-        <div class="brand" aria-label="尺刻图片尺寸标注工具">
-          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-          <span>尺寸标注</span>
-        </div>
-        <div class="top-actions">
-          <button class="button" id="libraryButton" hidden>项目</button>
-          <button class="button" id="shareButton" hidden>复制链接</button>
-          <button class="button ghost mobile-hide" id="replaceImage" type="button">
-            <span class="mini-icon" aria-hidden="true">＋</span>
-            <span class="replace-text">新建标注</span>
-          </button>
-          <button class="button primary" id="exportImage" type="button" disabled>
-            <span class="mini-icon" aria-hidden="true">↓</span>
-            导出标注图
-          </button>
-        </div>
-      </header>
-
-      <div class="sync-bar"><span id="syncStatus" role="status" aria-live="polite">正在连接 Auto Office…</span><button id="retryButton" hidden>重试同步</button><span id="presenceStatus"></span></div>
-      <section id="conflictPanel" class="conflict-panel" hidden role="alert">
-        <p>同一条标注已被其他员工修改。你的修改已保留，请选择处理方式。删除冲突会保留团队版本。</p>
-        <button id="copyConflict">将我的修改另存为标注</button><button id="discardConflict">使用团队版本</button>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="与团队共享图片、协作标注尺寸，并记录每一位制作员工。">
+  <meta name="theme-color" content="#f2f2f7">
+  <title>尺寸标注 · Auto Office</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="../../appearance.css">
+  <link rel="stylesheet" href="collaboration.css">
+  <script src="bootstrap.js" defer></script>
+</head>
+<body data-view="library">
+  <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><symbol id="back" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></symbol><symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol><symbol id="share" viewBox="0 0 24 24"><path d="M8 8H5v13h14V8h-3M12 15V2m-4 4 4-4 4 4"/></symbol><symbol id="download" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></symbol><symbol id="search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol><symbol id="refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M6.3 6.3A8 8 0 0 1 20 12M4 12a8 8 0 0 0 13.7 5.7"/></symbol><symbol id="line" viewBox="0 0 24 24"><path d="M4 18 20 6M2 15l4 6M18 3l4 6"/></symbol><symbol id="rect" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="2"/></symbol><symbol id="circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></symbol><symbol id="ruler" viewBox="0 0 24 24"><path d="m3 16 13-13 5 5L8 21H3v-5Z"/><path d="m12 7 2 2m-6 2 2 2m-6 2 2 2"/></symbol><symbol id="fit" viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><rect x="7" y="7" width="10" height="10" rx="1"/></symbol><symbol id="minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol><symbol id="photo" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1"/><path d="m3 16 5-5 5 5 3-3 5 5"/></symbol><symbol id="check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol><symbol id="cloud" viewBox="0 0 24 24"><path d="M7 18a5 5 0 1 1 .9-9.9A7 7 0 0 1 21 11a3.5 3.5 0 0 1-1 7H7Z"/></symbol></svg>
+  <main class="app-shell">
+    <header class="topbar" aria-label="项目操作">
+      <button id="libraryButton" class="button back-button" type="button" hidden><svg class="icon" aria-hidden="true"><use href="#back"/></svg><span>所有项目</span></button>
+      <div class="top-actions">
+        <button id="shareButton" class="button quiet" type="button" hidden aria-label="复制项目协作链接" title="复制项目协作链接"><svg class="icon" aria-hidden="true"><use href="#share"/></svg><span>共享</span></button>
+        <button id="replaceImage" class="button quiet new-image" type="button"><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span class="replace-text">新建标注</span></button>
+        <button id="exportImage" class="button primary" type="button" disabled title="添加一条标注后即可导出"><svg class="icon" aria-hidden="true"><use href="#download"/></svg><span>导出图片</span></button>
+      </div>
+    </header>
+    <div class="sync-bar" data-status="connecting">
+      <span class="sync-symbol" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#cloud"/></svg></span>
+      <span id="syncStatus" role="status" aria-live="polite">正在连接团队空间…</span>
+      <button id="retryButton" class="text-button" hidden>重试同步</button>
+      <span id="presenceStatus"></span>
+    </div>
+    <section id="conflictPanel" class="conflict-panel" hidden role="alert">
+      <strong>有一处修改需要你确认</strong>
+      <p>同一条标注已被同事修改。你的版本已保留，可以另存为新标注，或使用团队版本。删除冲突会保留团队版本。</p>
+      <div><button id="copyConflict" class="button primary" type="button" ><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span>另存我的标注</span></button><button id="discardConflict" class="button">使用团队版本</button></div>
+    </section>
+    <section id="library" class="project-library" aria-labelledby="libraryTitle">
+      <div class="library-heading">
+        <div><p class="eyebrow">团队工作空间</p><h1 id="libraryTitle">尺寸项目</h1><p class="library-intro">图片、尺寸与制作记录，和团队保持同步。</p></div>
+        <button id="newProject" class="button primary" type="button" ><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span>新建标注</span></button>
+      </div>
+      <div class="library-tools">
+        <label class="search-field" for="projectSearch"><svg class="icon" aria-hidden="true"><use href="#search"/></svg><span class="sr-only">搜索项目或制作员工</span><input id="projectSearch" type="search" placeholder="搜索项目或制作员工" autocomplete="off"></label>
+        <fieldset class="project-scope">
+          <legend class="sr-only">项目范围</legend>
+          <label class="scope-option"><input id="allProjects" type="radio" name="projectScope" value="all" checked><span>全部</span></label>
+          <label class="scope-option"><input id="onlyMine" type="radio" name="projectScope" value="mine"><span>我创建的</span></label>
+        </fieldset>
+      </div>
+      <div class="library-section-heading"><h2>项目资料库</h2><p id="libraryMessage" role="status">正在加载…</p></div>
+      <div id="projectList" class="project-grid" aria-label="共享项目"></div>
+      <section id="libraryEmpty" class="library-empty" hidden>
+        <div class="empty-illustration" aria-hidden="true"><div class="empty-sheet"><svg class="icon" aria-hidden="true"><use href="#photo"/></svg><span class="empty-measure"></span></div><span class="empty-pencil"><svg class="icon" aria-hidden="true"><use href="#ruler"/></svg></span></div>
+        <h3 id="emptyTitle">从一张图片开始</h3><p id="emptyDescription">上传需要标注的图片，和同事一起记录尺寸。</p>
+        <button id="emptyCreate" class="button primary" type="button" ><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span>创建第一个项目</span></button>
+        <small>自动转换压缩 · 支持 JPG、PNG、WebP · 原图最大 15 MB</small>
       </section>
-      <section id="library" class="project-library">
-        <div class="library-heading"><div><p class="eyebrow">AUTO OFFICE / 团队协作</p><h1>每个尺寸，都有记录。</h1><p>共享图片、一起标注，随时查看制作员工。</p></div><button class="button primary" id="newProject">＋ 新建标注</button></div>
-        <div class="library-tools"><label class="sr-only" for="projectSearch">搜索项目或员工</label><input id="projectSearch" type="search" placeholder="搜索图片名称或制作员工"><label class="mine-filter"><input id="onlyMine" type="checkbox">我创建的</label><button id="refreshLibrary">刷新</button></div>
-        <p id="libraryMessage" role="status">正在加载共享项目…</p><div id="projectList" class="project-grid"></div><button id="moreProjects" hidden>加载更多项目</button>
-      </section>
-      <div id="projectHeading" class="project-heading" hidden><strong id="projectTitle"></strong><span id="projectAuthor"></span></div>
-      <section class="workspace" id="workspace" hidden>
+      <button id="moreProjects" class="button more-projects" hidden>载入更多项目</button>
+      <div class="library-footnote"><svg class="icon" aria-hidden="true"><use href="#cloud"/></svg><span>团队共享 · 自动保存每一次修改</span></div>
+    </section>
+    <div id="projectHeading" class="project-heading" hidden>
+      <div class="project-file-symbol"><svg class="icon" aria-hidden="true"><use href="#photo"/></svg></div>
+      <div class="project-heading-text"><strong id="projectTitle"></strong><span id="projectAuthor"></span></div>
+      <span class="project-format">图片标注</span>
+    </div>
+    <section class="workspace" id="workspace" hidden>
+      <div class="canvas-area">
+        <div class="canvas-caption"><span>标注画布</span><span>尺寸需手动填写</span></div>
         <div class="canvas-viewport" id="viewport">
-          <section class="empty-state" id="emptyState">
-            <div class="measure-motif" aria-hidden="true">
-              <span class="motif-line"></span>
-              <span class="motif-point point-a"></span>
-              <span class="motif-point point-b"></span>
-              <span class="motif-label">宽 128 cm</span>
-            </div>
-            <p class="eyebrow">图片尺寸标注工具</p>
-            <h1>上传图片，<br>清楚标出每个尺寸。</h1>
-            <p class="intro">在图片上拖出标记，再手动填写说明文字。所有内容仅用于标注，不进行像素尺寸换算。</p>
-            <button class="upload-button" id="uploadButton" type="button">
-              <span class="upload-arrow" aria-hidden="true">↑</span>
-              <span>
-                <strong>选择一张图片</strong>
-                <small>或拖放到此处 · JPG / PNG / WebP</small>
-              </span>
-            </button>
-            <div class="privacy"><span>✓</span>图片与标注会上传团队云端，供有权限的员工协作</div>
-          </section>
-
-          <div class="canvas-stage" id="canvasStage" hidden>
-            <canvas id="measureCanvas" aria-label="图片标注画布，拖动以创建尺寸线、矩形或圆形"></canvas>
-          </div>
-
-          <div class="canvas-hint" id="canvasHint" hidden>
-            <span class="live-dot"></span><span id="notice">上传图片开始标注</span>
-          </div>
-          <div class="drop-mask" id="dropMask" hidden>松开以载入图片</div>
+          <section id="emptyState" class="empty-state"><p>正在准备画布…</p><button id="uploadButton" class="button">选择图片</button></section>
+          <div class="canvas-stage" id="canvasStage" hidden><canvas id="measureCanvas" aria-label="图片标注画布，拖动以创建尺寸线、矩形或圆形"></canvas></div>
+          <div class="drop-mask" id="dropMask" hidden><svg class="icon" aria-hidden="true"><use href="#photo"/></svg>松开以新建图片项目</div>
         </div>
-
-        <aside class="side-panel" id="sidePanel" hidden>
-          <div class="mobile-drag-handle"></div>
-
-          <div class="draw-mode" role="group" aria-label="绘制模式">
-            <button class="active" id="lineTool" type="button" aria-pressed="true">
-              <span class="line-tool-icon" aria-hidden="true"></span><span>尺寸线</span>
-            </button>
-            <button id="rectTool" type="button" aria-pressed="false">
-              <span class="rect-tool-icon" aria-hidden="true"></span><span>矩形</span>
-            </button>
-            <button id="circleTool" type="button" aria-pressed="false">
-              <span class="circle-tool-icon" aria-hidden="true"></span><span>圆形</span>
-            </button>
+        <div class="canvas-bottom">
+          <div class="canvas-hint" id="canvasHint" hidden><span id="notice" role="status">拖动添加标注</span></div>
+          <div class="zoom-controls" role="group" aria-label="画布缩放">
+            <button id="zoomOut" class="icon-button" type="button" aria-label="缩小画布" title="缩小画布"><svg class="icon" aria-hidden="true"><use href="#minus"/></svg><span>缩小</span></button>
+            <output id="zoomValue" aria-live="off">100%</output>
+            <button id="zoomIn" class="icon-button" type="button" aria-label="放大画布" title="放大画布"><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span>放大</span></button>
+            <span class="control-divider"></span>
+            <button id="fitCanvas" class="icon-button" type="button" aria-label="图片适合窗口" title="图片适合窗口"><svg class="icon" aria-hidden="true"><use href="#fit"/></svg><span>适合窗口</span></button>
           </div>
-
-          <div class="style-picker">
-            <span>标注样式</span>
-            <div class="style-options" role="group" aria-label="标注样式">
-              <button type="button" data-style="outline"><i class="style-swatch outline"></i>黑白</button>
-              <button class="active" type="button" data-style="light"><i class="style-swatch light"></i>白色</button>
-              <button type="button" data-style="dark"><i class="style-swatch dark"></i>黑色</button>
-            </div>
+        </div>
+      </div>
+      <aside class="side-panel" id="sidePanel" hidden aria-label="标注工具与属性">
+        <div class="inspector-header"><h2>标注工具</h2><span>手动尺寸</span></div>
+        <div class="draw-mode" role="group" aria-label="绘制模式">
+          <button id="lineTool" class="active" type="button" aria-pressed="true"><svg class="icon" aria-hidden="true"><use href="#line"/></svg><span>尺寸线</span></button>
+          <button id="rectTool" class="" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#rect"/></svg><span>矩形</span></button>
+          <button id="circleTool" class="" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#circle"/></svg><span>圆形</span></button>
+        </div>
+        <section class="panel-section label-editor">
+          <div class="section-heading"><h3>标注内容</h3><span id="selectionType">未选中</span></div>
+          <div id="lineLabelFields"><label for="labelInput">尺寸文字</label><input id="labelInput" type="text" maxlength="32" placeholder="例如：宽 120 cm" disabled>
+            <div class="quick-labels" aria-label="快速插入标注前缀"><button type="button" data-prefix="宽 ">宽度</button><button type="button" data-prefix="高 ">高度</button><button type="button" data-prefix="深 ">深度</button><button type="button" data-prefix="直径 Ø">直径</button></div>
           </div>
-
-          <div class="position-picker">
-            <span>文字位置</span>
-            <div class="position-options" role="group" aria-label="文字位置">
-              <button type="button" data-label-position="above"><i class="position-icon above"></i>线上方</button>
-              <button class="active" type="button" data-label-position="center"><i class="position-icon center"></i>线上居中</button>
-            </div>
-          </div>
-
-          <section class="panel-section label-editor">
-            <div class="section-heading">
-              <span>标注内容</span><em>手动填写</em>
-            </div>
-            <p>选择尺寸线、矩形或圆形，填写对应的标注内容。</p>
-            <div id="lineLabelFields">
-              <label for="labelInput">尺寸文字</label>
-              <input id="labelInput" type="text" maxlength="32" placeholder="请输入标注文字（可留空）" disabled>
-              <div class="quick-labels" aria-label="快速插入标注前缀">
-                <button type="button" data-prefix="宽 ">宽度</button>
-                <button type="button" data-prefix="高 ">高度</button>
-                <button type="button" data-prefix="深 ">深度</button>
-                <button type="button" data-prefix="直径 Ø">直径</button>
-              </div>
-            </div>
-            <div class="edge-fields" id="rectLabelFields" hidden>
-              <label>上边<input id="topLabelInput" type="text" maxlength="32" placeholder="可留空" disabled></label>
-              <label>右边<input id="rightLabelInput" type="text" maxlength="32" placeholder="可留空" disabled></label>
-              <label>下边<input id="bottomLabelInput" type="text" maxlength="32" placeholder="可留空" disabled></label>
-              <label>左边<input id="leftLabelInput" type="text" maxlength="32" placeholder="可留空" disabled></label>
-            </div>
-            <small class="editor-tip" id="editorTip">选择标注后可修改文字与节点位置。</small>
-          </section>
-
-          <section class="panel-section measure-list">
-            <div class="section-heading"><span>标注列表</span><b id="measureCount">0</b></div>
-            <p class="list-empty" id="listEmpty">选择尺寸线、矩形或圆形，然后在图片上拖动添加标注。</p>
-            <div class="list-items" id="listItems"></div>
-          </section>
-
-          <div class="panel-footer">
-            <button id="panelReplace" type="button">新建标注</button>
-            <span id="imageSize"></span>
-          </div>
-        </aside>
-      </section>
-
-      <footer class="steps" id="steps" hidden>
-        <div><b>01</b><span><strong>上传图片</strong><small>支持常见图片格式</small></span></div>
-        <div><b>02</b><span><strong>拖动标记</strong><small>从起点拖到终点</small></span></div>
-        <div><b>03</b><span><strong>填写并导出</strong><small>手动输入真实尺寸</small></span></div>
-      </footer>
-
-      <input class="sr-only" id="fileInput" type="file" accept="image/png,image/jpeg,image/webp">
-    </main>
-  </body>
+          <div class="edge-fields" id="rectLabelFields" hidden><label>上边<input id="topLabelInput" type="text" maxlength="32" placeholder="填写尺寸" disabled></label><label>右边<input id="rightLabelInput" type="text" maxlength="32" placeholder="填写尺寸" disabled></label><label>下边<input id="bottomLabelInput" type="text" maxlength="32" placeholder="填写尺寸" disabled></label><label>左边<input id="leftLabelInput" type="text" maxlength="32" placeholder="填写尺寸" disabled></label></div>
+          <small class="editor-tip" id="editorTip">先在画布上拖出一条标注，再填写尺寸。</small>
+        </section>
+        <section class="panel-section appearance-section" aria-label="标注外观">
+          <div class="section-heading"><h3>外观</h3></div>
+          <div class="style-picker"><span>线条与标签</span><div class="style-options" role="group" aria-label="标注样式"><button type="button" data-style="outline"><i class="style-swatch outline"></i>线框</button><button class="active" type="button" data-style="light"><i class="style-swatch light"></i>白色</button><button type="button" data-style="dark"><i class="style-swatch dark"></i>黑色</button></div></div>
+          <div class="position-picker"><span>文字位置</span><div class="position-options" role="group" aria-label="文字位置"><button type="button" data-label-position="above"><i class="position-icon above"></i>线上方</button><button class="active" type="button" data-label-position="center"><i class="position-icon center"></i>线上居中</button></div></div>
+        </section>
+        <section class="panel-section measure-list"><div class="section-heading"><h3>全部标注</h3><b id="measureCount">0</b></div><p class="list-empty" id="listEmpty">还没有标注。选择上方工具，在图片上拖动即可添加。</p><div class="list-items" id="listItems"></div></section>
+        <div class="panel-footer"><span id="imageSize"></span><button id="panelReplace" type="button" title="创建新的图片项目"><svg class="icon" aria-hidden="true"><use href="#plus"/></svg>新建项目</button></div>
+      </aside>
+    </section>
+    <footer id="steps" hidden></footer>
+    <input class="sr-only" id="fileInput" type="file" accept="image/png,image/jpeg,image/webp">
+  </main>
+</body>
 </html>

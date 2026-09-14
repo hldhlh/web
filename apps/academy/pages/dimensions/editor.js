@@ -151,6 +151,9 @@
     elements.canvas.style.height = `${height}px`;
     elements.canvasStage.style.width = `${width}px`;
     elements.canvasStage.style.height = `${height}px`;
+    document.getElementById('zoomValue').textContent = `${Math.round(state.fitScale * state.zoom * 100)}%`;
+    document.getElementById('zoomOut').disabled = state.zoom <= .5;
+    document.getElementById('zoomIn').disabled = state.zoom >= 4;
   }
 
   function setZoom(nextZoom, clientX, clientY) {
@@ -437,8 +440,9 @@
     ];
   }
 
+  const coarsePointer = window.matchMedia("(any-pointer: coarse)");
   function nearestHandle(point) {
-    const threshold = 14 / (state.fitScale * state.zoom);
+    const threshold = (coarsePointer.matches ? 22 : 14) / (state.fitScale * state.zoom);
     let winner = null;
     [...state.annotations].reverse().forEach((item) => {
       handlesFor(item).forEach((handle) => {
@@ -649,6 +653,7 @@
 
   function updateInterface() {
     const selected = selectedAnnotation();
+    document.getElementById('selectionType').textContent = selected ? ({ line: '尺寸线', rect: '矩形', circle: '圆形' }[selected.type] || '标注') : '未选中';
     const isRectangle = selected?.type === "rect";
     elements.exportImage.disabled = !state.image || state.annotations.length === 0;
     elements.lineLabelFields.hidden = Boolean(isRectangle);
@@ -659,7 +664,7 @@
       input.disabled = !isRectangle;
       input.value = isRectangle ? selected.labels?.[side] || "" : "";
     });
-    elements.editorTip.textContent = isRectangle
+    elements.editorTip.textContent = !selected ? "先在画布上拖出一条标注，再填写尺寸。" : isRectangle
       ? "四个角点可独立调节；按住 Shift 拖动可保持标准矩形。"
       : selected?.type === "circle"
         ? "拖动圆心可整体移动；拖动外侧节点可调节半径。"
@@ -677,6 +682,7 @@
       selectButton.type = "button";
       selectButton.className = "list-select";
       if (item.id === state.selectedId) selectButton.classList.add("selected");
+      selectButton.setAttribute("aria-pressed", String(item.id === state.selectedId));
       selectButton.innerHTML = `<span class="measure-index">${String(index + 1).padStart(2, "0")}</span><strong></strong>`;
       const summary = annotationSummary(item);
       const label = selectButton.querySelector("strong");
@@ -852,11 +858,12 @@
   elements.labelInput.addEventListener("input", () => {
     const selected = selectedAnnotation();
     if (!selected || selected.type === "rect") return;
+    const caret = [elements.labelInput.selectionStart, elements.labelInput.selectionEnd];
     selected.label = elements.labelInput.value;
     commit(selected);
     updateInterface();
     elements.labelInput.focus();
-    elements.labelInput.setSelectionRange(selected.label.length, selected.label.length);
+    elements.labelInput.setSelectionRange(...caret);
     render();
   });
 
@@ -864,11 +871,12 @@
     input.addEventListener("input", () => {
       const selected = selectedAnnotation();
       if (!selected || selected.type !== "rect") return;
+      const caret = [input.selectionStart, input.selectionEnd];
       selected.labels[side] = input.value;
       commit(selected);
       updateInterface();
       input.focus();
-      input.setSelectionRange(input.value.length, input.value.length);
+      input.setSelectionRange(...caret);
       render();
     });
   });
@@ -947,6 +955,18 @@
     loadFile(event.dataTransfer.files[0]);
   });
 
+  for (const [id, factor] of [['zoomOut', .8], ['zoomIn', 1.25]]) {
+    document.getElementById(id).addEventListener('click', () => {
+      const box = elements.viewport.getBoundingClientRect();
+      setZoom(state.zoom * factor, box.x + box.width / 2, box.y + box.height / 2);
+    });
+  }
+  document.getElementById('fitCanvas').addEventListener('click', () => {
+    state.zoom = 1; updateFit(); elements.viewport.scrollTo(0, 0); setNotice('图片已适合窗口');
+  });
+  const resizeObserver = new ResizeObserver(updateFit);
+  resizeObserver.observe(elements.viewport);
+  window.addEventListener('pagehide', () => resizeObserver.disconnect(), { once: true });
   window.addEventListener("resize", updateFit);
   window.addEventListener("beforeunload", () => {
     if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);

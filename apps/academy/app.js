@@ -3724,6 +3724,7 @@
     if (route.name !== 'home') view().style.removeProperty('min-height');
     document.querySelector(".app")?.classList.toggle("ops-mode", route.name === "ops");
     document.querySelector(".app")?.classList.toggle("embedded-mode", route.name === "embedded-app");
+    document.querySelector(".app")?.classList.toggle("dimensions-mode", route.name === "embedded-app" && route.app === "dimensions");
     updateNotificationButton();
     if (route.name === "home") return renderHome();
     if (route.name === "messages") return renderMessages();

@@ -354,5 +354,6 @@
   "apps/academy/pages/dimensions/bootstrap.js",
   "apps/academy/pages/dimensions/editor.js",
   "apps/academy/pages/dimensions/model.js",
-  "apps/academy/pages/dimensions/collaboration.js"
+  "apps/academy/pages/dimensions/collaboration.js",
+  "apps/academy/pages/dimensions/image-processing.js"
 ]
