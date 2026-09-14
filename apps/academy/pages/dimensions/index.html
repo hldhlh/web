@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="description" content="上传图片，手动绘制尺寸线、矩形和圆形标注。">
+    <meta name="theme-color" content="#f7f7f5">
+    <title>尺寸标注 · Auto Office</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="../../appearance.css">
+    <link rel="stylesheet" href="collaboration.css">
+    <script src="bootstrap.js" defer></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="brand" aria-label="尺刻图片尺寸标注工具">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span>尺寸标注</span>
+        </div>
+        <div class="top-actions">
+          <button class="button" id="libraryButton" hidden>项目</button>
+          <button class="button" id="shareButton" hidden>复制链接</button>
+          <button class="button ghost mobile-hide" id="replaceImage" type="button">
+            <span class="mini-icon" aria-hidden="true">＋</span>
+            <span class="replace-text">新建标注</span>
+          </button>
+          <button class="button primary" id="exportImage" type="button" disabled>
+            <span class="mini-icon" aria-hidden="true">↓</span>
+            导出标注图
+          </button>
+        </div>
+      </header>
+
+      <div class="sync-bar"><span id="syncStatus" role="status" aria-live="polite">正在连接 Auto Office…</span><button id="retryButton" hidden>重试同步</button><span id="presenceStatus"></span></div>
+      <section id="conflictPanel" class="conflict-panel" hidden role="alert">
+        <p>同一条标注已被其他员工修改。你的修改已保留，请选择处理方式。删除冲突会保留团队版本。</p>
+        <button id="copyConflict">将我的修改另存为标注</button><button id="discardConflict">使用团队版本</button>
+      </section>
+      <section id="library" class="project-library">
+        <div class="library-heading"><div><p class="eyebrow">AUTO OFFICE / 团队协作</p><h1>每个尺寸，都有记录。</h1><p>共享图片、一起标注，随时查看制作员工。</p></div><button class="button primary" id="newProject">＋ 新建标注</button></div>
+        <div class="library-tools"><label class="sr-only" for="projectSearch">搜索项目或员工</label><input id="projectSearch" type="search" placeholder="搜索图片名称或制作员工"><label class="mine-filter"><input id="onlyMine" type="checkbox">我创建的</label><button id="refreshLibrary">刷新</button></div>
+        <p id="libraryMessage" role="status">正在加载共享项目…</p><div id="projectList" class="project-grid"></div><button id="moreProjects" hidden>加载更多项目</button>
+      </section>
+      <div id="projectHeading" class="project-heading" hidden><strong id="projectTitle"></strong><span id="projectAuthor"></span></div>
+      <section class="workspace" id="workspace" hidden>
+        <div class="canvas-viewport" id="viewport">
+          <section class="empty-state" id="emptyState">
+            <div class="measure-motif" aria-hidden="true">
+              <span class="motif-line"></span>
+              <span class="motif-point point-a"></span>
+              <span class="motif-point point-b"></span>
+              <span class="motif-label">宽 128 cm</span>
+            </div>
+            <p class="eyebrow">图片尺寸标注工具</p>
+            <h1>上传图片，<br>清楚标出每个尺寸。</h1>
+            <p class="intro">在图片上拖出标记，再手动填写说明文字。所有内容仅用于标注，不进行像素尺寸换算。</p>
+            <button class="upload-button" id="uploadButton" type="button">
+              <span class="upload-arrow" aria-hidden="true">↑</span>
+              <span>
+                <strong>选择一张图片</strong>
+                <small>或拖放到此处 · JPG / PNG / WebP</small>
+              </span>
+            </button>
+            <div class="privacy"><span>✓</span>图片与标注会上传团队云端，供有权限的员工协作</div>
+          </section>
+
+          <div class="canvas-stage" id="canvasStage" hidden>
+            <canvas id="measureCanvas" aria-label="图片标注画布，拖动以创建尺寸线、矩形或圆形"></canvas>
+          </div>
+
+          <div class="canvas-hint" id="canvasHint" hidden>
+            <span class="live-dot"></span><span id="notice">上传图片开始标注</span>
+          </div>
+          <div class="drop-mask" id="dropMask" hidden>松开以载入图片</div>
+        </div>
+
+        <aside class="side-panel" id="sidePanel" hidden>
+          <div class="mobile-drag-handle"></div>
+
+          <div class="draw-mode" role="group" aria-label="绘制模式">
+            <button class="active" id="lineTool" type="button" aria-pressed="true">
+              <span class="line-tool-icon" aria-hidden="true"></span><span>尺寸线</span>
+            </button>
+            <button id="rectTool" type="button" aria-pressed="false">
+              <span class="rect-tool-icon" aria-hidden="true"></span><span>矩形</span>
+            </button>
+            <button id="circleTool" type="button" aria-pressed="false">
+              <span class="circle-tool-icon" aria-hidden="true"></span><span>圆形</span>
+            </button>
+          </div>
+
+          <div class="style-picker">
+            <span>标注样式</span>
+            <div class="style-options" role="group" aria-label="标注样式">
+              <button type="button" data-style="outline"><i class="style-swatch outline"></i>黑白</button>
+              <button class="active" type="button" data-style="light"><i class="style-swatch light"></i>白色</button>
+              <button type="button" data-style="dark"><i class="style-swatch dark"></i>黑色</button>
+            </div>
+          </div>
+
+          <div class="position-picker">
+            <span>文字位置</span>
+            <div class="position-options" role="group" aria-label="文字位置">
+              <button type="button" data-label-position="above"><i class="position-icon above"></i>线上方</button>
+              <button class="active" type="button" data-label-position="center"><i class="position-icon center"></i>线上居中</button>
+            </div>
+          </div>
+
+          <section class="panel-section label-editor">
+            <div class="section-heading">
+              <span>标注内容</span><em>手动填写</em>
+            </div>
+            <p>选择尺寸线、矩形或圆形，填写对应的标注内容。</p>
+            <div id="lineLabelFields">
+              <label for="labelInput">尺寸文字</label>
+              <input id="labelInput" type="text" maxlength="32" placeholder="请输入标注文字（可留空）" disabled>
+              <div class="quick-labels" aria-label="快速插入标注前缀">
+                <button type="button" data-prefix="宽 ">宽度</button>
+                <button type="button" data-prefix="高 ">高度</button>
+                <button type="button" data-prefix="深 ">深度</button>
+                <button type="button" data-prefix="直径 Ø">直径</button>
+              </div>
+            </div>
+            <div class="edge-fields" id="rectLabelFields" hidden>
+              <label>上边<input id="topLabelInput" type="text" maxlength="32" placeholder="可留空" disabled></label>
+              <label>右边<input id="rightLabelInput" type="text" maxlength="32" placeholder="可留空" disabled></label>
+              <label>下边<input id="bottomLabelInput" type="text" maxlength="32" placeholder="可留空" disabled></label>
+              <label>左边<input id="leftLabelInput" type="text" maxlength="32" placeholder="可留空" disabled></label>
+            </div>
+            <small class="editor-tip" id="editorTip">选择标注后可修改文字与节点位置。</small>
+          </section>
+
+          <section class="panel-section measure-list">
+            <div class="section-heading"><span>标注列表</span><b id="measureCount">0</b></div>
+            <p class="list-empty" id="listEmpty">选择尺寸线、矩形或圆形，然后在图片上拖动添加标注。</p>
+            <div class="list-items" id="listItems"></div>
+          </section>
+
+          <div class="panel-footer">
+            <button id="panelReplace" type="button">新建标注</button>
+            <span id="imageSize"></span>
+          </div>
+        </aside>
+      </section>
+
+      <footer class="steps" id="steps" hidden>
+        <div><b>01</b><span><strong>上传图片</strong><small>支持常见图片格式</small></span></div>
+        <div><b>02</b><span><strong>拖动标记</strong><small>从起点拖到终点</small></span></div>
+        <div><b>03</b><span><strong>填写并导出</strong><small>手动输入真实尺寸</small></span></div>
+      </footer>
+
+      <input class="sr-only" id="fileInput" type="file" accept="image/png,image/jpeg,image/webp">
+    </main>
+  </body>
+</html>

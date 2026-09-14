@@ -347,5 +347,12 @@
   "favicon.svg",
   "index.html",
   "sw.js",
-  "apps/academy/home-layout.js"
+  "apps/academy/home-layout.js",
+  "apps/academy/pages/dimensions/index.html",
+  "apps/academy/pages/dimensions/styles.css",
+  "apps/academy/pages/dimensions/collaboration.css",
+  "apps/academy/pages/dimensions/bootstrap.js",
+  "apps/academy/pages/dimensions/editor.js",
+  "apps/academy/pages/dimensions/model.js",
+  "apps/academy/pages/dimensions/collaboration.js"
 ]
