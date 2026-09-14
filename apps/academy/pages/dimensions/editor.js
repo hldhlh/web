@@ -7,6 +7,8 @@
     emptyState: document.querySelector("#emptyState"),
     canvasStage: document.querySelector("#canvasStage"),
     canvas: document.querySelector("#measureCanvas"),
+    selectionCanvas: document.querySelector("#selectionCanvas"),
+    toggleEdit: document.querySelector("#toggleEdit"),
     canvasHint: document.querySelector("#canvasHint"),
     notice: document.querySelector("#notice"),
     dropMask: document.querySelector("#dropMask"),
@@ -43,6 +45,7 @@
   const context = elements.canvas.getContext("2d");
   const state = {
     image: null,
+    editing: false,
     fileName: "图片",
     objectUrl: null,
     annotations: [],
@@ -97,9 +100,12 @@
     });
     if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
     Object.assign(state, { image, objectUrl, fileName: name, annotations: [], draft: null,
-      handleDrag: null, hoverHandle: null, selectedId: null, zoom: 1 });
+      handleDrag: null, hoverHandle: null, selectedId: null, zoom: 1, editing: false });
+    pointers.clear(); gesture = null; singlePointer = null; suppressDrawing = false; deferredAnnotations = null;
     elements.canvas.width = image.naturalWidth;
     elements.canvas.height = image.naturalHeight;
+    elements.selectionCanvas.width = image.naturalWidth;
+    elements.selectionCanvas.height = image.naturalHeight;
     elements.workspace.classList.add("has-image");
     elements.emptyState.hidden = true;
     elements.canvasStage.hidden = false;
@@ -109,10 +115,11 @@
     elements.replaceText.textContent = "新建标注";
     elements.imageSize.textContent = name;
     updateFit(); updateInterface(); render();
+    setNotice("浏览模式：可查看标注，双指缩放与移动；点击编辑标注后修改");
   }
 
   function commit(item, deleted = false) {
-    if (!item) return;
+    if (!item || !state.editing) return;
     window.DimensionCollab?.edit(item, deleted);
   }
 
@@ -154,15 +161,16 @@
     document.getElementById('zoomValue').textContent = `${Math.round(state.fitScale * state.zoom * 100)}%`;
     document.getElementById('zoomOut').disabled = state.zoom <= .5;
     document.getElementById('zoomIn').disabled = state.zoom >= 4;
+    renderSelection();
   }
 
-  function setZoom(nextZoom, clientX, clientY) {
+  function setZoom(nextZoom, clientX, clientY, anchor) {
     if (!state.image) return;
     const previousRect = elements.canvas.getBoundingClientRect();
-    const anchorX = previousRect.width ? (clientX - previousRect.left) / previousRect.width : .5;
-    const anchorY = previousRect.height ? (clientY - previousRect.top) / previousRect.height : .5;
+    const anchorX = anchor ? anchor.x : previousRect.width ? (clientX - previousRect.left) / previousRect.width : .5;
+    const anchorY = anchor ? anchor.y : previousRect.height ? (clientY - previousRect.top) / previousRect.height : .5;
     const clampedZoom = clamp(nextZoom, .5, 4);
-    if (Math.abs(clampedZoom - state.zoom) < .001) return;
+    if (!anchor && Math.abs(clampedZoom - state.zoom) < .001) return;
 
     state.zoom = clampedZoom;
     updateCanvasDisplaySize();
@@ -289,7 +297,7 @@
   }
 
   function drawRectangle(item, isDraft) {
-    const isSelected = item.id === state.selectedId || isDraft;
+    const isSelected = isDraft;
     const ratio = Math.max(1, state.image.naturalWidth / 1200);
     const points = rectanglePoints(item);
     const styleName = itemStyle(item, isDraft);
@@ -310,7 +318,7 @@
     context.stroke();
 
     ["nw", "ne", "se", "sw"].forEach((key, index) => {
-      drawHandle(points[index], ratio, isSelected, isHandleHovered(item.id, key), styleName);
+      drawHandle(points[index], ratio, isSelected, false, styleName);
     });
 
     const labels = isDraft
@@ -328,7 +336,7 @@
   }
 
   function drawCircle(item, isDraft) {
-    const isSelected = item.id === state.selectedId || isDraft;
+    const isSelected = isDraft;
     const ratio = Math.max(1, state.image.naturalWidth / 1200);
     const radius = circleRadius(item);
     const styleName = itemStyle(item, isDraft);
@@ -344,8 +352,8 @@
     context.strokeStyle = style.line;
     context.lineWidth = (style.lineWidth + (isSelected ? 1 : 0)) * ratio;
     context.stroke();
-    drawHandle(item.start, ratio, isSelected, isHandleHovered(item.id, "center"), styleName);
-    drawHandle(item.end, ratio, isSelected, isHandleHovered(item.id, "radius"), styleName);
+    drawHandle(item.start, ratio, isSelected, false, styleName);
+    drawHandle(item.end, ratio, isSelected, false, styleName);
 
     const label = isDraft ? "圆形标记" : item.label;
     if (label) {
@@ -356,7 +364,7 @@
   }
 
   function drawLine(item, isDraft) {
-    const isSelected = item.id === state.selectedId || isDraft;
+    const isSelected = isDraft;
     const dx = item.end.x - item.start.x;
     const dy = item.end.y - item.start.y;
     const length = Math.max(1, Math.hypot(dx, dy));
@@ -388,8 +396,8 @@
     context.strokeStyle = style.line;
     context.lineWidth = (style.lineWidth + (isSelected ? 1 : 0)) * ratio;
     context.stroke();
-    drawHandle(item.start, ratio, isSelected, isHandleHovered(item.id, "start"), styleName);
-    drawHandle(item.end, ratio, isSelected, isHandleHovered(item.id, "end"), styleName);
+    drawHandle(item.start, ratio, isSelected, false, styleName);
+    drawHandle(item.end, ratio, isSelected, false, styleName);
 
     const label = isDraft ? "拖动标记" : item.label;
     if (label) {
@@ -412,6 +420,59 @@
     context.drawImage(state.image, 0, 0, elements.canvas.width, elements.canvas.height);
     state.annotations.forEach((item) => drawAnnotation(item, false));
     if (state.draft) drawAnnotation(state.draft, true);
+    renderSelection();
+  }
+
+  // Editing affordances live on a separate canvas and never enter PNG exports.
+  function renderSelection() {
+    const overlay = elements.selectionCanvas, ctx = overlay.getContext('2d');
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+    const item = selectedAnnotation();
+    if (!state.image || !item) return;
+    const unit = 1 / (state.fitScale * state.zoom);
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#007aff';
+    ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    if (item.type === 'rect') {
+      const points = rectanglePoints(item);
+      ctx.moveTo(points[0].x, points[0].y);
+      points.slice(1).forEach(point => ctx.lineTo(point.x, point.y)); ctx.closePath();
+    } else if (item.type === 'circle') ctx.arc(item.start.x, item.start.y, circleRadius(item), 0, Math.PI * 2);
+    else { ctx.moveTo(item.start.x, item.start.y); ctx.lineTo(item.end.x, item.end.y); }
+    if (item.type !== 'line') { ctx.fillStyle = accent; ctx.globalAlpha = .09; ctx.fill(); ctx.globalAlpha = 1; }
+    ctx.strokeStyle = 'white'; ctx.lineWidth = 6 * unit; ctx.stroke();
+    ctx.strokeStyle = accent; ctx.lineWidth = 2.5 * unit; ctx.stroke();
+    // Shape, white halo, and explicit status also identify selection without color.
+    for (const handle of handlesFor(item)) {
+      ctx.beginPath(); ctx.arc(handle.point.x, handle.point.y, (state.editing && isHandleHovered(item.id, handle.key) ? 8 : 6) * unit, 0, Math.PI * 2);
+      ctx.fillStyle = 'white'; ctx.fill(); ctx.lineWidth = 2.5 * unit; ctx.stroke();
+      if (state.editing) {
+        ctx.beginPath(); ctx.arc(handle.point.x, handle.point.y, 2 * unit, 0, Math.PI * 2);
+        ctx.fillStyle = accent; ctx.fill();
+      }
+    }
+    // Keep dimension text readable where the selection stroke crosses a label.
+    const ratio = Math.max(1, state.image.naturalWidth / 1200);
+    const clearLabel = (label, x, y, angle = 0) => {
+      if (!label) return;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
+      ctx.font = `700 ${18 * ratio}px Arial, sans-serif`;
+      const width = ctx.measureText(label).width + 28 * ratio;
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = '#000'; ctx.fillRect(-width / 2, -20 * ratio, width, 40 * ratio); ctx.restore();
+    };
+    if (item.type === 'rect') {
+      const points = rectanglePoints(item);
+      ['top', 'right', 'bottom', 'left'].forEach((side, i) => {
+        const a = points[i], b = points[(i + 1) % 4], dx = b.x - a.x, dy = b.y - a.y;
+        const length = Math.max(1, Math.hypot(dx, dy)), offset = itemLabelPosition(item, false) === 'center' ? 0 : 18 * ratio;
+        let angle = Math.atan2(dy, dx);
+        if (angle > Math.PI / 2) angle -= Math.PI; if (angle < -Math.PI / 2) angle += Math.PI;
+        clearLabel(item.labels?.[side], (a.x + b.x) / 2 + dy / length * offset, (a.y + b.y) / 2 - dx / length * offset, angle);
+      });
+    } else if (item.type === 'circle') clearLabel(item.label, item.start.x, itemLabelPosition(item, false) === 'center' ? item.start.y : item.start.y - circleRadius(item) - 20 * ratio);
+    else clearLabel(item.label, (item.start.x + item.end.x) / 2, (item.start.y + item.end.y) / 2 - (itemLabelPosition(item, false) === 'above' ? 18 * ratio : 0));
+    ctx.restore();
   }
 
   function pointFromEvent(event) {
@@ -571,8 +632,9 @@
     state.selectedId = id;
     updateInterface();
     render();
-    if (!focusInput) return;
+    if (!focusInput || !state.editing) return;
     requestAnimationFrame(() => {
+      if (!state.editing) return;
       const selected = selectedAnnotation();
       const input = selected?.type === "rect" ? elements.edgeInputs.top : elements.labelInput;
       input.focus();
@@ -594,6 +656,7 @@
   }
 
   function setTool(tool) {
+    if (!state.editing) return;
     state.tool = tool;
     state.draft = null;
     updateToolInterface();
@@ -618,6 +681,7 @@
   }
 
   function setAnnotationStyle(style) {
+    if (!state.editing) return;
     state.annotationStyle = style;
     const selected = selectedAnnotation();
     if (selected) { selected.style = style; commit(selected); }
@@ -638,6 +702,7 @@
   }
 
   function setLabelPosition(position) {
+    if (!state.editing) return;
     state.labelPosition = position;
     const selected = selectedAnnotation();
     if (selected) { selected.labelPosition = position; commit(selected); }
@@ -653,15 +718,25 @@
 
   function updateInterface() {
     const selected = selectedAnnotation();
+    elements.workspace.dataset.editing = String(state.editing);
+    elements.toggleEdit.textContent = state.editing ? '完成编辑' : '编辑标注';
+    elements.toggleEdit.setAttribute('aria-pressed', String(state.editing));
+    elements.canvas.style.cursor = state.editing ? 'crosshair' : 'grab';
+    elements.canvas.setAttribute('aria-label', state.editing ? '图片标注画布，单指拖动绘制，双指缩放与移动' : '图片标注画布，浏览模式，可缩放和移动');
+    document.getElementById('interactionState').textContent = state.editing ? '编辑模式 · 单指绘制，双指移图' : '浏览模式 · 双指缩放与移动';
+    const selectionStatus = document.getElementById('selectionStatus');
+    selectionStatus.hidden = !selected;
+    selectionStatus.textContent = selected ? `已选中 · ${state.annotations.indexOf(selected) + 1} 号标注` : '';
+    for (const button of [elements.lineTool, elements.rectTool, elements.circleTool, ...elements.styleButtons, ...elements.positionButtons, ...elements.quickLabels.querySelectorAll('button')]) button.disabled = !state.editing;
     document.getElementById('selectionType').textContent = selected ? ({ line: '尺寸线', rect: '矩形', circle: '圆形' }[selected.type] || '标注') : '未选中';
     const isRectangle = selected?.type === "rect";
     elements.exportImage.disabled = !state.image || state.annotations.length === 0;
     elements.lineLabelFields.hidden = Boolean(isRectangle);
     elements.rectLabelFields.hidden = !isRectangle;
-    elements.labelInput.disabled = !selected || isRectangle;
+    elements.labelInput.disabled = !state.editing || !selected || isRectangle;
     elements.labelInput.value = selected && !isRectangle ? selected.label || "" : "";
     Object.entries(elements.edgeInputs).forEach(([side, input]) => {
-      input.disabled = !isRectangle;
+      input.disabled = !state.editing || !isRectangle;
       input.value = isRectangle ? selected.labels?.[side] || "" : "";
     });
     elements.editorTip.textContent = !selected ? "先在画布上拖出一条标注，再填写尺寸。" : isRectangle
@@ -696,11 +771,13 @@
 
       const deleteButton = document.createElement("button");
       deleteButton.type = "button";
+      deleteButton.hidden = !state.editing;
       deleteButton.className = "row-delete";
       deleteButton.title = "删除这条标注";
       deleteButton.setAttribute("aria-label", `删除标注：${summary || `第 ${index + 1} 条`}`);
       deleteButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"></path><path d="M9 7V4h6v3"></path><path d="M6.5 7l1 13h9l1-13"></path><path d="M10 11v5M14 11v5"></path></svg>';
       deleteButton.addEventListener("click", () => {
+        if (!state.editing) return;
         commit(item, true);
         state.annotations = state.annotations.filter((annotation) => annotation.id !== item.id);
         if (state.selectedId === item.id) state.selectedId = null;
@@ -713,13 +790,12 @@
     });
   }
 
-  elements.canvas.addEventListener("pointerdown", (event) => {
-    if (!state.image) return;
+  function beginDrawing(event) {
     const point = pointFromEvent(event);
     const handle = nearestHandle(point);
     if (handle) {
       const item = state.annotations.find((annotation) => annotation.id === handle.id);
-      elements.canvas.setPointerCapture(event.pointerId);
+
       state.handleDrag = {
         id: handle.id,
         key: handle.key,
@@ -745,32 +821,17 @@
       return;
     }
 
-    elements.canvas.setPointerCapture(event.pointerId);
+
     state.selectedId = null;
     state.draft = { id: -1, type: state.tool, start: point, end: point };
     updateInterface();
     render();
-  });
-
-  elements.canvas.addEventListener("pointermove", (event) => {
-    const point = pointFromEvent(event);
-    if (state.handleDrag) {
-      moveHandle(point, event.shiftKey);
-      render();
-      return;
-    }
-    if (state.draft) {
-      state.draft.end = point;
-      render();
-      return;
-    }
-    updateHoveredHandle(point);
-  });
+  }
 
   function finishDrawing(event) {
     if (!state.draft) return;
     state.draft.end = pointFromEvent(event);
-    const minimum = 5 / state.fitScale;
+    const minimum = 5 / (state.fitScale * state.zoom);
     const tooSmall = state.draft.type === "rect"
       ? Math.abs(state.draft.end.x - state.draft.start.x) < minimum
         || Math.abs(state.draft.end.y - state.draft.start.y) < minimum
@@ -813,35 +874,106 @@
     selectAnnotation(annotation.id, true);
   }
 
-  elements.canvas.addEventListener("pointerup", (event) => {
-    if (state.handleDrag) {
-      const changed = selectedAnnotation();
-      state.handleDrag = null;
-      commit(changed);
-      updateHoveredHandle(pointFromEvent(event));
-      setNotice("节点位置已调整");
-      render();
+  const pointers = new Map();
+  let gesture = null, singlePointer = null, suppressDrawing = false;
+
+  function cancelDrawing() {
+    const drag = state.handleDrag;
+    if (drag?.snapshot) Object.assign(state.annotations.find(item => item.id === drag.id) || {}, drag.snapshot);
+    state.draft = null; state.handleDrag = null; state.hoverHandle = null;
+    if (deferredAnnotations) applyAnnotations(deferredAnnotations);
+    render();
+  }
+
+  function gesturePoints() {
+    const [a, b] = [...pointers.values()];
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, distance: Math.max(1, Math.hypot(b.x - a.x, b.y - a.y)) };
+  }
+
+  function startGesture() {
+    cancelDrawing(); singlePointer = null; suppressDrawing = true;
+    const mid = gesturePoints(), box = elements.canvas.getBoundingClientRect();
+    gesture = { ...mid, zoom: state.zoom, anchor: { x: (mid.x - box.left) / box.width, y: (mid.y - box.top) / box.height } };
+    setNotice('双指缩放与移动画布');
+  }
+
+  elements.viewport.addEventListener('pointerdown', event => {
+    if (!state.image || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    event.preventDefault();
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    elements.viewport.setPointerCapture(event.pointerId);
+    if (pointers.size >= 2) { startGesture(); return; }
+    if (suppressDrawing) return;
+    const drawing = state.editing && event.target === elements.canvas;
+    singlePointer = { id: event.pointerId, x: event.clientX, y: event.clientY, lastX: event.clientX, lastY: event.clientY, moved: false, drawing };
+    if (drawing) beginDrawing(event);
+  });
+
+  elements.viewport.addEventListener('pointermove', event => {
+    if (!state.image) return;
+    if (!pointers.has(event.pointerId)) {
+      if (state.editing && event.target === elements.canvas && !pointers.size) updateHoveredHandle(pointFromEvent(event));
       return;
     }
-    finishDrawing(event);
+    event.preventDefault();
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (gesture && pointers.size >= 2) {
+      const mid = gesturePoints();
+      setZoom(gesture.zoom * mid.distance / gesture.distance, mid.x, mid.y, gesture.anchor);
+      return;
+    }
+    if (suppressDrawing || singlePointer?.id !== event.pointerId) return;
+    const p = singlePointer;
+    if (Math.hypot(event.clientX - p.x, event.clientY - p.y) > 6) p.moved = true;
+    if (!p.drawing) {
+      elements.viewport.scrollLeft += p.lastX - event.clientX;
+      elements.viewport.scrollTop += p.lastY - event.clientY;
+      p.lastX = event.clientX; p.lastY = event.clientY;
+    } else if (state.handleDrag) { moveHandle(pointFromEvent(event), event.shiftKey); render(); }
+    else if (state.draft) { state.draft.end = pointFromEvent(event); render(); }
   });
 
-  elements.canvas.addEventListener("pointercancel", () => {
-    const drag = state.handleDrag;
-    if (drag?.snapshot) Object.assign(selectedAnnotation() || {}, drag.snapshot);
-    state.draft = null;
-    state.handleDrag = null;
-    if (deferredAnnotations) applyAnnotations(deferredAnnotations);
+  function finishPointer(event, cancelled = false) {
+    if (!pointers.has(event.pointerId)) return;
+    pointers.delete(event.pointerId);
+    if (cancelled) { cancelDrawing(); suppressDrawing = true; }
+    if (gesture || suppressDrawing) {
+      if (pointers.size >= 2) startGesture(); else gesture = null;
+      if (!pointers.size) { suppressDrawing = false; singlePointer = null; }
+      return;
+    }
+    if (singlePointer?.id !== event.pointerId) return;
+    const p = singlePointer; singlePointer = null;
+    if (!p.drawing) {
+      if (!p.moved) {
+        const point = pointFromEvent(event), hit = nearestAnnotation(point), handle = nearestHandle(point);
+        selectAnnotation(hit?.id || handle?.id || null, false);
+        setNotice(hit || handle ? '已选中标注 · 点击编辑标注可修改' : '浏览模式 · 双指缩放与移动');
+      }
+    } else if (state.handleDrag) {
+      const changed = state.annotations.find(item => item.id === state.handleDrag.id);
+      const moved = JSON.stringify(state.handleDrag.snapshot) !== JSON.stringify({ start: changed.start, end: changed.end, points: changed.points || null });
+      state.handleDrag = null;
+      if (moved) commit(changed);
+      if (deferredAnnotations) applyAnnotations(deferredAnnotations);
+      updateInterface(); render();
+      setNotice(moved ? '节点位置已调整' : '已选中标注，可修改文字或节点');
+    } else finishDrawing(event);
+  }
+  elements.viewport.addEventListener('pointerup', event => finishPointer(event));
+  elements.viewport.addEventListener('pointercancel', event => finishPointer(event, true));
+  elements.viewport.addEventListener('lostpointercapture', event => finishPointer(event, true));
+  elements.viewport.addEventListener('pointerleave', () => {
+    if (pointers.size) return;
     state.hoverHandle = null;
-    elements.canvas.style.cursor = "crosshair";
-    render();
+    elements.canvas.style.cursor = state.editing ? 'crosshair' : 'grab'; render();
   });
-
-  elements.canvas.addEventListener("pointerleave", () => {
-    if (state.draft || state.handleDrag) return;
-    state.hoverHandle = null;
-    elements.canvas.style.cursor = "crosshair";
-    render();
+  elements.toggleEdit.addEventListener('click', () => {
+    cancelDrawing();
+    if (pointers.size) suppressDrawing = true;
+    state.editing = !state.editing;
+    updateInterface(); render();
+    setNotice(state.editing ? '编辑模式：单指绘制或调整节点，双指缩放与移动' : '已退出编辑，可放心缩放和浏览');
   });
 
   elements.lineTool.addEventListener("click", () => setTool("line"));
@@ -857,7 +989,7 @@
 
   elements.labelInput.addEventListener("input", () => {
     const selected = selectedAnnotation();
-    if (!selected || selected.type === "rect") return;
+    if (!state.editing || !selected || selected.type === "rect") return;
     const caret = [elements.labelInput.selectionStart, elements.labelInput.selectionEnd];
     selected.label = elements.labelInput.value;
     commit(selected);
@@ -870,7 +1002,7 @@
   Object.entries(elements.edgeInputs).forEach(([side, input]) => {
     input.addEventListener("input", () => {
       const selected = selectedAnnotation();
-      if (!selected || selected.type !== "rect") return;
+      if (!state.editing || !selected || selected.type !== "rect") return;
       const caret = [input.selectionStart, input.selectionEnd];
       selected.labels[side] = input.value;
       commit(selected);
@@ -884,7 +1016,7 @@
   elements.quickLabels.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-prefix]");
     const selected = selectedAnnotation();
-    if (!button || !selected || selected.type === "rect") return;
+    if (!state.editing || !button || !selected || selected.type === "rect") return;
     selected.label = `${button.dataset.prefix}${selected.label.replace(/^(宽|高|深|直径 Ø)\s*/, "")}`;
     commit(selected);
     updateInterface();
@@ -894,6 +1026,7 @@
   });
 
   function undoLast() {
+    if (!state.editing) return;
     const removed = [...state.annotations].reverse().find(item => item.createdBy?.id === window.DimensionCollab?.actor?.id);
     if (!removed) return;
     commit(removed, true);
@@ -919,6 +1052,7 @@
 
   elements.exportImage.addEventListener("click", () => {
     if (!state.image) return;
+    if (state.draft || state.handleDrag) { setNotice("请先结束当前标注操作再导出"); return; }
     const link = document.createElement("a");
     link.download = `${state.fileName.replace(/\.[^.]+$/, "")}-尺寸标注.png`;
     const selection = state.selectedId;
@@ -966,6 +1100,9 @@
   });
   const resizeObserver = new ResizeObserver(updateFit);
   resizeObserver.observe(elements.viewport);
+  const themeObserver = new MutationObserver(renderSelection);
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  window.addEventListener('pagehide', () => themeObserver.disconnect(), { once: true });
   window.addEventListener('pagehide', () => resizeObserver.disconnect(), { once: true });
   window.addEventListener("resize", updateFit);
   window.addEventListener("beforeunload", () => {

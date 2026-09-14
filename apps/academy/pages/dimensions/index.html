@@ -64,10 +64,10 @@
     </div>
     <section class="workspace" id="workspace" hidden>
       <div class="canvas-area">
-        <div class="canvas-caption"><span>标注画布</span><span>尺寸需手动填写</span></div>
+        <div class="canvas-caption"><div class="canvas-state"><span id="interactionState">浏览模式 · 双指缩放与移动</span><span id="selectionStatus" role="status" hidden></span></div><button id="toggleEdit" class="button primary" type="button" aria-pressed="false">编辑标注</button></div>
         <div class="canvas-viewport" id="viewport">
           <section id="emptyState" class="empty-state"><p>正在准备画布…</p><button id="uploadButton" class="button">选择图片</button></section>
-          <div class="canvas-stage" id="canvasStage" hidden><canvas id="measureCanvas" aria-label="图片标注画布，拖动以创建尺寸线、矩形或圆形"></canvas></div>
+          <div class="canvas-stage" id="canvasStage" hidden><canvas id="measureCanvas" aria-label="图片标注画布，浏览模式，可缩放和移动"></canvas><canvas id="selectionCanvas" aria-hidden="true"></canvas></div>
           <div class="drop-mask" id="dropMask" hidden><svg class="icon" aria-hidden="true"><use href="#photo"/></svg>松开以新建图片项目</div>
         </div>
         <div class="canvas-bottom">

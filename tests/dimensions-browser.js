@@ -63,6 +63,9 @@ async page => {
     await p.mouse.move(box.x+box.width*start[0],box.y+box.height*start[1]);await p.mouse.down();
     await p.mouse.move(box.x+box.width*end[0],box.y+box.height*end[1],{steps:6});await p.mouse.up();
   };
+  await draw(a, fa, [.15,.13],[.8,.13]);
+  if (Object.keys([...rows.values()][0].payload.annotations).length) throw Error('Browse mode created an annotation');
+  await fa.locator('#toggleEdit').click(); await fb.locator('#toggleEdit').click();
   await draw(a, fa, [.15,.13],[.8,.13]); await fa.locator('#labelInput').fill('宽 120 cm');
   await fb.locator('.list-select strong', { hasText: '宽 120 cm' }).waitFor();
   await fb.locator('#circleTool').click(); await draw(b, fb, [.5,.55],[.65,.55]); await fb.locator('#labelInput').fill('直径 30 cm');
@@ -81,6 +84,7 @@ async page => {
   await fa.locator('.list-select strong', { hasText: '宽 125 cm' }).waitFor();
   await fb.locator('.list-select strong', { hasText: '深 65 cm' }).waitFor();
   // Same-annotation concurrent edits preserve a conflict copy.
+  await fa.locator('#toggleEdit').click();
   await fa.locator('.list-select').filter({hasText:'宽 125 cm'}).click();
   offline.add(a); await fa.locator('#labelInput').fill('宽 130 cm');
   await fb.locator('#labelInput').fill('宽 140 cm'); await fb.locator('#syncStatus', {hasText:'已保存至云端'}).waitFor();
