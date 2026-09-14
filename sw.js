@@ -12,7 +12,6 @@ const SHELL = [
   './apps/cloud/icon.svg',
   './apps/eatwhat/icon.svg',
   './apps/academy/pages/notes/icon.svg',
-  './apps/jlksh/icon.svg',
   './apps/academy/pages/jlhcdh/icon.svg',
   './apps/academy/icon.svg',
   './apps/academy/version-guard.js',
