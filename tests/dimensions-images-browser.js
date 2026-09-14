@@ -21,6 +21,12 @@ async page => {
       pixels.data[i + 2] = (seed >>> 16) & 255; pixels.data[i + 3] = 255;
     }
     ctx.putImageData(pixels, 0, 0);
+    ctx.fillStyle = '#fff'; ctx.fillRect(100, 100, 600, 90);
+    ctx.fillStyle = '#000'; ctx.font = '48px sans-serif'; ctx.fillText('120 cm', 130, 165);
+    const exported = await api.exportCanvas(source);
+    const exportedImage = await inspect(exported.blob);
+    assert(exportedImage.bytes <= 512 * 1024 && exportedImage.type === 'image/webp', 'Export budget or encoding incorrect');
+    assert(exportedImage.width === exported.width && exportedImage.height === exported.height, 'Export dimensions mismatch');
     const large = await fileFor(source, 'image/jpeg');
     const optimized = await api.prepare(large);
     const decoded = await inspect(optimized.main.blob);
@@ -72,7 +78,7 @@ async page => {
       assert(rejected,'Failed encoding must not fall back to uploading the original');
     } finally { HTMLCanvasElement.prototype.toBlob = nativeToBlob; }
     source.width=1;source.height=1;
-    return {passed:true,sourceBytes:large.size,main:decoded,previewBytes:optimized.preview.blob.size,
+    return {passed:true,exportedImage,sourceBytes:large.size,main:decoded,previewBytes:optimized.preview.blob.size,
       storageReduction:Math.round((1-(decoded.bytes+optimized.preview.blob.size)/large.size)*100)+'%',
       checks:['real WebP conversion','byte and dimension limits','aspect ratio','transparent pixels','unsupported WebP fallback','EXIF orientation','small file reuse','invalid input and encoder failure'],productionWrites:0};
   });

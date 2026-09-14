@@ -91,7 +91,7 @@ async page => {
   offline.delete(a); await fa.locator('#retryButton').click(); await fa.locator('#conflictPanel').waitFor();
   await fa.locator('#copyConflict').click(); await fb.locator('.list-select strong', {hasText:'宽 130 cm'}).waitFor();
   const downloadPromise=a.waitForEvent('download');await fa.locator('#exportImage').click();const download=await downloadPromise;
-  await download.saveAs('output/playwright/dimensions-export.png');
+  await download.saveAs('output/playwright/' + download.suggestedFilename());
   await a.frames()[1].evaluate(()=>{document.getElementById('sidePanel').scrollTop=0;document.activeElement?.blur();});
   await a.screenshot({path:'output/playwright/dimensions-desktop.png',fullPage:true});
   await a.setViewportSize({width:390,height:844});

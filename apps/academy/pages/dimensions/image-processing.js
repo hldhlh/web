@@ -1,7 +1,7 @@
 (function (root) {
   'use strict';
   const limits = Object.freeze({ inputBytes: 15 * 1024 * 1024, inputPixels: 24000000,
-    imageEdge: 2560, imageBytes: 1024 * 1024, previewEdge: 480, previewBytes: 64 * 1024 });
+    imageEdge: 2560, imageBytes: 1024 * 1024, exportBytes: 512 * 1024, previewEdge: 480, previewBytes: 64 * 1024 });
   const extensions = { 'image/webp': 'webp', 'image/jpeg': 'jpg', 'image/png': 'png' };
   function fit(width, height, edge) {
     const ratio = Math.min(1, edge / Math.max(width, height));
@@ -80,5 +80,14 @@
   function formatBytes(bytes) {
     return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
   }
-  root.DimensionImages = { prepare, fit, formatBytes, limits };
+  async function exportCanvas(source, onProgress) {
+    // Snapshot before the first await so edits during encoding cannot alter the export.
+    const snapshot = document.createElement('canvas');
+    snapshot.width = source.width; snapshot.height = source.height;
+    try {
+      snapshot.getContext('2d').drawImage(source, 0, 0);
+      return await compress(snapshot, limits.imageEdge, limits.exportBytes, .84, onProgress);
+    } finally { snapshot.width = 1; snapshot.height = 1; }
+  }
+  root.DimensionImages = { prepare, exportCanvas, fit, formatBytes, limits };
 })(globalThis);

@@ -1050,19 +1050,34 @@
     undoLast();
   });
 
-  elements.exportImage.addEventListener("click", () => {
-    if (!state.image) return;
+  let exporting = false;
+  elements.exportImage.addEventListener("click", async () => {
+    if (!state.image || exporting) return;
     if (state.draft || state.handleDrag) { setNotice("请先结束当前标注操作再导出"); return; }
     const link = document.createElement("a");
-    link.download = `${state.fileName.replace(/\.[^.]+$/, "")}-尺寸标注.png`;
+    const fileName = `${state.fileName.replace(/\.[^.]+$/, "")}-尺寸标注`;
     const selection = state.selectedId;
     state.selectedId = null;
     render();
-    link.href = elements.canvas.toDataURL("image/png");
-    state.selectedId = selection;
-    render();
-    link.click();
-    setNotice("标注图已导出");
+    exporting = true;
+    try {
+      setNotice("正在压缩标注图…");
+      let pending;
+      try { pending = window.DimensionImages.exportCanvas(elements.canvas); }
+      finally { state.selectedId = selection; render(); }
+      const result = await pending;
+      const url = URL.createObjectURL(result.blob);
+      link.download = `${fileName}.${result.extension}`;
+      link.href = url;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      setNotice(`标注图已导出 · ${window.DimensionImages.formatBytes(result.blob.size)}`);
+    } catch (error) {
+      setNotice(error.message || "导出失败，请重试");
+    } finally {
+      exporting = false;
+      render();
+    }
   });
 
   [elements.uploadButton, elements.replaceImage, elements.panelReplace].forEach((button) => {
