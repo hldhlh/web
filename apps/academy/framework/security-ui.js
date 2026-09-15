@@ -47,30 +47,57 @@ window.AcademySecurity = (() => {
   function mountEvents(container,auth) {
     let before=null,busy=false,revision=0;
     const root=el('section','security-events');
-    const description=el('p','security-events-intro','服务端登录记录 · 保留最近 90 天');
+    const description=el('p','security-events-intro','登录活动 · 最近 90 天');
     const filters=el('div','security-event-filters');
     const accountLabel=el('label',null,'账号'),account=el('select');account.setAttribute('aria-label','筛选账号');
     account.append(new Option('全部账号',''));
     auth.list().forEach(user=>account.append(new Option(user.name,user.name)));accountLabel.append(account);
     const eventLabel=el('label',null,'结果'),event=el('select');event.setAttribute('aria-label','筛选登录结果');
     event.append(new Option('全部结果',''));Object.entries(labels).forEach(([value,label])=>event.append(new Option(label,value)));eventLabel.append(event);
-    const refresh=el('button','ghost','刷新记录');refresh.type='button';filters.append(accountLabel,eventLabel,refresh);
+    const refresh=el('button','ghost security-events-refresh');refresh.type='button';refresh.setAttribute('aria-label','刷新记录');refresh.title='刷新记录';refresh.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.6 7a8 8 0 0 1 13.5-1L20 7M4 17l.9 1A8 8 0 0 0 18.4 17"/></svg>';filters.append(accountLabel,eventLabel,refresh);
     const status=el('p','security-event-status');status.setAttribute('role','status');status.setAttribute('aria-live','polite');
     const list=el('div','security-event-list');const more=el('button','ghost security-events-more','载入更早记录');more.type='button';more.hidden=true;
-    const footnote=el('p','security-events-footnote','IP 为网关转发信息，浏览器与设备信息可能被伪造。请结合使用时间核对；IP 变化本身不代表入侵。');
+    const footnote=el('p','security-events-footnote','地区由离线 IP 数据推测，代理或移动网络可能显示出口所在地。设备根据浏览器信息识别，不能证明操作者身份。时间为北京时间。');
     root.append(description,filters,status,list,more,footnote);container.replaceChildren(root);
+    const insights=window.AcademySecurityInsights;
+    const icons={phone:'<rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M10 5h4M11 19h2"/>',tablet:'<rect x="4" y="2" width="16" height="20" rx="2.5"/><path d="M11 19h2"/>',computer:'<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>',unknown:'<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 10a3 3 0 0 1 6 0c0 2-3 2-3 4M12 17h.01"/>'};
     function row(item){
-      const article=el('article','security-event');
+      const article=el('details','security-event');
+      const summary=el('summary','security-event-summary');
+      const info=insights?.deviceInfo(item.user_agent)||{device:'未知设备',browser:'未知浏览器',browserName:'未知浏览器',os:'未知系统',type:'unknown'};
+      const icon=el('span','security-device-icon');icon.setAttribute('aria-hidden','true');
+      icon.innerHTML=`<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${icons[info.type]||icons.unknown}</svg>`;
+      const body=el('div','security-event-body');
       const head=el('div','security-event-head'),name=el('strong',null,item.account_name||'未知账号');
       const badge=el('span','security-event-result',labels[item.event]||item.event);
       badge.dataset.kind=/failed|replaced/.test(item.event)?'attention':'normal';head.append(name,badge);
-      const date=new Date(item.occurred_at),time=el('time',null,Number.isFinite(date.getTime())?date.toLocaleString('zh-CN',{hour12:false}):'时间不可用');
-      time.dateTime=item.occurred_at;
-      const ip=el('p','security-event-ip',`IP · ${item.forwarded_for||'未提供'}`);
-      const details=el('details'),summary=el('summary',null,'设备与原因');
-      const browser=el('p',null,`浏览器：${item.user_agent||'未提供'}`),device=el('p',null,`设备指纹：${item.device_fingerprint||'未提供'}`);
-      details.append(summary,browser,device);if(item.reason)details.append(el('p',null,`原因：${reasons[item.reason]||item.reason}`));
-      article.append(head,time,ip,details);return article;
+      const device=el('p','security-device-label',`${info.device} · ${info.browserName}`);
+      const date=new Date(item.occurred_at),valid=Number.isFinite(date.getTime());
+      const time=el('time',null,valid?date.toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}):'时间未知');
+      if(valid)time.dateTime=date.toISOString();
+      const location=el('span','security-region-label','正在识别地区…');
+      const meta=el('div','security-event-meta');meta.append(location,time);body.append(head,device,meta);
+      const chevron=el('span','security-event-chevron');chevron.setAttribute('aria-hidden','true');chevron.innerHTML='<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 3 5 5-5 5"/></svg>';
+      summary.append(icon,body,chevron);
+      const details=el('div','security-event-expanded'),facts=el('dl','security-event-facts');
+      function fact(label,value){const pair=el('div'),dt=el('dt',null,label),dd=el('dd',null,value||'未提供');pair.append(dt,dd);facts.append(pair);return dd;}
+      const regionFact=fact('推测地区','正在识别…'),networkFact=fact('网络运营商','正在识别…');
+      fact('设备',info.device);fact('系统',info.os);fact('浏览器',info.browser);
+      fact('登录 IP',insights?.parseIP(item.forwarded_for)?.ip||item.forwarded_for||'未提供');
+      if((item.forwarded_for||'').includes(','))fact('网关转发链',item.forwarded_for);
+      fact('设备识别码',item.device_fingerprint);
+      fact('时间',valid?date.toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})+'（北京时间）':'时间未知');
+      if(item.reason)fact('事件原因',reasons[item.reason]||item.reason);
+      const raw=el('details','security-raw-agent'),rawSummary=el('summary',null,'原始浏览器信息');
+      raw.append(rawSummary,el('p',null,item.user_agent||'未提供'));details.append(facts,raw);
+      const provenance=el('p','security-region-source');details.append(provenance);
+      article.append(summary,details);
+      (insights?insights.locate(item.forwarded_for):Promise.resolve({state:'unknown',label:'地区未知'})).then(region=>{
+        location.textContent=region.label+(region.state==='estimated'?' · IP 推测':'');
+        regionFact.textContent=region.label;networkFact.textContent=region.isp||'未识别';
+        provenance.textContent=region.state==='estimated'?`地区库：ip2region · ${region.dataDate}。识别码用于区分浏览器安装；同一台设备的不同浏览器可能不同。`:'地区未识别不影响原始登录记录。识别码用于区分浏览器安装。';
+      });
+      return article;
     }
     async function load(append=false){
       if(busy)return;busy=true;const current=++revision;refresh.disabled=more.disabled=true;account.disabled=event.disabled=true;
