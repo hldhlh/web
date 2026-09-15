@@ -32,7 +32,7 @@
     // 在 Auto Office 内打开时复用主程序运行时，避免重复下载和账号同步。
     if (!inheritAutoOfficeRuntime()) {
       // Download dependencies together while preserving their execution order.
-      for (const href of ['../../../network.js', '../../framework/reliable-store.js', '../../framework/store.js', '../../framework/auth.js']) {
+      for (const href of ['../../../network.js', '../../framework/reliable-store.js', '../../framework/store.js', '../../framework/secure-auth.js', '../../framework/auth.js']) {
         const link = document.createElement('link');
         link.rel = 'preload'; link.as = 'script'; link.href = href;
         document.head.appendChild(link);
@@ -40,6 +40,7 @@
       await loadScript("../../../network.js");
       await loadScript("../../framework/reliable-store.js");
       await loadScript("../../framework/store.js");
+      await loadScript("../../framework/secure-auth.js");
       await loadScript("../../framework/auth.js");
     }
     await loadScript("../../framework/stable-view.js");

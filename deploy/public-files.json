@@ -349,5 +349,8 @@
   "apps/academy/pages/dimensions/editor.js",
   "apps/academy/pages/dimensions/model.js",
   "apps/academy/pages/dimensions/collaboration.js",
-  "apps/academy/pages/dimensions/image-processing.js"
+  "apps/academy/pages/dimensions/image-processing.js",
+  "apps/academy/framework/secure-auth.js",
+  "apps/academy/framework/security-ui.js",
+  "apps/academy/framework/security.css"
 ]

@@ -24,7 +24,7 @@
   const OPS_STORAGE_KEY = "academy-ops-content-v1";
   const OPS_LESSON_DRAFT_KEY = "academy-ops-lesson-draft-v1";
   const HomeLayout = window.AcademyHomeLayout;
-  const OPS_TABS = ["layout", "lessons", "exams", "notices", "tasks", "status", "staff"];
+  const OPS_TABS = ["layout", "lessons", "exams", "notices", "tasks", "status", "staff", "security"];
   const NAVIGATION_STATE_KEY = "academyNavigation";
   let contentRevision = 0;
 
@@ -1906,13 +1906,14 @@
       { key: "notices", icon: "bell", label: "通知", fullLabel: "事务通知", count: (DATA.notices || []).length },
       { key: "tasks", icon: "group", label: "任务", fullLabel: "任务面板", count: (DATA.taskBoard?.stages || []).length },
       { key: "status", icon: "bell", label: "今日状态", fullLabel: "今日状态", count: 7 },
-      { key: "staff", icon: "me", label: "员工", fullLabel: "员工与权限", count: Auth.list().length }
+      { key: "staff", icon: "me", label: "员工", fullLabel: "员工与权限", count: Auth.list().length },
+      { key: "security", icon: "me", label: "登录记录", fullLabel: "登录记录", count: null }
     ];
     return `<nav class="ops-subtabs" aria-label="运营事务导航">${sections.map((item) => `
-      <button class="${section === item.key ? "on" : ""}" data-act="ops-tab" data-section="${item.key}" aria-label="${item.fullLabel}，${item.count} 项" ${section === item.key ? 'aria-current="page"' : ""}>
+      <button class="${section === item.key ? "on" : ""}" data-act="ops-tab" data-section="${item.key}" aria-label="${item.fullLabel}${item.count == null ? '' : `，${item.count} 项`}" ${section === item.key ? 'aria-current="page"' : ""}>
         <span class="ops-nav-mark">${svgIcon(item.icon)}</span>
         <span class="ops-nav-label">${item.label}</span>
-        <small>${item.count}</small>
+        ${item.count == null ? '' : `<small>${item.count}</small>`}
       </button>
     `).join("")}</nav>`;
   }
@@ -2947,7 +2948,8 @@
       notices: "通知",
       tasks: "任务面板",
       status: "今日状态",
-      staff: "员工与权限"
+      staff: "员工与权限",
+      security: "登录记录"
     };
     const actionMap = {
       lessons: { label: "新建课程", hash: "#/ops?section=lessons&mode=add" },
@@ -2968,7 +2970,8 @@
       notices: active === "notices" ? (route.mode === "edit" ? renderOpsNoticeEditor(editNotice) : renderOpsNoticeList()) : "",
       tasks: active === "tasks" ? renderOpsTaskBoard() : "",
       status: active === "status" ? window.AcademyDailyStatus.editorHTML() : "",
-      staff: active === "staff" ? renderOpsStaff() : ""
+      staff: active === "staff" ? renderOpsStaff() : "",
+      security: active === "security" ? '<div id="security-events-root"></div>' : ""
     };
     const content = route.mode === "add"
       ? (active === "lessons" ? renderOpsLessonEditor(null)
@@ -3008,6 +3011,10 @@
     });
     if (active === "status") window.AcademyDailyStatus.mountEditor();
     if (active === "tasks") refreshTaskBoardEditor();
+    if (active === "security") {
+      window.AcademySecurity.mountEvents(view().querySelector('#security-events-root'),Auth);
+      view().querySelector('.ops-subtabs [aria-current="page"]')?.scrollIntoView({block:'nearest',inline:'center'});
+    }
     if (active === "staff") {
       StaffProgress.load();
       view().querySelector("[data-staff-refresh]")?.addEventListener("click", (event) => {
@@ -4313,6 +4320,7 @@
       return;
     }
     if (act === "gate-mode") {
+      if (gateBusy) return;
       gateMode = btn.dataset.mode;
       return showGate();
     }
@@ -4495,15 +4503,17 @@
             <button type="button" class="chip ${gateMode === "register" ? "on" : ""}" data-act="gate-mode" data-mode="register">注册</button>
           </div>
           <label class="gate-label"><span>姓名</span><input name="name" maxlength="16" autocomplete="username" placeholder="请输入注册时的姓名" required><small data-field-error="name"></small></label>
-          <label class="gate-label"><span>密码</span><span class="gate-password"><input name="password" type="password" minlength="4" autocomplete="${gateMode === "login" ? "current-password" : "new-password"}" placeholder="请输入密码" required><button type="button" data-password-toggle>显示</button></span><small data-field-error="password"></small></label>
+          <label class="gate-label"><span>密码</span><span class="gate-password"><input name="password" type="password" minlength="${gateMode === "register" ? 10 : 1}" maxlength="128" autocomplete="${gateMode === "login" ? "current-password" : "new-password"}" placeholder="请输入密码" required><button type="button" data-password-toggle>显示</button></span><small data-field-error="password"></small></label>
           ${authNotice ? `<div class="auth-kicked" role="alert"><i>!</i><span>${escapeHtml(authNotice)}</span></div>` : ""}
           <p class="auth-message" id="auth-error" role="status" aria-live="polite">${gateMode === "login" ? "使用 Auto Office 账号登录" : "注册后即可使用 Auto Office，完整权限由店长开放"}</p>
           <button class="primary gate-submit" id="auth-submit" type="submit"><span>${gateMode === "login" ? "登录" : "注册并进入"}</span><i aria-hidden="true"></i></button>
+          ${gateMode === 'login' ? '<button class="gate-password-link" type="button" data-change-password>更改密码</button>' : ''}
           <div class="gate-success" aria-hidden="true"><i>✓</i><strong>${gateMode === "login" ? "登录成功" : "注册成功"}</strong><span>正在进入 Auto Office</span></div>
         </form>
       </div>
     `;
     const form = document.getElementById("auth-form");
+    form.querySelector('[data-change-password]')?.addEventListener('click',()=>{if(!gateBusy)window.AcademySecurity.openPasswordDialog(form.elements.name.value);});
     const passwordInput = form.elements.password;
     form.querySelector("[data-password-toggle]").addEventListener("click", (event) => {
       const visible = passwordInput.type === "text";

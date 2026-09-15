@@ -17,6 +17,7 @@
   <script>
     document.documentElement.dataset.theme = localStorage.getItem("app-theme") || "light";
     window.ACADEMY_CONFIG = {
+      authMode: "server-v1",
       url: "https://fmxddvjgkykuqwmasigo.supabase.co",
       key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo",
       bucket: "cloud-files",
@@ -37,6 +38,7 @@
   <link rel="prefetch" href="./pages/feedback/app.js" as="script">
   <link rel="stylesheet" href="./framework/save-status.css">
   <link rel="stylesheet" href="./appearance.css?v=__BUILD_VERSION__">
+  <link rel="stylesheet" href="./framework/security.css?v=__BUILD_VERSION__">
   <link rel="stylesheet" href="./admin-design.css?v=__BUILD_VERSION__">
 </head>
 <body>
@@ -61,6 +63,8 @@
   <script defer src="../network.js?v=__BUILD_VERSION__"></script>
   <script defer src="./framework/reliable-store.js"></script>
   <script defer src="./framework/store.js?v=__BUILD_VERSION__"></script>
+  <script defer src="./framework/secure-auth.js?v=__BUILD_VERSION__"></script>
+  <script defer src="./framework/security-ui.js?v=__BUILD_VERSION__"></script>
   <script defer src="./framework/auth.js?v=__BUILD_VERSION__"></script>
   <script defer src="./framework/gate.js?v=__BUILD_VERSION__"></script>
   <script defer src="./content.js?v=__BUILD_VERSION__"></script>

@@ -13,6 +13,9 @@ window.AcademyAuth = (() => {
   function canShortcut(user, id) {
     return shortcuts.some(item => item.id === id) && canEnter(user) && (isManager(user) || user.shortcutAccess?.[id] !== false);
   }
+  if (window.ACADEMY_CONFIG?.authMode === 'server-v1') {
+    return window.AcademySecureAuth.create({ shortcuts, canShortcut, canEnter, canFull, isManager });
+  }
   const FILE = "academy/accounts.json";
   const SESSION_KEY = "academy-session-v1";
   const NOTICE_KEY = "academy-auth-notice-v1";
@@ -27,6 +30,9 @@ window.AcademyAuth = (() => {
   let hasPulled = false;
   let lastPullAt = 0;
   let sessionCheckTimer = 0;
+  let sessionGeneration = 0;
+  let sessionCheck = null;
+  let sessionRelease = Promise.resolve();
 
   const deviceId = (() => {
     try {
@@ -49,6 +55,7 @@ window.AcademyAuth = (() => {
   }
 
   function writeSession(next, notice) {
+    if (session?.id !== next?.id || session?.sessionToken !== next?.sessionToken) sessionGeneration++;
     session = next;
     if (next) sessionStorage.setItem(SESSION_KEY, JSON.stringify(next));
     else sessionStorage.removeItem(SESSION_KEY);
@@ -72,6 +79,14 @@ window.AcademyAuth = (() => {
   }
 
   async function claimSession(user) {
+    // A late logout write from this page must finish before issuing a new lease.
+    await sessionRelease;
+    // Called only after password verification (or successful registration).
+    // Reopening this account in another tab should not evict the original tab.
+    const existing = await window.AcademyStore.getJSON(sessionFile(user.id));
+    if (validLease(existing, user.id) && existing.token && existing.deviceId === deviceId) {
+      return Object.assign(publicUser(user), { sessionToken: existing.token, deviceId });
+    }
     const token = createSessionToken();
     const lease = {
       userId: user.id,
@@ -80,7 +95,7 @@ window.AcademyAuth = (() => {
       issuedAt: Date.now()
     };
     await window.AcademyStore.putJSON(sessionFile(user.id), lease);
-    if (channel) channel.send({ type: "broadcast", event: "session", payload: lease });
+    if (channel) channel.send({ type: "broadcast", event: "session", payload: { userId: user.id, issuedAt: lease.issuedAt } });
     return Object.assign(publicUser(user), { sessionToken: token, deviceId });
   }
 
@@ -89,25 +104,48 @@ window.AcademyAuth = (() => {
     writeSession(null, message || "账号已在其他终端登录，本终端已安全退出");
   }
 
-  async function verifySession() {
+  function validLease(lease, userId) {
+    return lease?.userId === userId && typeof lease.token === "string" &&
+      typeof lease.deviceId === "string" && Boolean(lease.deviceId) &&
+      (lease.token ? Number.isFinite(lease.issuedAt) && lease.issuedAt > 0 : Number.isFinite(lease.releasedAt) && lease.releasedAt > 0);
+  }
+
+  function verifySession() {
     const current = session;
-    if (!current) return false;
-    try {
-      const lease = await window.AcademyStore.getJSON(sessionFile(current.id));
-      if (!session || session.id !== current.id) return false;
-      if (!lease && !current.sessionToken) {
-        const user = findById(current.id);
-        if (user) writeSession(await claimSession(user));
-        return true;
-      }
-      if (!lease || !current.sessionToken || lease.token !== current.sessionToken) {
-        forceLogout("账号已在其他终端登录，本终端已安全退出");
-        return false;
-      }
-      return true;
-    } catch (_) {
-      return true;
+    if (!current) return Promise.resolve(false);
+    const generation = sessionGeneration;
+    if (sessionCheck?.generation === generation) return sessionCheck.promise;
+    if (!current.sessionToken) {
+      forceLogout("登录状态已失效，请重新登录");
+      return Promise.resolve(false);
     }
+    const stillCurrent = () => Boolean(session && sessionGeneration === generation);
+    const check = { generation };
+    check.promise = (async () => {
+      try {
+        // A missing/failed network route is not evidence of another login.
+        const read = () => window.AcademyStore.getJSON(sessionFile(current.id), { required: true });
+        const lease = await read();
+        if (!stillCurrent()) return false;
+        if (!validLease(lease, current.id) || lease.token === current.sessionToken) return true;
+        // Confirm mismatches to tolerate a stale response on foreground/reconnect.
+        const confirmed = await read();
+        if (!stillCurrent()) return false;
+        if (!validLease(confirmed, current.id) || confirmed.token !== lease.token ||
+          confirmed.deviceId !== lease.deviceId || confirmed.issuedAt !== lease.issuedAt ||
+          confirmed.releasedAt !== lease.releasedAt) return true;
+        forceLogout(!confirmed.token ? "登录状态已结束，请重新登录" :
+          confirmed.deviceId === (current.deviceId || deviceId) ? "此浏览器的登录状态已更新，请重新登录当前页面" :
+            "账号已在其他终端登录，本终端已退出");
+        return false;
+      } catch (_) {
+        return stillCurrent();
+      }
+    })().finally(() => {
+      if (sessionCheck === check) sessionCheck = null;
+    });
+    sessionCheck = check;
+    return check.promise;
   }
 
   async function releaseSession(current) {
@@ -287,7 +325,7 @@ window.AcademyAuth = (() => {
   function logout() {
     const current = session;
     writeSession(null);
-    releaseSession(current);
+    sessionRelease = sessionRelease.then(() => releaseSession(current));
   }
 
   async function setAccess(userId, access, actor) {
@@ -362,11 +400,12 @@ window.AcademyAuth = (() => {
       },
       connection: connected => { realtimeConnected = connected; },
       connected: syncAccounts,
-      session: (lease) => {
+      session: async (lease) => {
         if (!session || !lease || lease.userId !== session.id) return;
-        if (lease.token && lease.token !== session.sessionToken) {
-          forceLogout("账号已在其他终端登录，本终端已安全退出");
-        }
+        // Broadcasts are public, unordered hints, never proof of a replacement.
+        // If a read predates this event, check once more after it completes.
+        if (sessionCheck) await sessionCheck.promise;
+        return verifySession();
       }
     });
     return channel;
