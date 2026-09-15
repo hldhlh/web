@@ -46,7 +46,7 @@ async page => {
   await a.setViewportSize({width:1440,height:1000});
   await a.goto(origin + '/dimension-test?actor=A');
   const fa = a.frameLocator('iframe');
-  await fa.locator('#newProject').waitFor();
+  await fa.locator('#newProject:not([disabled])').waitFor();
   const png = await a.evaluate(() => { const c=document.createElement('canvas');c.width=3600;c.height=2600;const x=c.getContext('2d');x.scale(4,4);x.fillStyle='#e8e3da';x.fillRect(0,0,900,650);x.fillStyle='#b59b7d';x.fillRect(190,180,500,260);x.fillStyle='#7b624b';x.fillRect(210,440,22,135);x.fillRect(650,440,22,135);return c.toDataURL().split(',')[1]; });
   await a.frames()[1].evaluate(png => { const file=new File([Uint8Array.from(atob(png),c=>c.charCodeAt(0))], '工作台尺寸.png', {type:'image/png'});const dt=new DataTransfer();dt.items.add(file);const input=document.getElementById('fileInput');input.files=dt.files;input.dispatchEvent(new Event('change')); }, png);
   await fa.locator('#projectTitle').waitFor();

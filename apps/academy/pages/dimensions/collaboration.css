@@ -160,6 +160,29 @@ input::placeholder { color: var(--muted); opacity: 1; }
 #toggleEdit { background: transparent; border-color: transparent; color: var(--accent); font-size: 1rem; padding: 8px 12px; }
 body[data-editing="true"] #toggleEdit { font-weight: 700; }
 body[data-view="editor"] .sync-bar:not([data-status="error"]):not([data-status="conflict"]) { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; overflow: hidden; clip-path: inset(50%); }
+/* Status occupies its own space, keeping navigation and canvas controls reachable. */
+.image-operation { position: sticky; z-index: 10; top: env(safe-area-inset-top, 0px); flex-shrink: 0; align-self: center; width: calc(100% - max(32px, env(safe-area-inset-left) + env(safe-area-inset-right))); max-width: 1032px; max-height: 60dvh; overflow: hidden; margin: 12px auto; padding: 16px; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; grid-template-rows: minmax(0, 1fr); column-gap: 12px; align-items: start; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--text); }
+.operation-symbol { width: 28px; height: 28px; display: grid; place-items: center; }
+.operation-spinner { width: 20px; height: 20px; border: 2px solid var(--control-fill); border-top-color: var(--accent); border-right-color: var(--accent); border-radius: 50%; animation: operation-spin .9s linear infinite; }
+@keyframes operation-spin { to { transform: rotate(360deg); } }
+.operation-error { display: none; width: 24px; height: 24px; color: var(--warn); }
+.image-operation[data-status="error"] .operation-error { display: block; }
+.operation-content { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }.operation-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.operation-heading strong { font-size: 1rem; font-weight: 600; line-height: 1.4; }
+.operation-step { flex-shrink: 0; font-size: .765rem; line-height: 1.5; font-variant-numeric: tabular-nums; color: var(--muted); }
+.operation-file { margin-top: 3px; color: var(--muted); font-size: .765rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.operation-message { margin-top: 6px; font-size: .882rem; line-height: 1.5; overflow-wrap: anywhere; }
+.image-operation-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: 12px; align-self: center; }
+.image-operation-actions:not(:has(button:not([hidden]))) { display: none; }
+.image-operation-actions .button { min-height: 44px; font-size: .882rem; }
+body:has(.image-operation:not([hidden])) .workspace.has-image { height: auto; flex: 1; }
+@media (max-width: 640px) {
+  .image-operation { grid-template-columns: 24px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; column-gap: 10px; padding: 14px; margin-top: max(8px, env(safe-area-inset-top)); }
+  .operation-symbol { width: 24px; height: 24px; }
+  .image-operation-actions { grid-column: 2; grid-row: 2; margin: 12px 0 0; }
+  body:has(.image-operation:not([hidden])) .canvas-area { min-height: 0; }
+  .image-operation-actions .button { flex: 1; padding-inline: 12px; white-space: nowrap; }
+}
 .workspace.has-image { height: calc(100svh - 96px); }
 .inspector-toggle { display: none; }
 @media (max-width: 640px) {

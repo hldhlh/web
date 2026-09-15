@@ -32,6 +32,18 @@
       <button id="retryButton" class="text-button" hidden>重试同步</button>
       <span id="presenceStatus"></span>
     </div>
+    <section id="imageOperation" class="image-operation" hidden aria-label="图片处理进度">
+      <div class="operation-symbol">
+        <div id="imageOperationProgress" class="operation-spinner" role="progressbar" aria-label="正在处理图片"></div>
+        <svg class="operation-error icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v6m0 3v.1"/></svg>
+      </div>
+      <div class="operation-content" role="status" aria-live="polite" aria-atomic="true">
+        <div class="operation-heading"><strong id="imageOperationTitle">正在打开图片</strong><span id="imageOperationStep" class="operation-step" hidden></span></div>
+        <p id="imageOperationFile" class="operation-file" hidden></p>
+        <p id="imageOperationMessage" class="operation-message"></p>
+      </div>
+      <div class="image-operation-actions"><button id="retryImageOperation" class="button primary" type="button" hidden>重试打开</button><button id="dismissImageOperation" class="button quiet" type="button" hidden>关闭</button></div>
+    </section>
     <section id="conflictPanel" class="conflict-panel" hidden role="alert">
       <strong>有一处修改需要你确认</strong>
       <p>同一条标注已被同事修改。你的版本已保留，可以另存为新标注，或使用团队版本。删除冲突会保留团队版本。</p>
@@ -40,7 +52,7 @@
     <section id="library" class="project-library" aria-labelledby="libraryTitle">
       <div class="library-heading">
         <div><p class="eyebrow">团队工作空间</p><h1 id="libraryTitle">尺寸项目</h1><p class="library-intro">图片、尺寸与制作记录，和团队保持同步。</p></div>
-        <button id="newProject" class="button primary" type="button" aria-label="新建标注" title="新建标注"><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span>新建标注</span></button>
+        <button id="newProject" class="button primary" type="button" aria-label="新建标注" title="新建标注" disabled><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span>正在加载…</span></button>
       </div>
       <div class="library-tools">
         <label class="search-field" for="projectSearch"><svg class="icon" aria-hidden="true"><use href="#search"/></svg><span class="sr-only">搜索项目或制作员工</span><input id="projectSearch" type="search" placeholder="搜索项目或制作员工" autocomplete="off"></label>
@@ -55,7 +67,7 @@
       <section id="libraryEmpty" class="library-empty" hidden>
         <div class="empty-illustration" aria-hidden="true"><div class="empty-sheet"><svg class="icon" aria-hidden="true"><use href="#photo"/></svg><span class="empty-measure"></span></div><span class="empty-pencil"><svg class="icon" aria-hidden="true"><use href="#ruler"/></svg></span></div>
         <h3 id="emptyTitle">从一张图片开始</h3><p id="emptyDescription">上传需要标注的图片，和同事一起记录尺寸。</p>
-        <button id="emptyCreate" class="button primary" type="button" ><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span>创建第一个项目</span></button>
+        <button id="emptyCreate" class="button primary" type="button" disabled><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span>创建第一个项目</span></button>
         <small>自动转换压缩 · 支持 JPG、PNG、WebP · 原图最大 15 MB</small>
       </section>
       <button id="moreProjects" class="button more-projects" hidden>载入更多项目</button>
@@ -63,7 +75,7 @@
     </section>
     <section class="workspace" id="workspace" hidden>
       <div class="canvas-area">
-        <div class="canvas-caption"><div class="canvas-state"><span id="interactionState">浏览模式 · 双指缩放与移动</span><span id="selectionStatus" role="status" hidden></span></div></div>
+        <div class="canvas-caption"><div class="canvas-state"><span id="interactionState">浏览模式 · 双指缩放 · 三指拖动</span><span id="selectionStatus" role="status" hidden></span></div></div>
         <div class="canvas-viewport" id="viewport">
           <section id="emptyState" class="empty-state"><p>正在准备画布…</p><button id="uploadButton" class="button">选择图片</button></section>
           <div class="canvas-stage" id="canvasStage" hidden><canvas id="measureCanvas" aria-label="图片标注画布，浏览模式，可缩放和移动"></canvas><canvas id="selectionCanvas" aria-hidden="true"></canvas></div>

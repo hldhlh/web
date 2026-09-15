@@ -243,13 +243,63 @@
       nextOffset = (more ? nextOffset : 0) + rows.length;
       $('moreProjects').hidden = rows.length < 100;
       renderLibrary();
-      if (!session) { status(catalogConnected ? `已连接团队空间 · ${actor.name}` : `团队空间 · ${actor.name} · 正在恢复实时连接`, catalogConnected ? 'saved' : 'connecting'); $('retryButton').hidden = true; }
+      if (!session && !opening) { status(catalogConnected ? `已连接团队空间 · ${actor.name}` : `团队空间 · ${actor.name} · 正在恢复实时连接`, catalogConnected ? 'saved' : 'connecting'); $('retryButton').hidden = true; }
     } catch (error) { $('libraryEmpty').hidden = true; $('libraryMessage').textContent = '项目加载失败，请重试'; reportError(error); }
     finally { listLoading = false; if (listAgain) { listAgain = false; loadProjects(); } }
   }
   function setProjectLocation(id) {
     const hash = '#/apps/dimensions' + (id ? `?project=${encodeURIComponent(id)}` : '');
     window.parent.history.replaceState(window.parent.history.state, '', hash);
+  }
+  let retryImageAction = null;
+  function deadline(promise, label, milliseconds = 45000) {
+    let timeout;
+    return Promise.race([promise, new Promise((_, reject) => {
+      timeout = setTimeout(() => reject(new Error(`${label}超时，请检查网络后重试`)), milliseconds);
+    })]).finally(() => clearTimeout(timeout));
+  }
+  function imageProgress(title, message, name) {
+    const step = message.match(/^(\d+) \/ (\d+) · /);
+    $('imageOperationStep').hidden = !step;
+    $('imageOperationStep').textContent = step ? `步骤 ${step[1]} / ${step[2]}` : '';
+    if (name !== undefined) {
+      $('imageOperationFile').textContent = name;
+      $('imageOperationFile').title = name;
+      $('imageOperationFile').hidden = !name;
+    }
+    $('imageOperation').hidden = false;
+    $('imageOperation').dataset.status = 'loading';
+    $('imageOperationTitle').textContent = title;
+    $('imageOperationMessage').textContent = step ? message.slice(step[0].length) : message;
+    $('imageOperationProgress').setAttribute('aria-valuetext', message);
+    $('imageOperationProgress').hidden = false;
+    $('retryImageOperation').hidden = true;
+    $('dismissImageOperation').hidden = true;
+  }
+  async function imageOperation(action, retry, name = '') {
+    $('imageOperationFile').textContent = name;
+    $('imageOperationFile').title = name;
+    $('imageOperationFile').hidden = !name;
+    retryImageAction = retry;
+    setOpening(true);
+    try {
+      await action();
+      $('imageOperation').hidden = true;
+      retryImageAction = null;
+    } catch (error) {
+      $('imageOperation').hidden = false;
+      $('imageOperation').dataset.status = 'error';
+      $('imageOperationTitle').textContent = '图片打开失败';
+      $('imageOperationStep').hidden = true;
+      $('imageOperationMessage').textContent = error.message || String(error);
+      $('imageOperationProgress').hidden = true;
+      $('retryImageOperation').hidden = !allowed();
+      $('dismissImageOperation').hidden = false;
+    } finally {
+      setOpening(false);
+      if (allowed()) ($('imageOperation').dataset.status === 'error' && !$('imageOperation').hidden
+        ? $('retryImageOperation') : $('toggleEdit')).focus({ preventScroll: true });
+    }
   }
   function setOpening(value) {
     opening = value;
@@ -262,77 +312,110 @@
     $('newProject').setAttribute('aria-label', value ? '正在准备图片' : '新建标注');
     $('emptyCreate').disabled = value;
   }
-  async function open(id) {
-    if (opening || !allowed()) return;
-    if (session?.dirty || session?.saving) { reportError(new Error('请先同步或处理当前项目的冲突，再切换项目')); return; }
-    if (!/^[a-f0-9-]{36}$/i.test(id)) throw new Error('项目链接无效');
-    setOpening(true);
-    status('正在加载共享图片…');
-    try {
-      const row = await transport.read(prefix + id);
-      const meta = row.payload.meta;
-      if (!meta.imagePath.startsWith('academy/dimensions/')) throw new Error('图片路径无效');
-      const response = await request(store.objectUrl(meta.imagePath), { headers: store.headers() });
-      if (!response.ok) throw new Error('图片加载失败，请重试');
-      const blob = await response.blob();
-      if (!allowed()) return;
-      await editor.openImage(blob, meta.name);
-      document.body.dataset.view = 'editor';
-      $('workspace').hidden = false;
-      $('library').hidden = true;
-      $('projectHeading').hidden = false;
-      const key = `academy-dimensions-outbox:${actor.id}:${id}`;
-      let restored = [];
-      try { restored = JSON.parse(localStorage.getItem(key) || '[]'); } catch (_) {}
-      session = new window.DimensionModel.Session({ row, actor, transport, restored,
-        persist: entries => entries.length ? localStorage.setItem(key, JSON.stringify(entries)) : localStorage.removeItem(key), changed: update });
-      session.checkConflicts(); session.notify();
-      $('libraryButton').hidden = false;
-      setProjectLocation(id); subscribeProject(); if (session.dirty) schedule();
-    } finally { setOpening(false); }
+  async function showProject(row, blob) {
+    ensureAllowed();
+    const meta = row.payload.meta, id = meta.id;
+    await editor.openImage(blob, meta.name);
+    ensureAllowed();
+    document.body.dataset.view = 'editor';
+    $('workspace').hidden = false;
+    $('library').hidden = true;
+    $('projectHeading').hidden = false;
+    editor.fit();
+    const key = `academy-dimensions-outbox:${actor.id}:${id}`;
+    let restored = [];
+    try { restored = JSON.parse(localStorage.getItem(key) || '[]'); } catch (_) {}
+    session = new window.DimensionModel.Session({ row, actor, transport, restored,
+      persist: entries => entries.length ? localStorage.setItem(key, JSON.stringify(entries)) : localStorage.removeItem(key), changed: update });
+    session.checkConflicts(); session.notify();
+    $('libraryButton').hidden = false;
+    setProjectLocation(id); subscribeProject(); if (session.dirty) schedule();
   }
-  async function create(file) {
+  async function open(id) {
+    if (opening) return;
+    await imageOperation(async () => {
+      ensureAllowed();
+      if (session?.dirty || session?.saving) throw new Error('请先同步或处理当前项目的冲突，再切换项目');
+      if (!/^[a-f0-9-]{36}$/i.test(id)) throw new Error('项目链接无效');
+      imageProgress('正在打开图片', '1 / 3 · 正在读取项目资料…');
+      const row = await deadline(transport.read(prefix + id), '读取项目');
+      const meta = row.payload.meta;
+      if (!meta.imagePath?.startsWith('academy/dimensions/')) throw new Error('图片路径无效');
+      imageProgress('正在打开图片', '2 / 3 · 正在下载共享图片…', meta.name);
+      const blob = await deadline((async () => {
+        const response = await request(store.objectUrl(meta.imagePath), { headers: store.headers() });
+        if (!response.ok) throw new Error(`图片下载失败（${response.status}），请重试打开`);
+        return response.blob();
+      })(), '下载图片');
+      imageProgress('正在打开图片', '3 / 3 · 正在解码图片并准备画布…');
+      await showProject(row, blob);
+    }, () => open(id), projects.find(meta => meta.id === id)?.name);
+  }
+  async function create(file, pending = {}) {
     if (!file || opening) return;
-    try {
+    await imageOperation(async () => {
       ensureAllowed();
       if (session?.dirty || session?.saving) throw new Error('请先同步或处理当前项目的冲突，再新建项目');
-      setOpening(true);
-      const processed = await window.DimensionImages.prepare(file, message => status(message, 'saving'));
+      imageProgress('正在打开新图片', '1 / 4 · 正在本机转换并压缩图片…');
+      if (!pending.processed) {
+        let processing = true;
+        try {
+          pending.processed = await deadline(window.DimensionImages.prepare(file, message => {
+            if (processing) imageProgress('正在打开新图片', `1 / 4 · ${message}`);
+          }), '图片处理');
+        } finally { processing = false; }
+      }
       ensureAllowed();
-      const { main, preview, reusePreview, sourceBytes, sourceWidth, sourceHeight } = processed;
-      const id = crypto.randomUUID(), now = new Date().toISOString();
+      const { main, preview, reusePreview, sourceBytes, sourceWidth, sourceHeight } = pending.processed;
+      const id = pending.id ||= crypto.randomUUID(), now = new Date().toISOString();
       const imagePath = `academy/dimensions/${id}/image.${main.extension}`;
-      status(`正在上传优化后的图片（${window.DimensionImages.formatBytes(main.blob.size)}）…`, 'saving');
-      const upload = await request(store.objectUrl(imagePath), { method: 'POST', headers: store.headers({ 'Content-Type': main.blob.type }), body: main.blob });
-      if (!upload.ok) throw new Error(`图片上传失败（${upload.status}）`);
+      imageProgress('正在打开新图片', `2 / 4 · 正在上传图片（${window.DimensionImages.formatBytes(main.blob.size)}）…`);
+      if (!pending.uploaded) {
+        // Retry uses the same project and object path, including lost upload replies.
+        const upload = await deadline(request(store.objectUrl(imagePath), { method: 'POST', headers: store.headers({ 'Content-Type': main.blob.type, 'x-upsert': 'true' }), body: main.blob }), '上传图片');
+        if (!upload.ok) throw new Error(`图片上传失败（${upload.status}），请重试`);
+        pending.uploaded = true;
+      }
       let thumbnailPath = reusePreview ? imagePath : undefined, thumbnailBytes = 0;
-      if (preview) {
+      if (!pending.payload && preview) {
+        imageProgress('正在打开新图片', '2 / 4 · 正在上传图片预览…');
         const path = `academy/dimensions/${id}/preview.${preview.extension}`;
         try {
-          const result = await request(store.objectUrl(path), { method: 'POST', headers: store.headers({ 'Content-Type': preview.blob.type }), body: preview.blob });
+          const result = await deadline(request(store.objectUrl(path), { method: 'POST', headers: store.headers({ 'Content-Type': preview.blob.type, 'x-upsert': 'true' }), body: preview.blob }), '上传预览', 15000);
           if (result.ok) { thumbnailPath = path; thumbnailBytes = preview.blob.size; }
         } catch (_) { /* A preview failure must not discard the optimized main image. */ }
       }
-      const payload = { schema: 1, meta: { id, thumbnailPath, name: file.name.slice(0, 180), imagePath,
+      const payload = pending.payload ||= { schema: 1, meta: { id, thumbnailPath, name: file.name.slice(0, 180), imagePath,
         width: main.width, height: main.height, sourceWidth, sourceHeight, sourceBytes,
         imageBytes: main.blob.size, imageFormat: main.extension, thumbnailBytes,
         storedBytes: main.blob.size + thumbnailBytes,
         createdBy: actor, updatedBy: actor, createdAt: now, updatedAt: now, count: 0 }, annotations: {} };
-      try {
-        const result = await rest({}, { method: 'POST', body: JSON.stringify({ user_id: prefix + id, payload, ts: Date.now(), updated_at: now }) });
-        if (!result?.length) throw new Error('创建项目失败');
-      } catch (error) {
-        // An uncertain response may already have committed; verify before cleanup.
-        let existing;
-        try { existing = await transport.read(prefix + id); } catch (_) {}
-        if (!existing) throw new Error('图片已上传，但项目保存状态尚未确认。请刷新项目列表后再重试');
+      imageProgress('正在打开新图片', '3 / 4 · 正在保存共享项目…');
+      if (!pending.row) {
+        // Reconcile an uncertain save before retrying; never create another project.
+        if (pending.saveAttempted) {
+          const rows = await deadline(rest({ user_id: `eq.${prefix + id}`, select: 'user_id,payload,ts,updated_at' }), '确认项目保存状态');
+          pending.row = rows?.[0];
+        }
+        if (!pending.row) {
+          pending.saveAttempted = true;
+          try {
+            const result = await deadline(rest({}, { method: 'POST', body: JSON.stringify({ user_id: prefix + id, payload, ts: Date.now(), updated_at: now }) }), '保存项目');
+            if (!result?.[0]) throw new Error('创建项目失败');
+            pending.row = result[0];
+          } catch (error) {
+            imageProgress('正在打开新图片', '3 / 4 · 正在确认项目是否已保存…');
+            try { pending.row = await deadline(transport.read(prefix + id), '确认项目保存状态'); } catch (_) {}
+            if (!pending.row) throw new Error('图片已上传，项目保存尚未确认。请重试，系统会先检查保存结果。');
+          }
+        }
       }
-      setOpening(false);
-      catalogChannel?.send({ type: 'broadcast', event: 'changed', payload: { id } });
-      await open(id);
+      imageProgress('正在打开新图片', '4 / 4 · 正在打开图片并准备画布…');
+      // Use the confirmed row and local optimized blob instead of downloading again.
+      await showProject(pending.row, main.blob);
+      Promise.resolve().then(() => catalogChannel?.send({ type: 'broadcast', event: 'changed', payload: { id } })).catch(() => {});
       editor.notice(`图片已优化并共享 · ${window.DimensionImages.formatBytes(main.blob.size)}`);
-    } catch (error) { reportError(error); }
-    finally { setOpening(false); }
+    }, () => create(file, pending), file.name);
   }
   window.DimensionCollab = { actor, create, edit(item, deleted) {
     if (!allowed() || !session) return;
@@ -350,6 +433,11 @@
   });
   $('emptyCreate').addEventListener('click', () => $('newProject').click());
   $('newProject').addEventListener('click', () => { $('fileInput').value = ''; $('fileInput').click(); });
+  $('retryImageOperation').addEventListener('click', () => { if (!opening) retryImageAction?.(); });
+  $('dismissImageOperation').addEventListener('click', () => {
+    $('imageOperation').hidden = true; retryImageAction = null;
+    (session ? $('toggleEdit') : $('newProject')).focus({ preventScroll: true });
+  });
   $('retryButton').addEventListener('click', () => { if (session) { refreshCurrent(); subscribeProject(); schedule(0); } else loadProjects(); });
   $('moreProjects').addEventListener('click', () => loadProjects(true));
   $('projectSearch').addEventListener('input', renderLibrary); $('onlyMine').addEventListener('change', renderLibrary); $('allProjects').addEventListener('change', renderLibrary);
@@ -364,7 +452,7 @@
   window.addEventListener('beforeunload', event => { if (session?.dirty || opening) { event.preventDefault(); event.returnValue = ''; } });
   function stop() {
     stopped = true; clearTimeout(timer); clearTimeout(retryTimer); clearInterval(pollTimer);
-    sb.removeAllChannels(); stopAuth?.();
+    sb.removeAllChannels(); stopAuth?.(); retryImageAction = null; $('imageOperation').hidden = true;
     previewObserver.disconnect(); previewQueue.length = 0;
     for (const promise of previewCache.values()) promise.then(url => { if (url) URL.revokeObjectURL(url); }).catch(() => {});
     previewCache.clear();
@@ -379,6 +467,7 @@
   });
   window.addEventListener('pagehide', stop, { once: true });
   if (!allowed()) { status('请通过 Auto Office 登录并开通尺寸标注权限'); return; }
+  setOpening(false);
   openCatalogChannel(); loadProjects();
   const projectId = new URLSearchParams(window.parent.location.hash.split('?')[1] || '').get('project');
   if (projectId) open(projectId).catch(reportError);
