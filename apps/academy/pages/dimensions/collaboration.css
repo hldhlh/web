@@ -147,7 +147,7 @@ input::placeholder { color: var(--muted); opacity: 1; }
 }
 @media (max-width: 359px) { .project-grid { grid-template-columns: 1fr; }.library-section-heading { align-items: flex-start; }.canvas-bottom { flex-wrap: wrap; }.canvas-hint { flex-basis: 100%; } }
 /* Content-first viewer: one project toolbar and a disclosure inspector. */
-.topbar { min-height: 56px; gap: 8px; }
+.topbar { position: relative; z-index: 6; min-height: 56px; gap: 8px; }
 .topbar .project-heading { position: relative; display: block; flex: 1; min-width: 0; padding: 0; }
 .project-heading summary { min-height: 44px; display: flex; justify-content: center; padding: 3px 8px; cursor: pointer; list-style: none; border-radius: 8px; }
 .project-heading summary::-webkit-details-marker { display: none; }
@@ -227,3 +227,13 @@ body:has(.image-operation:not([hidden])) .workspace.has-image { height: auto; fl
 @media (prefers-reduced-transparency: reduce) { .topbar, .zoom-controls { backdrop-filter: none; background: var(--surface); } }
 @media (prefers-contrast: more) { :root { --muted: var(--text); --line: #72757b; }[data-theme="dark"] { --line: #a3a8b0; }.button, .project-card, .style-options button, .position-options button { border-width: 2px; }.scope-option input:checked + span { outline: 2px solid var(--text); outline-offset: -2px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+/* Project naming uses a solid, accessible system-style dialog. */
+.rename-dialog { width: min(420px, calc(100% - 32px)); max-height: calc(100svh - 48px); overflow: auto; margin: auto; padding: 24px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--text); }
+.rename-dialog::backdrop { background: rgb(0 0 0 / 35%); }
+.rename-dialog form { display: grid; gap: 12px; }
+.rename-dialog h2 { margin: 0 0 8px; font-size: 1.176rem; }
+.rename-dialog label { font-size: .882rem; }
+.rename-dialog input { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--quiet-fill); color: var(--text); font: inherit; }
+.rename-dialog p { margin: 0; font-size: .765rem; color: var(--muted); overflow-wrap: anywhere; }
+.rename-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }

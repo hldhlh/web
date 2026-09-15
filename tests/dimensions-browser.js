@@ -75,6 +75,32 @@ async page => {
   if (!(await fa.locator('#listItems').innerText()).includes('员工B')) throw Error('Missing employee attribution');
   await fa.locator('#rectTool').click(); await draw(a, fa, [.08,.7],[.25,.9]); await fa.locator('#topLabelInput').fill('深 60 cm');
   await fb.locator('.list-select strong', { hasText: '深 60 cm' }).waitFor();
+  // Filename defaults, cancellation, failed-save retry and cross-member rename sync.
+  if (meta.name !== '工作台尺寸.png') throw Error('Project did not default to image filename');
+  await fa.locator('#projectTitle').dblclick();
+  await fa.locator('#projectNameInput').fill('取消的名称');
+  await fa.locator('#projectNameInput').press('Escape');
+  if (await fa.locator('#projectTitle').innerText() !== meta.name) throw Error('Cancel changed project name');
+  await fa.locator('#projectTitle').dblclick();
+  await fa.locator('#projectNameInput').fill('   ');
+  await fa.locator('#saveRename').click();
+  await fa.locator('#renameStatus', {hasText:'请输入项目名称'}).waitFor();
+  await fa.locator('#projectNameInput').fill('  装配工作台  ');
+  offline.add(a);
+  await fa.locator('#saveRename').click();
+  await fa.locator('#renameStatus', {hasText:'输入已保留'}).waitFor();
+  if (await fa.locator('#projectNameInput').inputValue() !== '  装配工作台  ') throw Error('Failed rename lost input');
+  offline.delete(a);
+  const annotationsBeforeRename = JSON.stringify([...rows.values()][0].payload.annotations);
+  await fa.locator('#saveRename').click();
+  await fb.locator('#projectTitle', {hasText:'装配工作台'}).waitFor();
+  await fa.locator('#renameDialog').waitFor({state:'hidden'});
+  if (JSON.stringify([...rows.values()][0].payload.annotations) !== annotationsBeforeRename) throw Error('Rename altered annotations');
+  // Keyboard / touch users can use the explicit disclosure action.
+  await fb.locator('#projectHeading summary').click();
+  await fb.locator('#renameProject').click();
+  if (await fb.locator('#projectNameInput').inputValue() !== '装配工作台') throw Error('Rename did not persist');
+  await fb.locator('#cancelRename').click();
   // Independent offline modifications are restored after a page reload.
   offline.add(a);
   await fa.locator('#topLabelInput').fill('深 65 cm');
@@ -109,7 +135,7 @@ async page => {
   if (!previewSize || previewSize > 480) throw Error('Thumbnail did not load at the expected size');
   await a.screenshot({path:'output/playwright/dimensions-library-mobile.png',fullPage:true});
   if(errors.length)throw Error(errors.join('\n'));
-  const result = { passed:true, scenarios:['shared upload','line / circle / rectangle','employee attribution','two employee realtime','offline reopen and merge','same-annotation conflict copy','PNG export','390px dark theme','library employee search'], projects:rows.size,annotations:Object.keys([...rows.values()][0].payload.annotations).length,productionWrites:0 };
+  const result = { passed:true, scenarios:['shared upload','rename cancel / retry / realtime sync','line / circle / rectangle','employee attribution','two employee realtime','offline reopen and merge','same-annotation conflict copy','PNG export','390px dark theme','library employee search'], projects:rows.size,annotations:Object.keys([...rows.values()][0].payload.annotations).length,productionWrites:0 };
   await a.evaluate(result => { window.__dimensionBrowserResult = result; }, result);
   return result;
 }

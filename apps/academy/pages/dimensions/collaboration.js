@@ -421,6 +421,63 @@
     if (!allowed() || !session) return;
     session.edit(item, deleted); schedule();
   } };
+  let renameSession = null, renameBase = '', renaming = false;
+  function openRename() {
+    if (!session || !allowed() || renaming) return;
+    renameSession = session; renameBase = session.row.payload.meta.name;
+    $('projectHeading').open = false;
+    $('projectNameInput').value = renameBase;
+    $('renameStatus').textContent = '名称会同步给项目成员。';
+    $('renameDialog').showModal();
+    $('projectNameInput').focus(); $('projectNameInput').select();
+  }
+  $('projectTitle').addEventListener('dblclick', event => { event.preventDefault(); openRename(); });
+  $('renameProject').addEventListener('click', openRename);
+  $('cancelRename').addEventListener('click', () => $('renameDialog').close());
+  $('renameDialog').addEventListener('cancel', event => { if (renaming) event.preventDefault(); });
+  $('renameDialog').addEventListener('close', () => document.querySelector('#projectHeading summary').focus({ preventScroll: true }));
+  $('renameForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (renaming || !renameSession || renameSession !== session || !allowed()) return;
+    const name = $('projectNameInput').value.trim();
+    if (!name) { $('renameStatus').textContent = '请输入项目名称。'; $('projectNameInput').focus(); return; }
+    if (name === renameBase) { $('renameDialog').close(); return; }
+    const current = renameSession;
+    renaming = true;
+    $('renameForm').setAttribute('aria-busy', 'true');
+    $('saveRename').disabled = $('cancelRename').disabled = $('projectNameInput').disabled = true;
+    $('saveRename').textContent = '保存中…';
+    $('renameStatus').textContent = '正在保存到云端…';
+    try {
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const row = await deadline(transport.read(current.row.user_id), '读取项目名称', 15000);
+        ensureAllowed();
+        if (current !== session) throw new Error('项目已切换，请重新打开项目后重试');
+        current.receive(row);
+        if (row.payload.meta.name !== name && row.payload.meta.name !== renameBase) {
+          renameBase = row.payload.meta.name;
+          throw new Error(`其他成员已将名称改为“${renameBase}”。再次保存将使用你输入的名称。`);
+        }
+        const payload = JSON.parse(JSON.stringify(row.payload));
+        payload.meta.name = name;
+        payload.meta.updatedAt = new Date().toISOString(); payload.meta.updatedBy = actor;
+        const saved = row.payload.meta.name === name ? row : await deadline(transport.cas(row, payload), '保存项目名称', 15000);
+        if (!saved) continue;
+        if (allowed() && current === session) { current.receive(saved); editor.notice('项目名称已保存'); }
+        $('renameDialog').close();
+        return;
+      }
+      throw new Error('项目正在频繁更新，请稍后重试');
+    } catch (error) {
+      $('renameStatus').textContent = `${error.message || '保存失败'} 输入已保留。`;
+    } finally {
+      renaming = false;
+      $('renameForm').removeAttribute('aria-busy');
+      $('saveRename').disabled = $('cancelRename').disabled = $('projectNameInput').disabled = false;
+      $('saveRename').textContent = '保存';
+      if ($('renameDialog').open) $('projectNameInput').focus();
+    }
+  });
   $('libraryButton').addEventListener('click', async () => {
     if (opening || session?.saving) return;
     if (session?.dirty) { await session.flush(); if (session.dirty) return; }
@@ -449,9 +506,9 @@
   document.addEventListener('visibilitychange', resume);
   window.addEventListener('online', resume);
   window.addEventListener('offline', () => { connected = false; if (session) update(session); });
-  window.addEventListener('beforeunload', event => { if (session?.dirty || opening) { event.preventDefault(); event.returnValue = ''; } });
+  window.addEventListener('beforeunload', event => { if (session?.dirty || opening || renaming) { event.preventDefault(); event.returnValue = ''; } });
   function stop() {
-    stopped = true; clearTimeout(timer); clearTimeout(retryTimer); clearInterval(pollTimer);
+    stopped = true; $('renameDialog').close(); clearTimeout(timer); clearTimeout(retryTimer); clearInterval(pollTimer);
     sb.removeAllChannels(); stopAuth?.(); retryImageAction = null; $('imageOperation').hidden = true;
     previewObserver.disconnect(); previewQueue.length = 0;
     for (const promise of previewCache.values()) promise.then(url => { if (url) URL.revokeObjectURL(url); }).catch(() => {});
