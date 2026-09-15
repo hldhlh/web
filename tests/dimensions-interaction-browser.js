@@ -63,30 +63,51 @@ async page => {
   await touch('touchStart',[{...h,x:h.x+22,y:h.y+15},other]);await touch('touchEnd',[other]);await touch('touchEnd',[]);
   assert(await count()===0,'Second finger saved an endpoint edit');
   assert(await page.locator('#measureCanvas').evaluate(c=>c.toDataURL())===baseBefore,'Endpoint edit was not rolled back');
-  // Holding still enters canvas pan even on an existing endpoint; the image
-  // can move at fit scale, and annotation pixels/coordinates remain unchanged.
+  // Holding an endpoint no longer switches to canvas panning.
   await touch('touchStart',[h]);
-  const heldH={...h,x:h.x+3,y:h.y+2};
-  await touch('touchMove',[heldH]);
-  await page.locator('#notice', {hasText:'已进入拖动'}).waitFor();
+  await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,450)));
   const holdBefore=await page.locator('#measureCanvas').boundingBox();
-  await touch('touchMove',[{...heldH,x:heldH.x+35,y:heldH.y+25}]);
+  await touch('touchMove',[{...h,x:h.x+35,y:h.y+25}]);
   const holdAfter=await page.locator('#measureCanvas').boundingBox();
-  assert(Math.abs(holdAfter.x-holdBefore.x-35)<2 && Math.abs(holdAfter.y-holdBefore.y-25)<2,'Held finger did not freely drag the fitted canvas');
-  await touch('touchEnd',[]);
-  assert(await count()===0,'Long press committed an endpoint edit');
-  assert(await page.locator('#measureCanvas').evaluate(c=>c.toDataURL())===baseBefore,'Long press changed annotation pixels');
+  assert(Math.abs(holdAfter.x-holdBefore.x)<2 && Math.abs(holdAfter.y-holdBefore.y)<2,'Long press unexpectedly panned the canvas');
+  await touch('touchCancel',[]);
+  assert(await count()===0,'Cancelled long press committed an endpoint edit');
+  assert(await page.locator('#measureCanvas').evaluate(c=>c.toDataURL())===baseBefore,'Cancelled endpoint edit changed annotation pixels');
   await page.locator('#fitCanvas').click();
-  // Two fingers only scale; a third finger suspends gestures without panning.
+
+  // A fitted image can pan and scale in one continuous two-finger gesture.
+  const fittedViewport=await page.locator('#viewport').boundingBox();
+  const freeA={id:15,x:fittedViewport.x+110,y:fittedViewport.y+90},freeB={id:16,x:fittedViewport.x+220,y:fittedViewport.y+90};
+  await touch('touchStart',[freeA,freeB]);
+  const freeBefore=await page.locator('#measureCanvas').boundingBox();
+  const freeZoom=await page.locator('#zoomValue').innerText();
+  const translated=[freeA,freeB].map(t=>({...t,x:t.x+30,y:t.y+20}));
+  await touch('touchMove',translated);
+  const freeAfter=await page.locator('#measureCanvas').boundingBox();
+  assert(Math.abs(freeAfter.x-freeBefore.x-30)<2 && Math.abs(freeAfter.y-freeBefore.y-20)<2,'Two fingers did not freely pan the fitted image');
+  assert(await page.locator('#zoomValue').innerText()===freeZoom,'Equal finger translation changed scale');
+  const anchor={x:((freeA.x+freeB.x)/2-freeBefore.x)/freeBefore.width,y:((freeA.y+freeB.y)/2-freeBefore.y)/freeBefore.height};
+  const combined=translated.map((t,i)=>({...t,x:t.x+10+(i?12:-12),y:t.y+15}));
+  await touch('touchMove',combined);
+  const combinedBox=await page.locator('#measureCanvas').boundingBox();
+  assert(await page.locator('#zoomValue').innerText()!==freeZoom,'Combined gesture did not change scale');
+  assert(Math.abs(combinedBox.x+anchor.x*combinedBox.width-(combined[0].x+combined[1].x)/2)<2 && Math.abs(combinedBox.y+anchor.y*combinedBox.height-(combined[0].y+combined[1].y)/2)<2,'Image anchor slipped away from the moving midpoint');
+  await touch('touchEnd',[combined[0]]);
+  await touch('touchMove',[{...combined[0],x:combined[0].x+20}]);await touch('touchEnd',[]);
+  const releasedBox=await page.locator('#measureCanvas').boundingBox();
+  assert(Math.abs(releasedBox.x-combinedBox.x)<2 && Math.abs(releasedBox.y-combinedBox.y)<2,'Remaining finger moved the canvas');
+  assert(await count()===0,'Combined gesture wrote an annotation');
+  await page.locator('#fitCanvas').click();
+  // A third finger suspends the two-finger gesture without moving the image.
   await page.locator('#zoomIn').click();await page.locator('#zoomIn').click();await page.locator('#zoomIn').click();
   const viewport=await page.locator('#viewport').boundingBox();
   const p={id:5,x:viewport.x+120,y:viewport.y+100},q={id:6,x:viewport.x+230,y:viewport.y+100};
   await touch('touchStart',[p]);await touch('touchStart',[p,q]);
-  const scrollBefore=await page.locator('#viewport').evaluate(e=>[e.scrollLeft,e.scrollTop]);
+  const scrollBefore=await page.locator('#measureCanvas').boundingBox();
   const panZoom=await page.locator('#zoomValue').innerText();
   await touch('touchMove',[{...p,x:p.x-45,y:p.y-30},{...q,x:q.x-45,y:q.y-30}]);
-  const scrollAfter=await page.locator('#viewport').evaluate(e=>[e.scrollLeft,e.scrollTop]);
-  assert(scrollBefore.every((v,i)=>Math.abs(v-scrollAfter[i])<=1),'Two-finger translation unexpectedly panned');
+  const scrollAfter=await page.locator('#measureCanvas').boundingBox();
+  assert(Math.abs(scrollAfter.x-scrollBefore.x+45)<2 && Math.abs(scrollAfter.y-scrollBefore.y+30)<2,'Two-finger translation did not pan accurately');
   assert(await page.locator('#zoomValue').innerText()===panZoom,'Two-finger translation changed zoom');
   const movedP={...p,x:p.x-45,y:p.y-30},movedQ={...q,x:q.x-45,y:q.y-30};
   const third={id:10,x:viewport.x+170,y:viewport.y+160};
@@ -133,7 +154,7 @@ async page => {
   const browseStart=await page.locator('#measureCanvas').boundingBox();
   await touch('touchStart',[one]);await touch('touchMove',[{...one,x:one.x-25,y:one.y-20}]);await touch('touchEnd',[]);
   const browseAfter=await page.locator('#measureCanvas').boundingBox();
-  assert(Math.abs(browseAfter.x-browseStart.x+25)<2 && Math.abs(browseAfter.y-browseStart.y+20)<2,'Single-finger browse drag did not move the canvas');
+  assert(Math.abs(browseAfter.x-browseStart.x)<2 && Math.abs(browseAfter.y-browseStart.y)<2,'Single-finger browse drag unexpectedly moved the canvas');
   const trio=[one,{id:12,x:one.x+70,y:one.y},{id:13,x:one.x+35,y:one.y+60}];
   await touch('touchStart',trio);
   const trioZoom=await page.locator('#zoomValue').innerText();
@@ -146,6 +167,24 @@ async page => {
   const remainingAfter=await page.locator('#measureCanvas').boundingBox();
   assert(Math.abs(remainingAfter.x-trioAfter.x)<2 && Math.abs(remainingAfter.y-trioAfter.y)<2,'Remaining finger unexpectedly restarted dragging');
   assert(await count()===savedCount,'Browse gestures wrote data');
+  for (const direction of ['zoomIn','zoomOut']) {
+    for(let i=0;i<20;i++) {
+      const button=page.locator('#'+direction);
+      if(await button.isDisabled()) break;
+      await button.click();
+    }
+    const limitZoom=await page.locator('#zoomValue').innerText();
+    const pair=[{id:17,x:one.x,y:one.y},{id:18,x:one.x+110,y:one.y}];
+    await touch('touchStart',pair);
+    const sign=direction==='zoomIn'?1:-1;
+    const overshoot=pair.map((t,i)=>({...t,x:t.x+(i?20:-20)*sign}));
+    await touch('touchMove',overshoot);
+    assert(await page.locator('#zoomValue').innerText()===limitZoom,'Zoom exceeded its limit');
+    const reversed=overshoot.map((t,i)=>({...t,x:t.x+(i?-5:5)*sign}));
+    await touch('touchMove',reversed);
+    assert(await page.locator('#zoomValue').innerText()!==limitZoom,'Zoom did not immediately reverse at its limit');
+    await touch('touchEnd',[]);
+  }
   await page.locator('#fitCanvas').click();
   await page.locator('#inspectorToggle').click();
   await page.locator('.list-select').first().click();
@@ -160,5 +199,5 @@ async page => {
   await page.evaluate(async()=>{const c=document.createElement('canvas');c.width=100;c.height=100;await DimensionEditor.openImage(await new Promise(r=>c.toBlob(r)),'另一个项目.png');});
   assert(await page.locator('#toggleEdit').getAttribute('aria-pressed')==='false','New project inherited editing mode');
   await cdp.detach();
-  return {passed:true,checks:['browse blocks writes and undo','explicit edit and done','visible selection without export changes','pinch zoom','two-finger translation does not pan','long-press pan and endpoint rollback','free dragging at fit scale','three-finger gestures disabled','single-finger browse pan','immediate touch drawing','draft cancellation','endpoint rollback','remaining finger suppression','pointer cancellation','new project resets mode'],productionWrites:0};
+  return {passed:true,checks:['browse blocks writes and undo','explicit edit and done','visible selection without export changes','pinch zoom','two-finger pan and simultaneous zoom','moving midpoint stays anchored','immediate reversal at zoom limits','long-press panning removed','free two-finger dragging at fit scale','three-finger gestures disabled','single-finger browse does not pan','immediate touch drawing','draft cancellation','endpoint rollback','remaining finger suppression','pointer cancellation','new project resets mode'],productionWrites:0};
 }

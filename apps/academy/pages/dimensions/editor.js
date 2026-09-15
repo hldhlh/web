@@ -71,10 +71,10 @@
   }
 
   let noticeTimer;
-  function setNotice(message, toast = false) {
+  function setNotice(message) {
     elements.notice.textContent = message;
     clearTimeout(noticeTimer);
-    elements.canvasHint.classList.toggle('is-toast', toast || /失败|导出|已复制|复制失败|不足|冲突/.test(message));
+    elements.canvasHint.classList.toggle('is-toast', /失败|导出|已复制|复制失败|不足|冲突/.test(message));
     noticeTimer = setTimeout(() => elements.canvasHint.classList.remove('is-toast'), 4000);
   }
   function setInspector(open) {
@@ -119,7 +119,6 @@
     if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
     Object.assign(state, { image, objectUrl, fileName: name, annotations: [], draft: null,
       handleDrag: null, hoverHandle: null, selectedId: null, zoom: 1, panX: 0, panY: 0, editing: false });
-    clearTimeout(holdTimer); holdTimer = null;
     elements.canvasStage.style.transform = '';
     cancelAnimationFrame(gestureFrame); gestureFrame = null;
     pointers.clear(); gesture = null; singlePointer = null; suppressDrawing = false; deferredAnnotations = null;
@@ -137,7 +136,7 @@
     elements.replaceText.textContent = "新建标注";
     elements.imageSize.textContent = `${image.naturalWidth} × ${image.naturalHeight}`;
     updateFit(); updateInterface(); render();
-    setNotice("浏览模式：单指按住拖动画布，双指仅缩放；点击编辑后修改标注");
+    setNotice("浏览模式：双指缩放和拖动画布，单指点选；点击编辑后修改标注");
   }
 
   function commit(item, deleted = false) {
@@ -758,8 +757,8 @@
     elements.toggleEdit.setAttribute('aria-label', state.editing ? '完成编辑' : '编辑标注');
     elements.toggleEdit.setAttribute('aria-pressed', String(state.editing));
     elements.canvas.style.cursor = state.editing ? 'crosshair' : 'grab';
-    elements.canvas.setAttribute('aria-label', state.editing ? '图片标注画布，单指绘制，长按拖动画布，双指仅缩放' : '图片标注画布，浏览模式，单指按住拖动画布，双指仅缩放');
-    document.getElementById('interactionState').textContent = state.editing ? '单指绘制 · 长按拖动 · 双指仅缩放' : '浏览模式 · 单指拖动 · 双指仅缩放';
+    elements.canvas.setAttribute('aria-label', state.editing ? '图片标注画布，单指绘制，双指缩放和拖动画布' : '图片标注画布，浏览模式，单指点选，双指缩放和拖动画布');
+    document.getElementById('interactionState').textContent = state.editing ? '单指绘制 · 双指缩放与拖动' : '浏览模式 · 双指缩放与拖动';
     const selectionStatus = document.getElementById('selectionStatus');
     selectionStatus.hidden = !selected;
     selectionStatus.textContent = selected ? `已选中 · ${state.annotations.indexOf(selected) + 1} 号标注` : '';
@@ -912,10 +911,9 @@
   }
 
   const pointers = new Map();
-  let gesture = null, gestureFrame = null, holdTimer = null, singlePointer = null, suppressDrawing = false;
+  let gesture = null, gestureFrame = null, singlePointer = null, suppressDrawing = false;
 
   function cancelDrawing() {
-    clearTimeout(holdTimer); holdTimer = null;
     const drag = state.handleDrag;
     if (drag?.snapshot) Object.assign(state.annotations.find(item => item.id === drag.id) || {}, drag.snapshot);
     state.draft = null; state.handleDrag = null; state.hoverHandle = null;
@@ -938,16 +936,18 @@
     const mid = gesturePoints(), box = elements.canvas.getBoundingClientRect();
     gesture = { ...mid, zoom: state.zoom,
       anchor: { x: (mid.x - box.left) / box.width, y: (mid.y - box.top) / box.height } };
-    setNotice('双指仅缩放画布');
+    setNotice('双指可同时缩放和拖动画布');
   }
 
   function applyGesture() {
     cancelAnimationFrame(gestureFrame); gestureFrame = null;
     if (!gesture || pointers.size !== 2) return;
     const mid = gesturePoints();
-    // Keep the initial midpoint fixed: translating two fingers must not pan.
+    // Track the midpoint and scale together so the same image point stays under
+    // both fingers. Rebase each frame for immediate reversal at the zoom limits.
     const zoom = clamp(gesture.zoom * mid.distance / gesture.distance, .5, 4);
-    if (Math.abs(zoom - state.zoom) > .0001) setZoom(zoom, gesture.x, gesture.y, gesture.anchor);
+    setZoom(zoom, mid.x, mid.y, gesture.anchor);
+    Object.assign(gesture, mid, { zoom: state.zoom });
   }
 
   elements.viewport.addEventListener('pointerdown', event => {
@@ -959,21 +959,8 @@
     if (pointers.size >= 2) { startGesture(); return; }
     if (suppressDrawing) return;
     const drawing = state.editing && event.target === elements.canvas;
-    singlePointer = { id: event.pointerId, x: event.clientX, y: event.clientY, lastX: event.clientX, lastY: event.clientY, moved: false, drawing };
-    if (drawing) {
-      beginDrawing(event);
-      const p = singlePointer;
-      holdTimer = setTimeout(() => {
-        holdTimer = null;
-        if (singlePointer !== p || p.moved || pointers.size !== 1 || suppressDrawing) return;
-        cancelDrawing();
-        const point = pointers.get(p.id);
-        p.lastX = point.x; p.lastY = point.y;
-        p.drawing = false; p.moved = true;
-        elements.canvas.style.cursor = 'grabbing';
-        setNotice('已进入拖动，保持按住并移动画布', true);
-      }, 350);
-    }
+    singlePointer = { id: event.pointerId, touch: event.pointerType === 'touch', x: event.clientX, y: event.clientY, lastX: event.clientX, lastY: event.clientY, moved: false, drawing };
+    if (drawing) beginDrawing(event);
   });
 
   elements.viewport.addEventListener('pointermove', event => {
@@ -993,11 +980,13 @@
     if (suppressDrawing || singlePointer?.id !== event.pointerId) return;
     const p = singlePointer;
     if (Math.hypot(event.clientX - p.x, event.clientY - p.y) > 6) {
-      p.moved = true; clearTimeout(holdTimer); holdTimer = null;
+      p.moved = true;
     }
     if (!p.drawing) {
-      panCanvas(event.clientX - p.lastX, event.clientY - p.lastY);
-      elements.canvas.style.cursor = 'grabbing';
+      if (!p.touch) {
+        panCanvas(event.clientX - p.lastX, event.clientY - p.lastY);
+        elements.canvas.style.cursor = 'grabbing';
+      }
       p.lastX = event.clientX; p.lastY = event.clientY;
     } else if (state.handleDrag) { moveHandle(pointFromEvent(event), event.shiftKey); render(); }
     else if (state.draft) { state.draft.end = pointFromEvent(event); render(); }
@@ -1005,7 +994,6 @@
 
   function finishPointer(event, cancelled = false) {
     if (!pointers.has(event.pointerId)) return;
-    clearTimeout(holdTimer); holdTimer = null;
     elements.canvas.style.cursor = state.editing ? 'crosshair' : 'grab';
     if (!cancelled && gestureFrame !== null) applyGesture();
     cancelAnimationFrame(gestureFrame); gestureFrame = null;
@@ -1022,7 +1010,7 @@
       if (!p.moved) {
         const point = pointFromEvent(event), hit = nearestAnnotation(point), handle = nearestHandle(point);
         selectAnnotation(hit?.id || handle?.id || null, false);
-        setNotice(hit || handle ? '已选中标注 · 点击编辑标注可修改' : '浏览模式 · 单指拖动 · 双指仅缩放');
+        setNotice(hit || handle ? '已选中标注 · 点击编辑标注可修改' : '浏览模式 · 双指缩放与拖动');
       }
     } else if (state.handleDrag) {
       const changed = state.annotations.find(item => item.id === state.handleDrag.id);
@@ -1049,7 +1037,7 @@
     state.editing = !state.editing;
     setInspector(state.editing);
     updateInterface(); render();
-    setNotice(state.editing ? '编辑模式：直接拖动绘制，按住片刻拖动画布，双指仅缩放' : '已退出编辑，单指按住拖动画布，双指仅缩放');
+    setNotice(state.editing ? '编辑模式：单指绘制或调整节点，双指同时缩放和拖动画布' : '已退出编辑，双指可同时缩放和拖动画布');
   });
 
   elements.lineTool.addEventListener("click", () => setTool("line"));
@@ -1195,7 +1183,7 @@
   const themeObserver = new MutationObserver(renderSelection);
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   window.addEventListener('pagehide', () => themeObserver.disconnect(), { once: true });
-  window.addEventListener('pagehide', () => { resizeObserver.disconnect(); clearTimeout(holdTimer); cancelAnimationFrame(gestureFrame); }, { once: true });
+  window.addEventListener('pagehide', () => { resizeObserver.disconnect(); cancelAnimationFrame(gestureFrame); }, { once: true });
   window.addEventListener("resize", updateFit);
   window.addEventListener("beforeunload", () => {
     if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
