@@ -128,24 +128,43 @@
     use.setAttribute('href', `#${name}`); svg.append(use); return svg;
   }
   const previewCache = new Map(), previewQueue = [];
+  const previewSources = new WeakMap();
   let previewActive = 0;
+  function imagePaths(meta) {
+    if (!/^[a-f0-9-]{36}$/i.test(meta.id)) return [];
+    const directory = `academy/dimensions/${meta.id}/`;
+    return [...new Set([meta.thumbnailPath, meta.imagePath].filter(path =>
+      typeof path === 'string' && path.startsWith(directory) &&
+      /^[a-z0-9][a-z0-9._-]*\.(?:webp|jpe?g|png)$/i.test(path.slice(directory.length))))];
+  }
+  async function loadPreview(paths) {
+    for (const path of paths) {
+      if (!allowed()) return null;
+      try {
+        const response = await request(store.objectUrl(path), { headers: store.headers() });
+        if (!response.ok) continue;
+        // Decode before caching: a 200 response can still contain a broken image.
+        // Legacy projects have only original.*; generate a small local preview.
+        const blob = await window.DimensionImages.preview(await response.blob());
+        if (!allowed()) return null;
+        return URL.createObjectURL(blob);
+      } catch (_) { /* Try the project image if its thumbnail is missing or invalid. */ }
+    }
+    throw new Error('预览暂不可用，连接恢复后自动重试');
+  }
   async function drainPreviews() {
     while (previewActive < 2 && previewQueue.length && !stopped) {
-      const { img, path } = previewQueue.shift();
+      const { img, paths } = previewQueue.shift();
       if (!img.isConnected) continue;
       previewActive++;
       (async () => {
+        const key = paths.join('|');
+        let cached;
         try {
-          let cached = previewCache.get(path);
+          cached = previewCache.get(key);
           if (!cached) {
-            cached = (async () => {
-              const response = await request(store.objectUrl(path), { headers: store.headers() });
-              if (!response.ok) throw new Error('preview');
-              const blob = await response.blob();
-              if (stopped) return null;
-              return URL.createObjectURL(blob);
-            })();
-            previewCache.set(path, cached);
+            cached = loadPreview(paths);
+            previewCache.set(key, cached);
             if (previewCache.size > 100) {
               const oldest = previewCache.keys().next().value, previous = previewCache.get(oldest);
               previewCache.delete(oldest);
@@ -154,7 +173,10 @@
           }
           const url = await cached;
           if (url && img.isConnected && !stopped) { img.src = url; img.hidden = false; }
-        } catch (_) { previewCache.delete(path); }
+        } catch (_) {
+          if (previewCache.get(key) === cached) previewCache.delete(key);
+          if (img.isConnected) img.parentElement.title = '预览暂不可用，连接恢复后自动重试';
+        }
         finally { previewActive--; drainPreviews(); }
       })();
     }
@@ -162,7 +184,7 @@
   const previewObserver = new IntersectionObserver(entries => {
     for (const entry of entries) if (entry.isIntersecting) {
       previewObserver.unobserve(entry.target);
-      previewQueue.push({ img: entry.target.querySelector('img'), path: entry.target.dataset.preview });
+      previewQueue.push({ img: entry.target.querySelector('img'), paths: previewSources.get(entry.target) });
     }
     drainPreviews();
   }, { rootMargin: '120px' });
@@ -178,9 +200,10 @@
       button.type = 'button'; button.className = 'project-card';
       button.setAttribute('aria-label', `${meta.name}，制作：${meta.createdBy.name}，${meta.count || 0} 条标注`);
       const preview = document.createElement('span'); preview.className = 'project-preview'; preview.append(icon('photo'));
-      if (/^academy\/dimensions\/[a-f0-9-]{36}\/(?:preview|image)\.(?:webp|jpg|png)$/i.test(meta.thumbnailPath || '')) {
+      const paths = imagePaths(meta);
+      if (paths.length) {
         const img = document.createElement('img'); img.alt = ''; img.hidden = true; img.decoding = 'async'; img.onerror = () => { img.hidden = true; };
-        preview.append(img); preview.dataset.preview = meta.thumbnailPath; previewObserver.observe(preview);
+        preview.append(img); previewSources.set(preview, paths); previewObserver.observe(preview);
       }
       const count = document.createElement('span'); count.className = 'project-count'; count.textContent = `${meta.count || 0} 条标注`; preview.append(count);
       const info = document.createElement('span'); info.className = 'project-info';

@@ -89,5 +89,14 @@
       return await compress(snapshot, limits.imageEdge, limits.exportBytes, .84, onProgress);
     } finally { snapshot.width = 1; snapshot.height = 1; }
   }
-  root.DimensionImages = { prepare, exportCanvas, fit, formatBytes, limits };
+  async function preview(blob) {
+    if (!blob.size || blob.size > limits.inputBytes) throw new Error('预览图片大小无效');
+    const bitmap = await createImageBitmap(blob, { imageOrientation: 'from-image' });
+    try {
+      if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > limits.inputPixels) throw new Error('预览图片尺寸无效');
+      if (Math.max(bitmap.width, bitmap.height) <= limits.previewEdge && blob.size <= limits.previewBytes) return blob;
+      return (await compress(bitmap, limits.previewEdge, limits.previewBytes, .76)).blob;
+    } finally { bitmap.close(); }
+  }
+  root.DimensionImages = { prepare, exportCanvas, preview, fit, formatBytes, limits };
 })(globalThis);
