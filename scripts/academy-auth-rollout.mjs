@@ -83,7 +83,10 @@ export async function rollout(mode, { env=process.env, request=fetch, report=con
   }
   const ids=await sql('select id from academy_private.accounts order by id',true);
   if(ids.some(row=>!/^[a-zA-Z0-9-]{1,100}$/.test(row.id)))throw new Error('发现非标准旧账号路径，需人工核对后清理。');
-  const paths=['academy/accounts.json',...ids.map(row=>`academy/sessions/${row.id}.json`)];
+  // Former employees may still have public session objects; cover the whole retired prefix.
+  const oldSessions=await sql("select name from storage.objects where bucket_id='cloud-files' and name like 'academy/sessions/%' order by name",true);
+  if(oldSessions.some(row=>!/^academy\/sessions\/[a-zA-Z0-9-]{1,100}\.json$/.test(row.name)))throw new Error('发现非标准旧会话路径，需人工核对后清理。');
+  const paths=[...new Set(['academy/accounts.json',...ids.map(row=>`academy/sessions/${row.id}.json`),...oldSessions.map(row=>row.name)])];
   for(const path of paths){
     const response=await request(storageURL(path),{
       method:'POST',headers:{apikey:serviceKey,Authorization:`Bearer ${serviceKey}`,'Content-Type':'application/json','x-upsert':'true','cache-control':'max-age=0'},

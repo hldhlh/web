@@ -5,7 +5,7 @@ import {rollout} from '../scripts/academy-auth-rollout.mjs';
 const env={SUPABASE_ACCESS_TOKEN:'test-management-secret',SUPABASE_SERVICE_ROLE_KEY:'test-service-secret'};
 const json=value=>({ok:true,json:async()=>value});
 const asset=readFileSync('apps/academy/framework/secure-auth.js','utf8');
-function fixture({active=false,changed=false,publicRetired=true}={}){
+function fixture({active=false,changed=false,publicRetired=true,oldSessions=[]}={}){
   const queries=[],writes=[],reports=[];
   const request=async(url,options={})=>{
     const path=String(url);
@@ -17,6 +17,7 @@ function fixture({active=false,changed=false,publicRetired=true}={}){
       if(body.query.startsWith('select import_fingerprint'))return json([{matches:!changed}]);
       if(body.query.startsWith('select enabled from'))return json([{enabled:active}]);
       if(body.query.startsWith('select id from'))return json([{id:'test-user'}]);
+      if(body.query.startsWith('select name from storage.objects'))return json(oldSessions.map(name=>({name})));
       if(body.query.startsWith('update academy_private.settings set enabled'))active=true;
       return json([]);
     }
@@ -63,4 +64,17 @@ test('cleanup can resume after activation without re-importing or reopening old 
   await assert.rejects(rollout('activate',{...f,env}),/仍需核验/);
   assert.ok(!f.queries.some(q=>/drop policy|import_accounts|set enabled=false/.test(q.query)));
   assert.equal(f.writes.length,1);
+});
+test('cleanup includes orphaned old sessions and avoids rewriting duplicate paths',async()=>{
+  const f=fixture({oldSessions:['academy/sessions/test-user.json','academy/sessions/former-user.json']});
+  await rollout('activate',{...f,env});
+  assert.equal(f.writes.length,3);
+  assert.ok(f.writes.some(w=>w.path.endsWith('/academy/sessions/former-user.json')));
+  assert.equal(f.reports.at(-1).retiredObjects,3);
+});
+test('unexpected objects under the old session prefix stop cleanup without reopening access',async()=>{
+  const f=fixture({active:true,oldSessions:['academy/sessions/unexpected/file.json']});
+  await assert.rejects(rollout('activate',{...f,env}),/非标准旧会话路径/);
+  assert.equal(f.writes.length,0);
+  assert.ok(!f.queries.some(q=>/drop policy|set enabled=false/.test(q.query)));
 });
