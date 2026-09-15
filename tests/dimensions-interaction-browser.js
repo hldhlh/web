@@ -23,6 +23,18 @@ async page => {
   const mouseDrag=async(a,b)=>{await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(b.x,b.y,{steps:5});await page.mouse.up();};
   let box=await page.locator('#measureCanvas').boundingBox();
   const position=(x,y)=>({x:box.x+box.width*x,y:box.y+box.height*y});
+  // Real wheel input covers two-finger trackpad scrolling, which previously
+  // entered the zoom path regardless of whether Ctrl/pinch was present.
+  const trackpadViewport=await page.locator('#viewport').boundingBox();
+  await page.mouse.move(trackpadViewport.x+100,trackpadViewport.y+100);
+  const trackpadBefore=await page.locator('#measureCanvas').boundingBox();
+  const trackpadZoom=await page.locator('#zoomValue').innerText();
+  await page.mouse.wheel(40,35);
+  await page.waitForFunction(({x,y})=>{const r=document.getElementById('measureCanvas').getBoundingClientRect();return Math.abs(r.x-x+40)<2&&Math.abs(r.y-y+35)<2;},trackpadBefore);
+  assert(await page.locator('#zoomValue').innerText()===trackpadZoom,'Trackpad scroll unexpectedly zoomed');
+  await page.keyboard.down('Control');await page.mouse.wheel(0,-30);await page.keyboard.up('Control');
+  await page.waitForFunction(value=>document.getElementById('zoomValue').textContent!==value,trackpadZoom);
+  await page.locator('#fitCanvas').click();box=await page.locator('#measureCanvas').boundingBox();
   await mouseDrag(position(.15,.4),position(.8,.4));assert(await count()===0,'Browse dragging mutated an annotation');
   await page.locator('#fitCanvas').click();
   await page.locator('#inspectorToggle').click();
@@ -199,5 +211,5 @@ async page => {
   await page.evaluate(async()=>{const c=document.createElement('canvas');c.width=100;c.height=100;await DimensionEditor.openImage(await new Promise(r=>c.toBlob(r)),'另一个项目.png');});
   assert(await page.locator('#toggleEdit').getAttribute('aria-pressed')==='false','New project inherited editing mode');
   await cdp.detach();
-  return {passed:true,checks:['browse blocks writes and undo','explicit edit and done','visible selection without export changes','pinch zoom','two-finger pan and simultaneous zoom','moving midpoint stays anchored','immediate reversal at zoom limits','long-press panning removed','free two-finger dragging at fit scale','three-finger gestures disabled','single-finger browse does not pan','immediate touch drawing','draft cancellation','endpoint rollback','remaining finger suppression','pointer cancellation','new project resets mode'],productionWrites:0};
+  return {passed:true,checks:['trackpad wheel pan and Ctrl-wheel pinch','browse blocks writes and undo','explicit edit and done','visible selection without export changes','pinch zoom','two-finger pan and simultaneous zoom','moving midpoint stays anchored','immediate reversal at zoom limits','long-press panning removed','free two-finger dragging at fit scale','three-finger gestures disabled','single-finger browse does not pan','immediate touch drawing','draft cancellation','endpoint rollback','remaining finger suppression','pointer cancellation','new project resets mode'],productionWrites:0};
 }

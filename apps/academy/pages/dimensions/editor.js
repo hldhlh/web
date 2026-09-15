@@ -186,15 +186,11 @@
   }
 
   function panCanvas(dx, dy) {
-    // Use scrolling where possible, then translate the remaining distance so a
-    // fitted image can also be dragged freely. Annotation coordinates stay local.
-    const before = elements.canvas.getBoundingClientRect();
-    elements.viewport.scrollLeft -= dx;
-    elements.viewport.scrollTop -= dy;
-    const after = elements.canvas.getBoundingClientRect();
-    state.panX += dx - (after.left - before.left);
-    state.panY += dy - (after.top - before.top);
-    elements.canvasStage.style.transform = `translate(${state.panX}px, ${state.panY}px)`;
+    // One coordinate system for pan and zoom; native scroll offsets must not
+    // absorb or clamp the two-finger translation on mobile browsers.
+    state.panX += dx;
+    state.panY += dy;
+    elements.canvasStage.style.transform = `translate(-50%, -50%) translate3d(${state.panX}px, ${state.panY}px, 0)`;
   }
 
   function setZoom(nextZoom, clientX, clientY, anchor) {
@@ -950,20 +946,20 @@
     Object.assign(gesture, mid, { zoom: state.zoom });
   }
 
-  elements.viewport.addEventListener('pointerdown', event => {
+  function pointerDown(event) {
     if (!state.image || (event.pointerType === 'mouse' && event.button !== 0)) return;
     event.preventDefault();
     if (gestureFrame !== null) applyGesture();
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    elements.viewport.setPointerCapture(event.pointerId);
+    if (!event.nativeTouch) elements.viewport.setPointerCapture(event.pointerId);
     if (pointers.size >= 2) { startGesture(); return; }
     if (suppressDrawing) return;
     const drawing = state.editing && event.target === elements.canvas;
     singlePointer = { id: event.pointerId, touch: event.pointerType === 'touch', x: event.clientX, y: event.clientY, lastX: event.clientX, lastY: event.clientY, moved: false, drawing };
     if (drawing) beginDrawing(event);
-  });
+  }
 
-  elements.viewport.addEventListener('pointermove', event => {
+  function pointerMove(event) {
     if (!state.image) return;
     if (!pointers.has(event.pointerId)) {
       if (state.editing && event.target === elements.canvas && !pointers.size) updateHoveredHandle(pointFromEvent(event));
@@ -990,7 +986,7 @@
       p.lastX = event.clientX; p.lastY = event.clientY;
     } else if (state.handleDrag) { moveHandle(pointFromEvent(event), event.shiftKey); render(); }
     else if (state.draft) { state.draft.end = pointFromEvent(event); render(); }
-  });
+  }
 
   function finishPointer(event, cancelled = false) {
     if (!pointers.has(event.pointerId)) return;
@@ -1023,9 +1019,34 @@
     } else finishDrawing(event);
   }
   elements.viewport.addEventListener('contextmenu', event => { if (state.image) event.preventDefault(); });
-  elements.viewport.addEventListener('pointerup', event => finishPointer(event));
-  elements.viewport.addEventListener('pointercancel', event => finishPointer(event, true));
-  elements.viewport.addEventListener('lostpointercapture', event => finishPointer(event, true));
+  // Touch Events retain their original target even when fingers leave the
+  // canvas and provide a coherent snapshot of both fingers on iOS and Android.
+  // Mouse/pen keep Pointer Events; never process a touch through both paths.
+  const touchId = touch => `touch:${touch.identifier}`;
+  const touchEvent = (touch, event) => ({ pointerId: touchId(touch), pointerType: 'touch',
+    nativeTouch: true, clientX: touch.clientX, clientY: touch.clientY, target: touch.target,
+    shiftKey: event.shiftKey, preventDefault: () => event.preventDefault() });
+  for (const type of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) {
+    elements.viewport.addEventListener(type, event => {
+      if (!state.image) return;
+      event.preventDefault();
+      // Synchronize all tracked contacts before processing any changed contact.
+      for (const touch of Array.from(event.touches)) if (pointers.has(touchId(touch))) {
+        pointers.set(touchId(touch), { x: touch.clientX, y: touch.clientY });
+      }
+      for (const touch of Array.from(event.changedTouches)) {
+        const pointer = touchEvent(touch, event);
+        if (type === 'touchstart') pointerDown(pointer);
+        else if (type === 'touchmove') pointerMove(pointer);
+        else finishPointer(pointer, type === 'touchcancel');
+      }
+    }, { passive: false });
+  }
+  elements.viewport.addEventListener('pointerdown', event => { if (event.pointerType !== 'touch') pointerDown(event); });
+  elements.viewport.addEventListener('pointermove', event => { if (event.pointerType !== 'touch') pointerMove(event); });
+  elements.viewport.addEventListener('pointerup', event => { if (event.pointerType !== 'touch') finishPointer(event); });
+  elements.viewport.addEventListener('pointercancel', event => { if (event.pointerType !== 'touch') finishPointer(event, true); });
+  elements.viewport.addEventListener('lostpointercapture', event => { if (event.pointerType !== 'touch') finishPointer(event, true); });
   elements.viewport.addEventListener('pointerleave', () => {
     if (pointers.size) return;
     state.hoverHandle = null;
@@ -1098,11 +1119,18 @@
   }
 
   elements.viewport.addEventListener("wheel", (event) => {
-    if (!state.image || !elements.canvasStage.contains(event.target)) return;
+    if (!state.image) return;
     event.preventDefault();
-    const sensitivity = event.ctrlKey ? .01 : .002;
-    const factor = clamp(Math.exp(-event.deltaY * sensitivity), .75, 1.25);
-    setZoom(state.zoom * factor, event.clientX, event.clientY);
+    if (event.ctrlKey) {
+      // Trackpad pinch is delivered as Ctrl+wheel; ordinary two-finger scrolling
+      // must move the canvas instead of being interpreted as another zoom.
+      const factor = clamp(Math.exp(-event.deltaY * .01), .75, 1.25);
+      setZoom(state.zoom * factor, event.clientX, event.clientY);
+    } else {
+      const unitX = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? elements.viewport.clientWidth : 1;
+      const unitY = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? elements.viewport.clientHeight : 1;
+      panCanvas(-event.deltaX * unitX, -event.deltaY * unitY);
+    }
   }, { passive: false });
 
   window.addEventListener("keydown", (event) => {
