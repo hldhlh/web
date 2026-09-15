@@ -36,6 +36,26 @@ async page => {
     assert(Math.abs(decoded.width / decoded.height - 3200 / 2200) < .005, 'Aspect ratio changed');
     assert(optimized.preview.blob.size <= api.limits.previewBytes && Math.max(optimized.preview.width, optimized.preview.height) <= 480, 'Preview budget not enforced');
 
+    // Real 48 MP files previously failed before reaching the compression loop.
+    source.width = 8000; source.height = 6000;
+    ctx.fillStyle = '#345678'; ctx.fillRect(0, 0, source.width, source.height);
+    ctx.fillStyle = '#fff'; ctx.font = '240px sans-serif'; ctx.fillText('4800 万像素 / 120 cm', 400, 600);
+    const highResolution = [];
+    for (const type of ['image/jpeg', 'image/png', 'image/webp']) {
+      const file = await fileFor(source, type);
+      assert(file.size <= api.limits.inputBytes, '48 MP fixture exceeds the byte limit');
+      const result = await api.prepare(file), actual = await inspect(result.main.blob);
+      assert(result.sourceWidth === 8000 && result.sourceHeight === 6000, 'Original dimensions lost');
+      assert(actual.width === 2560 && actual.height === 1920, '48 MP image was not proportionally resized');
+      assert(actual.width === result.main.width && actual.height === result.main.height, '48 MP stored dimensions mismatch');
+      assert(actual.bytes <= api.limits.imageBytes && actual.bytes < file.size, '48 MP image was not compressed');
+      const thumbnail = await inspect(result.preview.blob);
+      assert(thumbnail.width === 480 && thumbnail.height === 360 && thumbnail.bytes <= api.limits.previewBytes, '48 MP preview budget not enforced');
+      const legacyPreview = await inspect(await api.preview(file));
+      assert(legacyPreview.width === 480 && legacyPreview.height === 360 && legacyPreview.bytes <= api.limits.previewBytes, 'Legacy 48 MP preview failed');
+      highResolution.push({ sourceType: type, sourceBytes: file.size, main: actual, preview: thumbnail });
+    }
+
     source.width = 400; source.height = 300;
     ctx.fillStyle = 'rgba(255,0,0,.5)'; ctx.fillRect(80, 60, 240, 180);
     const transparent = await fileFor(source, 'image/png');
@@ -78,8 +98,8 @@ async page => {
       assert(rejected,'Failed encoding must not fall back to uploading the original');
     } finally { HTMLCanvasElement.prototype.toBlob = nativeToBlob; }
     source.width=1;source.height=1;
-    return {passed:true,exportedImage,sourceBytes:large.size,main:decoded,previewBytes:optimized.preview.blob.size,
+    return {passed:true,exportedImage,highResolution,sourceBytes:large.size,main:decoded,previewBytes:optimized.preview.blob.size,
       storageReduction:Math.round((1-(decoded.bytes+optimized.preview.blob.size)/large.size)*100)+'%',
-      checks:['real WebP conversion','byte and dimension limits','aspect ratio','transparent pixels','unsupported WebP fallback','EXIF orientation','small file reuse','invalid input and encoder failure'],productionWrites:0};
+      checks:['real WebP conversion','48 MP JPEG/PNG/WebP compression and legacy previews','byte and dimension limits','aspect ratio','transparent pixels','unsupported WebP fallback','EXIF orientation','small file reuse','invalid input and encoder failure'],productionWrites:0};
   });
 }

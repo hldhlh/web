@@ -1,6 +1,6 @@
 (function (root) {
   'use strict';
-  const limits = Object.freeze({ inputBytes: 15 * 1024 * 1024, inputPixels: 24000000,
+  const limits = Object.freeze({ inputBytes: 15 * 1024 * 1024,
     imageEdge: 2560, imageBytes: 1024 * 1024, exportBytes: 512 * 1024, previewEdge: 480, previewBytes: 64 * 1024 });
   const extensions = { 'image/webp': 'webp', 'image/jpeg': 'jpg', 'image/png': 'png' };
   function fit(width, height, edge) {
@@ -59,9 +59,11 @@
     catch (_) { throw new Error('无法读取这张图片，请选择有效的 JPG、PNG 或 WebP 文件'); }
     try {
       const sourceWidth = bitmap.width, sourceHeight = bitmap.height;
-      if (!sourceWidth || !sourceHeight || sourceWidth * sourceHeight > limits.inputPixels) {
-        throw new Error('图片超过 2400 万像素，请缩小后上传');
+      if (!sourceWidth || !sourceHeight) {
+        throw new Error('图片尺寸无效，请选择有效的图片');
       }
+      // Large decoded images use the same bounded output canvas as other inputs;
+      // source pixel count must not prevent automatic resizing and compression.
       let main = await compress(bitmap, limits.imageEdge, limits.imageBytes, .84, onProgress);
       // Already optimized inputs must not grow or suffer an unnecessary re-encode.
       // Only retain source bytes when dimensions and the byte limit already fit.
@@ -93,7 +95,7 @@
     if (!blob.size || blob.size > limits.inputBytes) throw new Error('预览图片大小无效');
     const bitmap = await createImageBitmap(blob, { imageOrientation: 'from-image' });
     try {
-      if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > limits.inputPixels) throw new Error('预览图片尺寸无效');
+      if (!bitmap.width || !bitmap.height) throw new Error('预览图片尺寸无效');
       if (Math.max(bitmap.width, bitmap.height) <= limits.previewEdge && blob.size <= limits.previewBytes) return blob;
       return (await compress(bitmap, limits.previewEdge, limits.previewBytes, .76)).blob;
     } finally { bitmap.close(); }
