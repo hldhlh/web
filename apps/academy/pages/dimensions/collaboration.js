@@ -287,7 +287,7 @@
       session = new window.DimensionModel.Session({ row, actor, transport, restored,
         persist: entries => entries.length ? localStorage.setItem(key, JSON.stringify(entries)) : localStorage.removeItem(key), changed: update });
       session.checkConflicts(); session.notify();
-      $('libraryButton').hidden = false; $('shareButton').hidden = false;
+      $('libraryButton').hidden = false;
       setProjectLocation(id); subscribeProject(); if (session.dirty) schedule();
     } finally { setOpening(false); }
   }
@@ -345,7 +345,7 @@
     projectChannel = null; session = null; connected = false; clearTimeout(retryTimer);
     document.body.dataset.view = 'library';
     $('workspace').hidden = true; $('projectHeading').hidden = true; $('library').hidden = false;
-    $('libraryButton').hidden = true; $('shareButton').hidden = true; $('presenceStatus').textContent = ''; $('compactPresence').textContent = ''; $('projectHeading').open = false;
+    $('libraryButton').hidden = true; $('presenceStatus').textContent = ''; $('compactPresence').textContent = ''; $('projectHeading').open = false;
     $('exportImage').disabled = true; setProjectLocation(null); loadProjects();
   });
   $('emptyCreate').addEventListener('click', () => $('newProject').click());
@@ -355,10 +355,6 @@
   $('projectSearch').addEventListener('input', renderLibrary); $('onlyMine').addEventListener('change', renderLibrary); $('allProjects').addEventListener('change', renderLibrary);
   $('copyConflict').addEventListener('click', () => { session.resolve('copy'); schedule(0); });
   $('discardConflict').addEventListener('click', () => { session.resolve('remote'); schedule(0); });
-  $('shareButton').addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText(window.parent.location.href); editor.notice('项目链接已复制，登录 Auto Office 后即可协作'); }
-    catch (_) { editor.notice('复制失败，请复制浏览器地址栏中的项目链接'); }
-  });
   document.addEventListener('click', event => { if (!$('projectHeading').contains(event.target)) $('projectHeading').open = false; });
   document.addEventListener('keydown', event => { if (event.key === 'Escape') $('projectHeading').open = false; });
   const resume = () => { if (!document.hidden && allowed()) { if (session) refreshCurrent(); else loadProjects(); } };
