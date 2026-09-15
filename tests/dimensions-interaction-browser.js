@@ -24,6 +24,7 @@ async page => {
   let box=await page.locator('#measureCanvas').boundingBox();
   const position=(x,y)=>({x:box.x+box.width*x,y:box.y+box.height*y});
   await mouseDrag(position(.15,.4),position(.8,.4));assert(await count()===0,'Browse dragging mutated an annotation');
+  await page.locator('#fitCanvas').click();
   await page.locator('#inspectorToggle').click();
   await page.locator('.list-select').click();
   assert(await page.locator('#labelInput').isDisabled(),'Browse text is editable');
@@ -62,7 +63,21 @@ async page => {
   await touch('touchStart',[{...h,x:h.x+22,y:h.y+15},other]);await touch('touchEnd',[other]);await touch('touchEnd',[]);
   assert(await count()===0,'Second finger saved an endpoint edit');
   assert(await page.locator('#measureCanvas').evaluate(c=>c.toDataURL())===baseBefore,'Endpoint edit was not rolled back');
-  // Two fingers only scale; three fingers pan without changing scale.
+  // Holding still enters canvas pan even on an existing endpoint; the image
+  // can move at fit scale, and annotation pixels/coordinates remain unchanged.
+  await touch('touchStart',[h]);
+  const heldH={...h,x:h.x+3,y:h.y+2};
+  await touch('touchMove',[heldH]);
+  await page.locator('#notice', {hasText:'已进入拖动'}).waitFor();
+  const holdBefore=await page.locator('#measureCanvas').boundingBox();
+  await touch('touchMove',[{...heldH,x:heldH.x+35,y:heldH.y+25}]);
+  const holdAfter=await page.locator('#measureCanvas').boundingBox();
+  assert(Math.abs(holdAfter.x-holdBefore.x-35)<2 && Math.abs(holdAfter.y-holdBefore.y-25)<2,'Held finger did not freely drag the fitted canvas');
+  await touch('touchEnd',[]);
+  assert(await count()===0,'Long press committed an endpoint edit');
+  assert(await page.locator('#measureCanvas').evaluate(c=>c.toDataURL())===baseBefore,'Long press changed annotation pixels');
+  await page.locator('#fitCanvas').click();
+  // Two fingers only scale; a third finger suspends gestures without panning.
   await page.locator('#zoomIn').click();await page.locator('#zoomIn').click();await page.locator('#zoomIn').click();
   const viewport=await page.locator('#viewport').boundingBox();
   const p={id:5,x:viewport.x+120,y:viewport.y+100},q={id:6,x:viewport.x+230,y:viewport.y+100};
@@ -81,8 +96,8 @@ async page => {
   const panPoints=[movedP,movedQ,third].map(t=>({...t,x:t.x-30,y:t.y-20}));
   await touch('touchMove',panPoints);
   const threeScroll=await page.locator('#viewport').evaluate(e=>[e.scrollLeft,e.scrollTop]);
-  assert(panStart.some((v,i)=>Math.abs(v-threeScroll[i])>10),'Three-finger translation did not pan');
-  assert(await page.locator('#zoomValue').innerText()===panZoom,'Three-finger pan changed scale');
+  assert(panStart.every((v,i)=>Math.abs(v-threeScroll[i])<=1),'Three fingers unexpectedly panned');
+  assert(await page.locator('#zoomValue').innerText()===panZoom,'Three fingers unexpectedly changed scale');
   const spreadPoints=panPoints.map((t,i)=>({...t,x:t.x+(i-1)*12}));
   await touch('touchMove',spreadPoints);
   assert(await page.locator('#zoomValue').innerText()===panZoom,'Spreading three fingers changed scale');
@@ -98,11 +113,14 @@ async page => {
   const interrupted={id:7,...position(.2,.8)};
   await touch('touchStart',[interrupted]);await touch('touchMove',[{...interrupted,x:interrupted.x+60}]);await touch('touchCancel',[]);
   assert(await count()===0,'Cancelled single-finger drawing was committed');
-  await mouseDrag(position(.15,.65),position(.8,.65));assert(await count()===1,'Explicit edit mode did not create exactly one annotation');
+  const drawStart={id:14,...position(.15,.65)},drawEnd={id:14,...position(.8,.65)};
+  await touch('touchStart',[drawStart]);await touch('touchMove',[drawEnd]);await touch('touchEnd',[]);
+  assert(await count()===1,'Immediate single-finger drawing did not create exactly one annotation');
   await page.locator('#labelInput').fill('深 60 cm');
   await page.locator('#toggleEdit').click();
   const savedCount=await count();
   box=await page.locator('#measureCanvas').boundingBox();await mouseDrag(position(.15,.8),position(.8,.8));assert(await count()===savedCount,'Done did not lock editing');
+  await page.locator('#fitCanvas').click();box=await page.locator('#measureCanvas').boundingBox();
   const browseP={id:8,...position(.3,.5)},browseQ={id:9,...position(.7,.5)};
   await touch('touchStart',[browseP]);await touch('touchStart',[browseP,browseQ]);
   const browseZoom=await page.locator('#zoomValue').innerText();
@@ -112,17 +130,22 @@ async page => {
   await page.locator('#zoomIn').click();await page.locator('#zoomIn').click();
   const browseViewport=await page.locator('#viewport').boundingBox();
   const one={id:11,x:browseViewport.x+110,y:browseViewport.y+90};
-  const browseStart=await page.locator('#viewport').evaluate(e=>[e.scrollLeft,e.scrollTop]);
+  const browseStart=await page.locator('#measureCanvas').boundingBox();
   await touch('touchStart',[one]);await touch('touchMove',[{...one,x:one.x-25,y:one.y-20}]);await touch('touchEnd',[]);
-  assert((await page.locator('#viewport').evaluate(e=>[e.scrollLeft,e.scrollTop])).every((v,i)=>Math.abs(v-browseStart[i])<=1),'Single-finger touch panned in browse mode');
+  const browseAfter=await page.locator('#measureCanvas').boundingBox();
+  assert(Math.abs(browseAfter.x-browseStart.x+25)<2 && Math.abs(browseAfter.y-browseStart.y+20)<2,'Single-finger browse drag did not move the canvas');
   const trio=[one,{id:12,x:one.x+70,y:one.y},{id:13,x:one.x+35,y:one.y+60}];
   await touch('touchStart',trio);
   const trioZoom=await page.locator('#zoomValue').innerText();
+  const trioBefore=await page.locator('#measureCanvas').boundingBox();
   await touch('touchMove',trio.map(t=>({...t,x:t.x-25,y:t.y-20})));
-  assert((await page.locator('#viewport').evaluate(e=>[e.scrollLeft,e.scrollTop])).some((v,i)=>Math.abs(v-browseStart[i])>10),'Browse three-finger gesture did not pan');
-  assert(await page.locator('#zoomValue').innerText()===trioZoom,'Browse three-finger pan changed scale');
+  const trioAfter=await page.locator('#measureCanvas').boundingBox();
+  assert(Math.abs(trioAfter.x-trioBefore.x)<2 && Math.abs(trioAfter.y-trioBefore.y)<2,'Three-finger browse gesture unexpectedly moved the canvas');
+  assert(await page.locator('#zoomValue').innerText()===trioZoom,'Three fingers changed scale in browse mode');
   await touch('touchEnd',[trio[0]]);await touch('touchMove',[{...trio[0],x:one.x+20}]);await touch('touchEnd',[]);
-  assert(await count()===savedCount,'Browse pan or its remaining finger wrote data');
+  const remainingAfter=await page.locator('#measureCanvas').boundingBox();
+  assert(Math.abs(remainingAfter.x-trioAfter.x)<2 && Math.abs(remainingAfter.y-trioAfter.y)<2,'Remaining finger unexpectedly restarted dragging');
+  assert(await count()===savedCount,'Browse gestures wrote data');
   await page.locator('#fitCanvas').click();
   await page.locator('#inspectorToggle').click();
   await page.locator('.list-select').first().click();
@@ -137,5 +160,5 @@ async page => {
   await page.evaluate(async()=>{const c=document.createElement('canvas');c.width=100;c.height=100;await DimensionEditor.openImage(await new Promise(r=>c.toBlob(r)),'另一个项目.png');});
   assert(await page.locator('#toggleEdit').getAttribute('aria-pressed')==='false','New project inherited editing mode');
   await cdp.detach();
-  return {passed:true,checks:['browse blocks writes and undo','explicit edit and done','visible selection without export changes','pinch zoom','two-finger translation does not pan','three-finger pan in edit and browse','two/three-finger transitions','single touch does not pan','draft cancellation','endpoint rollback','remaining finger suppression','pointer cancellation','new project resets mode'],productionWrites:0};
+  return {passed:true,checks:['browse blocks writes and undo','explicit edit and done','visible selection without export changes','pinch zoom','two-finger translation does not pan','long-press pan and endpoint rollback','free dragging at fit scale','three-finger gestures disabled','single-finger browse pan','immediate touch drawing','draft cancellation','endpoint rollback','remaining finger suppression','pointer cancellation','new project resets mode'],productionWrites:0};
 }

@@ -66,6 +66,7 @@ async page => {
   };
   await draw(a, fa, [.15,.13],[.8,.13]);
   if (Object.keys([...rows.values()][0].payload.annotations).length) throw Error('Browse mode created an annotation');
+  await fa.locator('#fitCanvas').click();
   await fa.locator('#toggleEdit').click(); await fb.locator('#toggleEdit').click();
   await draw(a, fa, [.15,.13],[.8,.13]); await fa.locator('#labelInput').fill('宽 120 cm');
   await fb.locator('.list-select strong', { hasText: '宽 120 cm' }).waitFor();
