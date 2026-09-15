@@ -24,6 +24,7 @@ async page => {
   let box=await page.locator('#measureCanvas').boundingBox();
   const position=(x,y)=>({x:box.x+box.width*x,y:box.y+box.height*y});
   await mouseDrag(position(.15,.4),position(.8,.4));assert(await count()===0,'Browse dragging mutated an annotation');
+  await page.locator('#inspectorToggle').click();
   await page.locator('.list-select').click();
   assert(await page.locator('#labelInput').isDisabled(),'Browse text is editable');
   await page.keyboard.press('Control+z');assert(await count()===0,'Browse undo mutated data');
@@ -81,6 +82,7 @@ async page => {
   await touch('touchMove',[{...browseP,x:browseP.x-30},{...browseQ,x:browseQ.x+30}]);
   assert(await page.locator('#zoomValue').innerText()!==browseZoom,'Browse pinch did not zoom');
   await touch('touchEnd',[]);assert(await count()===savedCount,'Browse pinch wrote data');await page.locator('#fitCanvas').click();
+  await page.locator('#inspectorToggle').click();
   await page.locator('.list-select').first().click();
   const baseSelected=await page.locator('#measureCanvas').evaluate(c=>c.toDataURL());
   await page.locator('.list-select').last().click();

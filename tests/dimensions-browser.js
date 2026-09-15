@@ -43,6 +43,7 @@ async page => {
     }
     return route.abort();
   });
+  await a.setViewportSize({width:1440,height:1000});
   await a.goto(origin + '/dimension-test?actor=A');
   const fa = a.frameLocator('iframe');
   await fa.locator('#newProject').waitFor();

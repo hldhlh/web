@@ -41,7 +41,11 @@
       return rows?.[0] || null;
     }
   };
-  function status(message, kind = 'connecting') { $('syncStatus').textContent = message; document.querySelector('.sync-bar').dataset.status = kind; }
+  function status(message, kind = 'connecting') {
+    $('syncStatus').textContent = message; document.querySelector('.sync-bar').dataset.status = kind;
+    $('compactSync').textContent = ({ saved: '已同步', saving: '保存中', connecting: '连接中', error: '同步异常', conflict: '有冲突' })[kind] || '连接中';
+    $('compactSync').title = message;
+  }
   function reportError(error) { status(error.message || String(error), 'error'); $('retryButton').hidden = false; }
   function schedule(delay = 450) {
     clearTimeout(timer);
@@ -64,7 +68,8 @@
       connected ? '已保存至云端 · 实时协作中' : '已保存至云端 · 正在恢复实时连接'), model.conflicts.size ? 'conflict' : model.error || model.cacheError ? 'error' : model.dirty || model.saving ? 'saving' : connected ? 'saved' : 'connecting');
     const meta = model.row.payload.meta;
     $('projectTitle').textContent = meta.name;
-    $('projectAuthor').textContent = `制作：${meta.createdBy.name} · 最近修改：${meta.updatedBy.name}`;
+    $('projectAuthor').textContent = meta.createdBy.id === meta.updatedBy.id
+      ? `制作：${meta.createdBy.name}` : `制作：${meta.createdBy.name} · 最近修改：${meta.updatedBy.name}`;
     const format = document.querySelector('.project-format');
     format.textContent = meta.imageBytes ? `${(meta.imageFormat || '图片').toUpperCase()} · ${window.DimensionImages.formatBytes(meta.imageBytes)}` : '图片标注';
     format.title = meta.sourceBytes ? `上传前 ${window.DimensionImages.formatBytes(meta.sourceBytes)} · 云端图片与预览共 ${window.DimensionImages.formatBytes(meta.storedBytes || meta.imageBytes)}` : '';
@@ -103,6 +108,7 @@
       if (channel !== projectChannel) return;
       const names = [...new Set(Object.values(channel.presenceState()).flat().map(value => value.name).filter(Boolean))];
       $('presenceStatus').textContent = names.length ? `${names.length} 人在线 · ${names.join('、')}` : '';
+      $('compactPresence').textContent = $('presenceStatus').textContent;
     }).subscribe(state => {
       if (channel !== projectChannel || !allowed()) return;
       connected = state === 'SUBSCRIBED';
@@ -247,6 +253,7 @@
   }
   function setOpening(value) {
     opening = value;
+    $('toggleEdit').disabled = value || !allowed();
     $('workspace').inert = value;
     $('newProject').disabled = value;
     $('workspace').setAttribute('aria-busy', String(value));
@@ -338,7 +345,7 @@
     projectChannel = null; session = null; connected = false; clearTimeout(retryTimer);
     document.body.dataset.view = 'library';
     $('workspace').hidden = true; $('projectHeading').hidden = true; $('library').hidden = false;
-    $('libraryButton').hidden = true; $('shareButton').hidden = true; $('presenceStatus').textContent = '';
+    $('libraryButton').hidden = true; $('shareButton').hidden = true; $('presenceStatus').textContent = ''; $('compactPresence').textContent = ''; $('projectHeading').open = false;
     $('exportImage').disabled = true; setProjectLocation(null); loadProjects();
   });
   $('emptyCreate').addEventListener('click', () => $('newProject').click());
@@ -352,6 +359,8 @@
     try { await navigator.clipboard.writeText(window.parent.location.href); editor.notice('项目链接已复制，登录 Auto Office 后即可协作'); }
     catch (_) { editor.notice('复制失败，请复制浏览器地址栏中的项目链接'); }
   });
+  document.addEventListener('click', event => { if (!$('projectHeading').contains(event.target)) $('projectHeading').open = false; });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') $('projectHeading').open = false; });
   const resume = () => { if (!document.hidden && allowed()) { if (session) refreshCurrent(); else loadProjects(); } };
   document.addEventListener('visibilitychange', resume);
   window.addEventListener('online', resume);

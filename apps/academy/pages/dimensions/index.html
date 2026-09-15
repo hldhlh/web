@@ -15,11 +15,16 @@
   <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><symbol id="back" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></symbol><symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol><symbol id="share" viewBox="0 0 24 24"><path d="M8 8H5v13h14V8h-3M12 15V2m-4 4 4-4 4 4"/></symbol><symbol id="download" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></symbol><symbol id="search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol><symbol id="refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M6.3 6.3A8 8 0 0 1 20 12M4 12a8 8 0 0 0 13.7 5.7"/></symbol><symbol id="line" viewBox="0 0 24 24"><path d="M4 18 20 6M2 15l4 6M18 3l4 6"/></symbol><symbol id="rect" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="2"/></symbol><symbol id="circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></symbol><symbol id="ruler" viewBox="0 0 24 24"><path d="m3 16 13-13 5 5L8 21H3v-5Z"/><path d="m12 7 2 2m-6 2 2 2m-6 2 2 2"/></symbol><symbol id="fit" viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><rect x="7" y="7" width="10" height="10" rx="1"/></symbol><symbol id="minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol><symbol id="photo" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1"/><path d="m3 16 5-5 5 5 3-3 5 5"/></symbol><symbol id="check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol><symbol id="cloud" viewBox="0 0 24 24"><path d="M7 18a5 5 0 1 1 .9-9.9A7 7 0 0 1 21 11a3.5 3.5 0 0 1-1 7H7Z"/></symbol></svg>
   <main class="app-shell">
     <header class="topbar" aria-label="项目操作">
-      <button id="libraryButton" class="button back-button" type="button" hidden><svg class="icon" aria-hidden="true"><use href="#back"/></svg><span>所有项目</span></button>
+      <button id="libraryButton" aria-label="返回所有项目" class="button back-button" type="button" hidden><svg class="icon" aria-hidden="true"><use href="#back"/></svg><span>所有项目</span></button>
+      <details id="projectHeading" class="project-heading" hidden>
+        <summary class="project-heading-text" aria-label="项目信息"><strong id="projectTitle"></strong><span id="compactSync">同步中</span></summary>
+        <div class="project-details"><span id="projectAuthor"></span><span class="project-format">图片标注</span><span id="compactPresence"></span></div>
+      </details>
       <div class="top-actions">
         <button id="shareButton" class="button quiet" type="button" hidden aria-label="复制项目协作链接" title="复制项目协作链接"><svg class="icon" aria-hidden="true"><use href="#share"/></svg><span>共享</span></button>
         <button id="replaceImage" class="button quiet new-image" type="button"><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span class="replace-text">新建标注</span></button>
-        <button id="exportImage" class="button primary" type="button" disabled title="添加一条标注后即可导出"><svg class="icon" aria-hidden="true"><use href="#download"/></svg><span>导出图片</span></button>
+        <button id="exportImage" aria-label="导出图片" class="button quiet" type="button" disabled title="添加一条标注后即可导出"><svg class="icon" aria-hidden="true"><use href="#download"/></svg><span>导出图片</span></button>
+        <button id="toggleEdit" class="button quiet" type="button" aria-pressed="false">编辑</button>
       </div>
     </header>
     <div class="sync-bar" data-status="connecting">
@@ -57,20 +62,16 @@
       <button id="moreProjects" class="button more-projects" hidden>载入更多项目</button>
       <div class="library-footnote"><svg class="icon" aria-hidden="true"><use href="#cloud"/></svg><span>团队共享 · 自动保存每一次修改</span></div>
     </section>
-    <div id="projectHeading" class="project-heading" hidden>
-      <div class="project-file-symbol"><svg class="icon" aria-hidden="true"><use href="#photo"/></svg></div>
-      <div class="project-heading-text"><strong id="projectTitle"></strong><span id="projectAuthor"></span></div>
-      <span class="project-format">图片标注</span>
-    </div>
     <section class="workspace" id="workspace" hidden>
       <div class="canvas-area">
-        <div class="canvas-caption"><div class="canvas-state"><span id="interactionState">浏览模式 · 双指缩放与移动</span><span id="selectionStatus" role="status" hidden></span></div><button id="toggleEdit" class="button primary" type="button" aria-pressed="false">编辑标注</button></div>
+        <div class="canvas-caption"><div class="canvas-state"><span id="interactionState">浏览模式 · 双指缩放与移动</span><span id="selectionStatus" role="status" hidden></span></div></div>
         <div class="canvas-viewport" id="viewport">
           <section id="emptyState" class="empty-state"><p>正在准备画布…</p><button id="uploadButton" class="button">选择图片</button></section>
           <div class="canvas-stage" id="canvasStage" hidden><canvas id="measureCanvas" aria-label="图片标注画布，浏览模式，可缩放和移动"></canvas><canvas id="selectionCanvas" aria-hidden="true"></canvas></div>
           <div class="drop-mask" id="dropMask" hidden><svg class="icon" aria-hidden="true"><use href="#photo"/></svg>松开以新建图片项目</div>
         </div>
         <div class="canvas-bottom">
+          <button id="inspectorToggle" class="button quiet inspector-toggle" type="button" aria-expanded="false" aria-controls="sidePanel"><span>标注</span><span id="inspectorCount">0</span><svg class="icon" aria-hidden="true"><use href="#back"/></svg></button>
           <div class="canvas-hint" id="canvasHint" hidden><span id="notice" role="status">拖动添加标注</span></div>
           <div class="zoom-controls" role="group" aria-label="画布缩放">
             <button id="zoomOut" class="icon-button" type="button" aria-label="缩小画布" title="缩小画布"><svg class="icon" aria-hidden="true"><use href="#minus"/></svg><span>缩小</span></button>

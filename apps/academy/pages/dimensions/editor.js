@@ -69,9 +69,20 @@
     return state.annotations.find((item) => item.id === state.selectedId) || null;
   }
 
+  let noticeTimer;
   function setNotice(message) {
     elements.notice.textContent = message;
+    clearTimeout(noticeTimer);
+    elements.canvasHint.classList.toggle('is-toast', /失败|导出|已复制|复制失败|不足|冲突/.test(message));
+    noticeTimer = setTimeout(() => elements.canvasHint.classList.remove('is-toast'), 4000);
   }
+  function setInspector(open) {
+    elements.workspace.dataset.inspector = String(open);
+    document.getElementById('inspectorToggle').setAttribute('aria-expanded', String(open));
+  }
+  document.getElementById('inspectorToggle').addEventListener('click', () => {
+    setInspector(elements.workspace.dataset.inspector !== 'true');
+  });
 
   function lineLength(item) {
     return Math.hypot(item.end.x - item.start.x, item.end.y - item.start.y);
@@ -102,6 +113,7 @@
     Object.assign(state, { image, objectUrl, fileName: name, annotations: [], draft: null,
       handleDrag: null, hoverHandle: null, selectedId: null, zoom: 1, editing: false });
     pointers.clear(); gesture = null; singlePointer = null; suppressDrawing = false; deferredAnnotations = null;
+    setInspector(false);
     elements.canvas.width = image.naturalWidth;
     elements.canvas.height = image.naturalHeight;
     elements.selectionCanvas.width = image.naturalWidth;
@@ -113,7 +125,7 @@
     elements.sidePanel.hidden = false;
     elements.steps.hidden = true;
     elements.replaceText.textContent = "新建标注";
-    elements.imageSize.textContent = name;
+    elements.imageSize.textContent = `${image.naturalWidth} × ${image.naturalHeight}`;
     updateFit(); updateInterface(); render();
     setNotice("浏览模式：可查看标注，双指缩放与移动；点击编辑标注后修改");
   }
@@ -633,6 +645,7 @@
     updateInterface();
     render();
     if (!focusInput || !state.editing) return;
+    setInspector(true);
     requestAnimationFrame(() => {
       if (!state.editing) return;
       const selected = selectedAnnotation();
@@ -719,7 +732,9 @@
   function updateInterface() {
     const selected = selectedAnnotation();
     elements.workspace.dataset.editing = String(state.editing);
-    elements.toggleEdit.textContent = state.editing ? '完成编辑' : '编辑标注';
+    document.body.dataset.editing = String(state.editing);
+    elements.toggleEdit.textContent = state.editing ? '完成' : '编辑';
+    elements.toggleEdit.setAttribute('aria-label', state.editing ? '完成编辑' : '编辑标注');
     elements.toggleEdit.setAttribute('aria-pressed', String(state.editing));
     elements.canvas.style.cursor = state.editing ? 'crosshair' : 'grab';
     elements.canvas.setAttribute('aria-label', state.editing ? '图片标注画布，单指拖动绘制，双指缩放与移动' : '图片标注画布，浏览模式，可缩放和移动');
@@ -745,6 +760,7 @@
         ? "拖动圆心可整体移动；拖动外侧节点可调节半径。"
         : "尺寸线端点可自由调节；按住 Shift 可约束水平或垂直方向。";
     elements.measureCount.textContent = String(state.annotations.length);
+    document.getElementById('inspectorCount').textContent = String(state.annotations.length);
     elements.listEmpty.hidden = state.annotations.length > 0;
     elements.listItems.innerHTML = "";
     updateStyleInterface();
@@ -765,7 +781,7 @@
       label.classList.toggle("is-placeholder", !summary);
       const author = document.createElement("small");
       author.className = "annotation-author";
-      author.textContent = `制作：${item.createdBy?.name || "员工"} · 修改：${item.updatedBy?.name || item.createdBy?.name || "员工"}`;
+      author.textContent = `制作：${item.createdBy?.name || "员工"}` + (item.updatedBy?.id && item.updatedBy.id !== item.createdBy?.id ? ` · 修改：${item.updatedBy.name}` : '');
       selectButton.append(author);
       selectButton.addEventListener("click", () => selectAnnotation(item.id, true));
 
@@ -972,6 +988,7 @@
     cancelDrawing();
     if (pointers.size) suppressDrawing = true;
     state.editing = !state.editing;
+    setInspector(state.editing);
     updateInterface(); render();
     setNotice(state.editing ? '编辑模式：单指绘制或调整节点，双指缩放与移动' : '已退出编辑，可放心缩放和浏览');
   });
