@@ -6192,7 +6192,7 @@ textarea:focus-visible {
 }
 
 .task-board-settings {
-  padding: 22px;
+  padding: 0;
 }
 
 .task-board-settings .editor-field {
@@ -6248,7 +6248,8 @@ textarea:focus-visible {
 
 .task-board-stage-editor {
   min-width: 0;
-  padding: 20px;
+  padding: 0 16px;
+  box-shadow: none;
 }
 
 .task-board-editor .editor-field,
@@ -6258,92 +6259,99 @@ textarea:focus-visible {
 }
 
 .task-board-stage-editor > header {
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 8px;
+  min-height: 64px;
+  margin: 0;
+  border-bottom: 1px solid var(--line);
 }
 
-.task-board-stage-number {
-  color: var(--accent);
-  font-size: 13px;
-  font-weight: 700;
+.task-board-editor [data-task-stage-title] {
+  flex: 1;
+  width: 0;
+  padding-inline: 8px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 600;
 }
 
-.task-board-stage-actions,
-.task-board-editor-item > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+.task-board-editor [data-task-stage-title]:hover {
+  background: var(--surface-2);
 }
 
-.task-board-stage-actions button,
-.task-board-editor-item button {
-  min-width: 44px;
+.task-board-editor [data-task-stage-title]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.task-board-editor input.task-board-stage-number {
+  flex-shrink: 0;
+  width: 6.5em;
   min-height: 44px;
-  padding: 0 9px;
-  border-radius: 10px;
-  color: var(--accent);
+  padding-inline: 4px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 400;
 }
 
-.task-board-stage-actions button:hover,
-.task-board-editor-item button:hover {
-  background: var(--accent-soft);
+.task-board-editor input.task-board-stage-number:hover {
+  background: var(--surface-2);
 }
 
-.task-board-stage-actions .danger-text,
-.task-board-editor-item .danger-text {
-  color: var(--bad);
+.task-board-editor input.task-board-stage-number:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .task-board-editor-items {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-  margin-top: 16px;
+  gap: 0;
+  margin-top: 0;
 }
 
 .task-board-editor-item {
   min-height: 54px;
-  gap: 10px;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--surface-2);
+  gap: 12px;
+  padding: 4px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
 }
 
 .task-board-editor-item > strong {
   overflow-wrap: anywhere;
   min-width: 0;
   flex: 1;
-  font-size: 14px;
+  font-size: 17px;
+  font-weight: 400;
 }
 
 .task-board-item-type {
-  min-width: 42px;
-  padding: 4px 7px;
-  border-radius: 7px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 11px;
+  flex-shrink: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
   font-weight: 700;
   text-align: center;
 }
 
 .task-board-stage-empty {
-  padding: 18px;
-  border: 1px dashed var(--line);
-  border-radius: 14px;
+  padding: 16px 0;
+  border: 0;
   color: var(--muted);
   font-size: 13px;
-  text-align: center;
+  text-align: left;
 }
 
 .task-board-item-add {
   gap: 8px;
-  margin-top: 12px;
+  margin: 8px 0;
 }
 
 .task-board-item-add select {
@@ -6361,19 +6369,68 @@ textarea:focus-visible {
 }
 
 .task-board-editor-footer {
-  position: sticky;
-  z-index: 10;
-  bottom: 12px;
+  position: static;
   justify-content: space-between;
   gap: 14px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--surface) 90%, transparent);
-  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.14);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  padding: 4px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
+
+.task-board-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.task-board-menu > summary {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  min-height: 44px;
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 22px;
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+.task-board-menu > summary::-webkit-details-marker { display: none; }
+.task-board-menu > summary:hover,
+.task-board-menu[open] > summary { background: var(--surface-2); }
+.task-board-menu > summary:focus-visible { outline: 2px solid var(--accent); }
+
+.task-board-menu-items {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  right: 0;
+  display: grid;
+  width: max-content;
+  min-width: 156px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+}
+
+.task-board-menu-items button {
+  min-height: 44px;
+  padding: 8px 12px;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 400;
+  text-align: left;
+  border-radius: 10px;
+}
+
+.task-board-menu-items button:hover { background: var(--surface-2); }
+.task-board-menu-items .danger-text { color: var(--bad); }
 
 .task-board-editor-footer .primary {
   width: auto;
@@ -6512,20 +6569,13 @@ textarea:focus-visible {
   }
 
   .task-board-editor-item {
-    align-items: flex-start;
-    flex-wrap: wrap;
+    align-items: center;
   }
 
   .task-board-editor-item > strong {
-    padding-top: 4px;
+    padding-top: 0;
   }
 
-  .task-board-editor-item > div {
-    width: 100%;
-    justify-content: flex-end;
-    padding-top: 7px;
-    border-top: 1px solid var(--line);
-  }
 }
 
 @media (max-width: 520px) {
@@ -6584,16 +6634,12 @@ textarea:focus-visible {
     width: 100%;
   }
 
-  .task-board-editor-head,
-  .task-board-editor-footer,
-  .task-board-item-add {
+  .task-board-editor-footer {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .task-board-editor-head .ghost,
-  .task-board-editor-footer .primary,
-  .task-board-item-add button {
+  .task-board-editor-footer .primary {
     width: 100%;
   }
 }

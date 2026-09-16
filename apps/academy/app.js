@@ -160,6 +160,7 @@
       });
       return {
         id: coerceId("task-stage", stage?.id),
+        label: coerceString(stage?.label, "").slice(0, 20),
         title: coerceString(stage?.title, `阶段 ${index + 1}`),
         items
       };
@@ -1528,6 +1529,7 @@
         done,
         available,
         title: stage.title,
+        label: stage.label,
         percent: tasks.length ? Math.round((done / tasks.length) * 100) : 0
       };
     });
@@ -1580,8 +1582,8 @@
         </header>
         <div class="stage-tabs" role="tablist" aria-label="学习阶段">
           ${stages.map((stage, index) => `
-            <button type="button" class="stage-tab ${index === activeStage ? "on" : ""} ${!stage.available ? "locked" : ""}" id="academy-stage-tab-${index}" role="tab" aria-label="阶段 ${index + 1}，${escapeHtml(stage.title)}，已完成 ${stage.done}/${stage.tasks.length} 项" aria-selected="${index === activeStage}" aria-controls="academy-stage-${index}" tabindex="${index === activeStage ? "0" : "-1"}" data-stage-target="academy-stage-${index}">
-              <span>${escapeHtml(stage.title)}</span>
+            <button type="button" class="stage-tab ${index === activeStage ? "on" : ""} ${!stage.available ? "locked" : ""}" id="academy-stage-tab-${index}" role="tab" aria-label="${escapeHtml(stage.label || `阶段 ${index + 1}`)}，${escapeHtml(stage.title)}，已完成 ${stage.done}/${stage.tasks.length} 项" aria-selected="${index === activeStage}" aria-controls="academy-stage-${index}" tabindex="${index === activeStage ? "0" : "-1"}" data-stage-target="academy-stage-${index}">
+              <span>${escapeHtml(stage.label || stage.title)}</span>
             </button>`).join("")}
         </div>
         <div class="learning-stages">
@@ -2483,11 +2485,14 @@
       <div class="task-board-editor-item" data-task-kind="${entry.kind}" data-task-id="${escapeHtml(entry.id)}">
         <span class="task-board-item-type">${entry.kind === "exam" ? "考试" : "课程"}</span>
         <strong>${escapeHtml(entry.title)}</strong>
-        <div>
-          <button type="button" data-act="ops-task-item-move" data-direction="up" title="上移">↑</button>
-          <button type="button" data-act="ops-task-item-move" data-direction="down" title="下移">↓</button>
-          <button type="button" class="danger-text" data-act="ops-task-item-remove">移除</button>
-        </div>
+        <details class="task-board-menu">
+          <summary aria-label="任务操作：${escapeHtml(entry.title)}"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="4" cy="10" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/><circle cx="16" cy="10" r="1.5" fill="currentColor"/></svg></summary>
+          <div class="task-board-menu-items">
+            <button type="button" data-act="ops-task-item-move" data-direction="up">上移任务</button>
+            <button type="button" data-act="ops-task-item-move" data-direction="down">下移任务</button>
+            <button type="button" class="danger-text" data-act="ops-task-item-remove">移除任务</button>
+          </div>
+        </details>
       </div>`;
   }
 
@@ -2496,15 +2501,18 @@
     return `
       <section class="card task-board-stage-editor" data-task-stage-id="${escapeHtml(stage.id)}">
         <header>
-          <span class="task-board-stage-number">阶段 ${index + 1}</span>
-          <div class="task-board-stage-actions">
-            <button type="button" data-act="ops-task-stage-rename">重命名</button>
-            <button type="button" data-act="ops-task-stage-move" data-direction="up" title="阶段上移">↑</button>
-            <button type="button" data-act="ops-task-stage-move" data-direction="down" title="阶段下移">↓</button>
-            <button type="button" class="danger-text" data-act="ops-task-stage-remove">删除阶段</button>
-          </div>
+          <input class="task-board-stage-number" data-task-stage-label aria-label="阶段标签" maxlength="20" value="${escapeHtml(stage.label || "")}" placeholder="阶段 ${index + 1}" title="编辑阶段标签">
+          <input data-task-stage-title aria-label="阶段名称" maxlength="40" value="${escapeHtml(stage.title)}" placeholder="输入阶段名称">
+          <details class="task-board-menu">
+            <summary aria-label="阶段操作"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="4" cy="10" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/><circle cx="16" cy="10" r="1.5" fill="currentColor"/></svg></summary>
+            <div class="task-board-menu-items">
+              <button type="button" data-act="ops-task-stage-rename">重命名</button>
+              <button type="button" data-act="ops-task-stage-move" data-direction="up">上移阶段</button>
+              <button type="button" data-act="ops-task-stage-move" data-direction="down">下移阶段</button>
+              <button type="button" class="danger-text" data-act="ops-task-stage-remove">删除阶段</button>
+            </div>
+          </details>
         </header>
-        <label class="editor-field"><span>阶段名称</span><input data-task-stage-title maxlength="40" value="${escapeHtml(stage.title)}" placeholder="例如：入职基础"></label>
         <div class="task-board-editor-items">
           ${stage.items.map(renderTaskBoardItemEditor).join("")}
           <p class="task-board-stage-empty" ${stage.items.length ? "hidden" : ""}>当前阶段还没有任务</p>
@@ -2523,12 +2531,11 @@
     const board = normalizeTaskBoard(DATA.taskBoard, DATA.lessons, DATA.exams);
     return `
       <form class="ops-editor task-board-editor" id="ops-task-board-editor">
-        <section class="card editor-section task-board-settings">
-          <div class="editor-section-head"><span>01</span><div><h3>面板设置</h3></div></div>
+        <section class="task-board-settings">
           <label class="editor-field editor-field-main"><span>面板名称</span><input id="ops-task-board-title" maxlength="40" value="${escapeHtml(board.title)}" placeholder="任务面板"></label>
         </section>
         <div class="task-board-editor-head">
-          <div><strong>阶段与任务</strong><span>可新增、删除或重命名阶段，修改后点击“发布任务面板”生效。课程和考试只能出现一次。</span></div>
+          <div><strong>阶段与任务</strong><span>点击名称编辑，更多操作见 ···</span></div>
           <button type="button" class="ghost" data-act="ops-task-stage-add">新增阶段</button>
         </div>
         <div class="task-board-stage-list">
@@ -2544,6 +2551,7 @@
   function collectTaskBoardEditor() {
     const stages = Array.from(document.querySelectorAll(".task-board-stage-editor")).map((stage, index) => ({
       id: coerceId("task-stage", stage.dataset.taskStageId),
+      label: coerceString(stage.querySelector("[data-task-stage-label]")?.value, ""),
       title: coerceString(stage.querySelector("[data-task-stage-title]")?.value, `阶段 ${index + 1}`),
       items: Array.from(stage.querySelectorAll(".task-board-editor-item")).map((item) => ({
         kind: item.dataset.taskKind === "exam" ? "exam" : "lesson",
@@ -2563,7 +2571,7 @@
     ));
     stages.forEach((stage, index) => {
       const number = stage.querySelector(".task-board-stage-number");
-      if (number) number.textContent = `阶段 ${index + 1}`;
+      if (number) number.placeholder = `阶段 ${index + 1}`;
       const empty = stage.querySelector(".task-board-stage-empty");
       if (empty) empty.hidden = Boolean(stage.querySelector(".task-board-editor-item"));
       stage.querySelectorAll("[data-task-item-select] option").forEach((option) => {
@@ -3863,6 +3871,10 @@
   }
 
   function onClick(event) {
+    document.querySelectorAll(".task-board-menu[open]").forEach((menu) => {
+      if (menu.contains(event.target) && event.target.closest("[data-act]")) menu.querySelector("summary")?.focus();
+      if (!menu.contains(event.target) || event.target.closest("[data-act]")) menu.open = false;
+    });
     const btn = event.target.closest("[data-act]");
     if (!btn || btn.disabled) return;
     if (btn.dataset.messageKey) markMessageRead(btn.dataset.messageKey);
@@ -4453,6 +4465,14 @@
   }
 
   function onKey(event) {
+    if (event.key === "Escape") {
+      const menu = event.target.closest(".task-board-menu[open]");
+      if (menu) {
+        menu.open = false;
+        menu.querySelector("summary")?.focus();
+        return;
+      }
+    }
     if (!Auth.session) return;
     if (state.route.name !== "exam" || !state.exam) return;
     const q = currentQuestion();
