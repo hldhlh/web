@@ -4909,7 +4909,7 @@ textarea:focus-visible {
 .stage-tab {
   min-width: 108px;
   min-height: 44px;
-  flex: 1 0 108px;
+  flex: 1 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -6183,6 +6183,9 @@ textarea:focus-visible {
 }
 
 .ops-editor.task-board-editor:not(.lesson-editor) {
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
   max-width: 960px;
   padding: 0;
   gap: 18px;
@@ -6208,6 +6211,7 @@ textarea:focus-visible {
 }
 
 .task-board-editor-head {
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 16px;
 }
@@ -6228,6 +6232,8 @@ textarea:focus-visible {
 }
 
 .task-board-editor-head .ghost {
+  min-height: 44px;
+  flex-shrink: 0;
   width: auto;
   margin: 0;
   padding-inline: 16px;
@@ -6235,14 +6241,24 @@ textarea:focus-visible {
 
 .task-board-stage-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 14px;
 }
 
 .task-board-stage-editor {
+  min-width: 0;
   padding: 20px;
 }
 
+.task-board-editor .editor-field,
+.task-board-editor input {
+  min-width: 0;
+  width: 100%;
+}
+
 .task-board-stage-editor > header {
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 16px;
@@ -6257,13 +6273,14 @@ textarea:focus-visible {
 .task-board-stage-actions,
 .task-board-editor-item > div {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
 .task-board-stage-actions button,
 .task-board-editor-item button {
-  min-width: 36px;
-  min-height: 36px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0 9px;
   border-radius: 10px;
   color: var(--accent);
@@ -6283,6 +6300,7 @@ textarea:focus-visible {
 
 .task-board-editor-items {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   margin-top: 16px;
 }
@@ -6297,6 +6315,7 @@ textarea:focus-visible {
 }
 
 .task-board-editor-item > strong {
+  overflow-wrap: anywhere;
   min-width: 0;
   flex: 1;
   font-size: 14px;

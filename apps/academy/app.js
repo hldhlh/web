@@ -1581,7 +1581,7 @@
         <div class="stage-tabs" role="tablist" aria-label="学习阶段">
           ${stages.map((stage, index) => `
             <button type="button" class="stage-tab ${index === activeStage ? "on" : ""} ${!stage.available ? "locked" : ""}" id="academy-stage-tab-${index}" role="tab" aria-label="阶段 ${index + 1}，${escapeHtml(stage.title)}，已完成 ${stage.done}/${stage.tasks.length} 项" aria-selected="${index === activeStage}" aria-controls="academy-stage-${index}" tabindex="${index === activeStage ? "0" : "-1"}" data-stage-target="academy-stage-${index}">
-              <span>阶段 ${index + 1}</span>
+              <span>${escapeHtml(stage.title)}</span>
             </button>`).join("")}
         </div>
         <div class="learning-stages">
@@ -2498,6 +2498,7 @@
         <header>
           <span class="task-board-stage-number">阶段 ${index + 1}</span>
           <div class="task-board-stage-actions">
+            <button type="button" data-act="ops-task-stage-rename">重命名</button>
             <button type="button" data-act="ops-task-stage-move" data-direction="up" title="阶段上移">↑</button>
             <button type="button" data-act="ops-task-stage-move" data-direction="down" title="阶段下移">↓</button>
             <button type="button" class="danger-text" data-act="ops-task-stage-remove">删除阶段</button>
@@ -2527,7 +2528,7 @@
           <label class="editor-field editor-field-main"><span>面板名称</span><input id="ops-task-board-title" maxlength="40" value="${escapeHtml(board.title)}" placeholder="任务面板"></label>
         </section>
         <div class="task-board-editor-head">
-          <div><strong>阶段与任务</strong><span>课程和考试只能在任务面板中出现一次，可调整阶段与任务顺序。</span></div>
+          <div><strong>阶段与任务</strong><span>可新增、删除或重命名阶段，修改后点击“发布任务面板”生效。课程和考试只能出现一次。</span></div>
           <button type="button" class="ghost" data-act="ops-task-stage-add">新增阶段</button>
         </div>
         <div class="task-board-stage-list">
@@ -3896,12 +3897,18 @@
       refreshTaskBoardEditor();
       return;
     }
+    if (act === "ops-task-stage-rename") {
+      const input = btn.closest(".task-board-stage-editor")?.querySelector("[data-task-stage-title]");
+      input?.focus();
+      input?.select();
+      return;
+    }
     if (act === "ops-task-stage-remove") {
       const stage = btn.closest(".task-board-stage-editor");
       const stages = document.querySelectorAll(".task-board-stage-editor");
       if (!stage) return;
       if (stages.length <= 1) return alert("任务面板至少需要保留一个阶段。");
-      if (stage.querySelector(".task-board-editor-item") && !confirm("删除阶段会同时移除其中的任务，确定继续吗？")) return;
+      if (stage.querySelector(".task-board-editor-item") && !confirm("删除阶段会将其中的任务移出面板，课程、考试和员工学习记录仍会保留。发布后生效，确定继续吗？")) return;
       stage.remove();
       refreshTaskBoardEditor();
       return;
