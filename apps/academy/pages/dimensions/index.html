@@ -96,7 +96,9 @@
         <div class="canvas-bottom">
           <button id="inspectorToggle" class="button quiet inspector-toggle" type="button" aria-expanded="false" aria-controls="sidePanel"><span>标注</span><span id="inspectorCount">0</span><svg class="icon" aria-hidden="true"><use href="#back"/></svg></button>
           <div class="canvas-hint" id="canvasHint" hidden><span id="notice" role="status">拖动添加标注</span></div>
-          <div class="zoom-controls" role="group" aria-label="画布缩放">
+          <div class="zoom-controls" role="group" aria-label="画布显示与缩放">
+            <button id="toggleAnnotations" class="icon-button" type="button" aria-label="显示标注" aria-pressed="true" title="隐藏标注" aria-controls="measureCanvas selectionCanvas labelLayer"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/><path class="visibility-slash" d="m4 4 16 16"/></svg><span>显示标注</span></button>
+            <span class="control-divider" aria-hidden="true"></span>
             <button id="zoomOut" class="icon-button" type="button" aria-label="缩小画布" title="缩小画布"><svg class="icon" aria-hidden="true"><use href="#minus"/></svg><span>缩小</span></button>
             <output id="zoomValue" aria-live="off">100%</output>
             <button id="zoomIn" class="icon-button" type="button" aria-label="放大画布" title="放大画布"><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span>放大</span></button>
@@ -123,7 +125,7 @@
         <section class="panel-section appearance-section" aria-label="标注外观">
           <div class="section-heading"><h3>外观</h3></div>
           <div class="style-picker"><span>线条与标签</span><div class="style-options" role="group" aria-label="标注样式"><button type="button" data-style="outline"><i class="style-swatch outline"></i>线框</button><button class="active" type="button" data-style="light"><i class="style-swatch light"></i>白色</button><button type="button" data-style="dark"><i class="style-swatch dark"></i>黑色</button></div></div>
-          <div class="position-picker"><span>文字位置</span><div class="position-options" role="group" aria-label="文字位置"><button type="button" data-label-position="above"><i class="position-icon above"></i>优先上方</button><button class="active" type="button" data-label-position="center"><i class="position-icon center"></i>自动避让</button></div></div>
+          <div class="position-picker"><span>文字位置</span><div class="position-options" role="group" aria-label="文字位置"><button type="button" data-label-position="above"><i class="position-icon above"></i>优先上方</button><button class="active" type="button" data-label-position="center"><i class="position-icon center"></i>自动避让</button><button type="button" data-label-position="inline" title="尺寸线足够长时，文字嵌入线内，两端显示箭头；短线自动避让"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h5m8 0h5M6 9l-3 3 3 3m12-6 3 3-3 3"/></svg>线内箭头</button></div></div>
         </section>
         <section class="panel-section measure-list"><div class="section-heading"><h3>全部标注</h3><b id="measureCount">0</b></div><p class="list-empty" id="listEmpty">还没有标注。选择上方工具，在图片上拖动即可添加。</p><div class="list-items" id="listItems"></div></section>
         <div class="panel-footer"><span id="imageSize"></span><button id="panelReplace" type="button" title="创建新的图片项目"><svg class="icon" aria-hidden="true"><use href="#plus"/></svg>新建项目</button></div>

@@ -92,6 +92,7 @@ input::placeholder { color: var(--muted); opacity: 1; }
 .editor-tip { display: block; margin-top: 8px; color: var(--muted); font-size: .6471rem; line-height: 1.6; }.edge-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }.edge-fields input { margin-top: 5px; }
 .style-picker > span, .position-picker > span { display: block; font-size: .706rem; color: var(--muted); margin-bottom: 8px; }.position-picker { margin-top: 14px; }
 .style-options, .position-options { display: grid; gap: 6px; grid-template-columns: repeat(3,1fr); }.position-options { grid-template-columns: 1fr 1fr; }
+.position-options [data-label-position="inline"] { grid-column: 1 / -1; }
 .style-options button, .position-options button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--muted); font-size: .706rem; }
 .style-options button.active, .position-options button.active { border-color: var(--accent); background: var(--accent-soft); color: var(--text); }
 .list-empty { color: var(--muted); font-size: .765rem; line-height: 1.6; }.list-items { display: grid; gap: 6px; }.list-row { position: relative; }
@@ -237,3 +238,9 @@ body:has(.image-operation:not([hidden])) .workspace.has-image { height: auto; fl
 .rename-dialog input { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--quiet-fill); color: var(--text); font: inherit; }
 .rename-dialog p { margin: 0; font-size: .765rem; color: var(--muted); overflow-wrap: anywhere; }
 .rename-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+
+/* The eye/slashed eye conveys visibility without relying on color alone. */
+#toggleAnnotations .visibility-slash { display: none; }
+#toggleAnnotations[aria-pressed="false"] .visibility-slash { display: block; }
+#toggleAnnotations[aria-pressed="false"] { color: var(--muted); background: var(--surface-2); }
+#toggleAnnotations:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }

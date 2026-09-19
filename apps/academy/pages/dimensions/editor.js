@@ -47,6 +47,7 @@
   const state = {
     image: null,
     editing: false,
+    annotationsVisible: true,
     fileName: "图片",
     objectUrl: null,
     annotations: [],
@@ -120,7 +121,7 @@
     });
     if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
     Object.assign(state, { image, objectUrl, fileName: name, annotations: [], draft: null,
-      handleDrag: null, hoverHandle: null, selectedId: null, zoom: 1, panX: 0, panY: 0, editing: false });
+      handleDrag: null, hoverHandle: null, selectedId: null, zoom: 1, panX: 0, panY: 0, editing: false, annotationsVisible: true });
     elements.canvasStage.style.transform = '';
     cancelAnimationFrame(gestureFrame); gestureFrame = null;
     pointers.clear(); gesture = null; singlePointer = null; suppressDrawing = false; deferredAnnotations = null;
@@ -161,6 +162,9 @@
   window.DimensionEditor = { openImage, applyAnnotations, fit: updateFit, notice: setNotice,
     busy: () => Boolean(state.draft || state.handleDrag) };
 
+  // Match the displayed percentage: 600% of the original image, on every viewport.
+  const maximumZoom = () => 6 / state.fitScale;
+
   function updateFit() {
     if (!state.image) return;
     const availableWidth = Math.max(200, elements.viewport.clientWidth - 36);
@@ -170,6 +174,7 @@
       availableHeight / state.image.naturalHeight,
       1,
     );
+    state.zoom = Math.min(state.zoom, maximumZoom());
     updateCanvasDisplaySize();
   }
 
@@ -183,7 +188,7 @@
     elements.canvasStage.style.height = `${height}px`;
     document.getElementById('zoomValue').textContent = `${Math.round(state.fitScale * state.zoom * 100)}%`;
     document.getElementById('zoomOut').disabled = state.zoom <= .5;
-    document.getElementById('zoomIn').disabled = state.zoom >= 4;
+    document.getElementById('zoomIn').disabled = state.zoom >= maximumZoom();
     render();
   }
 
@@ -200,7 +205,7 @@
     const previousRect = elements.canvas.getBoundingClientRect();
     const anchorX = anchor ? anchor.x : previousRect.width ? (clientX - previousRect.left) / previousRect.width : .5;
     const anchorY = anchor ? anchor.y : previousRect.height ? (clientY - previousRect.top) / previousRect.height : .5;
-    const clampedZoom = clamp(nextZoom, .5, 4);
+    const clampedZoom = clamp(nextZoom, .5, maximumZoom());
     if (!anchor && Math.abs(clampedZoom - state.zoom) < .001) return;
 
     state.zoom = clampedZoom;
@@ -209,7 +214,7 @@
     const nextAnchorX = nextRect.left + anchorX * nextRect.width;
     const nextAnchorY = nextRect.top + anchorY * nextRect.height;
     panCanvas(clientX - nextAnchorX, clientY - nextAnchorY);
-    setNotice(`图片缩放 ${Math.round(state.zoom * 100)}%`);
+    setNotice(`图片缩放 ${Math.round(state.fitScale * state.zoom * 100)}%`);
   }
 
   function visualStyle(name) {
@@ -384,6 +389,34 @@
     const style = visualStyle(styleName);
     const labelPosition = itemLabelPosition(item, isDraft);
 
+    if (labelPosition === 'inline') {
+      const label = isDraft ? '拖动标记' : item.label;
+      const measured = label ? typography.measure(context, label, renderUnit, elements.canvas.width) : null;
+      const x = (item.start.x + item.end.x) / 2, y = (item.start.y + item.end.y) / 2;
+      const fits = measured && measured.lines.length === 1 && length >= measured.width + 36 * renderUnit
+        && x >= measured.width / 2 && x + measured.width / 2 <= elements.canvas.width
+        && y >= measured.height / 2 && y + measured.height / 2 <= elements.canvas.height;
+      const ux = dx / length, uy = dy / length;
+      const gap = fits ? Math.min(measured.width / Math.max(.001, Math.abs(ux)), measured.height / Math.max(.001, Math.abs(uy))) / 2 : 0;
+      context.save(); context.lineCap = 'round'; context.lineJoin = 'round';
+      context.beginPath(); context.moveTo(item.start.x, item.start.y);
+      if (fits) { context.lineTo(x - ux * gap, y - uy * gap); context.moveTo(x + ux * gap, y + uy * gap); }
+      context.lineTo(item.end.x, item.end.y);
+      context.strokeStyle = style.underLine; context.lineWidth = 3 * renderUnit; context.stroke();
+      context.strokeStyle = style.line; context.lineWidth = 1.25 * renderUnit; context.stroke();
+      const arrow = Math.min(6 * renderUnit, length / 4);
+      for (const [point, sign] of [[item.start, 1], [item.end, -1]]) {
+        context.beginPath(); context.moveTo(point.x, point.y);
+        context.lineTo(point.x + sign * ux * arrow + nx * arrow * .6, point.y + sign * uy * arrow + ny * arrow * .6);
+        context.lineTo(point.x + sign * ux * arrow - nx * arrow * .6, point.y + sign * uy * arrow - ny * arrow * .6);
+        context.closePath(); context.fillStyle = style.line; context.fill();
+      }
+      context.restore();
+      if (fits) pendingLabels.push({ id: labelOwner, styleName, inline: true, anchor: { x, y }, ...measured });
+      else if (label) queueLabel(label, x, y, styleName);
+      return;
+    }
+
     context.save();
     context.lineCap = "round";
     context.beginPath();
@@ -429,6 +462,13 @@
     pendingLabels = [];
     context.clearRect(0, 0, elements.canvas.width, elements.canvas.height);
     context.drawImage(state.image, 0, 0, elements.canvas.width, elements.canvas.height);
+    elements.labelLayer.style.visibility = state.annotationsVisible ? 'visible' : 'hidden';
+    if (!state.annotationsVisible && !forExport) {
+      labelBoxes = [];
+      elements.labelLayer.replaceChildren();
+      renderSelection();
+      return;
+    }
     state.annotations.forEach((item) => drawAnnotation(item, false));
     if (state.draft) drawAnnotation(state.draft, true);
     paintLabels(forExport);
@@ -440,7 +480,7 @@
     const overlay = elements.selectionCanvas, ctx = overlay.getContext('2d');
     ctx.clearRect(0, 0, overlay.width, overlay.height);
     const item = selectedAnnotation();
-    if (!state.image || !item) return;
+    if (!state.image || !item || !state.annotationsVisible) return;
     const unit = 1 / (state.fitScale * state.zoom);
     const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#007aff';
     ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -496,6 +536,7 @@
 
   const coarsePointer = window.matchMedia("(any-pointer: coarse)");
   function nearestHandle(point) {
+    if (!state.annotationsVisible) return null;
     const threshold = (coarsePointer.matches ? 22 : 14) / (state.fitScale * state.zoom);
     let winner = null;
     [...state.annotations].reverse().forEach((item) => {
@@ -522,6 +563,7 @@
   }
 
   function nearestAnnotation(point) {
+    if (!state.annotationsVisible) return null;
     const label = [...labelBoxes].reverse().find(box => Math.abs(point.x - box.x) <= box.width / 2 && Math.abs(point.y - box.y) <= box.height / 2);
     if (label) return state.annotations.find(item => item.id === label.id) || null;
     const threshold = 18 / (state.fitScale * state.zoom);
@@ -624,6 +666,7 @@
   }
 
   function selectAnnotation(id, focusInput) {
+    state.annotationsVisible = true;
     state.selectedId = id;
     updateInterface();
     render();
@@ -691,6 +734,7 @@
     const selected = selectedAnnotation();
     const activePosition = selected?.labelPosition || state.labelPosition;
     elements.positionButtons.forEach((button) => {
+      button.disabled = !state.editing || !state.annotationsVisible || (button.dataset.labelPosition === 'inline' && (selected?.type || state.tool) !== 'line');
       const active = button.dataset.labelPosition === activePosition;
       button.classList.toggle("active", active);
       button.setAttribute("aria-pressed", String(active));
@@ -704,7 +748,7 @@
     if (selected) { selected.labelPosition = position; commit(selected); }
     updatePositionInterface();
     render();
-    setNotice(position === "center" ? "文字已居中在线条或图形中" : "文字已移动到图形上方");
+    setNotice(position === "inline" ? "已启用线内箭头：长度不足时自动外置文字" : position === "center" ? "文字自动避让" : "文字优先置于上方");
   }
 
   function annotationSummary(item) {
@@ -714,6 +758,9 @@
 
   function updateInterface() {
     const selected = selectedAnnotation();
+    const visibilityButton = document.getElementById('toggleAnnotations');
+    visibilityButton.setAttribute('aria-pressed', String(state.annotationsVisible));
+    visibilityButton.title = state.annotationsVisible ? '隐藏标注' : '显示标注';
     elements.workspace.dataset.editing = String(state.editing);
     document.body.dataset.editing = String(state.editing);
     elements.toggleEdit.textContent = state.editing ? '完成' : '编辑';
@@ -722,19 +769,20 @@
     elements.canvas.style.cursor = state.editing ? 'crosshair' : 'grab';
     elements.canvas.setAttribute('aria-label', state.editing ? '图片标注画布，单指绘制，双指缩放和拖动画布' : '图片标注画布，浏览模式，单指点选，双指缩放和拖动画布');
     document.getElementById('interactionState').textContent = state.editing ? '单指绘制 · 双指缩放与拖动' : '浏览模式 · 双指缩放与拖动';
+    if (!state.annotationsVisible) document.getElementById('interactionState').textContent = '标注已隐藏 · 查看原图';
     const selectionStatus = document.getElementById('selectionStatus');
-    selectionStatus.hidden = !selected;
+    selectionStatus.hidden = !selected || !state.annotationsVisible;
     selectionStatus.textContent = selected ? `已选中 · ${state.annotations.indexOf(selected) + 1} 号标注` : '';
-    for (const button of [elements.lineTool, elements.rectTool, elements.circleTool, ...elements.styleButtons, ...elements.positionButtons, ...elements.quickLabels.querySelectorAll('button')]) button.disabled = !state.editing;
+    for (const button of [elements.lineTool, elements.rectTool, elements.circleTool, ...elements.styleButtons, ...elements.positionButtons, ...elements.quickLabels.querySelectorAll('button')]) button.disabled = !state.editing || !state.annotationsVisible;
     document.getElementById('selectionType').textContent = selected ? ({ line: '尺寸线', rect: '矩形', circle: '圆形' }[selected.type] || '标注') : '未选中';
     const isRectangle = selected?.type === "rect";
     elements.exportImage.disabled = !state.image || state.annotations.length === 0;
     elements.lineLabelFields.hidden = Boolean(isRectangle);
     elements.rectLabelFields.hidden = !isRectangle;
-    elements.labelInput.disabled = !state.editing || !selected || isRectangle;
+    elements.labelInput.disabled = !state.editing || !state.annotationsVisible || !selected || isRectangle;
     elements.labelInput.value = selected && !isRectangle ? selected.label || "" : "";
     Object.entries(elements.edgeInputs).forEach(([side, input]) => {
-      input.disabled = !state.editing || !isRectangle;
+      input.disabled = !state.editing || !state.annotationsVisible || !isRectangle;
       input.value = isRectangle ? selected.labels?.[side] || "" : "";
     });
     elements.editorTip.textContent = !selected ? "先在画布上拖出一条标注，再填写尺寸。" : isRectangle
@@ -770,7 +818,7 @@
 
       const deleteButton = document.createElement("button");
       deleteButton.type = "button";
-      deleteButton.hidden = !state.editing;
+      deleteButton.hidden = !state.editing || !state.annotationsVisible;
       deleteButton.className = "row-delete";
       deleteButton.title = "删除这条标注";
       deleteButton.setAttribute("aria-label", `删除标注：${summary || `第 ${index + 1} 条`}`);
@@ -790,6 +838,7 @@
   }
 
   function beginDrawing(event) {
+    if (!state.annotationsVisible) return;
     const point = pointFromEvent(event);
     const handle = nearestHandle(point);
     if (handle) {
@@ -908,7 +957,7 @@
     const mid = gesturePoints();
     // Track the midpoint and scale together so the same image point stays under
     // both fingers. Rebase each frame for immediate reversal at the zoom limits.
-    const zoom = clamp(gesture.zoom * mid.distance / gesture.distance, .5, 4);
+    const zoom = clamp(gesture.zoom * mid.distance / gesture.distance, .5, maximumZoom());
     setZoom(zoom, mid.x, mid.y, gesture.anchor);
     Object.assign(gesture, mid, { zoom: state.zoom });
   }
@@ -921,7 +970,7 @@
     if (!event.nativeTouch) elements.viewport.setPointerCapture(event.pointerId);
     if (pointers.size >= 2) { startGesture(); return; }
     if (suppressDrawing) return;
-    const drawing = state.editing && event.target === elements.canvas;
+    const drawing = state.editing && state.annotationsVisible && event.target === elements.canvas;
     singlePointer = { id: event.pointerId, touch: event.pointerType === 'touch', x: event.clientX, y: event.clientY, lastX: event.clientX, lastY: event.clientY, moved: false, drawing };
     if (drawing) beginDrawing(event);
   }
@@ -1019,10 +1068,19 @@
     state.hoverHandle = null;
     elements.canvas.style.cursor = state.editing ? 'crosshair' : 'grab'; render();
   });
+  document.getElementById('toggleAnnotations').addEventListener('click', () => {
+    cancelDrawing();
+    if (pointers.size) suppressDrawing = true;
+    state.annotationsVisible = !state.annotationsVisible;
+    state.hoverHandle = null;
+    updateInterface(); render();
+    setNotice(state.annotationsVisible ? '已显示全部标注' : '已隐藏标注，仅查看原图；导出仍包含标注');
+  });
   elements.toggleEdit.addEventListener('click', () => {
     cancelDrawing();
     if (pointers.size) suppressDrawing = true;
     state.editing = !state.editing;
+    if (state.editing) state.annotationsVisible = true;
     setInspector(state.editing);
     updateInterface(); render();
     setNotice(state.editing ? '编辑模式：单指绘制或调整节点，双指同时缩放和拖动画布' : '已退出编辑，双指可同时缩放和拖动画布');

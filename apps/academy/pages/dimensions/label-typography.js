@@ -21,6 +21,7 @@
   function scene(ctx, boxes, unit, styleFor) {
     const nodes = [];
     for (const box of boxes) {
+      if (box.inline) continue;
       const style = styleFor(box.styleName);
       const points = { x1: box.anchor.x, y1: box.anchor.y,
         x2: clamp(box.anchor.x, box.x - box.width / 2, box.x + box.width / 2),
@@ -34,13 +35,14 @@
     const baseline = (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2;
     for (const box of boxes) {
       const style = styleFor(box.styleName);
-      nodes.push({ tag: 'rect', attrs: { x: box.x - box.width / 2, y: box.y - box.height / 2,
+      if (!box.inline) nodes.push({ tag: 'rect', attrs: { x: box.x - box.width / 2, y: box.y - box.height / 2,
         width: box.width, height: box.height, rx: tokens.radius * unit,
         fill: style.labelBackground, stroke: style.labelBorder, 'stroke-width': .75 * unit } });
       box.lines.forEach((text, i) => nodes.push({ tag: 'text', text, attrs: {
         x: box.x, y: box.y + (i - (box.lines.length - 1) / 2) * tokens.lineHeight * unit + baseline,
         'font-family': family, 'font-size': tokens.size * unit, 'font-weight': tokens.weight,
-        'text-anchor': 'middle', fill: style.labelText,
+        'text-anchor': 'middle', fill: box.inline ? style.line : style.labelText,
+        ...(box.inline ? { stroke: style.underLine, 'stroke-width': 3 * unit, 'stroke-linejoin': 'round', 'paint-order': 'stroke fill' } : {}),
       } }));
     }
     return nodes;
@@ -59,7 +61,10 @@
   function paintCanvas(ctx, nodes, unit) {
     ctx.save(); ctx.font = font(unit); ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
     for (const { tag, attrs: a, text } of nodes) {
-      if (tag === 'text') { ctx.fillStyle = a.fill; ctx.fillText(text, a.x, a.y); continue; }
+      if (tag === 'text') {
+        if (a.stroke) { ctx.strokeStyle = a.stroke; ctx.lineWidth = a['stroke-width']; ctx.lineJoin = 'round'; ctx.strokeText(text, a.x, a.y); }
+        ctx.fillStyle = a.fill; ctx.fillText(text, a.x, a.y); continue;
+      }
       ctx.beginPath(); ctx.strokeStyle = a.stroke; ctx.lineWidth = a['stroke-width'];
       if (tag === 'line') { ctx.moveTo(a.x1, a.y1); ctx.lineTo(a.x2, a.y2); }
       else { ctx.roundRect(a.x, a.y, a.width, a.height, a.rx); ctx.fillStyle = a.fill; ctx.fill(); }

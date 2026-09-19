@@ -208,6 +208,7 @@ async page => {
       await button.click();
     }
     const limitZoom=await page.locator('#zoomValue').innerText();
+    if(direction==='zoomIn') assert(limitZoom==='600%','Maximum zoom must display 600%');
     const pair=[{id:17,x:one.x,y:one.y},{id:18,x:one.x+110,y:one.y}];
     await touch('touchStart',pair);
     const sign=direction==='zoomIn'?1:-1;

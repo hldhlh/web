@@ -17,8 +17,8 @@
     return true;
   }
   function layout(labels, segments, width, height, unit) {
-    const placed = [], gap = 5 * unit;
-    for (const label of labels) {
+    const placed = labels.filter(label => label.inline).map(label => ({ ...label, ...label.anchor })), gap = 5 * unit;
+    for (const label of labels.filter(label => !label.inline)) {
       let best, bestScore = Infinity;
       // Keep the preferred side first; expand only when nearby space is occupied.
       for (let ring = 0; ring < 12; ring++) {
