@@ -1,0 +1,8 @@
+@font-face {
+  font-family: "Dimension Sans";
+  src: url("./fonts/annotation-sans-medium.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+#labelLayer { font-synthesis: none; text-rendering: optimizeLegibility; }

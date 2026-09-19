@@ -76,3 +76,11 @@ npm run check
 参考：[Supabase Postgres Changes](https://supabase.com/docs/guides/realtime/postgres-changes)、[Realtime 授权](https://supabase.com/docs/guides/realtime/authorization)、[Storage 权限](https://supabase.com/docs/guides/storage/security/access-control)。
 
 `tests/dimensions-touch-browser.js` 在 Chromium 和 WebKit 中注入 TouchEvent 结构的坐标快照，验证四向平移、适合窗口/放大、浏览/编辑、缩放与移动同时进行、非迭代 TouchList 兼容和指针取消隔离。Chromium 的真实触摸与滚轮输入另由 `dimensions-interaction-browser.js` 验证。
+
+## 标注呈现
+
+标签使用独立 SVG 矢量层、固定 13px Medium 屏幕字号和紧凑圆角背景，避免位图缩放导致文字发虚；导出时按相同字形与布局绘制到图片，缩放时重新排版，自动避让尺寸线及其他标签；细引线连接原始测量位置，长文字自动换行。原有「线上居中」设置现在对应「自动避让」，「线上方」对应「优先上方」，历史标注无需迁移。点击移位后的标签仍可选中标注。导出使用独立参考比例，不受当前画布缩放影响。极端密集且图内空间不足时采用最小遮挡位置，可放大继续查看。
+
+字体与呈现集中在 `label-typography.js`：苹方优先，其余设备使用本地 Noto Sans SC Medium（500）；数字与单位添加细空格，仅影响显示。屏幕 SVG 与导出 Canvas 共用绘制指令和基线度量。字体加载后重新测量；加载失败可回退系统字体，不阻塞编辑。字体说明及许可证见 `fonts/README.md` 与 `fonts/OFL.txt`。
+
+鼠标快捷操作：普通滚轮平移，Shift + 滚轮左右平移，Ctrl + 滚轮缩放；Shift 横移兼容浏览器已经转换为水平滚动的事件。

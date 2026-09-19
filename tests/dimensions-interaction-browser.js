@@ -32,6 +32,28 @@ async page => {
   await page.mouse.wheel(40,35);
   await page.waitForFunction(({x,y})=>{const r=document.getElementById('measureCanvas').getBoundingClientRect();return Math.abs(r.x-x+40)<2&&Math.abs(r.y-y+35)<2;},trackpadBefore);
   assert(await page.locator('#zoomValue').innerText()===trackpadZoom,'Trackpad scroll unexpectedly zoomed');
+  await page.keyboard.down('Shift');
+  for (const delta of [80, -80]) {
+    const before = await page.locator('#measureCanvas').boundingBox();
+    await page.mouse.wheel(0, delta);
+    await page.waitForFunction(({before, delta}) => {
+      const box = document.getElementById('measureCanvas').getBoundingClientRect();
+      return Math.abs(box.x - before.x + delta) < 2 && Math.abs(box.y - before.y) < 2;
+    }, {before, delta});
+  }
+  await page.keyboard.up('Shift');
+  assert(await page.locator('#zoomValue').innerText()===trackpadZoom,'Shift+wheel unexpectedly zoomed');
+  // Already-remapped horizontal input and line/page units must also stay horizontal.
+  await page.evaluate(() => {
+    const viewport = document.getElementById('viewport'), canvas = document.getElementById('measureCanvas');
+    for (const deltaMode of [0, 1, 2]) {
+      const before = canvas.getBoundingClientRect();
+      viewport.dispatchEvent(new WheelEvent('wheel', {deltaX: 1, deltaY: 0, deltaMode, shiftKey: true, cancelable: true}));
+      const after = canvas.getBoundingClientRect();
+      const distance = deltaMode === 1 ? 16 : deltaMode === 2 ? viewport.clientWidth : 1;
+      if (Math.abs(after.x - before.x + distance) > 1 || Math.abs(after.y - before.y) > 1) throw Error('Remapped Shift+wheel moved incorrectly');
+    }
+  });
   await page.keyboard.down('Control');await page.mouse.wheel(0,-30);await page.keyboard.up('Control');
   await page.waitForFunction(value=>document.getElementById('zoomValue').textContent!==value,trackpadZoom);
   await page.locator('#fitCanvas').click();box=await page.locator('#measureCanvas').boundingBox();
@@ -211,5 +233,5 @@ async page => {
   await page.evaluate(async()=>{const c=document.createElement('canvas');c.width=100;c.height=100;await DimensionEditor.openImage(await new Promise(r=>c.toBlob(r)),'另一个项目.png');});
   assert(await page.locator('#toggleEdit').getAttribute('aria-pressed')==='false','New project inherited editing mode');
   await cdp.detach();
-  return {passed:true,checks:['trackpad wheel pan and Ctrl-wheel pinch','browse blocks writes and undo','explicit edit and done','visible selection without export changes','pinch zoom','two-finger pan and simultaneous zoom','moving midpoint stays anchored','immediate reversal at zoom limits','long-press panning removed','free two-finger dragging at fit scale','three-finger gestures disabled','single-finger browse does not pan','immediate touch drawing','draft cancellation','endpoint rollback','remaining finger suppression','pointer cancellation','new project resets mode'],productionWrites:0};
+  return {passed:true,checks:['Shift-wheel horizontal pan in both directions and remapped events','trackpad wheel pan and Ctrl-wheel pinch','browse blocks writes and undo','explicit edit and done','visible selection without export changes','pinch zoom','two-finger pan and simultaneous zoom','moving midpoint stays anchored','immediate reversal at zoom limits','long-press panning removed','free two-finger dragging at fit scale','three-finger gestures disabled','single-finger browse does not pan','immediate touch drawing','draft cancellation','endpoint rollback','remaining finger suppression','pointer cancellation','new project resets mode'],productionWrites:0};
 }

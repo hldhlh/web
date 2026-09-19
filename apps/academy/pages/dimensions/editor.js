@@ -8,6 +8,7 @@
     canvasStage: document.querySelector("#canvasStage"),
     canvas: document.querySelector("#measureCanvas"),
     selectionCanvas: document.querySelector("#selectionCanvas"),
+    labelLayer: document.querySelector("#labelLayer"),
     toggleEdit: document.querySelector("#toggleEdit"),
     canvasHint: document.querySelector("#canvasHint"),
     notice: document.querySelector("#notice"),
@@ -103,6 +104,7 @@
   }
 
   async function openImage(blob, name) {
+    await typography.ready;
     const objectUrl = URL.createObjectURL(blob);
     const image = new Image();
     await new Promise((resolve, reject) => {
@@ -182,7 +184,7 @@
     document.getElementById('zoomValue').textContent = `${Math.round(state.fitScale * state.zoom * 100)}%`;
     document.getElementById('zoomOut').disabled = state.zoom <= .5;
     document.getElementById('zoomIn').disabled = state.zoom >= 4;
-    renderSelection();
+    render();
   }
 
   function panCanvas(dx, dy) {
@@ -210,36 +212,21 @@
     setNotice(`图片缩放 ${Math.round(state.zoom * 100)}%`);
   }
 
-  function roundedRect(ctx, x, y, width, height, radius) {
-    const r = Math.min(radius, width / 2, height / 2);
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + width - r, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-    ctx.lineTo(x + width, y + height - r);
-    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-    ctx.lineTo(x + r, y + height);
-    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.closePath();
-  }
-
   function visualStyle(name) {
     const styles = {
       outline: {
         line: "#0b0b0b", underLine: "rgba(255,255,255,.96)", lineWidth: 2.8, underLineWidth: 7,
-        labelBackground: "rgba(255,255,255,.96)", labelText: "#0b0b0b", labelBorder: "#0b0b0b",
+        labelBackground: "#ffffff", labelText: "#1d1d1f", labelBorder: "#0b0b0b",
         labelBorderWidth: 1.5, labelRadius: 9, shadow: "transparent",
       },
       light: {
         line: "#ffffff", underLine: "rgba(0,0,0,.28)", lineWidth: 4, underLineWidth: 6.5,
-        labelBackground: "#ffffff", labelText: "#0b0b0b", labelBorder: "rgba(0,0,0,.08)",
+        labelBackground: "#ffffff", labelText: "#1d1d1f", labelBorder: "rgba(0,0,0,.08)",
         labelBorderWidth: 1, labelRadius: 99, shadow: "rgba(0,0,0,.24)",
       },
       dark: {
         line: "#0b0b0b", underLine: "rgba(255,255,255,.82)", lineWidth: 4, underLineWidth: 6.5,
-        labelBackground: "#0b0b0b", labelText: "#ffffff", labelBorder: "rgba(255,255,255,.28)",
+        labelBackground: "#242426", labelText: "#ffffff", labelBorder: "rgba(255,255,255,.28)",
         labelBorderWidth: 1, labelRadius: 99, shadow: "rgba(0,0,0,.28)",
       },
     };
@@ -254,31 +241,33 @@
     return isDraft ? state.labelPosition : item.labelPosition || "center";
   }
 
-  function drawLabel(label, x, y, ratio, angle = 0, styleName = "light") {
-    const style = visualStyle(styleName);
-    const fontSize = 18 * ratio;
-    context.font = `700 ${fontSize}px Arial, sans-serif`;
-    const boxWidth = context.measureText(label).width + 24 * ratio;
-    const boxHeight = 36 * ratio;
+  let renderUnit = 1, pendingLabels = [], labelBoxes = [], labelOwner = null;
+  const typography = window.DimensionTypography;
+  typography.loaded.then(() => { if (state.image) render(); });
 
-    context.save();
-    context.translate(x, y);
-    context.rotate(angle);
-    context.shadowColor = style.shadow;
-    context.shadowBlur = styleName === "outline" ? 0 : 8 * ratio;
-    context.shadowOffsetY = styleName === "outline" ? 0 : 2 * ratio;
-    context.fillStyle = style.labelBackground;
-    context.strokeStyle = style.labelBorder;
-    context.lineWidth = style.labelBorderWidth * ratio;
-    roundedRect(context, -boxWidth / 2, -boxHeight / 2, boxWidth, boxHeight, style.labelRadius * ratio);
-    context.fill();
-    if (style.labelBorderWidth) context.stroke();
-    context.shadowColor = "transparent";
-    context.fillStyle = style.labelText;
-    context.textAlign = "center";
-    context.textBaseline = "middle";
-    context.fillText(label, 0, .5 * ratio);
-    context.restore();
+  function queueLabel(label, x, y, styleName = "light", above = false) {
+    const maxWidth = Math.max(24 * renderUnit, Math.min(240 * renderUnit, elements.canvas.width - 12 * renderUnit));
+    pendingLabels.push({ id: labelOwner, styleName, above, anchor: { x, y },
+      ...typography.measure(context, label, renderUnit, maxWidth) });
+  }
+
+  function paintLabels(forExport) {
+    const segments = [];
+    for (const item of [...state.annotations, ...(state.draft ? [state.draft] : [])]) {
+      if (item.type === 'rect') {
+        const points = rectanglePoints(item);
+        points.forEach((p, i) => segments.push([p, points[(i + 1) % 4]]));
+      } else if (item.type === 'circle') {
+        const radius = circleRadius(item);
+        const point = angle => ({ x: item.start.x + Math.cos(angle) * radius, y: item.start.y + Math.sin(angle) * radius });
+        for (let i = 0; i < 48; i++) segments.push([point(i * Math.PI / 24), point((i + 1) * Math.PI / 24)]);
+        segments.push([item.start, item.end]);
+      } else segments.push([item.start, item.end]);
+    }
+    labelBoxes = window.DimensionLabelLayout.layout(pendingLabels, segments, elements.canvas.width, elements.canvas.height, renderUnit);
+    const scene = typography.scene(context, labelBoxes, renderUnit, visualStyle);
+    if (forExport) typography.paintCanvas(context, scene, renderUnit);
+    else typography.paintSVG(elements.labelLayer, scene, elements.canvas.width, elements.canvas.height);
   }
 
   function isHandleHovered(itemId, key) {
@@ -310,23 +299,14 @@
     ];
   }
 
-  function drawEdgeLabel(label, start, end, ratio, styleName, labelPosition) {
+  function drawEdgeLabel(label, start, end, styleName, labelPosition) {
     if (!label) return;
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-    const length = Math.max(1, Math.hypot(dx, dy));
-    const offset = labelPosition === "center" ? 0 : 18 * ratio;
-    const x = (start.x + end.x) / 2 + (dy / length) * offset;
-    const y = (start.y + end.y) / 2 - (dx / length) * offset;
-    let angle = Math.atan2(dy, dx);
-    if (angle > Math.PI / 2) angle -= Math.PI;
-    if (angle < -Math.PI / 2) angle += Math.PI;
-    drawLabel(label, x, y, ratio, angle, styleName);
+    queueLabel(label, (start.x + end.x) / 2, (start.y + end.y) / 2, styleName, labelPosition === "above");
   }
 
   function drawRectangle(item, isDraft) {
     const isSelected = isDraft;
-    const ratio = Math.max(1, state.image.naturalWidth / 1200);
+    const ratio = renderUnit * .55;
     const points = rectanglePoints(item);
     const styleName = itemStyle(item, isDraft);
     const style = visualStyle(styleName);
@@ -358,14 +338,14 @@
       { side: "bottom", start: points[2], end: points[3] },
       { side: "left", start: points[3], end: points[0] },
     ].forEach((edge) => {
-      drawEdgeLabel(labels[edge.side], edge.start, edge.end, ratio, styleName, labelPosition);
+      drawEdgeLabel(labels[edge.side], edge.start, edge.end, styleName, labelPosition);
     });
     context.restore();
   }
 
   function drawCircle(item, isDraft) {
     const isSelected = isDraft;
-    const ratio = Math.max(1, state.image.naturalWidth / 1200);
+    const ratio = renderUnit * .55;
     const radius = circleRadius(item);
     const styleName = itemStyle(item, isDraft);
     const style = visualStyle(styleName);
@@ -385,8 +365,8 @@
 
     const label = isDraft ? "圆形标记" : item.label;
     if (label) {
-      const labelY = labelPosition === "center" ? item.start.y : item.start.y - radius - 20 * ratio;
-      drawLabel(label, item.start.x, labelY, ratio, 0, styleName);
+      const labelY = item.start.y - radius;
+      queueLabel(label, item.start.x, labelY, styleName, labelPosition === "above");
     }
     context.restore();
   }
@@ -398,7 +378,7 @@
     const length = Math.max(1, Math.hypot(dx, dy));
     const nx = -dy / length;
     const ny = dx / length;
-    const ratio = Math.max(1, state.image.naturalWidth / 1200);
+    const ratio = renderUnit * .55;
     const cap = 10 * ratio;
     const styleName = itemStyle(item, isDraft);
     const style = visualStyle(styleName);
@@ -430,24 +410,28 @@
     const label = isDraft ? "拖动标记" : item.label;
     if (label) {
       const x = (item.start.x + item.end.x) / 2;
-      const y = (item.start.y + item.end.y) / 2 - (labelPosition === "above" ? 18 * ratio : 0);
-      drawLabel(label, x, y, ratio, 0, styleName);
+      const y = (item.start.y + item.end.y) / 2;
+      queueLabel(label, x, y, styleName, labelPosition === "above");
     }
     context.restore();
   }
 
   function drawAnnotation(item, isDraft) {
+    labelOwner = item.id;
     if (item.type === "rect") drawRectangle(item, isDraft);
     else if (item.type === "circle") drawCircle(item, isDraft);
     else drawLine(item, isDraft);
   }
 
-  function render() {
+  function render(forExport = false) {
     if (!state.image) return;
+    renderUnit = forExport ? Math.max(1, state.image.naturalWidth / 1200) : 1 / (state.fitScale * state.zoom);
+    pendingLabels = [];
     context.clearRect(0, 0, elements.canvas.width, elements.canvas.height);
     context.drawImage(state.image, 0, 0, elements.canvas.width, elements.canvas.height);
     state.annotations.forEach((item) => drawAnnotation(item, false));
     if (state.draft) drawAnnotation(state.draft, true);
+    paintLabels(forExport);
     renderSelection();
   }
 
@@ -479,27 +463,8 @@
         ctx.fillStyle = accent; ctx.fill();
       }
     }
-    // Keep dimension text readable where the selection stroke crosses a label.
-    const ratio = Math.max(1, state.image.naturalWidth / 1200);
-    const clearLabel = (label, x, y, angle = 0) => {
-      if (!label) return;
-      ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
-      ctx.font = `700 ${18 * ratio}px Arial, sans-serif`;
-      const width = ctx.measureText(label).width + 28 * ratio;
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.fillStyle = '#000'; ctx.fillRect(-width / 2, -20 * ratio, width, 40 * ratio); ctx.restore();
-    };
-    if (item.type === 'rect') {
-      const points = rectanglePoints(item);
-      ['top', 'right', 'bottom', 'left'].forEach((side, i) => {
-        const a = points[i], b = points[(i + 1) % 4], dx = b.x - a.x, dy = b.y - a.y;
-        const length = Math.max(1, Math.hypot(dx, dy)), offset = itemLabelPosition(item, false) === 'center' ? 0 : 18 * ratio;
-        let angle = Math.atan2(dy, dx);
-        if (angle > Math.PI / 2) angle -= Math.PI; if (angle < -Math.PI / 2) angle += Math.PI;
-        clearLabel(item.labels?.[side], (a.x + b.x) / 2 + dy / length * offset, (a.y + b.y) / 2 - dx / length * offset, angle);
-      });
-    } else if (item.type === 'circle') clearLabel(item.label, item.start.x, itemLabelPosition(item, false) === 'center' ? item.start.y : item.start.y - circleRadius(item) - 20 * ratio);
-    else clearLabel(item.label, (item.start.x + item.end.x) / 2, (item.start.y + item.end.y) / 2 - (itemLabelPosition(item, false) === 'above' ? 18 * ratio : 0));
+    // Use actual laid-out bounds, including labels belonging to other shapes.
+    for (const box of labelBoxes) ctx.clearRect(box.x - box.width / 2 - unit, box.y - box.height / 2 - unit, box.width + 2 * unit, box.height + 2 * unit);
     ctx.restore();
   }
 
@@ -557,6 +522,8 @@
   }
 
   function nearestAnnotation(point) {
+    const label = [...labelBoxes].reverse().find(box => Math.abs(point.x - box.x) <= box.width / 2 && Math.abs(point.y - box.y) <= box.height / 2);
+    if (label) return state.annotations.find(item => item.id === label.id) || null;
     const threshold = 18 / (state.fitScale * state.zoom);
     let winner = null;
     state.annotations.forEach((item) => {
@@ -1129,7 +1096,11 @@
     } else {
       const unitX = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? elements.viewport.clientWidth : 1;
       const unitY = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? elements.viewport.clientHeight : 1;
-      panCanvas(-event.deltaX * unitX, -event.deltaY * unitY);
+      if (event.shiftKey) {
+        // Some browsers already remap Shift+wheel to deltaX. Use one axis only.
+        const horizontal = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+        panCanvas(-horizontal * unitX, 0);
+      } else panCanvas(-event.deltaX * unitX, -event.deltaY * unitY);
     }
   }, { passive: false });
 
@@ -1150,7 +1121,7 @@
     const fileName = `${state.fileName.replace(/\.[^.]+$/, "")}-尺寸标注`;
     const selection = state.selectedId;
     state.selectedId = null;
-    render();
+    render(true);
     exporting = true;
     try {
       setNotice("正在压缩标注图…");

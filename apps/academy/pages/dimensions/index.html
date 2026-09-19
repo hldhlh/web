@@ -9,6 +9,9 @@
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="../../appearance.css">
   <link rel="stylesheet" href="collaboration.css">
+  <link rel="stylesheet" href="typography.css">
+  <script src="label-typography.js" defer></script>
+  <script src="label-layout.js" defer></script>
   <script src="bootstrap.js" defer></script>
 </head>
 <body data-view="library">
@@ -87,7 +90,7 @@
         <div class="canvas-caption"><div class="canvas-state"><span id="interactionState">浏览模式 · 双指缩放与拖动</span><span id="selectionStatus" role="status" hidden></span></div></div>
         <div class="canvas-viewport" id="viewport">
           <section id="emptyState" class="empty-state"><p>正在准备画布…</p><button id="uploadButton" class="button">选择图片</button></section>
-          <div class="canvas-stage" id="canvasStage" hidden><canvas id="measureCanvas" aria-label="图片标注画布，浏览模式，可缩放和移动"></canvas><canvas id="selectionCanvas" aria-hidden="true"></canvas></div>
+          <div class="canvas-stage" id="canvasStage" hidden><canvas id="measureCanvas" aria-label="图片标注画布，浏览模式，可缩放和移动"></canvas><canvas id="selectionCanvas" aria-hidden="true"></canvas><svg id="labelLayer" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg></div>
           <div class="drop-mask" id="dropMask" hidden><svg class="icon" aria-hidden="true"><use href="#photo"/></svg>松开以新建图片项目</div>
         </div>
         <div class="canvas-bottom">
@@ -120,7 +123,7 @@
         <section class="panel-section appearance-section" aria-label="标注外观">
           <div class="section-heading"><h3>外观</h3></div>
           <div class="style-picker"><span>线条与标签</span><div class="style-options" role="group" aria-label="标注样式"><button type="button" data-style="outline"><i class="style-swatch outline"></i>线框</button><button class="active" type="button" data-style="light"><i class="style-swatch light"></i>白色</button><button type="button" data-style="dark"><i class="style-swatch dark"></i>黑色</button></div></div>
-          <div class="position-picker"><span>文字位置</span><div class="position-options" role="group" aria-label="文字位置"><button type="button" data-label-position="above"><i class="position-icon above"></i>线上方</button><button class="active" type="button" data-label-position="center"><i class="position-icon center"></i>线上居中</button></div></div>
+          <div class="position-picker"><span>文字位置</span><div class="position-options" role="group" aria-label="文字位置"><button type="button" data-label-position="above"><i class="position-icon above"></i>优先上方</button><button class="active" type="button" data-label-position="center"><i class="position-icon center"></i>自动避让</button></div></div>
         </section>
         <section class="panel-section measure-list"><div class="section-heading"><h3>全部标注</h3><b id="measureCount">0</b></div><p class="list-empty" id="listEmpty">还没有标注。选择上方工具，在图片上拖动即可添加。</p><div class="list-items" id="listItems"></div></section>
         <div class="panel-footer"><span id="imageSize"></span><button id="panelReplace" type="button" title="创建新的图片项目"><svg class="icon" aria-hidden="true"><use href="#plus"/></svg>新建项目</button></div>
