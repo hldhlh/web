@@ -55,7 +55,7 @@ test('arrival and morning start blank and have independent storage keys', () => 
 test('arrival report includes actual receipts and explicit zero without inventory or orders', () => {
   const draft = M.empty('arrival');
   ['5.25', '3', '0', '2.5', '1', '0'].forEach((v, i) => { M.setValue(draft, 'stock', i, v); M.confirmStock(draft, i); });
-  assert.equal(M.report(draft, 'arrival'), '缦云店牛肉到货:\n实收重量\n吊龙：5.25kg\n板腱：3kg\n花趾：0kg\n碎肉：2.5kg\n胸口油：1kg\n极品雪花：0kg');
+  assert.equal(M.report(draft, 'arrival'), '缦云店到货:\n吊龙：5.25kg\n板腱：3kg\n花趾：0kg\n碎肉：2.5kg\n胸口油：1kg\n极品雪花：0kg');
 });
 
 test('morning report uses selected units, marks zero as no order and skips unfinished items', () => {

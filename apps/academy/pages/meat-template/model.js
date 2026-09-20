@@ -5,7 +5,7 @@
   const units = ["", "kg", "斤", "条", "件", "份"];
   const workflows = {
     count: { title: "盘肉报货", storageKey: "academy-meat-count-v1", primary: "剩余库存", step: "库存", done: "已盘", pending: "待盘", zero: "无库存 · 0", verb: "盘点", preview: "报货预览", copy: "复制报货文本", compound: true },
-    arrival: { title: "牛肉到货", storageKey: "academy-meat-arrival-v1", primary: "实收重量", step: "到货", done: "已核对", pending: "待核对", zero: "未到货 · 0", verb: "核对", preview: "到货预览", copy: "复制到货文本", compound: false },
+    arrival: { title: "到货", storageKey: "academy-meat-arrival-v1", primary: "实收重量", step: "到货", done: "已核对", pending: "待核对", zero: "未到货 · 0", verb: "核对", preview: "到货预览", copy: "复制到货文本", compound: false },
     morning: { title: "明早报货", storageKey: "academy-meat-morning-v1", primary: "明早需订数量", step: "明早订货", done: "已确认", pending: "待填写", zero: "不订此项", verb: "填写", preview: "明早报货预览", copy: "复制报货文本", compound: false }
   };
   const valid = value => typeof value === "string" && /^\d{1,5}(?:\.\d{1,3})?$/.test(value);
@@ -56,7 +56,7 @@
         return [`${name}：${value}`];
       });
       if (!lines.length) return "";
-      return kind === "arrival" ? `缦云店牛肉到货:\n实收重量\n${lines.join("\n")}` : `缦云店明早报货:\n明早订货：\n${lines.join("\n")}`;
+      return kind === "arrival" ? `缦云店到货:\n${lines.join("\n")}` : `缦云店明早报货:\n明早订货：\n${lines.join("\n")}`;
     }
     // The order template requires a real, confirmed tenderloin remainder.
     if (!confirmed(0)) return "";
