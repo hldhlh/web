@@ -87,7 +87,7 @@
     $("editor-context").textContent = mode === "stock" ? workflow.primary : "明日订货";
     $("progress-label").textContent = `${workflow.done} ${count} / 6`;
     $("overview-action").textContent = count === 6 ? "预览并复制" : `${count ? "继续" : "开始"}${workflow.verb}`;
-    $("preview-button").textContent = count === 6 ? "修改数量" : "预览";
+    $("preview-button").textContent = "预览";
     function renderRows(rows, rowMode) { rows.forEach((card, i) => {
       const value = draft[rowMode][i];
       const done = rowMode === "stock" ? M.valid(draft.stock[i]) : Number(value) > 0;
@@ -212,10 +212,7 @@
   $("next-item").addEventListener("click", nextItem);
   $("zero-value").addEventListener("click", () => { updateBuffer("0"); nextItem(); });
   $("order-unit").addEventListener("change", event => { draft.units[index] = event.target.value; save(); render(); });
-  $("preview-button").addEventListener("click", () => {
-    if (M.missing(draft).length) openPreview();
-    else { selectItem(0, "stock"); openEditor(); }
-  });
+  $("preview-button").addEventListener("click", openPreview);
   $("overview-action").addEventListener("click", () => {
     const missing = M.missing(draft);
     if (!missing.length) openPreview();
