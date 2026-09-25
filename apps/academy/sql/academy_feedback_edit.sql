@@ -17,7 +17,7 @@ begin
     if tg_op = 'DELETE' then return old; end if;
     return new;
   end if;
-  if tg_op = 'DELETE' then raise exception '不能删除反馈'; end if;
+  if tg_op = 'DELETE' then raise exception '请使用反馈删除标记'; end if;
   verified := public.academy_auth('verify', jsonb_build_object(
     'userId', headers->>'x-academy-user-id',
     'sessionToken', headers->>'x-academy-session-token'));
@@ -25,6 +25,18 @@ begin
   actor := verified->'user'->>'id';
   before_value := old.payload->'value';
   after_value := new.payload->'value';
+  -- Deletions retain a null tombstone so stale devices cannot restore the row.
+  if before_value is null or before_value = 'null'::jsonb then
+    raise exception '已删除的反馈不能恢复或修改';
+  end if;
+  if after_value = 'null'::jsonb and new.user_id = old.user_id then
+    if (before_value->'createdBy'->>'id') is distinct from actor or
+       (to_timestamp((before_value->>'createdAt')::numeric / 1000) at time zone 'Asia/Shanghai')::date
+         is distinct from (clock_timestamp() at time zone 'Asia/Shanghai')::date then
+      raise exception '仅可删除本人当天提交的反馈';
+    end if;
+    return new;
+  end if;
   if new.user_id <> old.user_id or after_value is null or
      (before_value - array['title','detail','category','status','updatedAt','updatedBy']) is distinct from
      (after_value - array['title','detail','category','status','updatedAt','updatedBy']) then

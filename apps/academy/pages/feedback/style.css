@@ -149,3 +149,5 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 }
 
 .feedback-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+
+.feedback-item footer .delete-feedback { color: var(--bad, #ff3b30); }

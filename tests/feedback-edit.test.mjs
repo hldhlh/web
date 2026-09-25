@@ -50,7 +50,19 @@ test('database enforces author/day, immutable attribution and separate manager s
   await update({...original,title:'修改两次',status:'resolved'});
   await auth('staff');
   await update({...original,title:'解决后修改',status:'resolved'});
-  await assert.rejects(db.query('delete from academy_progress where user_id=$1',[key('today')]),/不能删除/);
+  await assert.rejects(db.query('delete from academy_progress where user_id=$1',[key('today')]),/删除标记/);
+  await assert.rejects(update(null,'yesterday'),/本人当天/);
+  await auth('other');
+  await assert.rejects(update(null),/本人当天/);
+  await auth('manager');
+  await assert.rejects(update(null),/本人当天/);
+  await auth('forged');
+  await assert.rejects(update(null),/登录状态/);
+  await auth('staff');
+  await update(null);
+  const deleted = (await db.query('select payload from academy_progress where user_id=$1',[key('today')])).rows[0];
+  assert.equal(deleted.payload.value,null);
+  await assert.rejects(update(original),/已删除/);
   await auth('forged');
   await assert.rejects(update(original),/登录状态/);
 });
@@ -79,4 +91,25 @@ test('saving an edit updates the existing item without resetting status or attri
   assert.match(messages.at(-1),/本人当天/);
   assert.equal(state.editingId,'one');
   assert.equal($('#submit-feedback').disabled,false);
+});
+test('deletion confirms, preserves other items, and rechecks permission before saving', async () => {
+  const item={id:'one',title:'反馈'};
+  const other={id:'two',title:'其他反馈'};
+  const state={data:{items:[item,other]},saving:false};
+  let allowed=true,confirmed=true,writes=0,confirmations=0,expire=false,fail=false;
+  const messages=[];
+  const remove=new Function('state','window','canEdit','readLatest','writeData','showToast',`
+    const hydrated=true; let writeGeneration=0,pullAgain=false;
+    function render(){};
+    ${source.slice(source.indexOf('  async function deleteFeedback'),source.indexOf('  async function updateStatus'))}
+    return deleteFeedback;
+  `)(state,{confirm:()=>{confirmations++;return confirmed;}},value=>Boolean(value && allowed),
+    async()=>{if(expire)allowed=false;return structuredClone(state.data);},
+    async next=>{if(fail)throw new Error('offline');writes++;state.data=next;},message=>messages.push(message));
+  confirmed=false;await remove('one');assert.equal(writes,0);
+  confirmed=true;allowed=false;await remove('one');assert.equal(confirmations,1);
+  allowed=true;expire=true;await remove('one');assert.equal(writes,0);assert.match(messages.at(-1),/本人当天/);
+  allowed=true;expire=false;fail=true;await remove('one');assert.equal(state.data.items.length,2);assert.equal(state.saving,false);
+  fail=false;await remove('one');assert.equal(writes,1);assert.deepEqual(state.data.items,[other]);
+  await remove('one');assert.equal(writes,1);
 });

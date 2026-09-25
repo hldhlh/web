@@ -130,7 +130,7 @@
         <p>${escapeHtml(item.detail)}</p>
         <footer>
           <span><b>${escapeHtml(item.createdBy.name)}</b> · ${escapeHtml(timeLabel(item.createdAt))}</span>
-          <div class="feedback-actions">${canEdit(item) ? `<button type="button" data-edit-id="${escapeHtml(item.id)}">编辑</button>` : ""}${managerActions(item)}</div>
+          <div class="feedback-actions">${canEdit(item) ? `<button type="button" data-edit-id="${escapeHtml(item.id)}">编辑</button><button type="button" class="delete-feedback" data-delete-id="${escapeHtml(item.id)}">删除</button>` : ""}${managerActions(item)}</div>
         </footer>
       </article>`).join(""));
   }
@@ -236,6 +236,28 @@
     }
   }
 
+  async function deleteFeedback(id) {
+    if (!hydrated || state.saving) return;
+    const item = state.data.items.find(item => item.id === id);
+    if (!canEdit(item)) return showToast("仅可删除本人当天提交的反馈");
+    if (!window.confirm(`确定删除反馈“${item.title}”？删除后无法恢复。`)) return;
+    state.saving = true;
+    try {
+      const latest = await readLatest();
+      if (!canEdit(latest.items.find(item => item.id === id))) throw new Error("仅可删除本人当天提交的反馈");
+      const now = Date.now();
+      await writeData({ rev: now, updatedAt: now, items: latest.items.filter(item => item.id !== id) }, latest);
+      render();
+      showToast("反馈已删除");
+    } catch (error) {
+      showToast(`删除失败：${error?.message || "请检查网络"}`);
+    } finally {
+      state.saving = false;
+      writeGeneration++;
+      if (pullAgain) pullFeedback(true);
+    }
+  }
+
   async function updateStatus(id, status) {
     if (!hydrated || !isManager() || !STATUSES[status] || state.saving) return;
     state.saving = true;
@@ -306,6 +328,8 @@
       render();
     }));
     $("#feedback-list").addEventListener("click", (event) => {
+      const remove = event.target.closest("[data-delete-id]");
+      if (remove) return deleteFeedback(remove.dataset.deleteId);
       const edit = event.target.closest("[data-edit-id]");
       if (edit) return openCompose(edit.dataset.editId);
       const button = event.target.closest("[data-status-action]");
