@@ -75,7 +75,7 @@ button { cursor: pointer; }
 .board-header h2 { margin: 3px 0 0; font-size: 20px; letter-spacing: -0.02em; }
 
 .view-filter { display: inline-grid; grid-template-columns: repeat(3, 1fr); padding: 3px; border-radius: 10px; background: var(--surface-secondary); }
-.view-filter button { min-width: 66px; min-height: 36px; padding: 0 11px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; }
+.view-filter button { min-width: 66px; min-height: 44px; padding: 0 11px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; }
 .view-filter button.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 5px rgba(0, 0, 0, 0.12); }
 
 .feedback-list { padding: 0 18px; }
@@ -91,7 +91,7 @@ button { cursor: pointer; }
 .feedback-item footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 13px; }
 .feedback-item footer > span { min-width: 0; color: var(--muted); font-size: 12px; }
 .feedback-item footer b { color: var(--text); font-weight: 600; }
-.feedback-item footer button { flex: 0 0 auto; min-height: 36px; padding: 0 11px; border-radius: 9px; background: var(--accent-soft); color: var(--accent); font-size: 13px; font-weight: 650; }
+.feedback-item footer button { flex: 0 0 auto; min-height: 44px; padding: 0 11px; border-radius: 9px; background: var(--accent-soft); color: var(--accent); font-size: 13px; font-weight: 650; }
 
 .empty-state { display: grid; gap: 6px; padding: 42px 16px; text-align: center; }
 .empty-state strong { font-size: 17px; }
@@ -147,3 +147,5 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   :root { --line: rgba(0, 0, 0, 0.32); }
   [data-theme="dark"] { --line: rgba(255, 255, 255, 0.34); }
 }
+
+.feedback-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }

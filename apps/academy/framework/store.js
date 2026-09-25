@@ -221,9 +221,21 @@ window.AcademyStore = (() => {
   async function compareAndSet(key, value, version, token) {
     const row = rowFor(key, value, Math.max(Date.now(), Number(version) + 1), token);
     const params = version == null ? {} : { user_id: `eq.${remoteId(key)}`, ts: `eq.${version}`, select: 'user_id,payload,ts,updated_at' };
-    const response = await request(restUrl(table(), params), {
+    const feedback = key.startsWith('doc:academy/daily-feedback.json:');
+    // Session credentials go only to the configured project, never network mirrors.
+    const target = new URL(restUrl(table(), params));
+    const project = new URL(cfg().url);
+    if (feedback) { target.protocol = project.protocol; target.host = project.host; }
+    const send = feedback ? (url, init) => window.fetch(url, init) : request;
+    const response = await send(target.toString(), {
       method: version == null ? 'POST' : 'PATCH',
-      headers: headers({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+      cache: 'no-store',
+      headers: headers({ 'Content-Type': 'application/json', Prefer: 'return=representation',
+        ...(feedback ? {
+          'x-academy-user-id': window.AcademyAuth?.session?.id || '',
+          'x-academy-session-token': window.AcademyAuth?.session?.sessionToken || ''
+        } : {})
+      }),
       body: JSON.stringify(row)
     });
     if (response.status === 409) return null;

@@ -21,6 +21,7 @@
     data: readCachedData(),
     filter: "pending",
     channel: null,
+    editingId: null,
     saving: false
   };
   const $ = (selector) => document.querySelector(selector);
@@ -71,8 +72,14 @@
   }
 
   function localDateKey(timestamp = Date.now()) {
-    const date = new Date(timestamp);
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(timestamp));
+  }
+
+  function canEdit(item, now = Date.now()) {
+    const session = window.AcademyAuth?.session;
+    return Boolean(hydrated && session?.id && session.id === state.session?.id &&
+      item?.createdBy?.id === session.id && item.createdAt > 0 &&
+      localDateKey(item.createdAt) === localDateKey(now));
   }
 
   function timeLabel(timestamp) {
@@ -123,13 +130,13 @@
         <p>${escapeHtml(item.detail)}</p>
         <footer>
           <span><b>${escapeHtml(item.createdBy.name)}</b> · ${escapeHtml(timeLabel(item.createdAt))}</span>
-          ${managerActions(item)}
+          <div class="feedback-actions">${canEdit(item) ? `<button type="button" data-edit-id="${escapeHtml(item.id)}">编辑</button>` : ""}${managerActions(item)}</div>
         </footer>
       </article>`).join(""));
   }
 
   function render() {
-    state.renderDay = new Date().toDateString();
+    state.renderDay = localDateKey();
     renderOverview();
     renderList();
     document.querySelectorAll("[data-filter]").forEach((button) => {
@@ -139,8 +146,19 @@
     });
   }
 
-  function openCompose() {
+  function openCompose(id = null) {
+    if (state.saving) return;
+    const item = typeof id === "string" ? state.data.items.find(item => item.id === id) : null;
+    if (typeof id === "string" && !canEdit(item)) return showToast("仅可编辑本人当天提交的反馈");
+    state.editingId = item?.id || null;
     $("#feedback-form").reset();
+    $("#compose-title").textContent = item ? "编辑反馈" : "反馈问题";
+    $("#submit-feedback").textContent = item ? "保存修改" : "提交";
+    if (item) {
+      $("#feedback-title").value = item.title;
+      $("#feedback-detail").value = item.detail;
+      $("#feedback-category").value = item.category;
+    }
     $("#compose-backdrop").hidden = false;
     $("#compose-sheet").hidden = false;
     document.body.style.overflow = "hidden";
@@ -148,6 +166,8 @@
   }
 
   function closeCompose() {
+    if (state.saving) return;
+    state.editingId = null;
     $("#compose-backdrop").hidden = true;
     $("#compose-sheet").hidden = true;
     document.body.style.overflow = "";
@@ -173,6 +193,7 @@
     const category = $("#feedback-category").value;
     if (!title) return showToast("请填写问题标题");
     if (!detail) return showToast("请说明具体情况");
+    const editingId = state.editingId;
     state.saving = true;
     const button = $("#submit-feedback");
     button.disabled = true;
@@ -180,6 +201,9 @@
     try {
       const latest = await readLatest();
       const now = Date.now();
+      const existing = editingId ? latest.items.find(item => item.id === editingId) : null;
+      if (editingId && !canEdit(existing, now)) throw new Error("仅可编辑本人当天提交的反馈");
+      if (!window.AcademyAuth?.session?.id || window.AcademyAuth.session.id !== state.session?.id) throw new Error("登录状态已变化，请重新登录");
       const item = {
         id: (crypto.randomUUID && crypto.randomUUID()) || `feedback-${now}-${Math.random().toString(36).slice(2)}`,
         title,
@@ -191,12 +215,16 @@
         updatedAt: now,
         updatedBy: state.session.id
       };
-      await writeData({ rev: now, updatedAt: now, items: [item, ...latest.items] }, latest);
+      const items = editingId ? latest.items.map(entry => entry.id === editingId
+        ? { ...entry, title, detail, category: item.category, updatedAt: now, updatedBy: state.session.id } : entry)
+        : [item, ...latest.items];
+      await writeData({ rev: now, updatedAt: now, items }, latest);
+      state.saving = false;
       closeCompose();
-      state.filter = "pending";
+      if (!editingId) state.filter = "pending";
       render();
       $("#sync-status").textContent = "";
-      showToast("反馈已保存");
+      showToast(editingId ? "修改已保存" : "反馈已保存");
     } catch (error) {
       showToast(`提交失败：${error?.message || "请检查网络"}`);
     } finally {
@@ -204,7 +232,7 @@
       writeGeneration++;
       if (pullAgain) pullFeedback(true);
       button.disabled = false;
-      button.textContent = "提交";
+      button.textContent = state.editingId ? "保存修改" : "提交";
     }
   }
 
@@ -249,7 +277,7 @@
             }
           }
           $("#sync-status").textContent = "";
-          if (changed || state.renderDay !== new Date().toDateString()) render();
+          if (changed || state.renderDay !== localDateKey()) render();
         } catch (_) {
           if (!silent) $("#sync-status").textContent = "当前离线，显示上次同步的问题";
         }
@@ -278,6 +306,8 @@
       render();
     }));
     $("#feedback-list").addEventListener("click", (event) => {
+      const edit = event.target.closest("[data-edit-id]");
+      if (edit) return openCompose(edit.dataset.editId);
       const button = event.target.closest("[data-status-action]");
       if (button) updateStatus(button.dataset.id, button.dataset.statusAction);
     });

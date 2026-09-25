@@ -8,7 +8,7 @@ function fixture() {
   const state = {data:{rev:1,items:[]},saving:false,renderDay:new Date().toDateString()};
   const calls=[]; let renders=0;
   const api = new Function('state','window','document','normalizeData','cacheData','$','render', `
-    const FILE='test'; let pullPromise=null,pullAgain=false,writeGeneration=0;
+    const localDateKey=()=>new Date().toDateString(); const FILE='test'; let pullPromise=null,pullAgain=false,writeGeneration=0;
     ${body}
     return {pull:pullFeedback,beginSave(){state.saving=true;writeGeneration++},endSave(){state.saving=false;writeGeneration++}};
   `)(state,{AcademyStore:{getJSON:()=>new Promise((resolve,reject)=>calls.push({resolve,reject}))}},
