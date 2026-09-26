@@ -225,6 +225,47 @@ body:has(.image-operation:not([hidden])) .workspace.has-image { height: auto; fl
   .conflict-panel { flex-shrink: 0; max-height: 35svh; overflow-y: auto; }
   body[data-view="editor"] .sync-bar:is([data-status="error"], [data-status="conflict"]) { flex-shrink: 0; }
 }
+
+/* Phone tools occupy their own space and never cover the drawing surface. */
+@media (max-width: 640px) {
+  /* The embedded app already has its own project title and back control. */
+  body[data-view="editor"] #workspace .side-panel .inspector-header { display: none; }
+  body[data-view="editor"] #workspace .side-panel .draw-mode { margin: 0 12px 8px; }
+  body[data-view="editor"] #workspace .side-panel .panel-section { padding: 12px 16px; }
+  body[data-view="editor"] #workspace .side-panel .section-heading { margin-bottom: 8px; }
+  body[data-view="editor"] #workspace .side-panel .section-heading h3 { font-size: .882rem; }
+  body[data-view="editor"] #workspace .side-panel #selectionType { display: none; }
+  body[data-view="editor"] #workspace .side-panel .editor-tip { margin-top: 6px; font-size: .706rem; }
+  body[data-view="editor"] #workspace .side-panel .quick-labels { margin-top: 2px; }
+  body[data-view="editor"] #workspace .side-panel .style-picker > span,
+  body[data-view="editor"] #workspace .side-panel .position-picker > span { margin-bottom: 4px; }
+  body[data-view="editor"] #workspace.has-image { position: relative; }
+  body[data-view="editor"] #workspace .canvas-area { min-height: 0; }
+  body[data-view="editor"] #workspace .canvas-viewport { min-height: 0; }
+  body[data-view="editor"] #workspace .side-panel {
+    position: relative;
+    flex: 0 1 auto;
+    max-height: 38dvh;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid var(--line);
+    border-bottom: 0;
+    border-radius: 0;
+    background: var(--surface);
+    box-shadow: none;
+  }
+  body[data-view="editor"] #workspace[data-inspector="false"] .side-panel { display: none; }
+  body[data-view="editor"] #workspace .side-panel .inspector-header { position: sticky; top: 0; z-index: 1; padding: 10px 16px 4px; background: var(--surface); }
+  body[data-view="editor"] #workspace .side-panel .inspector-header::before { content: ''; position: absolute; top: 6px; left: calc(50% - 18px); width: 36px; height: 4px; border-radius: 99px; background: var(--line); }
+  body[data-view="editor"] #workspace .side-panel .panel-section:last-of-type { border-bottom: 0; }
+  body[data-view="editor"] #workspace .side-panel .list-select { min-height: 60px; }
+  body[data-view="editor"] #workspace .side-panel .panel-footer { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  body[data-view="editor"] #workspace .canvas-bottom { z-index: 6; }
+  body[data-view="editor"] #workspace[data-inspector="true"] .inspector-toggle { color: var(--accent); font-weight: 600; }
+  body[data-view="editor"] #workspace[data-inspector="true"] .inspector-toggle { display: inline-flex; }
+}
 @media (prefers-reduced-transparency: reduce) { .topbar, .zoom-controls { backdrop-filter: none; background: var(--surface); } }
 @media (prefers-contrast: more) { :root { --muted: var(--text); --line: #72757b; }[data-theme="dark"] { --line: #a3a8b0; }.button, .project-card, .style-options button, .position-options button { border-width: 2px; }.scope-option input:checked + span { outline: 2px solid var(--text); outline-offset: -2px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
@@ -244,3 +285,7 @@ body:has(.image-operation:not([hidden])) .workspace.has-image { height: auto; fl
 #toggleAnnotations[aria-pressed="false"] .visibility-slash { display: block; }
 #toggleAnnotations[aria-pressed="false"] { color: var(--muted); background: var(--surface-2); }
 #toggleAnnotations:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+
+/* Explicit annotation deletion action, with a full touch target. */
+#workspace[data-editing="true"] .list-row .list-select { padding-right: 80px; }
+.list-row .row-delete { width: 72px; display: flex; justify-content: center; gap: 4px; color: var(--bad); font-size: .765rem; }

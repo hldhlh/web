@@ -81,7 +81,9 @@
   }
   function setInspector(open) {
     elements.workspace.dataset.inspector = String(open);
-    document.getElementById('inspectorToggle').setAttribute('aria-expanded', String(open));
+    const toggle = document.getElementById('inspectorToggle');
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.querySelector('span').textContent = open ? '收起' : '标注';
   }
   document.getElementById('inspectorToggle').addEventListener('click', () => {
     setInspector(elements.workspace.dataset.inspector !== 'true');
@@ -165,8 +167,11 @@
   // Match the displayed percentage: 600% of the original image, on every viewport.
   const maximumZoom = () => 6 / state.fitScale;
 
-  function updateFit() {
+  function updateFit(preserveViewport = false) {
     if (!state.image) return;
+    const previousFitScale = state.fitScale;
+    const previousZoom = state.zoom;
+    const previousPanX = state.panX, previousPanY = state.panY;
     const availableWidth = Math.max(200, elements.viewport.clientWidth - 36);
     const availableHeight = Math.max(220, elements.viewport.clientHeight - 36);
     state.fitScale = Math.min(
@@ -174,8 +179,15 @@
       availableHeight / state.image.naturalHeight,
       1,
     );
-    state.zoom = Math.min(state.zoom, maximumZoom());
+    if (preserveViewport && previousFitScale > 0) {
+      state.zoom = clamp(previousFitScale * previousZoom / state.fitScale, .5, maximumZoom());
+      state.panX = previousPanX;
+      state.panY = previousPanY;
+    } else {
+      state.zoom = Math.min(state.zoom, maximumZoom());
+    }
     updateCanvasDisplaySize();
+    if (preserveViewport) panCanvas(0, 0);
   }
 
   function updateCanvasDisplaySize() {
@@ -823,8 +835,12 @@
       deleteButton.title = "删除这条标注";
       deleteButton.setAttribute("aria-label", `删除标注：${summary || `第 ${index + 1} 条`}`);
       deleteButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"></path><path d="M9 7V4h6v3"></path><path d="M6.5 7l1 13h9l1-13"></path><path d="M10 11v5M14 11v5"></path></svg>';
+      const deleteLabel = document.createElement('span');
+      deleteLabel.textContent = '删除';
+      deleteButton.append(deleteLabel);
       deleteButton.addEventListener("click", () => {
-        if (!state.editing) return;
+        if (!state.editing || !state.annotationsVisible) return;
+        cancelDrawing();
         commit(item, true);
         state.annotations = state.annotations.filter((annotation) => annotation.id !== item.id);
         if (state.selectedId === item.id) state.selectedId = null;
@@ -1081,7 +1097,7 @@
     if (pointers.size) suppressDrawing = true;
     state.editing = !state.editing;
     if (state.editing) state.annotationsVisible = true;
-    setInspector(state.editing);
+    setInspector(state.editing && !window.matchMedia('(max-width: 640px)').matches);
     updateInterface(); render();
     setNotice(state.editing ? '编辑模式：单指绘制或调整节点，双指同时缩放和拖动画布' : '已退出编辑，双指可同时缩放和拖动画布');
   });
@@ -1235,7 +1251,7 @@
     state.zoom = 1; state.panX = 0; state.panY = 0; elements.canvasStage.style.transform = '';
     updateFit(); elements.viewport.scrollTo(0, 0); setNotice('图片已适合窗口');
   });
-  const resizeObserver = new ResizeObserver(updateFit);
+  const resizeObserver = new ResizeObserver(() => updateFit(true));
   resizeObserver.observe(elements.viewport);
   const themeObserver = new MutationObserver(renderSelection);
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
