@@ -45,8 +45,8 @@ test('arrival and morning start blank and have independent storage keys', () => 
   assert.equal(new Set(Object.values(M.workflows).map(w => w.storageKey)).size, 3);
   for (const kind of ['arrival', 'morning']) {
     const draft = M.initial(kind);
-    assert.deepEqual(draft.stock, ['', '', '', '', '', '']);
-    assert.equal(M.missing(draft).length, 6);
+    assert.deepEqual(draft.stock, Array(kind === 'arrival' ? 9 : 6).fill(''));
+    assert.equal(M.missing(draft, kind).length, kind === 'arrival' ? 9 : 5);
     assert.equal(M.report(draft, kind).includes('剩余库存'), false);
   }
   assert.deepEqual(M.initial('morning').units, Array(6).fill('kg'));
@@ -58,15 +58,46 @@ test('arrival report includes actual receipts and explicit zero without inventor
   assert.equal(M.report(draft, 'arrival'), '缦云店到货:\n吊龙：5.25kg\n板腱：3kg\n花趾：0kg\n碎肉：2.5kg\n胸口油：1kg\n极品雪花：0kg');
 });
 
-test('morning report uses selected units, marks zero as no order and skips unfinished items', () => {
+test('arrival covers all order items and expands legacy drafts without losing receipts', () => {
+  const expected = ['吊龙', '板腱', '花趾', '碎肉', '胸口油', '极品雪花', '牛大肚', '牛小肠', '牛肋条'];
+  assert.deepEqual(M.itemsFor('arrival'), expected);
+  assert.deepEqual([...new Set([...M.orderItems, ...M.itemsFor('morning')])], expected);
+  const draft = M.restore({ stock: ['1', '2', '3', '4', '5', '6'] }, 'arrival');
+  assert.deepEqual(draft.stock, ['1', '2', '3', '4', '5', '6', '', '', '']);
+  assert.deepEqual(M.missing(draft, 'arrival'), [6, 7, 8]);
+  for (const [i, value] of [[6, '2.5'], [7, '0'], [8, '3.75']]) {
+    assert.equal(M.setValue(draft, 'stock', i, value), true);
+    assert.equal(M.confirmStock(draft, i), true);
+  }
+  assert.deepEqual(M.missing(draft, 'arrival'), []);
+  assert.match(M.report(draft, 'arrival'), /牛大肚：2.5kg\n牛小肠：0kg\n牛肋条：3.75kg$/);
+  assert.deepEqual(M.restore(JSON.parse(JSON.stringify(draft)), 'arrival'), draft);
+  assert.equal(M.setValue(M.empty(), 'stock', 6, '1'), false);
+});
+
+test('morning report uses selected units and skips zero and unfinished items', () => {
   const draft = M.empty('morning');
   M.setValue(draft, 'stock', 0, '2');
   draft.units[0] = '条';
   M.confirmStock(draft, 0);
   M.setValue(draft, 'stock', 1, '0');
   M.confirmStock(draft, 1);
-  assert.equal(M.report(draft, 'morning'), '缦云店明早报货:\n明早订货：\n吊龙：2条\n板腱：不订');
+  assert.equal(M.report(draft, 'morning'), '缦云店明早报货:\n吊龙：2条');
   assert.deepEqual(M.restore(JSON.parse(JSON.stringify(draft)), 'morning'), draft);
+});
+
+test('morning excludes premium snow beef from legacy drafts and completion counts', () => {
+  const draft = M.empty('morning');
+  draft.stock = ['1', '2', '3', '4', '5', '9'];
+  const restored = M.restore(draft, 'morning');
+  assert.deepEqual(M.itemsFor('morning'), ['吊龙', '板腱', '花趾', '碎肉', '胸口油']);
+  assert.equal(M.missing(M.empty('morning'), 'morning').length, 5);
+  assert.deepEqual(M.missing(restored, 'morning'), []);
+  assert.doesNotMatch(M.report(restored, 'morning'), /极品雪花/);
+  assert.match(M.report(restored, 'arrival'), /极品雪花：9kg/);
+  assert.match(M.report(restored, 'count'), /极品雪花：9kg/);
+  restored.stock[5] = '';
+  assert.deepEqual(M.missing(restored, 'morning'), []);
 });
 
 test('partial reports omit unconfirmed rows while count retains the order template', () => {

@@ -15,7 +15,7 @@
   }
   let draft = loadDraft();
   let mode = "stock";
-  let index = M.missing(draft)[0] ?? 0;
+  let index = M.missing(draft, kind)[0] ?? 0;
   let buffer = draft.stock[index];
   let replaceOnType = true;
   let copyBusy = false;
@@ -44,7 +44,7 @@
     else {
       draft = loadDraft();
       mode = "stock";
-      index = M.missing(draft)[0] ?? 0;
+      index = M.missing(draft, kind)[0] ?? 0;
       buffer = draft.stock[index];
       replaceOnType = true;
     }
@@ -53,8 +53,8 @@
     message("");
   }
   document.querySelectorAll("[data-kind]").forEach(button => button.addEventListener("click", () => switchWorkflow(button.dataset.kind)));
-  const namesFor = rowMode => rowMode === "orders" ? M.orderItems : M.items;
-  function makeRows(container, rowMode) { return namesFor(rowMode).map((name, i) => {
+  const namesFor = rowMode => rowMode === "orders" ? M.orderItems : M.itemsFor(kind);
+  function makeRows(container, rowMode) { return M.orderItems.map((name, i) => {
     const card = document.createElement("button");
     card.type = "button";
     card.className = "item-row";
@@ -82,13 +82,16 @@
     try { localStorage.setItem(storageKey, JSON.stringify(draft)); storageError = false; } catch { storageError = true; }
   }
   function render() {
-    const count = 6 - M.missing(draft).length;
+    const total = M.itemsFor(kind).length;
+    const count = total - M.missing(draft, kind).length;
     $("list-title").textContent = workflow.primary;
     $("editor-context").textContent = mode === "stock" ? workflow.primary : "明日订货";
-    $("progress-label").textContent = `${workflow.done} ${count} / 6`;
-    $("overview-action").textContent = count === 6 ? "预览并复制" : `${count ? "继续" : "开始"}${workflow.verb}`;
+    $("progress-label").textContent = `${workflow.done} ${count} / ${total}`;
+    $("overview-action").textContent = count === total ? "预览并复制" : `${count ? "继续" : "开始"}${workflow.verb}`;
     $("preview-button").textContent = "预览";
     function renderRows(rows, rowMode) { rows.forEach((card, i) => {
+      card.hidden = i >= namesFor(rowMode).length;
+      if (card.hidden) return;
       const value = draft[rowMode][i];
       const done = rowMode === "stock" ? M.valid(draft.stock[i]) : Number(value) > 0;
       const unit = rowMode === "stock" && kind !== "morning" ? "kg" : draft.units[i];
@@ -114,7 +117,7 @@
     $("order-unit").value = draft.units[index];
     $("previous-item").disabled = index === 0;
     $("zero-value").textContent = mode === "stock" ? workflow.zero : "不订此项";
-    $("next-item").textContent = mode === "stock" ? (index === 5 ? (workflow.compound ? "去填写订货" : "预览报货") : "下一项 ›") : (index === M.orderItems.length - 1 ? "完成 · 预览报货" : "下一项 ›");
+    $("next-item").textContent = mode === "stock" ? (index === M.itemsFor(kind).length - 1 ? (workflow.compound ? "去填写订货" : "预览报货") : "下一项 ›") : (index === M.orderItems.length - 1 ? "完成 · 预览报货" : "下一项 ›");
     if (storageError) $("draft-status").textContent = "本机保存不可用，请在离开前复制报货文本。";
     else if (draft.updatedAt) {
       const time = new Date(draft.updatedAt);
@@ -156,7 +159,7 @@
     if (mode === "stock") {
       if (!M.confirmStock(draft, index)) { message(`请先输入${kind === "morning" ? "数量" : "重量"}，或点“${workflow.zero}”。`, true); return; }
       save();
-      if (index === 5) { if (workflow.compound) selectItem(0, "orders"); else { render(); openPreview(); } }
+      if (index === M.itemsFor(kind).length - 1) { if (workflow.compound) selectItem(0, "orders"); else { render(); openPreview(); } }
       else selectItem(index + 1);
     } else if (index === M.orderItems.length - 1) openPreview();
     else selectItem(index + 1);
@@ -214,7 +217,7 @@
   $("order-unit").addEventListener("change", event => { draft.units[index] = event.target.value; save(); render(); });
   $("preview-button").addEventListener("click", openPreview);
   $("overview-action").addEventListener("click", () => {
-    const missing = M.missing(draft);
+    const missing = M.missing(draft, kind);
     if (!missing.length) openPreview();
     else { selectItem(missing[0], "stock"); openEditor(); }
   });
