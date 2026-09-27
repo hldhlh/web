@@ -60,9 +60,9 @@ test('saving persists selected groups, publishes and updates the employee card',
   let saved = 0;
   let resolve;
   const published = new Promise(done => { resolve = done; });
-  const invoke = new Function('act', 'event', 'btn', 'Auth', 'DATA', 'normalizeTaskBoard', 'saveOpsStore', 'ContentSync', 'document', 'staffGroupLabel', 'staffIdentityLabel', branch);
-  invoke('ops-staff-group-save', { preventDefault() {} }, btn, { isManager: () => true, list: () => [{ id: 'a' }] }, data, value => value, () => saved++, { publish: () => published }, { querySelectorAll: () => [{ dataset: { syncKey: 'a' }, querySelector: selector => selector === '[data-staff-role]' ? identity : row }], querySelector: () => null }, () => '前厅 · 兼职', () => '前厅、后厨 · 兼职');
-  assert.deepEqual(data.taskBoard.staffGroups.a, { departments: ['front', 'kitchen'], department: 'front', employment: 'part' });
+  const invoke = new Function('act', 'event', 'btn', 'Auth', 'DATA', 'normalizeTaskBoard', 'normalizeStaffDirectory', 'saveOpsStore', 'ContentSync', 'document', 'staffGroupLabel', 'staffIdentityLabel', branch);
+  invoke('ops-staff-group-save', { preventDefault() {} }, btn, { isManager: () => true, list: () => [{ id: 'a' }] }, data, value => value, (value, legacy) => value || { roles: [], profiles: legacy || {} }, () => saved++, { publish: () => published }, { querySelectorAll: () => [{ dataset: { syncKey: 'a' }, querySelector: selector => selector === '[data-staff-role]' ? identity : row }], querySelector: () => null }, () => '前厅 · 兼职', () => '前厅、后厨 · 兼职');
+  assert.deepEqual(data.staffDirectory.profiles.a, { departments: ['front', 'kitchen'], department: 'front', employment: 'part' });
   assert.equal(saved, 1);
   assert.equal(btn.disabled, true);
   assert.equal(closed, false);

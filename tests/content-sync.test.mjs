@@ -6,15 +6,15 @@ const source = readFileSync(new URL('../apps/academy/app.js', import.meta.url), 
 const start = source.indexOf('    apply(payload) {');
 const apply = source.slice(start, source.indexOf('    async pull()', start));
 function fixture(route = 'home') {
-  const DATA = {homeLayout:{},courseGroups:[],lessons:[],exams:[],notices:[],taskBoard:{}};
+  const DATA = {homeLayout:{},courseGroups:[],lessons:[],exams:[],notices:[],taskBoard:{},staffDirectory:{roles:[],profiles:{},defaults:{}}};
   let renders = 0, notifications = 0;
   const factory = new Function('DATA','state','Auth','HomeLayout','normalizeCourseGroups',
-    'stripUnrelatedCurriculum','normalizeLesson','normalizeExam','normalizeNotice','normalizeTaskBoard',
+    'stripUnrelatedCurriculum','normalizeLesson','normalizeExam','normalizeNotice','normalizeTaskBoard','normalizeStaffDirectory',
     'saveOpsStore','currentOpsRoute','updateNotificationButton','render','refreshBackgroundView',
     `let contentRevision = 10; return { base: null, ${apply} };`);
   const identity = value => value;
   const sync = factory(DATA,{route:{name:route}},{session:{id:'test'}},{normalize:identity},
-    identity,identity,identity,identity,identity,identity,() => {},() => ({}),
+    identity,identity,identity,identity,identity,identity,identity,() => {},() => ({}),
     () => notifications++,() => renders++,() => renders++);
   return {sync, DATA, counts:() => ({renders,notifications}), payload:() => ({rev:10,data:structuredClone(DATA)})};
 }

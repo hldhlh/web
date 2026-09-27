@@ -99,7 +99,7 @@
   function defaultCourseGroups() {
     return DATA.tracks.map((track, index) => ({
       id: coerceId("group", track.id),
-      name: coerceString(track.title, `课程分组 ${index + 1}`)
+      name: coerceString(track.title, `课程分类 ${index + 1}`)
     }));
   }
 
@@ -108,7 +108,7 @@
     const seen = new Set();
     return source.map((item, index) => ({
       id: coerceId("group", item?.id),
-      name: coerceString(item?.name || item?.title, `课程分组 ${index + 1}`)
+      name: coerceString(item?.name || item?.title, `课程分类 ${index + 1}`)
     })).filter((item) => !seen.has(item.id) && seen.add(item.id));
   }
 
@@ -131,7 +131,7 @@
     const trackNames = Object.fromEntries(DATA.tracks.map((track) => [track.id, track.title]));
     const stages = trackIds.map((track, index) => ({
       id: coerceId("task-stage", track),
-      title: coerceString(trackNames[track], `阶段 ${index + 1}`),
+      title: coerceString(trackNames[track], `任务 ${index + 1}`),
       items: [
         ...lessons.filter((item) => item.track === track).map((item) => ({ kind: "lesson", id: item.id })),
         ...exams.filter((item) => item.track === track).map((item) => ({ kind: "exam", id: item.id }))
@@ -162,7 +162,7 @@
         id: coerceId("task-stage", stage?.id),
         audience: normalizeNoticeAudience(stage?.audience),
         label: coerceString(stage?.label, "").slice(0, 20),
-        title: coerceString(stage?.title, `阶段 ${index + 1}`),
+        title: coerceString(stage?.title, `任务 ${index + 1}`),
         items
       };
     });
@@ -214,6 +214,7 @@
       minutes: Math.max(1, Math.round(coerceNumber(item.minutes, 3))),
       summary: coerceString(item.summary, "课程内容待完善。"),
       access: item.access === "basic" ? "basic" : "full",
+      videoDurationSeconds: Math.max(0, Number(item.videoDurationSeconds) || 0),
       mediaUrl: coerceString(item.mediaUrl, ""),
       publishedAt: coerceNumber(item.publishedAt, 0),
       notify: item.notify !== false,
@@ -345,14 +346,29 @@
 
   function normalizeStaffGroups(raw) {
     return Object.fromEntries(Object.entries(raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}).map(([id, group]) => [id, {
-      departments: Array.from(new Set((Array.isArray(group?.departments) ? group.departments : [group?.department]).filter(value => ["front", "kitchen", "dishwashing"].includes(value)))),
-      department: ["front", "kitchen", "dishwashing"].includes(group?.department) ? group.department : "",
+      departments: Array.from(new Set((Array.isArray(group?.departments) ? group.departments : [group?.department]).filter(value => typeof value === "string" && value.trim()))),
+      department: typeof group?.department === "string" ? group.department : "",
       employment: ["full", "part"].includes(group?.employment) ? group.employment : ""
     }]));
   }
 
+  function normalizeStaffDirectory(raw, legacy = {}) {
+    const source = raw && typeof raw === "object" ? raw : {};
+    const roles = Array.isArray(source.roles) && source.roles.length ? source.roles : [
+      { id: "front", name: "前厅" }, { id: "kitchen", name: "后厨" }, { id: "dishwashing", name: "洗碗间" }
+    ];
+    return {
+      roles: roles.filter(role => role && typeof role.id === "string" && typeof role.name === "string").map(role => ({ id: role.id, name: role.name })),
+      profiles: normalizeStaffGroups(source.profiles || legacy),
+      defaults: source.defaults || { departments: ["front"], employment: "part" }
+    };
+  }
+
+  function staffRoles() { return DATA.staffDirectory?.roles || normalizeStaffDirectory().roles; }
+  function staffRoleName(id) { return staffRoles().find(role => role.id === id)?.name || id; }
+
   function taskDepartmentOptions(selected = "") {
-    const groups = normalizeStaffGroups(DATA.taskBoard?.staffGroups);
+    const groups = normalizeStaffGroups(DATA.staffDirectory?.profiles || DATA.taskBoard?.staffGroups);
     const ids = new Set(Object.values(groups).flatMap(group => group.departments));
     if (selected) ids.add(selected);
     const names = { front: "前厅", kitchen: "后厨", dishwashing: "洗碗间" };
@@ -360,30 +376,30 @@
   }
 
   function staffGroupFor(userId) {
-    return DATA.taskBoard?.staffGroups?.[userId] || { departments: ["front"], department: "front", employment: "part" };
+    return DATA.staffDirectory?.profiles?.[userId] || DATA.taskBoard?.staffGroups?.[userId] || DATA.staffDirectory?.defaults || { departments: ["front"], department: "front", employment: "part" };
   }
 
   function staffGroupLabel(userId) {
     const group = staffGroupFor(userId);
-    return `${(group.departments || [group.department]).map(value => ({front: "前厅", kitchen: "后厨", dishwashing: "洗碗间"})[value]).filter(Boolean).join("、") || "岗位未设置"} · ${({full: "全职", part: "兼职"})[group.employment] || "用工类型未设置"}`;
+    return `${(group.departments || [group.department]).map(value => staffRoleName(value)).filter(Boolean).join("、") || "岗位未设置"} · ${({full: "全职", part: "兼职"})[group.employment] || "用工类型未设置"}`;
   }
 
   function staffIdentityLabel(user) {
     const group = staffGroupFor(user.id);
-    const departments = (group.departments || [group.department]).map(value => ({ front: "前厅", kitchen: "后厨", dishwashing: "洗碗间" })[value]).filter(Boolean);
+    const departments = (group.departments || [group.department]).map(value => staffRoleName(value)).filter(Boolean);
     const employment = ({ full: "全职", part: "兼职" })[group.employment];
     return [user.role === "manager" ? "店长" : "", departments.join("、"), employment].filter(Boolean).join(" · ");
   }
 
   function renderStaffGroupEditor(user) {
     const group = staffGroupFor(user.id);
-    return `<button type="button" class="staff-group-entry" data-departments="${escapeHtml((group.departments || [group.department]).filter(Boolean).join(","))}" data-employment="${escapeHtml(group.employment || "")}" data-act="ops-staff-group-edit" data-id="${escapeHtml(user.id)}">员工分组</button>`;
+    return `<button type="button" class="staff-group-entry" data-departments="${escapeHtml((group.departments || [group.department]).filter(Boolean).join(","))}" data-employment="${escapeHtml(group.employment || "")}" data-act="ops-staff-group-edit" data-id="${escapeHtml(user.id)}">员工信息</button>`;
   }
 
   function staffGroupForm(user) {
     const group = staffGroupFor(user.id);
     return `<div class="staff-group-editor" data-staff-group-id="${escapeHtml(user.id)}">
-      <fieldset class="staff-department-options"><legend>岗位 <small>可多选</small></legend>${[["front","前厅"],["kitchen","后厨"],["dishwashing","洗碗间"]].map(([value,label]) => `<label><span>${label}</span><input type="checkbox" data-staff-department value="${value}" ${(group.departments || [group.department]).includes(value) ? "checked" : ""}></label>`).join("")}</fieldset>
+      <fieldset class="staff-department-options"><legend>岗位 <small>可多选</small></legend>${staffRoles().map(role => [role.id, role.name]).map(([value,label]) => `<label><span>${label}</span><input type="checkbox" data-staff-department value="${value}" ${(group.departments || [group.department]).includes(value) ? "checked" : ""}></label>`).join("")}</fieldset>
       <label>用工类型<select data-staff-employment>${[["", "未设置"],["full","全职"],["part","兼职"]].map(([value,label]) => `<option value="${value}" ${group.employment === value ? "selected" : ""}>${label}</option>`).join("")}</select></label>
 
       <p role="status" aria-live="polite"></p>
@@ -397,7 +413,7 @@
     document.getElementById("staff-group-dialog")?.remove();
     const trigger = document.activeElement;
     document.body.insertAdjacentHTML("beforeend", `<dialog id="staff-group-dialog" class="shortcut-permissions-dialog staff-group-dialog" aria-labelledby="staff-group-title">
-      <form><header><button type="button" data-group-cancel>取消</button><h2 id="staff-group-title">员工分组</h2><button type="submit" data-act="ops-staff-group-save" data-id="${escapeHtml(user.id)}">保存</button></header>
+      <form><header><button type="button" data-group-cancel>取消</button><h2 id="staff-group-title">员工信息</h2><button type="submit" data-act="ops-staff-group-save" data-id="${escapeHtml(user.id)}">保存</button></header>
       <div class="shortcut-permissions-content"><p class="staff-group-person">${escapeHtml(user.name)}</p>${staffGroupForm(user)}<p class="staff-group-note">可选择多个岗位，接收任一所选岗位的任务。用工类型单独设置。</p></div></form>
     </dialog>`);
     const dialog = document.getElementById("staff-group-dialog");
@@ -516,11 +532,13 @@
       : fallbackExams;
     const notices = Array.isArray(raw?.notices) ? raw.notices.map(normalizeNotice) : [];
     const taskBoard = normalizeTaskBoard(raw?.taskBoard || DATA.taskBoard, lessons, exams);
+    const staffDirectory = normalizeStaffDirectory(raw?.staffDirectory || DATA.staffDirectory, taskBoard.staffGroups);
     return {
       courseGroups,
       lessons,
       exams,
       notices,
+      staffDirectory,
       taskBoard,
       homeLayout: HomeLayout.normalize(raw?.homeLayout || DATA.homeLayout)
     };
@@ -531,6 +549,7 @@
       try { return localStorage.getItem(OPS_STORAGE_KEY) || ""; } catch (_) { return ""; }
     })();
     const snapshot = stripUnrelatedCurriculum(loadOpsStore());
+    DATA.staffDirectory = snapshot.staffDirectory;
     DATA.courseGroups = snapshot.courseGroups;
     DATA.lessons = snapshot.lessons;
     DATA.exams = snapshot.exams;
@@ -563,7 +582,8 @@
       exams: DATA.exams,
       notices: DATA.notices,
       homeLayout: HomeLayout.normalize(DATA.homeLayout),
-      taskBoard: DATA.taskBoard
+      staffDirectory: DATA.staffDirectory,
+      taskBoard: { ...DATA.taskBoard, staffGroups: {} }
     };
     try { localStorage.setItem(OPS_STORAGE_KEY, JSON.stringify(payload)); } catch (_) {}
   }
@@ -616,11 +636,13 @@
     const scenes = parseLessonScenes(document.getElementById("ops-lesson-scenes")?.value);
     if (blocks === null || scenes === null) return;
     const data = {
+      optionDefaultsVersion: 2,
       title: document.getElementById("ops-lesson-title")?.value || "",
       summary: document.getElementById("ops-lesson-summary")?.value || "",
       type: document.getElementById("ops-lesson-type")?.value || "article",
       track: document.getElementById("ops-lesson-track")?.value || "onboard",
-      groupIds: Array.from(document.querySelectorAll('input[name="ops-lesson-groups"]:checked')).map((input) => input.value),
+      videoDurationSeconds: Number(document.getElementById("ops-lesson-video-duration")?.value) || 0,
+      groupIds: [document.getElementById("ops-lesson-track")?.value || "onboard"],
       minutes: document.getElementById("ops-lesson-minutes")?.value || "3",
       access: document.getElementById("ops-lesson-access")?.value || "full",
       mediaUrl: document.getElementById("ops-lesson-media-url")?.value || "",
@@ -918,7 +940,8 @@
         exams: DATA.exams,
         notices: DATA.notices || [],
         homeLayout: HomeLayout.normalize(DATA.homeLayout),
-      taskBoard: DATA.taskBoard
+      staffDirectory: DATA.staffDirectory,
+      taskBoard: { ...DATA.taskBoard, staffGroups: {} }
       };
     },
     apply(payload) {
@@ -935,9 +958,11 @@
         lessons: source.lessons.map(normalizeLesson),
         exams: source.exams.map(normalizeExam),
         notices: Array.isArray(source.notices) ? source.notices.map(normalizeNotice) : [],
+        staffDirectory: normalizeStaffDirectory(source.staffDirectory, source.taskBoard?.staffGroups),
         taskBoard: source.taskBoard
       });
-      const before = JSON.stringify([DATA.homeLayout, DATA.courseGroups, DATA.lessons, DATA.exams, DATA.notices, DATA.taskBoard]);
+      const before = JSON.stringify([DATA.homeLayout, DATA.courseGroups, DATA.lessons, DATA.exams, DATA.notices, DATA.taskBoard, DATA.staffDirectory]);
+      DATA.staffDirectory = normalized.staffDirectory;
       DATA.homeLayout = HomeLayout.normalize(source.homeLayout);
       DATA.courseGroups = normalized.courseGroups;
       DATA.lessons = normalized.lessons;
@@ -947,7 +972,7 @@
       contentRevision = rev || Date.now();
       saveOpsStore();
       this.base = JSON.parse(JSON.stringify(payload));
-      const changed = before !== JSON.stringify([DATA.homeLayout, DATA.courseGroups, DATA.lessons, DATA.exams, DATA.notices, DATA.taskBoard]);
+      const changed = before !== JSON.stringify([DATA.homeLayout, DATA.courseGroups, DATA.lessons, DATA.exams, DATA.notices, DATA.taskBoard, DATA.staffDirectory]);
       if (!changed) return false;
       // Sync updates the data model, not an active lesson/player, exam or embedded app.
       // Rebuilding these views would discard playback, answers or subprogram state.
@@ -1666,7 +1691,7 @@
         ${!stages.length ? `<p class="empty">暂无分配给你的任务。</p>` : ""}
         <div class="stage-tabs" role="tablist" aria-label="我的任务">
           ${stages.map((stage, index) => `
-            <button type="button" class="stage-tab ${index === activeStage ? "on" : ""} ${!stage.available ? "locked" : ""}" id="academy-stage-tab-${index}" role="tab" aria-label="${escapeHtml(stage.label || `阶段 ${index + 1}`)}，${escapeHtml(stage.title)}，已完成 ${stage.done}/${stage.tasks.length} 项" aria-selected="${index === activeStage}" aria-controls="academy-stage-${index}" tabindex="${index === activeStage ? "0" : "-1"}" data-stage-target="academy-stage-${index}">
+            <button type="button" class="stage-tab ${index === activeStage ? "on" : ""} ${!stage.available ? "locked" : ""}" id="academy-stage-tab-${index}" role="tab" aria-label="${escapeHtml(stage.label || `任务 ${index + 1}`)}，${escapeHtml(stage.title)}，已完成 ${stage.done}/${stage.tasks.length} 项" aria-selected="${index === activeStage}" aria-controls="academy-stage-${index}" tabindex="${index === activeStage ? "0" : "-1"}" data-stage-target="academy-stage-${index}">
               <span>${escapeHtml(stage.label || stage.title)}</span>
             </button>`).join("")}
         </div>
@@ -1848,7 +1873,7 @@
       return `<button class="card lesson-card course-result ${done ? "is-complete" : ""}" data-act="open-lesson" data-id="${lesson.id}" ${done ? 'data-course-learned="true"' : ""} aria-label="${escapeHtml(`${lesson.title}，${accessibleState}`)}">
         <div class="course-result-body">
           <div class="top"><span class="tag">${locked ? "需授权" : TYPE_LABEL[lesson.type]}</span>${done ? "" : `<span>${minutesLabel(lesson.minutes)}</span>`}</div>
-          ${groupBadges ? `<div class="course-group-badges" aria-label="课程分组">${groupBadges}</div>` : ""}
+          ${groupBadges ? `<div class="course-group-badges" aria-label="课程分类">${groupBadges}</div>` : ""}
           <strong>${escapeHtml(lesson.title)}</strong>
           <p class="muted">${locked ? "店长授权后可学" : escapeHtml(lesson.summary)}</p>
         </div>
@@ -1860,9 +1885,9 @@
     setTop("课程", false);
     setTab("learn");
     if (type !== "article" && type !== "video") type = "all";
-    if (groupId !== "all" && !DATA.courseGroups.some((group) => group.id === groupId)) groupId = "all";
+    if (groupId !== "all" && !DATA.tracks.some((group) => group.id === groupId)) groupId = "all";
     const chips = [["all", "全部"], ["article", "图文"], ["video", "视频"]];
-    const items = DATA.lessons.filter((item) => (type === "all" || item.type === type) && (groupId === "all" || item.groupIds?.includes(groupId)));
+    const items = DATA.lessons.filter((item) => (type === "all" || item.type === type) && (groupId === "all" || item.track === groupId));
     view().innerHTML = `
       <div class="course-search" role="search">
         <span class="course-search-icon" aria-hidden="true"></span>
@@ -1873,9 +1898,9 @@
       <div class="chips">
         ${chips.map(([id, label]) => `<button class="chip ${type === id ? "on" : ""}" data-act="go" data-hash="#/learn?type=${id}&group=${encodeURIComponent(groupId)}">${label}</button>`).join("")}
       </div>
-      <div class="chips course-group-filters" aria-label="课程分组筛选">
+      <div class="chips course-group-filters" aria-label="课程分类筛选">
         <button class="chip ${groupId === "all" ? "on" : ""}" data-act="go" data-hash="#/learn?type=${type}&group=all">全部分组</button>
-        ${DATA.courseGroups.map((group) => `<button class="chip ${groupId === group.id ? "on" : ""}" data-act="go" data-hash="#/learn?type=${type}&group=${encodeURIComponent(group.id)}">${escapeHtml(group.name)}</button>`).join("")}
+        ${DATA.tracks.map((group) => `<button class="chip ${groupId === group.id ? "on" : ""}" data-act="go" data-hash="#/learn?type=${type}&group=${encodeURIComponent(group.id)}">${escapeHtml(group.title)}</button>`).join("")}
       </div>
       ${!Auth.canFull(Auth.session) ? `<p class="muted" style="margin-bottom:12px">当前是基本权限。视频和进阶课需要店长授权。</p>` : ""}
       <div id="course-search-results">${renderCourseCards(items)}</div>
@@ -2019,10 +2044,11 @@
       minutes: Math.max(1, Math.round(coerceNumber(raw?.minutes, 3))),
       summary: coerceString(raw?.summary, ""),
       access: raw?.access === "basic" ? "basic" : "full",
+      videoDurationSeconds: Math.max(0, Number(raw?.videoDurationSeconds) || 0),
       mediaUrl: coerceString(raw?.mediaUrl, ""),
       requiredExamId: coerceString(raw?.requiredExamId, ""),
-      requireConfirmation: raw?.id ? raw?.requireConfirmation !== false : Boolean(raw?.requireConfirmation),
-      notify: raw?.notify !== false,
+      requireConfirmation: raw?.requireConfirmation !== false,
+      notify: raw?.id ? raw?.notify !== false : raw?.notify === true,
       blocks: blocks.length ? blocks : defaultBlocks(coerceString(raw?.summary, "课程内容待完善。")),
       scenes: Array.isArray(raw?.scenes) && raw.scenes.length ? raw.scenes : []
     };
@@ -2087,25 +2113,8 @@
   }
 
   function lessonGroupNames(lesson) {
-    return normalizeLessonGroupIds(lesson?.groupIds, lesson?.track)
-      .map(courseGroupName)
-      .filter((name, index, names) => names.indexOf(name) === index);
-  }
-
-  function renderLessonGroupOptions(selectedIds) {
-    const selected = new Set(normalizeLessonGroupIds(selectedIds, ""));
-    if (!DATA.courseGroups?.length) return `<p class="empty group-empty">请先返回课程管理创建分组。</p>`;
-    return `<fieldset class="lesson-group-options">
-      <legend>选择发布分组</legend>
-      <p>课程会显示在所有勾选的分组中，至少选择一个。</p>
-      <div>${DATA.courseGroups.map((group) => {
-        const id = `ops-lesson-group-${group.id}`;
-        return `<label for="${escapeHtml(id)}">
-          <input id="${escapeHtml(id)}" name="ops-lesson-groups" type="checkbox" value="${escapeHtml(group.id)}" ${selected.has(group.id) ? "checked" : ""}>
-          <span aria-hidden="true"></span><b>${escapeHtml(group.name)}</b>
-        </label>`;
-      }).join("")}</div>
-    </fieldset>`;
+    const track = DATA.tracks.find(track => track.id === lesson?.track);
+    return track ? [track.title] : [];
   }
 
   function lessonBlockTemplates(kind) {
@@ -2238,10 +2247,47 @@
     return blocks;
   }
 
+  function estimateLessonDuration(lesson, exams = []) {
+    const strings = [];
+    for (const block of lesson.blocks || []) {
+      for (const key of ["text", "title", "items", "headers", "rows"]) {
+        const collect = value => { if (typeof value === "string") strings.push(value); else if (Array.isArray(value)) value.forEach(collect); };
+        collect(block[key]);
+      }
+    }
+    const text = strings.join(" ").replace(/<[^>]*>/g, " ");
+    const characters = (text.match(/[\p{Script=Han}]/gu) || []).length;
+    const words = (text.match(/[A-Za-z0-9]+(?:['’-][A-Za-z0-9]+)*/g) || []).length;
+    // Conservative training assumptions, not individual measured reading speed.
+    const reading = characters / 300 + words / 200;
+    const review = (lesson.blocks || []).reduce((sum, block) => sum + (block.type === "figure" ? .5 : block.type === "table" ? .25 : 0), 0);
+    const video = lesson.type === "video" ? Math.max(0, Number(lesson.videoDurationSeconds) || 0) / 60 : 0;
+    const exam = exams.find(exam => exam.id === lesson.requiredExamId);
+    const examination = exam ? Math.max(0, Number(exam.minutes) || 0) : 0;
+    return { minutes: Math.max(1, Math.ceil(reading + review + video + examination)), reading, review, video, examination, characters, words,
+      incomplete: lesson.type === "video" && !video };
+  }
+
+  function updateLessonDuration() {
+    const input = document.getElementById("ops-lesson-minutes");
+    if (!input) return;
+    let blocks = [];
+    try { blocks = JSON.parse(document.getElementById("ops-lesson-blocks")?.value || "[]"); } catch (_) {}
+    const result = estimateLessonDuration({ blocks, type: document.getElementById("ops-lesson-type")?.value,
+      videoDurationSeconds: document.getElementById("ops-lesson-video-duration")?.value,
+      requiredExamId: document.getElementById("ops-lesson-required-exam")?.value }, DATA.exams);
+    input.value = result.minutes;
+    const output = document.getElementById("ops-lesson-duration-output");
+    if (output) output.textContent = `${result.incomplete ? "至少" : "约"} ${result.minutes} 分钟`;
+    const hint = document.getElementById("ops-lesson-duration-hint");
+    if (hint) hint.textContent = `${result.characters} 字 / ${result.words} 词 · 阅读 ${Math.ceil(result.reading + result.review)} 分钟${result.video ? ` · 视频 ${result.video.toFixed(1)} 分钟` : ""}${result.examination ? ` · 考试按上限 ${result.examination} 分钟` : ""}${result.incomplete ? " · 视频时长待读取，当前为部分估算" : " · 自动估算"}`;
+  }
+
   function syncLessonBlocksJson() {
     const blocks = collectLessonBlocksFromBuilder();
     const area = document.getElementById("ops-lesson-blocks");
     if (blocks !== null && area) area.value = JSON.stringify(blocks, null, 2);
+    updateLessonDuration();
     if (blocks !== null) saveLessonDraft();
     return blocks;
   }
@@ -2587,10 +2633,10 @@
     return `
       <section class="card task-board-stage-editor" data-task-stage-id="${escapeHtml(stage.id)}" data-task-original-audience="${escapeHtml(JSON.stringify(audience))}">
         <header>
-          <input class="task-board-stage-number" data-task-stage-label aria-label="阶段标签" maxlength="20" value="${escapeHtml(stage.label || "")}" placeholder="任务 ${index + 1}" title="编辑阶段标签">
+          <input class="task-board-stage-number" data-task-stage-label aria-label="任务标签" maxlength="20" value="${escapeHtml(stage.label || "")}" placeholder="任务 ${index + 1}" title="编辑任务标签">
           <input data-task-stage-title aria-label="任务名称" maxlength="40" value="${escapeHtml(stage.title)}" placeholder="例如：新员工入职培训">
           <details class="task-board-menu">
-            <summary aria-label="阶段操作"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="4" cy="10" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/><circle cx="16" cy="10" r="1.5" fill="currentColor"/></svg></summary>
+            <summary aria-label="任务操作"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="4" cy="10" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/><circle cx="16" cy="10" r="1.5" fill="currentColor"/></svg></summary>
             <div class="task-board-menu-items">
               <button type="button" data-act="ops-task-stage-rename">重命名</button>
               <button type="button" data-act="ops-task-stage-move" data-direction="up">上移任务</button>
@@ -2602,7 +2648,7 @@
         <details class="task-assignment task-recipient-picker"><summary>接收人 <span data-recipient-count>${Auth.list().filter(user => noticeVisibleTo(stage, user)).length} 人</span></summary>
           <div class="task-recipient-shortcuts"><button type="button" data-act="ops-task-recipients" data-group="all">全选</button><button type="button" data-act="ops-task-recipients" data-group="none">清空</button></div>
           <div class="task-recipient-section-title">按岗位推送</div>
-          <div class="task-recipient-roles">${Array.from(new Set([...Object.values(normalizeStaffGroups(DATA.taskBoard?.staffGroups)).flatMap(group => group.departments), ...Auth.list().flatMap(user => staffGroupFor(user.id).departments || []), ...(audience.departments || []), ...(audience.mode === "group" && audience.department ? [audience.department] : [])])).map(id => `<label><input type="checkbox" data-task-role value="${escapeHtml(id)}" ${audience.mode === "recipients" && audience.departments.includes(id) || audience.mode === "group" && !audience.employment && audience.department === id ? "checked" : ""}><span>${escapeHtml(({front:"前厅",kitchen:"后厨",dishwashing:"洗碗间"})[id] || id)}</span></label>`).join("")}</div>
+          <div class="task-recipient-roles">${Array.from(new Set([...staffRoles().map(role => role.id), ...(audience.departments || []), ...(audience.mode === "group" && audience.department ? [audience.department] : [])])).map(id => `<label><input type="checkbox" data-task-role value="${escapeHtml(id)}" ${audience.mode === "recipients" && audience.departments.includes(id) || audience.mode === "group" && !audience.employment && audience.department === id ? "checked" : ""}><span>${escapeHtml(staffRoleName(id))}</span></label>`).join("")}</div>
           <p>自动包含所选岗位成员。</p>
           <div class="task-recipient-section-title">指定员工</div>
           <div class="task-recipients">${Auth.list().filter(user => user.access !== "blocked").map(user => `<label><input type="checkbox" data-task-recipient value="${escapeHtml(user.id)}" ${(audience.mode === "recipients" ? audience.userIds.includes(user.id) : audience.mode === "group" && !audience.employment ? false : noticeVisibleTo(stage, user)) ? "checked" : ""}><span>${escapeHtml(user.name)}<small data-role-included hidden>岗位已包含</small></span></label>`).join("")}</div>
@@ -2666,14 +2712,14 @@
       id: coerceId("task-stage", stage.dataset.taskStageId),
       audience: stage.dataset.taskRecipientsChanged === "true" ? { mode: "recipients", departments: Array.from(stage.querySelectorAll("[data-task-role]:checked")).map(input => input.value), userIds: Array.from(stage.querySelectorAll("[data-task-recipient]:checked")).map(input => input.value) } : JSON.parse(stage.dataset.taskOriginalAudience || '{"mode":"selected","userIds":[]}'),
       label: coerceString(stage.querySelector("[data-task-stage-label]")?.value, ""),
-      title: coerceString(stage.querySelector("[data-task-stage-title]")?.value, `阶段 ${index + 1}`),
+      title: coerceString(stage.querySelector("[data-task-stage-title]")?.value, `任务 ${index + 1}`),
       items: Array.from(stage.querySelectorAll(".task-board-editor-item")).map((item) => ({
         kind: item.dataset.taskKind === "exam" ? "exam" : "lesson",
         id: coerceString(item.dataset.taskId, "")
       }))
     }));
     return normalizeTaskBoard({
-      staffGroups: DATA.taskBoard?.staffGroups,
+      staffGroups: {},
       title: coerceString(document.getElementById("ops-task-board-title")?.value, "任务面板"),
       stages
     }, DATA.lessons, DATA.exams);
@@ -2685,7 +2731,7 @@
       refreshTaskRecipientPreview(stage);
       const used = new Set(Array.from(stage.querySelectorAll(".task-board-editor-item")).map(item => taskBoardEntryKey(item.dataset.taskKind, item.dataset.taskId)));
       const number = stage.querySelector(".task-board-stage-number");
-      if (number) number.placeholder = `阶段 ${index + 1}`;
+      if (number) number.placeholder = `任务 ${index + 1}`;
       const empty = stage.querySelector(".task-board-stage-empty");
       if (empty) empty.hidden = Boolean(stage.querySelector(".task-board-editor-item"));
       stage.querySelectorAll("[data-task-item-select] option").forEach((option) => {
@@ -2696,34 +2742,35 @@
 
   function renderOpsLessonEditor(item) {
     const savedDraft = loadLessonDraft();
+    if (!item?.id && savedDraft && savedDraft.optionDefaultsVersion !== 2) {
+      savedDraft.requireConfirmation = true;
+      savedDraft.notify = false;
+    }
     const data = lessonForEditor(savedDraft ? { ...item, ...savedDraft, id: item?.id || "" } : item);
     const hasMedia = Boolean(data.mediaUrl);
     return `
       <form class="ops-editor lesson-editor" id="ops-editor">
+        <input type="hidden" id="ops-lesson-track" value="${escapeHtml(data.track)}">
+        <input type="hidden" id="ops-lesson-access" value="${escapeHtml(data.access)}">
         <header class="lesson-editor-title">
-          <div><p class="kicker">课程编辑</p><h2>${data.id ? "完善课程内容" : "创建一门新课程"}</h2></div>
-          <span class="editor-status">草稿自动保留在当前页面</span>
+          <div><p class="kicker">课程编辑</p><h2>${data.id ? "编辑课程" : "新建课程"}</h2></div>
+          <span class="editor-status">自动保存草稿</span>
         </header>
 
-        <section class="card editor-section">
-          <div class="editor-section-head"><span>01</span><div><h3>基本信息</h3><p>员工在课程列表中首先看到这些内容</p></div></div>
-          <label class="editor-field editor-field-main"><span>课程标题</span><input id="ops-lesson-title" value="${escapeHtml(data.title)}" placeholder="例如：火锅店开炉标准流程" autocomplete="off"></label>
-          <label class="editor-field"><span>课程简介</span><textarea id="ops-lesson-summary" placeholder="用一两句话说明这门课讲什么、学完能做什么">${escapeHtml(data.summary)}</textarea></label>
-          <div class="ops-grid">
-            <label class="editor-field"><span>课程形式</span>
+        <section class="card editor-section course-basics">
+          <div class="editor-section-head"><div><h3>课程信息</h3></div></div>
+          <label class="editor-field editor-field-main"><span>课程标题</span><input id="ops-lesson-title" value="${escapeHtml(data.title)}" placeholder="例如：门店开市标准流程" autocomplete="off"></label>
+          <label class="editor-field"><span>课程简介</span><textarea id="ops-lesson-summary" placeholder="简要说明课程内容和学习目标">${escapeHtml(data.summary)}</textarea></label>
+          <div class="course-metadata">
+            <label class="editor-field course-format"><span>课程形式</span>
               <select id="ops-lesson-type">
                 <option value="article" ${data.type === "article" ? "selected" : ""}>图文课程</option>
                 <option value="video" ${data.type === "video" ? "selected" : ""}>视频课程</option>
               </select>
             </label>
-            <label class="editor-field"><span>学习轨道</span><select id="ops-lesson-track">${DATA.tracks.map((track) => `<option value="${track.id}" ${track.id === data.track ? "selected" : ""}>${escapeHtml(track.title)}</option>`).join("")}</select></label>
-            <label class="editor-field"><span>预计学习时长</span><div class="input-suffix"><input id="ops-lesson-minutes" type="number" min="1" value="${data.minutes}"><span>分钟</span></div></label>
-            <label class="editor-field"><span>可学习员工</span>
-              <select id="ops-lesson-access">
-                <option value="full" ${data.access === "full" ? "selected" : ""}>全部员工</option>
-                <option value="basic" ${data.access === "basic" ? "selected" : ""}>仅基础权限员工</option>
-              </select>
-            </label>
+
+            <div class="course-duration"><div><span>预计学习</span><output id="ops-lesson-duration-output">约 ${data.minutes} 分钟</output></div><input id="ops-lesson-minutes" type="hidden" value="${data.minutes}"><input id="ops-lesson-video-duration" type="hidden" value="${data.videoDurationSeconds || 0}"><details class="course-duration-details"><summary aria-label="查看学习时长估算依据">详情</summary><p id="ops-lesson-duration-hint">根据正文、视频及关联考试估算</p></details></div>
+
           </div>
         </section>
 
@@ -2760,13 +2807,8 @@
           <button type="button" class="remove-media" data-act="ops-lesson-clear-media" ${hasMedia ? "" : "hidden"}>移除当前视频</button>
         </section>
 
-        <section class="card editor-section lesson-group-editor">
-          <div class="editor-section-head"><span data-lesson-step="group">${data.type === "video" ? "04" : "03"}</span><div><h3>发布分组</h3><p>勾选这门课程需要出现在哪些分组</p></div></div>
-          ${renderLessonGroupOptions(data.groupIds)}
-        </section>
-
-        <section class="card editor-section lesson-completion-editor">
-          <div class="editor-section-head"><span data-lesson-step="completion">${data.type === "video" ? "05" : "04"}</span><div><h3>完成与通知</h3><p>设置员工完成本课的条件，以及发布后是否提醒</p></div></div>
+        <details class="card editor-section lesson-completion-editor" ${data.requiredExamId ? "open" : ""}>
+          <summary class="lesson-options-summary">完成与通知<span>可选设置</span></summary>
           <label class="editor-field"><span>衔接考试</span>
             <select id="ops-lesson-required-exam">
               <option value="">不关联考试</option>
@@ -2778,7 +2820,7 @@
             ${renderPublishToggle("ops-lesson-require-confirmation", data.requireConfirmation, "阅读后需要确认", "不关联考试时，正文末尾显示“确认完成本课”按钮；关闭后阅读即完成")}
             ${renderPublishToggle("ops-lesson-notify", data.notify, "发送铃铛消息", "发布后进入成员消息列表并显示未读铃铛")}
           </div>
-        </section>
+        </details>
 
         <textarea id="ops-lesson-blocks" hidden>${escapeHtml(JSON.stringify(data.blocks))}</textarea>
         <textarea id="ops-lesson-scenes" hidden>${escapeHtml(JSON.stringify(data.scenes))}</textarea>
@@ -2793,27 +2835,6 @@
 
   function renderOpsLessonList() {
     return `
-      <details class="card course-group-manager">
-        <summary class="course-group-summary">
-          <span class="course-group-symbol" aria-hidden="true">${svgIcon("group")}</span>
-          <span><strong>课程分组</strong><small>${DATA.courseGroups.length} 个分组</small></span>
-          <i aria-hidden="true"></i>
-        </summary>
-        <div class="course-group-panel">
-          <div class="course-group-head">
-            <div><span>一门课程可以发布到多个分组。</span></div>
-            <div class="course-group-create"><input id="ops-group-new-name" maxlength="30" placeholder="新分组名称" aria-label="新分组名称"><button type="button" class="primary" data-act="ops-group-add">新增分组</button></div>
-          </div>
-          <div class="course-group-list">${DATA.courseGroups.map((group) => {
-          const count = DATA.lessons.filter((lesson) => lesson.groupIds?.includes(group.id)).length;
-          return `<div class="course-group-row" data-group-id="${escapeHtml(group.id)}">
-            <input data-group-name value="${escapeHtml(group.name)}" maxlength="30" aria-label="分组名称">
-            <span>${count} 门课程</span>
-            <button type="button" data-act="ops-group-rename" data-id="${escapeHtml(group.id)}">保存名称</button>
-            <button type="button" class="danger" data-act="ops-group-delete" data-id="${escapeHtml(group.id)}">删除</button>
-          </div>`;
-        }).join("")}</div></div>
-      </details>
       <section class="ops-list" aria-label="课程列表">
         <header class="ops-list-head"><div><h3>全部课程</h3><span>共 ${DATA.lessons.length} 门课程</span></div></header>
         ${DATA.lessons.length ? DATA.lessons.map((lesson) => `
@@ -2843,7 +2864,7 @@
         <p class="kicker">${data.id ? "编辑考试" : "新增考试"}</p>
         <label>标题<input id="ops-exam-title" value="${escapeHtml(data.title)}" placeholder="考试标题"></label>
         <div class="ops-grid">
-          <label>轨道
+          <label>课程分组
             <select id="ops-exam-track">
               ${DATA.tracks.map((track) => `<option value="${track.id}" ${track.id === data.track ? "selected" : ""}>${escapeHtml(track.title)}</option>`).join("")}
             </select>
@@ -2943,6 +2964,23 @@
     dialog.showModal();
   }
 
+  function staffTaskProgress(user, progress) {
+    return normalizeTaskBoard(DATA.taskBoard).stages.filter(task => noticeVisibleTo(task, user)).map(task => {
+      const entries = task.items.filter(entry => entry.kind === "exam" ? examById(entry.id) : lessonById(entry.id));
+      const done = entries.filter(entry => {
+        if (entry.kind === "lesson") return lessonCompletedForProgress(lessonById(entry.id), progress);
+        const exam = examById(entry.id);
+        return (progress.examHistory?.[entry.id] || []).some(attempt => (Number(attempt?.score ?? attempt) || 0) >= exam.pass);
+      }).length;
+      return { id: task.id, title: task.title, done, total: entries.length, complete: entries.length > 0 && done === entries.length };
+    });
+  }
+
+  function renderStaffTaskProgress(tasks, available) {
+    if (!available) return `<section class="staff-task-details"><strong>任务完成情况</strong><p>暂未读取到学习记录，无法判断完成情况。</p></section>`;
+    return `<section class="staff-task-details"><strong>任务完成情况</strong>${tasks.length ? tasks.map(task => `<div class="staff-task-row"><span>${escapeHtml(task.title)}</span><span>${task.total ? `${task.complete ? "已完成" : "进行中"} · ${task.done}/${task.total}` : "暂无学习内容"}</span></div>`).join("") : `<p>暂无分配任务。</p>`}</section>`;
+  }
+
   function renderOpsStaff() {
     const people = Auth.list().sort((a, b) => Number(a.access !== "basic") - Number(b.access !== "basic") || a.name.localeCompare(b.name, "zh"));
     const pending = people.filter((user) => user.access === "basic" && user.role !== "manager").length;
@@ -2978,8 +3016,9 @@
       : "尚未产生记录";
     return `
       <div class="staff-toolbar">
-        <label>岗位<select data-staff-filter="department" aria-label="按岗位筛选员工"><option value="">全部岗位</option><option value="front">前厅</option><option value="kitchen">后厨</option><option value="dishwashing">洗碗间</option><option value="unset">未设置</option></select></label>
+        <label>岗位<select data-staff-filter="department" aria-label="按岗位筛选员工"><option value="">全部岗位</option>${staffRoles().map(role => `<option value="${escapeHtml(role.id)}">${escapeHtml(role.name)}</option>`).join("")}<option value="unset">未设置</option></select></label>
         <label>用工类型<select data-staff-filter="employment" aria-label="按用工类型筛选员工"><option value="">全部类型</option><option value="full">全职</option><option value="part">兼职</option><option value="unset">未设置</option></select></label>
+        <button type="button" class="ghost" data-act="ops-role-add">新增岗位</button>
         <button type="button" class="ghost" data-staff-refresh>刷新</button>
       </div>
       <div class="counts staff-counts" aria-label="成员数据摘要">
@@ -3001,6 +3040,8 @@
               <div class="staff-loading-line"></div>
               <details class="staff-detail"><summary>查看明细</summary><div class="staff-detail-body"><div class="tools staff-actions">${renderStaffGroupEditor(user)}</div></div></details>
             </article>`;
+          const tasks = staffTaskProgress(user, item.progress);
+          const completedTasks = tasks.filter(task => task.complete).length;
           const isOnline = item.lastSeenAt && Date.now() - item.lastSeenAt < 90000;
           const pendingLessons = DATA.lessons.filter((lesson) => !lessonCompletedForProgress(lesson, item.progress));
           const passedExamIds = new Set(item.examDone.map((exam) => exam.id));
@@ -3021,9 +3062,11 @@
                 <div><b>${item.examDone.length}<small> / ${DATA.exams.length}</small></b><span>通过考试</span></div>
                 <div><b>${formatDuration(item.progress.onlineSeconds)}</b><span>累计在线学习</span></div>
               </div>
+              <div class="staff-task-overview"><span>任务完成</span><strong>${item.available === false ? "记录暂不可用" : tasks.length ? `${completedTasks} / ${tasks.length}` : "暂无任务"}</strong></div>
               <details class="staff-detail">
                 <summary>查看明细 <span>${pendingLessons.length + pendingExams.length ? `${pendingLessons.length + pendingExams.length} 项待完成` : "已全部完成"}</span></summary>
                 <div class="staff-detail-body">
+                  ${renderStaffTaskProgress(tasks, item.available !== false)}
                   <section><strong>待学习课程</strong><p>${pendingLessons.length ? pendingLessons.map((lesson) => escapeHtml(lesson.title)).join("、") : "课程已全部完成"}</p></section>
                   <section><strong>待通过考试</strong><p>${pendingExams.length ? pendingExams.map((exam) => escapeHtml(exam.title)).join("、") : "考试已全部通过"}</p></section>
                   <section><strong>账号权限</strong><p>${staffAccessLabel(user)}${user.approvedBy ? ` · 由 ${escapeHtml(user.approvedBy)} 授权` : ""}</p></section>
@@ -4111,7 +4154,7 @@
       return renderOps();
     }
     if (act === "ops-group-delete") {
-      if (DATA.courseGroups.length <= 1) return alert("至少保留一个课程分组。");
+      if (DATA.courseGroups.length <= 1) return alert("至少保留一个课程分类。");
       const group = DATA.courseGroups.find((item) => item.id === btn.dataset.id);
       if (!group || !confirm(`确认删除分组“${group.name}”吗？分组内课程会移到其他分组。`)) return;
       const remaining = DATA.courseGroups.filter((item) => item.id !== group.id);
@@ -4174,6 +4217,9 @@
       return;
     }
     if (act === "ops-lesson-clear-media") {
+      const durationInput = document.getElementById("ops-lesson-video-duration");
+      if (durationInput) durationInput.value = "0";
+      updateLessonDuration();
       const mediaUrlInput = document.getElementById("ops-lesson-media-url");
       const mediaInput = document.getElementById("ops-lesson-media");
       const node = document.querySelector(".media-preview");
@@ -4281,6 +4327,17 @@
       return;
     }
     if (act === "ops-shortcut-permissions") { openOpsShortcutPermissions(btn.dataset.id); return; }
+    if (act === "ops-role-add") {
+      if (!Auth.isManager(Auth.session)) return;
+      const name = prompt("岗位名称");
+      if (!name?.trim()) return;
+      DATA.staffDirectory = normalizeStaffDirectory(DATA.staffDirectory, DATA.taskBoard?.staffGroups);
+      if (DATA.staffDirectory.roles.some(role => role.name === name.trim())) return alert("此岗位已存在。");
+      DATA.staffDirectory.roles.push({ id: coerceId("role", ""), name: name.trim().slice(0, 30) });
+      saveOpsStore();
+      (async () => { try { await ContentSync.publish(); renderOps(); } catch (error) { alert(`岗位已暂存，同步失败：${error.message || "请重试"}`); } })();
+      return;
+    }
     if (act === "ops-staff-group-edit") { openStaffGroupEditor(btn.dataset.id); return; }
     if (act === "ops-staff-group-save") {
       event.preventDefault();
@@ -4290,8 +4347,8 @@
       const status = editor.querySelector('[role="status"]');
       const departments = Array.from(editor.querySelectorAll("[data-staff-department]:checked")).map(input => input.value);
       const group = { departments, department: departments[0] || "", employment: editor.querySelector("[data-staff-employment]").value };
-      DATA.taskBoard = normalizeTaskBoard(DATA.taskBoard);
-      DATA.taskBoard.staffGroups[btn.dataset.id] = group;
+      DATA.staffDirectory = normalizeStaffDirectory(DATA.staffDirectory, DATA.taskBoard?.staffGroups);
+      DATA.staffDirectory.profiles[btn.dataset.id] = group;
       saveOpsStore();
       (async () => {
         try {
@@ -4367,9 +4424,11 @@
             id: id || coerceId("lesson", ""),
             title: coerceString(document.getElementById("ops-lesson-title")?.value, ""),
             track: coerceString(document.getElementById("ops-lesson-track")?.value, ""),
-            groupIds: Array.from(document.querySelectorAll('input[name="ops-lesson-groups"]:checked')).map((input) => input.value),
+            videoDurationSeconds: Number(document.getElementById("ops-lesson-video-duration")?.value) || 0,
+      groupIds: [document.getElementById("ops-lesson-track")?.value || "onboard"],
             type: rawType,
-            minutes: document.getElementById("ops-lesson-minutes")?.value || "3",
+            minutes: document.getElementById("ops-lesson-minutes")?.value || "1",
+            videoDurationSeconds: Number(document.getElementById("ops-lesson-video-duration")?.value) || 0,
             access: document.getElementById("ops-lesson-access")?.value || "full",
             mediaUrl: coerceString(document.getElementById("ops-lesson-media-url")?.value, ""),
             publishedAt: Date.now(),
@@ -4385,11 +4444,9 @@
             alert("课程标题不能为空。");
             return;
           }
-          if (!raw.groupIds.length) {
-            setPublishFailed(btn);
-            alert("发布课程前请至少勾选一个分组。");
-            return;
-          }
+          const estimate = estimateLessonDuration(raw, DATA.exams);
+          if (estimate.incomplete) { setPublishFailed(btn); alert("请等待视频时长读取完成；如无法读取，请重新选择视频。"); return; }
+          raw.minutes = estimate.minutes;
           const pickedFile = document.getElementById("ops-lesson-media")?.files?.[0];
           try {
             if (pickedFile) {
@@ -4608,7 +4665,7 @@
       const groupStep = document.querySelector('[data-lesson-step="group"]');
       const completionStep = document.querySelector('[data-lesson-step="completion"]');
       if (groupStep) groupStep.textContent = hasVideoStep ? "04" : "03";
-      if (completionStep) completionStep.textContent = hasVideoStep ? "05" : "04";
+      if (completionStep) completionStep.textContent = hasVideoStep ? "04" : "03";
       saveLessonDraft();
       return;
     }
@@ -4873,6 +4930,19 @@
     if (!event.target.matches("[data-task-recipient], [data-task-role]")) return;
     refreshTaskRecipientPreview(event.target.closest(".task-board-stage-editor"), true);
   });
+
+  document.addEventListener("loadedmetadata", event => {
+    if (!event.target.matches(".video-editor-section video")) return;
+    const input = document.getElementById("ops-lesson-video-duration");
+    if (input && Number.isFinite(event.target.duration)) { input.value = event.target.duration; updateLessonDuration(); saveLessonDraft(); }
+  }, true);
+  document.addEventListener("change", event => {
+    if (event.target.matches("#ops-lesson-media, #ops-lesson-type, #ops-lesson-required-exam")) {
+      if (event.target.id === "ops-lesson-media") document.getElementById("ops-lesson-video-duration").value = "0";
+      updateLessonDuration();
+    }
+  });
+  new MutationObserver(() => { if (document.getElementById("ops-lesson-minutes") && !document.getElementById("ops-lesson-minutes").dataset.estimated) { document.getElementById("ops-lesson-minutes").dataset.estimated = "true"; updateLessonDuration(); } }).observe(document.documentElement, { childList: true, subtree: true });
 
   document.addEventListener("DOMContentLoaded", init);
 })();

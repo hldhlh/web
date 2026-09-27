@@ -44,7 +44,7 @@ test('tasks preserve separate audiences and can share a course', () => {
 test('staff groups persist across task edits and discard invalid values', () => {
   const board = normalize({ staffGroups: { a: { department: 'front', employment: 'part' }, b: { department: 'other', employment: 'other' } }, stages: [{ items: [] }] });
   assert.deepEqual(normalize(JSON.parse(JSON.stringify(board))).staffGroups.a, { departments: ['front'], department: 'front', employment: 'part' });
-  assert.deepEqual(board.staffGroups.b, { departments: [], department: '', employment: '' });
+  assert.deepEqual(board.staffGroups.b, { departments: ['other'], department: 'other', employment: '' });
 });
 
 test('group assignments normalize department and employment separately', () => {
@@ -72,7 +72,7 @@ test('multiple employee departments match either task and survive normalization'
   for (const department of ['front', 'kitchen']) assert.equal(visible({ audience: { mode: 'group', department } }, { id: 'd' }), true);
   assert.equal(visible({ audience: { mode: 'group', department: 'dishwashing' } }, { id: 'd' }), false);
   const board = normalize({ staffGroups: { d: { departments: ['front', 'kitchen', 'front', 'invalid'], employment: 'part' } }, stages: [{ items: [] }] });
-  assert.deepEqual(normalize(JSON.parse(JSON.stringify(board))).staffGroups.d.departments, ['front', 'kitchen']);
+  assert.deepEqual(normalize(JSON.parse(JSON.stringify(board))).staffGroups.d.departments, ['front', 'kitchen', 'invalid']);
 });
 
 test('role recipients match any selected department plus explicitly selected people', () => {
@@ -82,4 +82,16 @@ test('role recipients match any selected department plus explicitly selected peo
   assert.equal(visible({ audience: { mode: 'recipients', departments: ['dishwashing'], userIds: [] } }, { id: 'a' }), false);
   const board = normalize({ stages: [{ audience: task.audience, items: [] }] });
   assert.deepEqual(board.stages[0].audience, task.audience);
+});
+
+test('employee directory migrates legacy profiles and preserves cloud role definitions', () => {
+  const code = source.slice(source.indexOf('  function normalizeStaffGroups('), source.indexOf('  function taskDepartmentOptions('));
+  const normalizeDirectory = new Function(code + '; return normalizeStaffDirectory;')();
+  const legacy = { a: { departments: ['front', 'kitchen'], employment: 'part' } };
+  const directory = normalizeDirectory(null, legacy);
+  assert.deepEqual(directory.profiles.a.departments, ['front', 'kitchen']);
+  const updated = normalizeDirectory({ ...directory, roles: [{ id: 'custom', name: '培训岗' }], profiles: { a: { departments: ['custom'], employment: 'full' } } });
+  assert.deepEqual(updated.roles, [{ id: 'custom', name: '培训岗' }]);
+  assert.deepEqual(updated.profiles.a.departments, ['custom']);
+  assert.deepEqual(updated.defaults, { departments: ['front'], employment: 'part' });
 });
