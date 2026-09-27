@@ -119,3 +119,101 @@
 @media (prefers-contrast: more) { #shortcut-permissions-options, #restricted-visibility { outline: 1px solid var(--line); } }
 .shortcut-locked { display: block; color: var(--muted); font-size: .8125rem; margin-top: 6px; }
 .shortcut-permissions-dialog :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.task-assignment { border: 0; margin: 16px 0; padding: 16px; border-radius: 14px; background: var(--bg); }
+.task-assignment legend { font-size: 17px; font-weight: 600; }
+.task-assignment select { min-height: 44px; width: 100%; font-size: 17px; }
+.task-assignment p { font-size: 13px; line-height: 1.5; color: var(--muted); margin: 12px 0 0; }
+.task-recipients { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin-top: 12px; }
+.task-recipients[hidden] { display: none; }
+.task-recipients label { display: flex; align-items: center; gap: 12px; min-height: 44px; font-size: 17px; }
+.task-recipients input { width: 22px; height: 22px; }
+
+.staff-group-editor, .task-group-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 16px 0; }
+.staff-group-editor label, .task-group-filters label { display: grid; gap: 8px; flex: 1 1 140px; font-size: 15px; }
+.staff-group-editor select { min-height: 44px; font-size: 17px; width: 100%; }
+.staff-group-editor button { min-height: 44px; }
+.staff-group-editor p, .task-group-filters p { flex-basis: 100%; margin: 0; font-size: 13px; color: var(--muted); }
+.task-group-filters[hidden] { display: none; }
+.staff-group-summary { color: var(--muted); font-size: 15px; }
+
+.staff-toolbar { flex-wrap: wrap; gap: 12px; }
+.staff-toolbar label { display: grid; gap: 8px; font-size: 15px; flex: 1 1 140px; }
+.staff-toolbar select { min-height: 44px; font-size: 17px; }
+.staff-member[hidden] { display: none; }
+
+/* Employee grouping: quiet summary in the list, editing in a focused sheet. */
+.staff-group-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 20px 18px; padding: 12px 16px; border-radius: 14px; background: var(--bg); }
+.staff-group-row > div { display: grid; gap: 4px; min-width: 0; }
+.staff-group-caption { color: var(--muted); font-size: 12px; }
+.staff-group-row [data-staff-group-summary] { font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
+.staff-group-row button { flex: 0 0 auto; width: auto; min-width: 60px; min-height: 44px; border: 0; background: transparent; color: var(--accent); font-size: 15px; font-weight: 500; padding: 8px; }
+.staff-group-dialog .staff-group-person { margin: 0 4px 16px; font-size: 20px; font-weight: 600; }
+.staff-group-dialog .staff-group-editor { display: block; margin: 0; padding: 0 16px; border-radius: 16px; background: var(--surface); }
+.staff-group-dialog .staff-group-editor label { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 60px; font-size: 17px; }
+.staff-group-dialog .staff-group-editor label + label { border-top: 1px solid var(--line); }
+.staff-group-dialog .staff-group-editor select { width: auto; max-width: 65%; min-height: 44px; padding: 8px 24px 8px 8px; border: 0; border-radius: 8px; background-color: transparent; color: var(--muted); font: inherit; text-align: right; }
+.staff-group-dialog .staff-group-editor p:empty { display: none; }
+.staff-group-dialog .staff-group-editor p { padding: 12px 0; color: var(--bad); }
+.staff-group-note { margin: 12px 16px 0; font-size: 13px; line-height: 1.6; color: var(--muted); }
+.staff-toolbar select { padding: 10px 32px 10px 14px; border: 1px solid var(--line); border-radius: 12px; background-color: var(--surface); color: var(--text); }
+.staff-group-row button:focus-visible, .staff-toolbar select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 600px) { .staff-group-row { margin-inline: 16px; } }
+@media (prefers-contrast: more) { .staff-group-row { outline: 1px solid var(--muted); } .staff-group-dialog select { color: var(--text); } }
+@media (max-width: 600px) { .staff-metrics b { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; line-height: 1.4; } }
+.staff-department-options { border: 0; padding: 0; margin: 0; min-width: 0; }
+.staff-department-options legend { padding-top: 16px; font-size: 17px; font-weight: 600; }
+.staff-department-options legend small { color: var(--muted); font-size: 13px; font-weight: 400; margin-left: 8px; }
+.staff-group-dialog .staff-department-options label { cursor: pointer; border-bottom: 1px solid var(--line); border-top: 0; }
+.staff-group-dialog .staff-department-options input { width: 22px; height: 22px; min-height: 0; margin: 0; padding: 0; accent-color: var(--accent); }
+
+.staff-detail-body > .staff-group-row { margin: 0 0 16px; }
+.staff-identity > div { flex-wrap: wrap; }
+.staff-role { max-width: 100%; white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }
+.task-recipient-picker { padding: 0 16px; }
+.task-recipient-picker > summary { display: flex; justify-content: space-between; align-items: center; min-height: 52px; cursor: pointer; font-size: 17px; font-weight: 600; }
+.task-recipient-picker > summary span { color: var(--muted); font-size: 15px; font-weight: 400; }
+.task-recipient-shortcuts { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0; }
+.task-recipient-shortcuts button { min-height: 44px; width: auto; background: var(--surface); color: var(--accent); border: 0; border-radius: 12px; padding: 8px 14px; }
+.task-recipient-picker .task-recipients { margin: 0; padding: 8px 0 16px; }
+.task-recipient-roles { display: flex; flex-wrap: wrap; gap: 8px; }
+.task-recipient-roles label { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 12px; border-radius: 12px; background: var(--surface); font-size: 15px; cursor: pointer; }
+.task-recipient-roles input { width: 20px; height: 20px; min-height: 0; padding: 0; accent-color: var(--accent); }
+.task-recipient-section-title { font-size: 13px; font-weight: 600; color: var(--muted); margin: 16px 0 8px; }
+.task-recipient-picker .task-recipients { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 4px 16px; }
+.task-recipient-picker .task-recipients label { font-weight: 400; font-size: 15px; }
+.task-recipients [data-role-included] { display: block; color: var(--muted); font-size: 12px; font-weight: 400; }
+.task-recipients [data-role-included][hidden] { display: none; }
+.task-recipient-preview { margin: 0 0 16px; padding: 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+.task-recipient-preview strong { font-size: 15px; font-weight: 600; }
+.task-recipient-preview p { margin: 8px 0 0; font-size: 15px; line-height: 1.6; color: var(--muted); overflow-wrap: anywhere; }
+.task-recipient-shortcuts { justify-content: flex-end; }
+.task-recipient-shortcuts button { background: transparent; padding: 8px; font-size: 15px; }
+
+/* Recipient settings use solid, compact grouped rows. */
+.task-recipient-picker { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 0 16px; margin: 16px 0; }
+.task-recipient-picker > summary { min-height: 56px; gap: 16px; }
+.task-recipient-picker > summary::after { content: '›'; font-size: 22px; color: var(--muted); transform: rotate(90deg); }
+.task-recipient-picker[open] > summary::after { transform: rotate(-90deg); }
+.task-recipient-picker > summary span { margin-left: auto; }
+.task-recipient-picker[open] > summary { border-bottom: 1px solid var(--line); }
+.task-recipient-picker .task-recipient-shortcuts { padding: 4px 0; gap: 12px; }
+.task-recipient-picker .task-recipient-shortcuts button { margin: 0; font-size: 15px; font-weight: 400; min-height: 44px; }
+.task-recipient-picker .task-recipient-section-title { margin: 8px 0; color: var(--muted); font-size: 13px; font-weight: 400; }
+.task-recipient-picker .task-recipient-roles { gap: 8px; }
+.task-recipient-picker .task-recipient-roles label { background: var(--bg); border: 1px solid transparent; border-radius: 10px; min-height: 44px; padding: 8px 12px; font-size: 15px; font-weight: 500; }
+.task-recipient-picker .task-recipient-roles label:has(input:checked) { border-color: var(--accent); color: var(--accent); }
+.task-recipient-picker .task-recipient-roles input, .task-recipient-picker .task-recipients input { appearance: none; -webkit-appearance: none; flex: 0 0 22px; width: 22px; height: 22px; min-height: 0; border: 1.5px solid var(--muted); border-radius: 50%; background: transparent; margin: 0; padding: 0; display: grid; place-content: center; }
+.task-recipient-picker input:checked { background: var(--accent); border-color: var(--accent); }
+.task-recipient-picker input:checked::after { content: '✓'; color: #fff; font-size: 15px; font-weight: 600; }
+.task-recipient-picker input:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.task-recipient-picker > p { font-size: 13px; margin: 8px 0 16px; }
+.task-recipient-picker .task-recipients { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; padding: 0; margin: 0; }
+.task-recipient-picker .task-recipients label { min-height: 52px; padding: 8px 0; margin: 0; border-bottom: 1px solid var(--line); font-size: 17px; font-weight: 400; color: var(--text); }
+.task-recipient-picker .task-recipients label > span { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.task-recipient-picker .task-recipients [data-role-included] { font-size: 11px; font-weight: 400; padding: 2px 6px; border-radius: 6px; background: var(--bg); }
+.task-recipient-picker .task-recipient-preview { margin: 16px 0; padding: 12px 14px; background: var(--bg); border: 0; border-radius: 12px; }
+.task-recipient-picker .task-recipient-preview strong { font-size: 15px; font-weight: 600; }
+.task-recipient-picker .task-recipient-preview p { margin-top: 4px; font-size: 13px; line-height: 1.6; }
+@media (max-width: 600px) { .task-recipient-picker .task-recipients { grid-template-columns: 1fr; } }
+@media (prefers-contrast: more) { .task-recipient-picker input { border-color: var(--text); } .task-recipient-picker .task-recipient-preview { outline: 1px solid var(--line); } }

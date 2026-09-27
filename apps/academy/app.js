@@ -147,8 +147,8 @@
     const fallback = defaultTaskBoard(lessons, exams);
     const source = raw && Array.isArray(raw.stages) && raw.stages.length ? raw : fallback;
     const validEntries = new Set(taskBoardEntries(lessons, exams).map((item) => taskBoardEntryKey(item.kind, item.id)));
-    const used = new Set();
     const stages = source.stages.map((stage, index) => {
+      const used = new Set();
       const items = (Array.isArray(stage?.items) ? stage.items : []).map((item) => ({
         kind: item?.kind === "exam" ? "exam" : "lesson",
         id: coerceString(item?.id, "")
@@ -160,12 +160,14 @@
       });
       return {
         id: coerceId("task-stage", stage?.id),
+        audience: normalizeNoticeAudience(stage?.audience),
         label: coerceString(stage?.label, "").slice(0, 20),
         title: coerceString(stage?.title, `阶段 ${index + 1}`),
         items
       };
     });
     return {
+      staffGroups: normalizeStaffGroups(source.staffGroups),
       title: coerceString(source.title, "任务面板"),
       stages: stages.length ? stages : fallback.stages
     };
@@ -341,11 +343,87 @@
     };
   }
 
+  function normalizeStaffGroups(raw) {
+    return Object.fromEntries(Object.entries(raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}).map(([id, group]) => [id, {
+      departments: Array.from(new Set((Array.isArray(group?.departments) ? group.departments : [group?.department]).filter(value => ["front", "kitchen", "dishwashing"].includes(value)))),
+      department: ["front", "kitchen", "dishwashing"].includes(group?.department) ? group.department : "",
+      employment: ["full", "part"].includes(group?.employment) ? group.employment : ""
+    }]));
+  }
+
+  function taskDepartmentOptions(selected = "") {
+    const groups = normalizeStaffGroups(DATA.taskBoard?.staffGroups);
+    const ids = new Set(Object.values(groups).flatMap(group => group.departments));
+    if (selected) ids.add(selected);
+    const names = { front: "前厅", kitchen: "后厨", dishwashing: "洗碗间" };
+    return `<option value="">全部岗位</option>` + Array.from(ids).map(id => `<option value="${escapeHtml(id)}" ${id === selected ? "selected" : ""}>${escapeHtml(names[id] || id)}</option>`).join("");
+  }
+
+  function staffGroupFor(userId) {
+    return DATA.taskBoard?.staffGroups?.[userId] || { departments: ["front"], department: "front", employment: "part" };
+  }
+
+  function staffGroupLabel(userId) {
+    const group = staffGroupFor(userId);
+    return `${(group.departments || [group.department]).map(value => ({front: "前厅", kitchen: "后厨", dishwashing: "洗碗间"})[value]).filter(Boolean).join("、") || "岗位未设置"} · ${({full: "全职", part: "兼职"})[group.employment] || "用工类型未设置"}`;
+  }
+
+  function staffIdentityLabel(user) {
+    const group = staffGroupFor(user.id);
+    const departments = (group.departments || [group.department]).map(value => ({ front: "前厅", kitchen: "后厨", dishwashing: "洗碗间" })[value]).filter(Boolean);
+    const employment = ({ full: "全职", part: "兼职" })[group.employment];
+    return [user.role === "manager" ? "店长" : "", departments.join("、"), employment].filter(Boolean).join(" · ");
+  }
+
+  function renderStaffGroupEditor(user) {
+    const group = staffGroupFor(user.id);
+    return `<button type="button" class="staff-group-entry" data-departments="${escapeHtml((group.departments || [group.department]).filter(Boolean).join(","))}" data-employment="${escapeHtml(group.employment || "")}" data-act="ops-staff-group-edit" data-id="${escapeHtml(user.id)}">员工分组</button>`;
+  }
+
+  function staffGroupForm(user) {
+    const group = staffGroupFor(user.id);
+    return `<div class="staff-group-editor" data-staff-group-id="${escapeHtml(user.id)}">
+      <fieldset class="staff-department-options"><legend>岗位 <small>可多选</small></legend>${[["front","前厅"],["kitchen","后厨"],["dishwashing","洗碗间"]].map(([value,label]) => `<label><span>${label}</span><input type="checkbox" data-staff-department value="${value}" ${(group.departments || [group.department]).includes(value) ? "checked" : ""}></label>`).join("")}</fieldset>
+      <label>用工类型<select data-staff-employment>${[["", "未设置"],["full","全职"],["part","兼职"]].map(([value,label]) => `<option value="${value}" ${group.employment === value ? "selected" : ""}>${label}</option>`).join("")}</select></label>
+
+      <p role="status" aria-live="polite"></p>
+    </div>`;
+  }
+
+  function openStaffGroupEditor(userId) {
+    if (!Auth.isManager(Auth.session)) return;
+    const user = Auth.list().find(item => item.id === userId);
+    if (!user) return;
+    document.getElementById("staff-group-dialog")?.remove();
+    const trigger = document.activeElement;
+    document.body.insertAdjacentHTML("beforeend", `<dialog id="staff-group-dialog" class="shortcut-permissions-dialog staff-group-dialog" aria-labelledby="staff-group-title">
+      <form><header><button type="button" data-group-cancel>取消</button><h2 id="staff-group-title">员工分组</h2><button type="submit" data-act="ops-staff-group-save" data-id="${escapeHtml(user.id)}">保存</button></header>
+      <div class="shortcut-permissions-content"><p class="staff-group-person">${escapeHtml(user.name)}</p>${staffGroupForm(user)}<p class="staff-group-note">可选择多个岗位，接收任一所选岗位的任务。用工类型单独设置。</p></div></form>
+    </dialog>`);
+    const dialog = document.getElementById("staff-group-dialog");
+    // This dialog is a body child, outside appRoot's delegated click listener.
+    dialog.addEventListener("click", onClick);
+    dialog.querySelector("form").onsubmit = event => {
+      event.preventDefault();
+      const save = dialog.querySelector('[type="submit"]');
+      if (!save.disabled) onClick({ target: save, preventDefault() {} });
+    };
+    dialog.querySelector("[data-group-cancel]").onclick = () => dialog.close();
+    dialog.addEventListener("cancel", event => { if (dialog.querySelector('[type="submit"]').disabled) event.preventDefault(); });
+    dialog.addEventListener("close", () => { dialog.remove(); if (trigger?.isConnected) trigger.focus(); });
+    dialog.showModal();
+  }
+
   function normalizeNoticeAudience(audience) {
-    const mode = ["all", "staff", "manager", "selected"].includes(audience?.mode) ? audience.mode : "all";
+    const mode = ["all", "staff", "manager", "selected", "group", "recipients"].includes(audience?.mode) ? audience.mode : "all";
     const userIds = Array.isArray(audience?.userIds)
       ? Array.from(new Set(audience.userIds.map((id) => coerceString(id, "")).filter(Boolean)))
       : [];
+    if (mode === "recipients") return { mode, userIds, departments: Array.from(new Set((Array.isArray(audience.departments) ? audience.departments : []).map(id => coerceString(id, "")).filter(Boolean))) };
+    if (mode === "group") return { mode, userIds,
+      department: ["front", "kitchen", "dishwashing"].includes(audience.department) ? audience.department : "",
+      employment: ["full", "part"].includes(audience.employment) ? audience.employment : ""
+    };
     return { mode, userIds };
   }
 
@@ -355,6 +433,11 @@
     if (audience.mode === "all") return true;
     if (audience.mode === "staff") return user.role !== "manager";
     if (audience.mode === "manager") return user.role === "manager";
+    if (audience.mode === "group") {
+      const group = staffGroupFor(user.id);
+      return Boolean(audience.department || audience.employment) && (!audience.department || (group.departments || [group.department]).includes(audience.department)) && (!audience.employment || group.employment === audience.employment);
+    }
+    if (audience.mode === "recipients") return audience.userIds.includes(user.id) || audience.departments.some(id => (staffGroupFor(user.id).departments || [staffGroupFor(user.id).department]).includes(id));
     return audience.userIds.includes(user.id);
   }
 
@@ -1516,7 +1599,7 @@
       .sort((a, b) => Number(isUrgentTrack(b.track)) - Number(isUrgentTrack(a.track)));
     const importantMessages = box.unreadNotices.slice(0, 5);
     const taskBoard = normalizeTaskBoard(DATA.taskBoard, DATA.lessons, DATA.exams);
-    const stages = taskBoard.stages.map((stage) => {
+    const stages = taskBoard.stages.filter(stage => noticeVisibleTo(stage)).map((stage) => {
       const tasks = stage.items.map((item) => ({
         kind: item.kind,
         data: item.kind === "exam" ? examById(item.id) : lessonById(item.id)
@@ -1577,10 +1660,11 @@
         </div>
       </section><section data-home-block="tasks" class="learning-plan">
         <header class="learning-plan-head">
-          <h3>${escapeHtml(taskBoard.title)}</h3>
+          <h3>我的任务</h3>
           <strong><small>已完成</small><b>${taskBoardDone}/${taskBoardTotal}</b></strong>
         </header>
-        <div class="stage-tabs" role="tablist" aria-label="学习阶段">
+        ${!stages.length ? `<p class="empty">暂无分配给你的任务。</p>` : ""}
+        <div class="stage-tabs" role="tablist" aria-label="我的任务">
           ${stages.map((stage, index) => `
             <button type="button" class="stage-tab ${index === activeStage ? "on" : ""} ${!stage.available ? "locked" : ""}" id="academy-stage-tab-${index}" role="tab" aria-label="${escapeHtml(stage.label || `阶段 ${index + 1}`)}，${escapeHtml(stage.title)}，已完成 ${stage.done}/${stage.tasks.length} 项" aria-selected="${index === activeStage}" aria-controls="academy-stage-${index}" tabindex="${index === activeStage ? "0" : "-1"}" data-stage-target="academy-stage-${index}">
               <span>${escapeHtml(stage.label || stage.title)}</span>
@@ -1852,7 +1936,8 @@
       <header class="account-overview">
         <div>
           <h2>${escapeHtml(Auth.session?.name || "学员")}</h2>
-          <p>${Auth.isManager(Auth.session) ? "店长" : "员工"} · ${Auth.canFull(Auth.session) ? "全部学习权限" : "基础学习权限"}</p>
+          <p>${Auth.canFull(Auth.session) ? "全部学习权限" : "基础学习权限"}</p>
+          <p class="account-staff-groups" aria-label="岗位与用工类型">${escapeHtml(staffGroupLabel(Auth.session?.id))}</p>
         </div>
         <div class="account-progress">${progressRing(completionRate())}<span>总体学习进度</span></div>
       </header>
@@ -1906,7 +1991,7 @@
       { key: "lessons", icon: "learn", label: "课程", fullLabel: "课程内容", count: DATA.lessons.length },
       { key: "exams", icon: "exam", label: "考试", fullLabel: "考试题库", count: DATA.exams.length },
       { key: "notices", icon: "bell", label: "通知", fullLabel: "事务通知", count: (DATA.notices || []).length },
-      { key: "tasks", icon: "group", label: "任务", fullLabel: "任务面板", count: (DATA.taskBoard?.stages || []).length },
+      { key: "tasks", icon: "group", label: "任务", fullLabel: "任务管理", count: (DATA.taskBoard?.stages || []).length },
       { key: "status", icon: "bell", label: "今日状态", fullLabel: "今日状态", count: 7 },
       { key: "staff", icon: "me", label: "员工", fullLabel: "员工与权限", count: Auth.list().length },
       { key: "security", icon: "me", label: "登录记录", fullLabel: "登录记录", count: null }
@@ -2498,21 +2583,31 @@
 
   function renderTaskBoardStageEditor(stage, index) {
     const entries = taskBoardEntries();
+    const audience = normalizeNoticeAudience(stage.audience);
     return `
-      <section class="card task-board-stage-editor" data-task-stage-id="${escapeHtml(stage.id)}">
+      <section class="card task-board-stage-editor" data-task-stage-id="${escapeHtml(stage.id)}" data-task-original-audience="${escapeHtml(JSON.stringify(audience))}">
         <header>
-          <input class="task-board-stage-number" data-task-stage-label aria-label="阶段标签" maxlength="20" value="${escapeHtml(stage.label || "")}" placeholder="阶段 ${index + 1}" title="编辑阶段标签">
-          <input data-task-stage-title aria-label="阶段名称" maxlength="40" value="${escapeHtml(stage.title)}" placeholder="输入阶段名称">
+          <input class="task-board-stage-number" data-task-stage-label aria-label="阶段标签" maxlength="20" value="${escapeHtml(stage.label || "")}" placeholder="任务 ${index + 1}" title="编辑阶段标签">
+          <input data-task-stage-title aria-label="任务名称" maxlength="40" value="${escapeHtml(stage.title)}" placeholder="例如：新员工入职培训">
           <details class="task-board-menu">
             <summary aria-label="阶段操作"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="4" cy="10" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/><circle cx="16" cy="10" r="1.5" fill="currentColor"/></svg></summary>
             <div class="task-board-menu-items">
               <button type="button" data-act="ops-task-stage-rename">重命名</button>
-              <button type="button" data-act="ops-task-stage-move" data-direction="up">上移阶段</button>
-              <button type="button" data-act="ops-task-stage-move" data-direction="down">下移阶段</button>
-              <button type="button" class="danger-text" data-act="ops-task-stage-remove">删除阶段</button>
+              <button type="button" data-act="ops-task-stage-move" data-direction="up">上移任务</button>
+              <button type="button" data-act="ops-task-stage-move" data-direction="down">下移任务</button>
+              <button type="button" class="danger-text" data-act="ops-task-stage-remove">删除任务</button>
             </div>
           </details>
         </header>
+        <details class="task-assignment task-recipient-picker"><summary>接收人 <span data-recipient-count>${Auth.list().filter(user => noticeVisibleTo(stage, user)).length} 人</span></summary>
+          <div class="task-recipient-shortcuts"><button type="button" data-act="ops-task-recipients" data-group="all">全选</button><button type="button" data-act="ops-task-recipients" data-group="none">清空</button></div>
+          <div class="task-recipient-section-title">按岗位推送</div>
+          <div class="task-recipient-roles">${Array.from(new Set([...Object.values(normalizeStaffGroups(DATA.taskBoard?.staffGroups)).flatMap(group => group.departments), ...Auth.list().flatMap(user => staffGroupFor(user.id).departments || []), ...(audience.departments || []), ...(audience.mode === "group" && audience.department ? [audience.department] : [])])).map(id => `<label><input type="checkbox" data-task-role value="${escapeHtml(id)}" ${audience.mode === "recipients" && audience.departments.includes(id) || audience.mode === "group" && !audience.employment && audience.department === id ? "checked" : ""}><span>${escapeHtml(({front:"前厅",kitchen:"后厨",dishwashing:"洗碗间"})[id] || id)}</span></label>`).join("")}</div>
+          <p>自动包含所选岗位成员。</p>
+          <div class="task-recipient-section-title">指定员工</div>
+          <div class="task-recipients">${Auth.list().filter(user => user.access !== "blocked").map(user => `<label><input type="checkbox" data-task-recipient value="${escapeHtml(user.id)}" ${(audience.mode === "recipients" ? audience.userIds.includes(user.id) : audience.mode === "group" && !audience.employment ? false : noticeVisibleTo(stage, user)) ? "checked" : ""}><span>${escapeHtml(user.name)}<small data-role-included hidden>岗位已包含</small></span></label>`).join("")}</div>
+          <div class="task-recipient-preview" data-recipient-preview role="status" aria-live="polite"></div>
+        </details>
         <div class="task-board-editor-items">
           ${stage.items.map(renderTaskBoardItemEditor).join("")}
           <p class="task-board-stage-empty" ${stage.items.length ? "hidden" : ""}>当前阶段还没有任务</p>
@@ -2527,23 +2622,41 @@
       </section>`;
   }
 
+  function refreshTaskRecipientPreview(stage, changed = false) {
+    if (changed) stage.dataset.taskRecipientsChanged = "true";
+    const audience = stage.dataset.taskRecipientsChanged === "true" ? {
+      mode: "recipients",
+      departments: Array.from(stage.querySelectorAll("[data-task-role]:checked")).map(input => input.value),
+      userIds: Array.from(stage.querySelectorAll("[data-task-recipient]:checked")).map(input => input.value)
+    } : JSON.parse(stage.dataset.taskOriginalAudience || '{"mode":"selected","userIds":[]}');
+    const recipients = Auth.list().filter(user => noticeVisibleTo({ audience }, user));
+    const count = stage.querySelector("[data-recipient-count]");
+    if (count) count.textContent = `${recipients.length} 人`;
+    const preview = stage.querySelector("[data-recipient-preview]");
+    if (preview) preview.innerHTML = `<strong>${recipients.length ? `将推送给 ${recipients.length} 人` : "尚未选择接收人"}</strong><p>${recipients.length ? recipients.map(user => escapeHtml(user.name)).join("、") : "选择岗位或员工后，这里会显示接收名单。"}</p>`;
+    stage.querySelectorAll("[data-task-recipient]").forEach(input => {
+      const user = Auth.list().find(user => user.id === input.value);
+      const assigned = user && audience.mode === "recipients" && audience.departments.some(id => (staffGroupFor(user.id).departments || []).includes(id));
+      const hint = input.closest("label").querySelector("[data-role-included]");
+      if (hint) hint.hidden = !assigned;
+    });
+  }
+
   function renderOpsTaskBoard() {
     const board = normalizeTaskBoard(DATA.taskBoard, DATA.lessons, DATA.exams);
     return `
       <form class="ops-editor task-board-editor" id="ops-task-board-editor">
-        <section class="task-board-settings">
-          <label class="editor-field editor-field-main"><span>面板名称</span><input id="ops-task-board-title" maxlength="40" value="${escapeHtml(board.title)}" placeholder="任务面板"></label>
-        </section>
+        <input type="hidden" id="ops-task-board-title" value="${escapeHtml(board.title)}">
         <div class="task-board-editor-head">
-          <div><strong>阶段与任务</strong><span>点击名称编辑，更多操作见 ···</span></div>
-          <button type="button" class="ghost" data-act="ops-task-stage-add">新增阶段</button>
+          <div><strong>任务与学习内容</strong><span>填写任务名称、添加内容、选择接收人</span></div>
+          <button type="button" class="ghost" data-act="ops-task-stage-add">新建任务</button>
         </div>
         <div class="task-board-stage-list">
           ${board.stages.map(renderTaskBoardStageEditor).join("")}
         </div>
         <div class="lesson-editor-footer task-board-editor-footer">
-          <span>保存后会同步更新所有员工首页</span>
-          <button class="primary" type="button" data-act="ops-save" data-section="tasks">发布任务面板</button>
+          <span>分别绑定学习内容与接收人，发布后同步到成员首页</span>
+          <button class="primary" type="button" data-act="ops-save" data-section="tasks">发布任务</button>
         </div>
       </form>`;
   }
@@ -2551,6 +2664,7 @@
   function collectTaskBoardEditor() {
     const stages = Array.from(document.querySelectorAll(".task-board-stage-editor")).map((stage, index) => ({
       id: coerceId("task-stage", stage.dataset.taskStageId),
+      audience: stage.dataset.taskRecipientsChanged === "true" ? { mode: "recipients", departments: Array.from(stage.querySelectorAll("[data-task-role]:checked")).map(input => input.value), userIds: Array.from(stage.querySelectorAll("[data-task-recipient]:checked")).map(input => input.value) } : JSON.parse(stage.dataset.taskOriginalAudience || '{"mode":"selected","userIds":[]}'),
       label: coerceString(stage.querySelector("[data-task-stage-label]")?.value, ""),
       title: coerceString(stage.querySelector("[data-task-stage-title]")?.value, `阶段 ${index + 1}`),
       items: Array.from(stage.querySelectorAll(".task-board-editor-item")).map((item) => ({
@@ -2559,6 +2673,7 @@
       }))
     }));
     return normalizeTaskBoard({
+      staffGroups: DATA.taskBoard?.staffGroups,
       title: coerceString(document.getElementById("ops-task-board-title")?.value, "任务面板"),
       stages
     }, DATA.lessons, DATA.exams);
@@ -2566,10 +2681,9 @@
 
   function refreshTaskBoardEditor() {
     const stages = Array.from(document.querySelectorAll(".task-board-stage-editor"));
-    const used = new Set(Array.from(document.querySelectorAll(".task-board-editor-item")).map((item) =>
-      taskBoardEntryKey(item.dataset.taskKind, item.dataset.taskId)
-    ));
     stages.forEach((stage, index) => {
+      refreshTaskRecipientPreview(stage);
+      const used = new Set(Array.from(stage.querySelectorAll(".task-board-editor-item")).map(item => taskBoardEntryKey(item.dataset.taskKind, item.dataset.taskId)));
       const number = stage.querySelector(".task-board-stage-number");
       if (number) number.placeholder = `阶段 ${index + 1}`;
       const empty = stage.querySelector(".task-board-stage-empty");
@@ -2707,6 +2821,7 @@
             <div class="ops-item-main">
               <div class="ops-item-eyebrow"><span class="ops-tag">${TYPE_LABEL[lesson.type] || lesson.type}</span><span>${minutesLabel(lesson.minutes)}</span></div>
               <h3>${escapeHtml(lesson.title)}</h3>
+              <div class="ops-meta-list"><span>绑定任务：${escapeHtml(normalizeTaskBoard(DATA.taskBoard).stages.filter(stage => stage.items.some(item => item.kind === "lesson" && item.id === lesson.id)).map(stage => stage.title).join("、") || "未绑定")}</span></div>
               <p>${escapeHtml(lesson.summary)}</p>
               <div class="ops-meta-list"><span>${escapeHtml(lessonGroupNames(lesson).join("、") || "未分组")}</span><span>${escapeHtml(lessonCompletionLabel(lesson))}</span><span>${lesson.notify !== false ? "发布后提醒" : "静默发布"}</span></div>
             </div>
@@ -2863,6 +2978,8 @@
       : "尚未产生记录";
     return `
       <div class="staff-toolbar">
+        <label>岗位<select data-staff-filter="department" aria-label="按岗位筛选员工"><option value="">全部岗位</option><option value="front">前厅</option><option value="kitchen">后厨</option><option value="dishwashing">洗碗间</option><option value="unset">未设置</option></select></label>
+        <label>用工类型<select data-staff-filter="employment" aria-label="按用工类型筛选员工"><option value="">全部类型</option><option value="full">全职</option><option value="part">兼职</option><option value="unset">未设置</option></select></label>
         <button type="button" class="ghost" data-staff-refresh>刷新</button>
       </div>
       <div class="counts staff-counts" aria-label="成员数据摘要">
@@ -2882,6 +2999,7 @@
             <article class="staff-member is-loading" data-sync-key="${escapeHtml(user.id)}">
               <div class="staff-member-head"><span class="staff-avatar">${escapeHtml(user.name.slice(0, 1))}</span><div><strong>${escapeHtml(user.name)}</strong><small>正在读取学习数据...</small></div></div>
               <div class="staff-loading-line"></div>
+              <details class="staff-detail"><summary>查看明细</summary><div class="staff-detail-body"><div class="tools staff-actions">${renderStaffGroupEditor(user)}</div></div></details>
             </article>`;
           const isOnline = item.lastSeenAt && Date.now() - item.lastSeenAt < 90000;
           const pendingLessons = DATA.lessons.filter((lesson) => !lessonCompletedForProgress(lesson, item.progress));
@@ -2892,7 +3010,7 @@
               <div class="staff-member-head">
                 <span class="staff-avatar">${escapeHtml(user.name.slice(0, 1))}</span>
                 <div class="staff-identity">
-                  <div><strong>${escapeHtml(user.name)}</strong><span class="staff-role">${user.role === "manager" ? "店长" : "员工"}</span></div>
+                  <div><strong>${escapeHtml(user.name)}</strong><span class="staff-role" data-staff-role>${escapeHtml(staffIdentityLabel(user))}</span></div>
                   <small><i class="staff-presence ${isOnline ? "on" : ""}"></i>${isOnline ? "当前在线" : `最后在线 ${formatSeen(item.lastSeenAt)}`}</small>
                 </div>
                 <div class="staff-percent" style="--percent:${item.percent * 3.6}deg"><b>${item.percent}%</b><span>完成度</span></div>
@@ -2904,13 +3022,14 @@
                 <div><b>${formatDuration(item.progress.onlineSeconds)}</b><span>累计在线学习</span></div>
               </div>
               <details class="staff-detail">
-                <summary>查看学习明细 <span>${pendingLessons.length + pendingExams.length ? `${pendingLessons.length + pendingExams.length} 项待完成` : "已全部完成"}</span></summary>
+                <summary>查看明细 <span>${pendingLessons.length + pendingExams.length ? `${pendingLessons.length + pendingExams.length} 项待完成` : "已全部完成"}</span></summary>
                 <div class="staff-detail-body">
                   <section><strong>待学习课程</strong><p>${pendingLessons.length ? pendingLessons.map((lesson) => escapeHtml(lesson.title)).join("、") : "课程已全部完成"}</p></section>
                   <section><strong>待通过考试</strong><p>${pendingExams.length ? pendingExams.map((exam) => escapeHtml(exam.title)).join("、") : "考试已全部通过"}</p></section>
                   <section><strong>账号权限</strong><p>${staffAccessLabel(user)}${user.approvedBy ? ` · 由 ${escapeHtml(user.approvedBy)} 授权` : ""}</p></section>
                   <div class="tools staff-actions">
                     ${shortcutButton}
+                    ${renderStaffGroupEditor(user)}
                     ${user.access !== "full" && user.access !== "blocked" ? `<button data-act="ops-staff-auth" data-id="${user.id}" data-access="full">开放全部学习内容</button>` : ""}
                     ${user.access === "full" && user.id !== Auth.session.id ? `<button data-act="ops-staff-auth" data-id="${user.id}" data-access="basic">改为基础权限</button>` : ""}
                     ${user.access !== "blocked" && user.id !== Auth.session.id ? `<button data-act="ops-staff-auth" data-id="${user.id}" data-access="blocked">停用账号</button>` : ""}
@@ -2921,6 +3040,7 @@
             </article>`;
         }).join("")}
       </div>
+      <p data-staff-filter-empty class="empty" hidden>没有符合此分组的员工。</p>
     `;
   }
 
@@ -2955,7 +3075,7 @@
       lessons: "课程管理",
       exams: "考试管理",
       notices: "通知",
-      tasks: "任务面板",
+      tasks: "任务管理",
       status: "今日状态",
       staff: "员工与权限",
       security: "登录记录"
@@ -3890,11 +4010,23 @@
       return go(`#/ops?section=${currentOpsRoute().section}`);
     }
     if (act === "ops-message") return go("#/ops?section=notices");
+    if (act === "ops-task-recipients") {
+      const stage = btn.closest(".task-board-stage-editor");
+      stage.querySelectorAll("[data-task-recipient]").forEach(input => {
+        if (btn.dataset.group === "all") input.checked = true;
+        else if (btn.dataset.group === "none") input.checked = false;
+        else if ((staffGroupFor(input.value).departments || []).includes(btn.dataset.group)) input.checked = true;
+      });
+      if (btn.dataset.group === "none") stage.querySelectorAll("[data-task-role]").forEach(input => { input.checked = false; });
+      const first = stage.querySelector("[data-task-recipient], [data-task-role]");
+      first?.dispatchEvent(new Event("change", { bubbles: true }));
+      return;
+    }
     if (act === "ops-task-stage-add") {
       const list = document.querySelector(".task-board-stage-list");
       if (!list) return;
       const index = list.querySelectorAll(".task-board-stage-editor").length;
-      const stage = { id: coerceId("task-stage", ""), title: `阶段 ${index + 1}`, items: [] };
+      const stage = { id: coerceId("task-stage", ""), title: `任务 ${index + 1}`, audience: { mode: "selected", userIds: [] }, items: [] };
       list.insertAdjacentHTML("beforeend", renderTaskBoardStageEditor(stage, index));
       refreshTaskBoardEditor();
       list.lastElementChild?.querySelector("[data-task-stage-title]")?.focus();
@@ -3920,7 +4052,7 @@
       const stages = document.querySelectorAll(".task-board-stage-editor");
       if (!stage) return;
       if (stages.length <= 1) return alert("任务面板至少需要保留一个阶段。");
-      if (stage.querySelector(".task-board-editor-item") && !confirm("删除阶段会将其中的任务移出面板，课程、考试和员工学习记录仍会保留。发布后生效，确定继续吗？")) return;
+      if (stage.querySelector(".task-board-editor-item") && !confirm("删除任务会将其中的任务移出面板，课程、考试和员工学习记录仍会保留。发布后生效，确定继续吗？")) return;
       stage.remove();
       refreshTaskBoardEditor();
       return;
@@ -3934,7 +4066,7 @@
       const kind = key.slice(0, separator) === "exam" ? "exam" : "lesson";
       const id = key.slice(separator + 1);
       const entry = taskBoardEntry(kind, id);
-      const duplicate = Array.from(document.querySelectorAll(".task-board-editor-item")).some((item) =>
+      const duplicate = Array.from(stage.querySelectorAll(".task-board-editor-item")).some((item) =>
         item.dataset.taskKind === kind && item.dataset.taskId === id
       );
       if (!entry || duplicate) return;
@@ -4149,6 +4281,38 @@
       return;
     }
     if (act === "ops-shortcut-permissions") { openOpsShortcutPermissions(btn.dataset.id); return; }
+    if (act === "ops-staff-group-edit") { openStaffGroupEditor(btn.dataset.id); return; }
+    if (act === "ops-staff-group-save") {
+      event.preventDefault();
+      if (!Auth.isManager(Auth.session)) return;
+      const dialog = btn.closest("dialog");
+      const editor = dialog.querySelector("[data-staff-group-id]");
+      const status = editor.querySelector('[role="status"]');
+      const departments = Array.from(editor.querySelectorAll("[data-staff-department]:checked")).map(input => input.value);
+      const group = { departments, department: departments[0] || "", employment: editor.querySelector("[data-staff-employment]").value };
+      DATA.taskBoard = normalizeTaskBoard(DATA.taskBoard);
+      DATA.taskBoard.staffGroups[btn.dataset.id] = group;
+      saveOpsStore();
+      (async () => {
+        try {
+          dialog.querySelector("[data-group-cancel]").disabled = true;
+          btn.disabled = true;
+          btn.textContent = "保存中";
+          await ContentSync.publish();
+          const card = Array.from(document.querySelectorAll(".staff-member[data-sync-key]")).find(card => card.dataset.syncKey === btn.dataset.id);
+          const row = card?.querySelector(".staff-group-entry");
+          if (row) { row.dataset.departments = group.departments.join(","); row.dataset.employment = group.employment; }
+          const identity = card?.querySelector("[data-staff-role]");
+          const user = Auth.list().find(user => user.id === btn.dataset.id);
+          if (identity && user) identity.textContent = staffIdentityLabel(user);
+          dialog.close();
+          document.querySelector("[data-staff-filter]")?.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        catch (error) { status.textContent = `已暂存，同步失败：${error.message || "请重试"}`; }
+        finally { if (dialog.isConnected) { dialog.querySelector("[data-group-cancel]").disabled = false; btn.disabled = false; btn.textContent = "保存"; } }
+      })();
+      return;
+    }
     if (act === "ops-staff-auth") {
       (async () => {
         try {
@@ -4167,11 +4331,13 @@
         if (section === "tasks") {
           const title = coerceString(document.getElementById("ops-task-board-title")?.value, "");
           const stageNodes = document.querySelectorAll(".task-board-stage-editor");
-          const itemNodes = document.querySelectorAll(".task-board-editor-item");
           if (!title) return alert("任务面板名称不能为空。");
           if (!stageNodes.length) return alert("任务面板至少需要一个阶段。");
-          if (!itemNodes.length) return alert("请至少添加一项课程或考试任务。");
-          DATA.taskBoard = collectTaskBoardEditor();
+          const draft = collectTaskBoardEditor();
+          if (draft.stages.some(stage => stage.audience.mode === "selected" && !stage.audience.userIds.length)) return alert("请为指定成员任务选择至少一位接收人。");
+          if (draft.stages.some(stage => stage.audience.mode === "group" && !stage.audience.department && !stage.audience.employment)) return alert("请至少选择一个岗位或用工类型。");
+          if (draft.stages.some(stage => stage.audience.mode === "recipients" && !stage.audience.userIds.length && !stage.audience.departments.length)) return alert("请选择接收岗位或员工。");
+          DATA.taskBoard = draft;
           saveOpsStore();
           try {
             await publishWithState(btn, "任务面板");
@@ -4703,5 +4869,25 @@
     requestAnimationFrame(loop);
   }
 
+  document.addEventListener("change", event => {
+    if (!event.target.matches("[data-task-recipient], [data-task-role]")) return;
+    refreshTaskRecipientPreview(event.target.closest(".task-board-stage-editor"), true);
+  });
+
   document.addEventListener("DOMContentLoaded", init);
 })();
+
+document.addEventListener("change", event => {
+  if (!event.target.matches("[data-staff-filter]")) return;
+  const department = document.querySelector('[data-staff-filter="department"]').value;
+  const employment = document.querySelector('[data-staff-filter="employment"]').value;
+  let visible = 0;
+  document.querySelectorAll(".staff-member[data-sync-key]").forEach(card => {
+    const row = card.querySelector(".staff-group-entry");
+    const values = { departments: (row?.dataset.departments || "").split(",").filter(Boolean), employment: row?.dataset.employment || "" };
+    card.hidden = !((!department || (department === "unset" ? !values.departments.length : values.departments.includes(department))) && (!employment || values.employment === (employment === "unset" ? "" : employment)));
+    if (!card.hidden) visible++;
+  });
+  const empty = document.querySelector("[data-staff-filter-empty]");
+  if (empty) empty.hidden = visible > 0;
+});
