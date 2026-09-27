@@ -5,7 +5,7 @@
 
   const LETTERS = "ABCDEFGH";
 
-  const TYPE_LABEL = { article: "图文", video: "视频" };
+  const TYPE_LABEL = { article: "图文", video: "视频", document: "文档" };
   const DROPPED_LESSON_IDS = new Set(["a-html-what", "g-tags", "v-html-page", "a-tags", "g-card", "g-fix", "v-css", "g-box"]);
   // Retired built-in exams must not return from cached or older cloud content.
   const DROPPED_EXAM_IDS = new Set(["e-html", "e-mix"]);
@@ -93,7 +93,7 @@
   }
 
   function normalizeLessonType(type) {
-    return ["article", "video"].includes(type) ? type : "article";
+    return ["article", "video", "document"].includes(type) ? type : "article";
   }
 
   function defaultCourseGroups() {
@@ -238,6 +238,7 @@
       access: item.access === "basic" ? "basic" : "full",
       videoDurationSeconds: Math.max(0, Number(item.videoDurationSeconds) || 0),
       mediaUrl: coerceString(item.mediaUrl, ""),
+      document: window.AcademyDocuments.normalize(item.document),
       publishedAt: coerceNumber(item.publishedAt, 0),
       notify: item.notify !== false,
       requiredExamId: coerceString(item.requiredExamId, ""),
@@ -668,6 +669,7 @@
       minutes: document.getElementById("ops-lesson-minutes")?.value || "3",
       access: document.getElementById("ops-lesson-access")?.value || "full",
       mediaUrl: document.getElementById("ops-lesson-media-url")?.value || "",
+      document: readDocumentEditor(),
       requiredExamId: document.getElementById("ops-lesson-required-exam")?.value || "",
       requireConfirmation: Boolean(document.getElementById("ops-lesson-require-confirmation")?.checked),
       notify: document.getElementById("ops-lesson-notify")?.checked !== false,
@@ -2106,6 +2108,7 @@
       access: raw?.access === "basic" ? "basic" : "full",
       videoDurationSeconds: Math.max(0, Number(raw?.videoDurationSeconds) || 0),
       mediaUrl: coerceString(raw?.mediaUrl, ""),
+      document: window.AcademyDocuments.normalize(raw?.document),
       requiredExamId: coerceString(raw?.requiredExamId, ""),
       requireConfirmation: raw?.requireConfirmation !== false,
       notify: raw?.id ? raw?.notify !== false : raw?.notify === true,
@@ -2314,6 +2317,7 @@
         collect(block[key]);
       }
     }
+    if (lesson.type === "document" && lesson.document?.text) strings.push(lesson.document.text);
     const text = strings.join(" ").replace(/<[^>]*>/g, " ");
     const characters = (text.match(/[\p{Script=Han}]/gu) || []).length;
     const words = (text.match(/[A-Za-z0-9]+(?:['’-][A-Za-z0-9]+)*/g) || []).length;
@@ -2334,7 +2338,7 @@
     if (confirmation) confirmation.hidden = Boolean(document.getElementById("ops-lesson-required-exam")?.value);
     let blocks = [];
     try { blocks = JSON.parse(document.getElementById("ops-lesson-blocks")?.value || "[]"); } catch (_) {}
-    const result = estimateLessonDuration({ blocks, type: document.getElementById("ops-lesson-type")?.value,
+    const result = estimateLessonDuration({ blocks, document: readDocumentEditor(), type: document.getElementById("ops-lesson-type")?.value,
       videoDurationSeconds: document.getElementById("ops-lesson-video-duration")?.value,
       requiredExamId: document.getElementById("ops-lesson-required-exam")?.value }, DATA.exams);
     input.value = result.minutes;
@@ -2801,6 +2805,39 @@
     });
   }
 
+  function readDocumentEditor() {
+    try { return JSON.parse(document.getElementById("ops-lesson-document")?.value || "null"); }
+    catch { return null; }
+  }
+
+  async function createFrontSafetyCourse(btn) {
+    if (!Auth.isManager(Auth.session) || !window.AcademyFrontSafety) return;
+    const preset = structuredClone(window.AcademyFrontSafety);
+    const existing = lessonById(preset.lesson.id);
+    if (existing) return go(`#/ops?section=lessons&mode=edit&id=${existing.id}`);
+    setPublishState(btn, "uploading", "正在上传安全手册");
+    try {
+      const response = await fetch(window.AcademyDocuments.safeUrl(preset.lesson.document.url));
+      if (!response.ok) throw new Error(`安全手册读取失败（HTTP ${response.status}）`);
+      const file = new File([await response.arrayBuffer()], preset.lesson.document.name, { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+      preset.lesson.document = { ...await window.AcademyDocuments.upload(file, preset.lesson.id), text: preset.lesson.document.text };
+    } catch (error) { setPublishFailed(btn); alert(`安全手册未上传：${error.message || "请重试"}`); return; }
+    const oldLessons = DATA.lessons.slice(), oldExams = DATA.exams.slice();
+    const group = DATA.courseGroups.find(item => /前厅/.test(item.name)) || DATA.courseGroups.find(item => item.id === "onboard") || DATA.courseGroups[0];
+    preset.lesson.groupIds = group ? [group.id] : [];
+    preset.lesson.publishedAt = preset.exam.publishedAt = Date.now();
+    DATA.lessons.push(normalizeLesson(preset.lesson));
+    if (!examById(preset.exam.id)) DATA.exams.push(normalizeExam(preset.exam));
+    saveOpsStore();
+    try {
+      await publishWithState(btn, "课程与考试");
+      go(`#/ops?section=lessons&mode=edit&id=${preset.lesson.id}`);
+    } catch (error) {
+      DATA.lessons = oldLessons; DATA.exams = oldExams; saveOpsStore();
+      alert(`课程与考试未发布，请重试：${error.message || "网络错误"}`);
+    }
+  }
+
   function renderOpsLessonEditor(item) {
     const savedDraft = loadLessonDraft();
     if (!item?.id && savedDraft && savedDraft.optionDefaultsVersion !== 2) {
@@ -2809,6 +2846,7 @@
     }
     const data = lessonForEditor(savedDraft ? { ...item, ...savedDraft, id: item?.id || "" } : item);
     const hasMedia = Boolean(data.mediaUrl);
+    const hasDocument = Boolean(data.document);
     return `
       <form class="ops-editor lesson-editor" id="ops-editor">
         <input type="hidden" id="ops-lesson-group-ids" value="${escapeHtml(JSON.stringify(data.groupIds))}">
@@ -2828,6 +2866,7 @@
               <select id="ops-lesson-type">
                 <option value="article" ${data.type === "article" ? "selected" : ""}>图文课程</option>
                 <option value="video" ${data.type === "video" ? "selected" : ""}>视频课程</option>
+                <option value="document" ${data.type === "document" ? "selected" : ""}>文档课程</option>
               </select>
             </label>
 
@@ -2868,6 +2907,14 @@
           <div class="media-preview" ${hasMedia ? "" : "hidden"}>${hasMedia ? `<video src="${escapeHtml(data.mediaUrl)}" controls></video>` : ""}</div>
           <input type="hidden" id="ops-lesson-media-url" value="${escapeHtml(data.mediaUrl)}">
           <button type="button" class="remove-media" data-act="ops-lesson-clear-media" ${hasMedia ? "" : "hidden"}>移除当前视频</button>
+        </section>
+
+        <section class="card editor-section document-editor-section" data-document-panel ${data.type === "document" ? "" : "hidden"}>
+          <div class="editor-section-head"><span>03</span><div><h3>课程文档</h3><p>支持 DOCX、PDF、TXT，单个文件不超过20MB。Word按标题、段落和表格重新排版，PDF保留页面布局。</p></div></div>
+          <label class="document-dropzone" for="ops-lesson-document-file"><strong>${hasDocument ? "更换课程文档" : "上传课程文档"}</strong><input id="ops-lesson-document-file" type="file" accept=".docx,.pdf,.txt"><span class="document-editor-status">${hasDocument ? escapeHtml(data.document.name) : "选择文件后可立即预览；发布时上传"}</span></label>
+          <input id="ops-lesson-document" type="hidden" value="${escapeHtml(JSON.stringify(data.document))}">
+          <div class="document-course-preview" data-document-preview ${hasDocument ? "" : "hidden"}></div>
+          <button type="button" data-act="ops-lesson-clear-document" ${hasDocument ? "" : "hidden"}>移除文档</button>
         </section>
 
         <details class="card editor-section lesson-completion-editor" ${data.requiredExamId ? "open" : ""}>
@@ -2919,6 +2966,7 @@
     return `
       <section class="ops-list" aria-label="课程列表">
         <header class="ops-list-head"><div><h3>全部课程</h3><span>共 ${DATA.lessons.length} 门课程</span></div></header>
+        ${window.AcademyFrontSafety ? `<section class="card front-safety-starter"><div><strong>前厅安全入门</strong><p>火锅前厅安全手册与20题考试，全部答对通过。</p></div><button type="button" class="primary" data-act="ops-front-safety">${lessonById(window.AcademyFrontSafety.lesson.id) ? "查看课程" : "创建课程与考试"}</button></section>` : ""}
         ${renderGroupedCourses(DATA.lessons, renderOpsCourseCards, "ops")}
       </section>
     `;
@@ -3241,7 +3289,11 @@
         </main>
       </div>
     `;
-    if (isEditing && active === "lessons") resizeLessonEditorFields(view());
+    if (isEditing && active === "lessons") {
+      resizeLessonEditorFields(view());
+      const doc = readDocumentEditor();
+      if (doc) window.AcademyDocuments.mount(view().querySelector('[data-document-preview]'), doc);
+    }
     if (active === "layout") HomeLayout.mount(view(), DATA.homeLayout, renderHome, async (layout) => {
       const previous = DATA.homeLayout;
       DATA.homeLayout = layout;
@@ -3272,7 +3324,7 @@
     state.progress.last = { type: "lesson", id };
     save();
     touchStreak();
-    if (lesson.type === "article") return renderArticle(lesson);
+    if (["article", "document"].includes(lesson.type)) return renderArticle(lesson);
     if (lesson.type === "video") return startVideo(lesson);
     return go("#/learn");
   }
@@ -3398,13 +3450,18 @@
     setTop(lesson.title, true);
     view().innerHTML = `
       <article class="article">
-        <p class="muted">${TYPE_LABEL.article} · ${minutesLabel(lesson.minutes)}</p>
+        <p class="muted">${TYPE_LABEL[lesson.type]} · ${minutesLabel(lesson.minutes)}</p>
         ${lessonGroupDetails(lesson)}
+        ${lesson.type === "document" ? `<section class="document-course-panel"><h2>${escapeHtml(lesson.title)}</h2><p>${escapeHtml(lesson.summary)}</p><div class="document-course-preview" data-document-preview></div>${lesson.document ? `<a class="document-download" href="${escapeHtml(window.AcademyDocuments.safeUrl(lesson.document.url))}" target="_blank" rel="noopener noreferrer">打开原文档</a>` : ""}</section>` : ""}
         ${renderBlocks(lesson.blocks)}
         ${lessonCompletionPanel(lesson)}
       </article>
     `;
-    if (!lesson.requiredExamId && !lesson.requireConfirmation) bindArticleAutoCompletion(lesson);
+    if (lesson.type === "document") {
+      window.AcademyDocuments.mount(view().querySelector('[data-document-preview]'), lesson.document).then(record => {
+        if (record && state.route.id === lesson.id && !lesson.requiredExamId && !lesson.requireConfirmation) bindArticleAutoCompletion(lesson);
+      });
+    } else if (!lesson.requiredExamId && !lesson.requireConfirmation) bindArticleAutoCompletion(lesson);
   }
 
   function lessonVideoSource(lesson) {
@@ -4180,6 +4237,16 @@
     if (!btn || btn.disabled) return;
     if (btn.dataset.messageKey) markMessageRead(btn.dataset.messageKey);
     const act = btn.dataset.act;
+    if (act === "ops-front-safety") { createFrontSafetyCourse(btn); return; }
+    if (act === "ops-lesson-clear-document") {
+      const field = document.getElementById("ops-lesson-document");
+      field.value = "null"; delete field.dataset.previewState;
+      document.getElementById("ops-lesson-document-file").value = "";
+      const preview = view().querySelector('[data-document-preview]');
+      preview.replaceChildren(); preview.hidden = true;
+      view().querySelector('.document-editor-status').textContent = "选择文件后可立即预览；发布时上传";
+      btn.hidden = true; updateLessonDuration(); saveLessonDraft(); return;
+    }
     if (act === "ops-tab") return go(`#/ops?section=${btn.dataset.section}`, { replace: true });
     if (act === "back") return goToParentPage();
     if (act === "theme-toggle") {
@@ -4571,6 +4638,7 @@
             videoDurationSeconds: Number(document.getElementById("ops-lesson-video-duration")?.value) || 0,
             access: document.getElementById("ops-lesson-access")?.value || "full",
             mediaUrl: coerceString(document.getElementById("ops-lesson-media-url")?.value, ""),
+            document: rawType === "document" ? readDocumentEditor() : null,
             publishedAt: Date.now(),
             notify: document.getElementById("ops-lesson-notify")?.checked !== false,
             requiredExamId: coerceString(document.getElementById("ops-lesson-required-exam")?.value, ""),
@@ -4587,8 +4655,18 @@
           const estimate = estimateLessonDuration(raw, DATA.exams);
           if (estimate.incomplete) { setPublishFailed(btn); alert("请等待视频时长读取完成；如无法读取，请重新选择视频。"); return; }
           raw.minutes = estimate.minutes;
-          const pickedFile = document.getElementById("ops-lesson-media")?.files?.[0];
+          const documentFile = rawType === "document" ? document.getElementById("ops-lesson-document-file")?.files?.[0] : null;
+          if (rawType === "document" && (!raw.document?.url && !documentFile)) { setPublishFailed(btn); alert("请上传课程文档，再发布课程。"); return; }
+          if (documentFile && document.getElementById("ops-lesson-document").dataset.previewState !== "ready") { setPublishFailed(btn); alert("请等待文档成功预览后发布；预览失败请重新选择文件。"); return; }
+          const pickedFile = rawType === "video" ? document.getElementById("ops-lesson-media")?.files?.[0] : null;
           try {
+            if (documentFile) {
+              setPublishState(btn, "uploading", "正在上传文档");
+              raw.document = { ...await window.AcademyDocuments.upload(documentFile, raw.id), text: raw.document?.text || "" };
+              document.getElementById("ops-lesson-document").value = JSON.stringify(raw.document);
+              document.getElementById("ops-lesson-document-file").value = "";
+              saveLessonDraft();
+            }
             if (pickedFile) {
               await loadUploadSdk();
               raw.mediaUrl = await uploadLessonVideo(pickedFile, raw.id, (percent) => setVideoUploadProgress(btn, percent));
@@ -4598,7 +4676,7 @@
             }
           } catch (error) {
             setPublishFailed(btn, "上传失败 · 重试");
-            alert(error.message || "视频上传失败，请重新选择。");
+            alert(error.message || "文件上传失败，请重新选择。");
             return;
           }
           const normalized = normalizeLesson(raw);
@@ -4801,6 +4879,8 @@
     if (event.target.id === "ops-lesson-type") {
       const panel = document.querySelector("[data-video-panel]");
       if (panel) panel.hidden = event.target.value !== "video";
+      const documentPanel = document.querySelector("[data-document-panel]");
+      if (documentPanel) documentPanel.hidden = event.target.value !== "document";
       const hasVideoStep = event.target.value === "video";
       const groupStep = document.querySelector('[data-lesson-step="group"]');
       const completionStep = document.querySelector('[data-lesson-step="completion"]');
@@ -5069,6 +5149,31 @@
   document.addEventListener("change", event => {
     if (!event.target.matches("[data-task-recipient], [data-task-role]")) return;
     refreshTaskRecipientPreview(event.target.closest(".task-board-stage-editor"), true);
+  });
+
+  document.addEventListener("change", async event => {
+    if (event.target.id !== "ops-lesson-document-file") return;
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const field = document.getElementById("ops-lesson-document");
+    const preview = view().querySelector('[data-document-preview]');
+    const status = view().querySelector('.document-editor-status');
+    field.dataset.previewState = "loading";
+    status.textContent = "正在读取文档…";
+    try {
+      window.AcademyDocuments.validate(file);
+      const record = await window.AcademyDocuments.mount(preview, null, file);
+      if (!field.isConnected || event.target.files?.[0] !== file) return;
+      if (!record) throw new Error('文档未能成功预览，请检查文件后重新选择。');
+      field.value = JSON.stringify(record); field.dataset.previewState = "ready";
+      status.textContent = `${record.name} · ${(record.size / 1024 / 1024).toFixed(1)} MB · 已预览，发布时上传`;
+      view().querySelector('[data-act="ops-lesson-clear-document"]').hidden = false;
+      updateLessonDuration(); saveLessonDraft();
+    } catch (error) {
+      if (!field.isConnected || event.target.files?.[0] !== file) return;
+      field.dataset.previewState = "error";
+      status.textContent = error.message || "文档读取失败，请重试。";
+    }
   });
 
   document.addEventListener("loadedmetadata", event => {

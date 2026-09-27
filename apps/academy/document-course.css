@@ -1,0 +1,27 @@
+.document-course-panel { margin-block: 20px; min-width: 0; }
+.document-dropzone { display: grid; gap: 8px; padding: 20px; border: 1px dashed var(--line); border-radius: 14px; cursor: pointer; min-height: 88px; }
+.document-dropzone input { max-width: 100%; min-height: 44px; }
+.document-course-preview { margin-top: 16px; border: 1px solid var(--line); border-radius: 14px; padding: 16px; overflow: hidden; background: var(--surface); }
+.document-status { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.document-body { font-size: 17px; line-height: 1.75; color: var(--text); overflow-wrap: anywhere; }
+.document-body h1 { font-size: 28px; line-height: 1.35; margin: 16px 0; }
+.document-body h2 { font-size: 22px; line-height: 1.4; margin: 24px 0 12px; }
+.document-body h3,.document-body h4 { font-size: 20px; }
+.document-body p { margin: 12px 0; }
+.document-body ul,.document-body ol { padding-left: 26px; }
+.document-body img { max-width: 100%; height: auto; }
+.document-body pre { white-space: pre-wrap; font: inherit; }
+.document-table { overflow-x: auto; margin: 16px 0; }
+.document-body table { border-collapse: collapse; width: 100%; min-width: 420px; font-size: 15px; }
+.document-body th,.document-body td { border: 1px solid var(--line); padding: 10px; vertical-align: top; }
+.document-body a,.document-course-panel a { color: var(--accent); }
+.document-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0; }
+.document-pagination button,.document-course-preview>button,.document-download { min-height: 44px; padding: 10px 14px; }
+.document-pagination span { font-size: 13px; }
+.document-body canvas { display: block; background: white; }
+.document-body details { margin-top: 12px; font-size: 15px; }
+.document-body summary { min-height: 44px; padding: 10px 0; cursor: pointer; }
+.document-editor-status { font-size: 13px; color: var(--muted); }
+.front-safety-starter { display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.front-safety-starter p { margin: 6px 0; }
+@media(max-width: 600px) { .document-course-preview { padding: 12px; } .document-body h1 { font-size: 24px; } .front-safety-starter .primary { width: 100%; } }
