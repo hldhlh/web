@@ -171,3 +171,14 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .app .learning-task-group-row { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: start; gap: 14px; padding: 0; }
 .learning-task-group-row > .task-status { flex: 0 0 22px; margin-top: 30px; }
 .learning-task-group-row > .learning-task-group { flex: 1; min-width: 0; }
+.course-list-group { margin: 12px 0; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.course-list-group > summary { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 14px 16px; cursor: pointer; list-style: none; }
+.course-list-group > summary::-webkit-details-marker { display: none; }
+.course-list-group summary strong { font-size: 17px; font-weight: 600; }
+.course-list-group summary span { margin-left: auto; color: var(--muted); font-size: 13px; }
+.course-list-group summary i { color: var(--muted); font-size: 22px; font-style: normal; }
+.course-list-group[open] summary i { transform: rotate(90deg); }
+.course-list-group[open] > summary { border-bottom: 1px solid var(--line); }
+.course-list-group-content { padding: 12px; }
+.course-list-group-content .card { box-shadow: none; }
+.course-list-group > summary:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }

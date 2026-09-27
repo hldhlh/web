@@ -1913,7 +1913,7 @@
       const done = isDone(lesson.id);
       const groupBadges = lessonGroupNames(lesson).map((name) => `<span>${escapeHtml(name)}</span>`).join("");
       const accessibleState = done ? "已学习" : locked ? "需授权" : `${TYPE_LABEL[lesson.type]}，${minutesLabel(lesson.minutes)}`;
-      return `<button class="card lesson-card course-result ${done ? "is-complete" : ""}" data-act="open-lesson" data-id="${lesson.id}" ${done ? 'data-course-learned="true"' : ""} aria-label="${escapeHtml(`${lesson.title}，${accessibleState}`)}">
+      return `<button class="card lesson-card course-result ${done ? "is-complete" : ""}" data-act="open-lesson" data-id="${lesson.id}" ${done ? 'data-course-learned="true"' : 'data-course-pending="true"'} aria-label="${escapeHtml(`${lesson.title}，${accessibleState}`)}">
         <div class="course-result-body">
           <div class="top"><span class="tag">${locked ? "需授权" : TYPE_LABEL[lesson.type]}</span>${done ? "" : `<span>${minutesLabel(lesson.minutes)}</span>`}</div>
           ${groupBadges ? `<div class="course-group-badges" aria-label="课程分类">${groupBadges}</div>` : ""}
@@ -1923,6 +1923,23 @@
       </button>`;
     }).join("");
   }
+
+  const courseGroupExpansion = new Map();
+
+  function renderGroupedCourses(items, renderer, scope, forceOpen = false) {
+    if (!items.length) return renderer(items);
+    const groups = (DATA.courseGroups || []).map(group => ({ ...group, items: items.filter(item => item.groupIds?.includes(group.id)) })).filter(group => group.items.length);
+    const ungrouped = items.filter(item => !(item.groupIds || []).some(id => DATA.courseGroups.some(group => group.id === id)));
+    if (ungrouped.length) groups.push({ id: "ungrouped", name: "未分组", items: ungrouped });
+    return groups.map(group => {
+      const key = `${scope}:${group.id}`;
+      return `<details class="course-list-group" data-course-list-group="${escapeHtml(key)}" ${forceOpen || courseGroupExpansion.get(key) ? "open" : ""}><summary><strong>${escapeHtml(group.name)}</strong><span>${group.items.length} 门课程</span><i aria-hidden="true">›</i></summary><div class="course-list-group-content">${renderer(group.items)}</div></details>`;
+    }).join("");
+  }
+
+  document.addEventListener("toggle", event => {
+    if (event.target.matches?.("[data-course-list-group]")) courseGroupExpansion.set(event.target.dataset.courseListGroup, event.target.open);
+  }, true);
 
   function renderLearn(type, groupId) {
     setTop("课程", false);
@@ -1946,7 +1963,7 @@
         ${DATA.courseGroups.map((group) => `<button class="chip ${groupId === group.id ? "on" : ""}" data-act="go" data-hash="#/learn?type=${type}&group=${encodeURIComponent(group.id)}">${escapeHtml(group.name)}</button>`).join("")}
       </div>
       ${!Auth.canFull(Auth.session) ? `<p class="muted" style="margin-bottom:12px">当前是基本权限。视频和进阶课需要店长授权。</p>` : ""}
-      <div id="course-search-results">${renderCourseCards(items)}</div>
+      <div id="course-search-results">${renderGroupedCourses(items, renderCourseCards, "learn", groupId !== "all")}</div>
     `;
     const input = document.getElementById("course-search-input");
     const clear = document.getElementById("course-search-clear");
@@ -1960,7 +1977,7 @@
           .sort((a, b) => b.score - a.score || a.index - b.index)
           .map((item) => item.lesson)
         : items;
-      results.innerHTML = renderCourseCards(matches);
+      results.innerHTML = renderGroupedCourses(matches, renderCourseCards, "learn", Boolean(keyword) || groupId !== "all");
       count.textContent = keyword ? `找到 ${matches.length} 门课程` : `共 ${items.length} 门课程`;
       clear.hidden = !keyword;
     };
@@ -2879,16 +2896,14 @@
     `;
   }
 
-  function renderOpsLessonList() {
-    return `
-      <section class="ops-list" aria-label="课程列表">
-        <header class="ops-list-head"><div><h3>全部课程</h3><span>共 ${DATA.lessons.length} 门课程</span></div></header>
-        ${DATA.lessons.length ? DATA.lessons.map((lesson) => `
+  function renderOpsCourseCards(items) {
+    if (!items.length) return `<p class="empty ops-empty">暂无课程。使用右上角“新建课程”开始创建。</p>`;
+    return items.map(lesson => `
           <article class="card ops-item-card">
             <div class="ops-item-main">
               <div class="ops-item-eyebrow"><span class="ops-tag">${TYPE_LABEL[lesson.type] || lesson.type}</span><span>${minutesLabel(lesson.minutes)}</span></div>
               <h3>${escapeHtml(lesson.title)}</h3>
-              <div class="ops-meta-list"><span>绑定任务：${escapeHtml(normalizeTaskBoard(DATA.taskBoard).stages.filter(stage => stage.items.some(item => item.kind === "lesson" && item.id === lesson.id)).map(stage => stage.title).join("、") || "未绑定")}</span></div>
+              <div class="ops-meta-list"><span>绑定任务：${escapeHtml(normalizeTaskBoard(DATA.taskBoard).stages.filter(stage => expandTaskItems(stage.items).some(item => item.kind === "lesson" && item.id === lesson.id)).map(stage => stage.title).join("、") || "未绑定")}</span></div>
               <p>${escapeHtml(lesson.summary)}</p>
               <div class="ops-meta-list"><span>${escapeHtml(lessonGroupNames(lesson).join("、") || "未分组")}</span><span>${escapeHtml(lessonCompletionLabel(lesson))}</span><span>${lesson.notify !== false ? "发布后提醒" : "静默发布"}</span></div>
             </div>
@@ -2897,7 +2912,14 @@
               <button class="danger-text" data-act="ops-delete" data-section="lessons" data-id="${lesson.id}">删除</button>
             </div>
           </article>
-        `).join("") : `<p class="empty ops-empty">暂无课程。使用右上角“新建课程”开始创建。</p>`}
+`).join("");
+  }
+
+  function renderOpsLessonList() {
+    return `
+      <section class="ops-list" aria-label="课程列表">
+        <header class="ops-list-head"><div><h3>全部课程</h3><span>共 ${DATA.lessons.length} 门课程</span></div></header>
+        ${renderGroupedCourses(DATA.lessons, renderOpsCourseCards, "ops")}
       </section>
     `;
   }
@@ -3102,12 +3124,12 @@
                 <div class="staff-percent" style="--percent:${item.percent * 3.6}deg"><b>${item.percent}%</b><span>完成度</span></div>
               </div>
               <div class="staff-progress-track"><i style="width:${item.percent}%"></i></div>
-              <div class="staff-metrics">
+              <div class="staff-metrics staff-metrics-with-tasks">
+                <div><b>${item.available === false ? "—" : tasks.length ? `${completedTasks}<small> / ${tasks.length}</small>` : "—"}</b><span>${item.available === false ? "任务记录暂不可用" : tasks.length ? "已完成任务" : "暂无分配任务"}</span></div>
                 <div><b>${item.lessonDone.length}<small> / ${DATA.lessons.length}</small></b><span>完成课程</span></div>
                 <div><b>${item.examDone.length}<small> / ${DATA.exams.length}</small></b><span>通过考试</span></div>
                 <div><b>${formatDuration(item.progress.onlineSeconds)}</b><span>累计在线学习</span></div>
               </div>
-              <div class="staff-task-overview"><span>任务完成</span><strong>${item.available === false ? "记录暂不可用" : tasks.length ? `${completedTasks} / ${tasks.length}` : "暂无任务"}</strong></div>
               <details class="staff-detail">
                 <summary>查看明细 <span>${pendingLessons.length + pendingExams.length ? `${pendingLessons.length + pendingExams.length} 项待完成` : "已全部完成"}</span></summary>
                 <div class="staff-detail-body">

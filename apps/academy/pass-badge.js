@@ -7,6 +7,7 @@
       position: relative !important;
       overflow: hidden !important;
     }
+    .course-result.ao-passed-item .course-result-body { padding-right: 116px; }
     .ao-pass-badge {
       position: absolute;
       top: 50%;
@@ -19,6 +20,11 @@
       transform: translateY(-50%) rotate(-9deg);
       pointer-events: none;
       filter: drop-shadow(0 5px 9px color-mix(in srgb, var(--ok) 12%, transparent));
+    }
+    .ao-pass-badge.is-pending {
+      color: var(--muted);
+      opacity: .65;
+      filter: none;
     }
     .ao-pass-badge svg {
       width: 100%;
@@ -63,6 +69,7 @@
       transform: translateY(-50%) rotate(-6deg) scale(1.025);
     }
     @media (max-width: 560px) {
+      .course-result.ao-passed-item .course-result-body { padding-right: 86px; }
       .ao-pass-badge { right: 15px; width: 76px; height: 76px; }
     }
     @media (prefers-contrast: more) {
@@ -92,17 +99,18 @@
 
   const badge = (state = "passed") => {
     const learned = state === "learned";
+    const pending = state === "pending";
     const wrapper = document.createElement("span");
-    wrapper.className = `ao-pass-badge${learned ? " is-learned" : ""}`;
+    wrapper.className = `ao-pass-badge${learned ? " is-learned" : pending ? " is-pending" : ""}`;
     wrapper.setAttribute("aria-hidden", "true");
     wrapper.innerHTML = `
       <svg viewBox="0 0 120 120">
         <circle class="ao-pass-ring" cx="60" cy="60" r="52"/>
         <circle class="ao-pass-inner" cx="60" cy="60" r="43"/>
         <path class="ao-pass-rule" d="M29 42h62M29 88h62"/>
-        <path class="ao-pass-check" d="m47 31 8 8 18-18"/>
-        <text class="ao-pass-en" x="61" y="56">${learned ? "LEARNED" : "PASS"}</text>
-        <text class="ao-pass-cn" x="60" y="80">${learned ? "已学习" : "已通过"}</text>
+        ${pending ? '<circle class="ao-pass-rule" cx="60" cy="28" r="10"/><path class="ao-pass-rule" d="M60 22v6l5 3"/>' : '<path class="ao-pass-check" d="m47 31 8 8 18-18"/>'}
+        <text class="ao-pass-en" x="61" y="56">${learned ? "LEARNED" : pending ? "TODO" : "PASS"}</text>
+        <text class="ao-pass-cn" x="60" y="80">${learned ? "已学习" : pending ? "待学习" : "已通过"}</text>
       </svg>`;
     return wrapper;
   };
@@ -115,6 +123,7 @@
   };
 
   const render = () => {
+    document.querySelectorAll('[data-course-pending="true"]').forEach((item) => decorate(item, "pending"));
     document.querySelectorAll('[data-course-learned="true"]').forEach((item) => decorate(item, "learned"));
     document.querySelectorAll('[data-exam-passed="true"]').forEach(decorate);
     statusLeaves().forEach((status) => {

@@ -337,3 +337,17 @@
 .course-group-edit-row [data-group-edit-name] { min-width: 0; flex: 1; width: 100%; min-height: 44px; border: 0; background: transparent; color: var(--text); font-size: 17px; }
 #course-groups-dialog .course-group-edit-row button { color: var(--bad); flex: 0 0 auto; }
 .lesson-editor .publish-options label[hidden] { display: none; }
+
+.staff-metrics.staff-metrics-with-tasks { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; padding: 16px 20px 20px; }
+.staff-metrics-with-tasks > div { min-width: 0; padding: 0 16px; }
+.staff-metrics-with-tasks > div:first-child { padding-left: 0; }
+.staff-metrics-with-tasks > div:last-child { padding-right: 0; }
+.staff-metrics-with-tasks b { font-size: 20px; font-weight: 600; line-height: 1.4; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.staff-metrics-with-tasks b small { color: var(--muted); font-size: 15px; font-weight: 400; }
+.staff-metrics-with-tasks span { font-size: 13px; font-weight: 400; margin-top: 6px; }
+@media(max-width:600px) {
+  .staff-metrics.staff-metrics-with-tasks { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 0; padding: 16px; }
+  .staff-metrics-with-tasks > div { padding: 0 16px; }
+  .staff-metrics-with-tasks > div:nth-child(odd) { padding-left: 0; border-left: 0; }
+  .staff-metrics-with-tasks > div:nth-child(even) { border-left: 1px solid var(--line); padding-right: 0; }
+}
