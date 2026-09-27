@@ -104,7 +104,7 @@
   }
 
   function normalizeCourseGroups(items) {
-    const source = Array.isArray(items) && items.length ? items : defaultCourseGroups();
+    const source = Array.isArray(items) ? items : defaultCourseGroups();
     const seen = new Set();
     return source.map((item, index) => ({
       id: coerceId("group", item?.id),
@@ -119,9 +119,31 @@
   function taskBoardEntries(lessons = DATA.lessons, exams = DATA.exams) {
     return [
       ...lessons.map((item) => ({ kind: "lesson", id: item.id, title: item.title })),
-      ...exams.map((item) => ({ kind: "exam", id: item.id, title: item.title }))
+      ...exams.map((item) => ({ kind: "exam", id: item.id, title: item.title })),
+      ...(DATA.courseGroups || []).map(group => ({ kind: "lesson-group", id: group.id, title: group.name })),
+      ...Array.from(new Set(exams.map(exam => exam.track).filter(Boolean))).map(id => ({ kind: "exam-group", id, title: DATA.tracks.find(track => track.id === id)?.title || id }))
     ];
   }
+
+  function expandTaskItems(items, lessons = DATA.lessons, exams = DATA.exams) {
+    const result = [], seen = new Set();
+    for (const item of items || []) {
+      const entries = item.kind === "lesson-group" ? lessons.filter(lesson => lesson.groupIds?.includes(item.id)).map(lesson => ({ kind: "lesson", id: lesson.id }))
+        : item.kind === "exam-group" ? exams.filter(exam => exam.track === item.id).map(exam => ({ kind: "exam", id: exam.id })) : [item];
+      for (const entry of entries) { const key = taskBoardEntryKey(entry.kind, entry.id); if (!seen.has(key)) { seen.add(key); result.push(entry); } }
+    }
+    return result;
+  }
+
+  function taskItemProgress(items, completed) {
+    const done = (items || []).filter(item => {
+      const entries = expandTaskItems([item]).filter(entry => entry.kind === "exam" ? examById(entry.id) : lessonById(entry.id));
+      return entries.length > 0 && entries.every(completed);
+    }).length;
+    return { done, total: (items || []).length };
+  }
+
+  function taskEntryLabel(kind) { return ({ lesson: "课程", exam: "考试", "lesson-group": "课程分组", "exam-group": "考试分组" })[kind] || "课程"; }
 
   function defaultTaskBoard(lessons = DATA.lessons, exams = DATA.exams) {
     const trackIds = [];
@@ -150,11 +172,11 @@
     const stages = source.stages.map((stage, index) => {
       const used = new Set();
       const items = (Array.isArray(stage?.items) ? stage.items : []).map((item) => ({
-        kind: item?.kind === "exam" ? "exam" : "lesson",
+        kind: ["exam", "lesson-group", "exam-group"].includes(item?.kind) ? item.kind : "lesson",
         id: coerceString(item?.id, "")
       })).filter((item) => {
         const key = taskBoardEntryKey(item.kind, item.id);
-        if (!item.id || !validEntries.has(key) || used.has(key)) return false;
+        if (!item.id || (!["lesson-group", "exam-group"].includes(item.kind) && !validEntries.has(key)) || used.has(key)) return false;
         used.add(key);
         return true;
       });
@@ -174,7 +196,7 @@
   }
 
   function normalizeLessonGroupIds(groupIds, fallbackTrack = "onboard") {
-    const source = Array.isArray(groupIds) && groupIds.length ? groupIds : [fallbackTrack];
+    const source = Array.isArray(groupIds) ? groupIds : [fallbackTrack];
     return Array.from(new Set(source.map((id) => coerceString(id, "")).filter(Boolean)));
   }
 
@@ -642,7 +664,7 @@
       type: document.getElementById("ops-lesson-type")?.value || "article",
       track: document.getElementById("ops-lesson-track")?.value || "onboard",
       videoDurationSeconds: Number(document.getElementById("ops-lesson-video-duration")?.value) || 0,
-      groupIds: [document.getElementById("ops-lesson-track")?.value || "onboard"],
+      groupIds: JSON.parse(document.getElementById("ops-lesson-group-ids")?.value || "[]"),
       minutes: document.getElementById("ops-lesson-minutes")?.value || "3",
       access: document.getElementById("ops-lesson-access")?.value || "full",
       mediaUrl: document.getElementById("ops-lesson-media-url")?.value || "",
@@ -1602,7 +1624,43 @@
     window.scrollTo({left:x, top:y, behavior:'instant'});
   }
 
+  function renderHomeTaskRow(task) {
+
+                  const item = task.data;
+                  const isExam = task.kind === "exam";
+                  const locked = isExam ? !Gate.canExam(item) : !Gate.canLesson(item);
+                  const done = isExam ? bestScore(item.id) >= item.pass : isDone(item.id);
+                  const score = isExam ? bestScore(item.id) : -1;
+                  const action = locked ? "locked" : isExam ? "go" : "open-lesson";
+                  const attrs = isExam ? `data-hash="#/exam/${item.id}"` : `data-id="${item.id}"`;
+                  const meta = isExam ? `考试 · ${score >= 0 ? `${score} 分` : minutesLabel(item.minutes)}` : `${TYPE_LABEL[item.type]} · ${minutesLabel(item.minutes)}`;
+                  const result = done ? "已完成" : locked ? "待授权" : isExam ? "去考试" : "去学习";
+                  return `<button class="learning-task ${done ? "done" : ""} ${locked ? "locked" : ""}" data-act="${action}" ${attrs} aria-label="${escapeHtml(`${item.title}，${meta}，${result}`)}">
+                    <span class="task-status" aria-hidden="true">${done ? "✓" : locked ? "锁" : ""}</span>
+                    <span class="task-main">
+                      <strong>${escapeHtml(item.title)}</strong>
+                      <small>${meta}</small>
+                    </span>
+                    <span class="task-result">${done ? "" : locked ? "待授权" : `<i aria-hidden="true">›</i>`}</span>
+                  </button>`;
+
+  }
+
+  function renderHomeTaskItems(items, stageId, openGroups) {
+    const seen = new Set();
+    return items.map(entry => {
+      const expanded = expandTaskItems([entry]).map(item => ({ kind: item.kind, data: item.kind === "exam" ? examById(item.id) : lessonById(item.id) })).filter(task => task.data);
+      const rows = expanded.filter(task => { const key = taskBoardEntryKey(task.kind, task.data.id); if (seen.has(key)) return false; seen.add(key); return true; });
+      if (!["lesson-group", "exam-group"].includes(entry.kind)) return rows.map(renderHomeTaskRow).join("");
+      const name = taskBoardEntry(entry.kind, entry.id)?.title || "分组已移除";
+      const done = expanded.filter(task => task.kind === "exam" ? bestScore(task.data.id) >= task.data.pass : isDone(task.data.id)).length;
+      const key = `${stageId}:${entry.kind}:${entry.id}`;
+      return `<div class="learning-task-group-row ${expanded.length > 0 && done === expanded.length ? "done" : ""}"><span class="task-status" aria-hidden="true">${expanded.length > 0 && done === expanded.length ? "✓" : ""}</span><details class="learning-task-group" data-task-group-key="${escapeHtml(key)}" ${openGroups.has(key) ? "open" : ""}><summary aria-label="${escapeHtml(`${name}，${expanded.length > 0 && done === expanded.length ? "已完成" : "未完成"}，${done}/${expanded.length}`)}"><span class="task-group-title"><strong>${escapeHtml(name)}</strong><small>${taskEntryLabel(entry.kind)}</small></span><span>${done}/${expanded.length}<i aria-hidden="true">›</i></span></summary><div>${rows.length ? rows.map(renderHomeTaskRow).join("") : `<p class="task-group-empty">${expanded.length ? "内容已在此任务的其他位置列出" : "此分组暂无内容"}</p>`}</div></details></div>`;
+    }).join("");
+  }
+
   function renderHome(target = view(), preview = false) {
+    const openTaskGroups = new Set(Array.from(target.querySelectorAll("[data-task-group-key][open]")).map(group => group.dataset.taskGroupKey));
     const previousStage = target.querySelector('.learning-stage:not([hidden])')?.dataset.stageKey;
     if (!preview) setTop("Auto Office", false);
     if (!preview) setTab("home");
@@ -1625,25 +1683,28 @@
     const importantMessages = box.unreadNotices.slice(0, 5);
     const taskBoard = normalizeTaskBoard(DATA.taskBoard, DATA.lessons, DATA.exams);
     const stages = taskBoard.stages.filter(stage => noticeVisibleTo(stage)).map((stage) => {
-      const tasks = stage.items.map((item) => ({
+      const tasks = expandTaskItems(stage.items).map((item) => ({
         kind: item.kind,
         data: item.kind === "exam" ? examById(item.id) : lessonById(item.id)
       })).filter((item) => item.data);
-      const done = tasks.filter((task) => task.kind === "lesson" ? isDone(task.data.id) : bestScore(task.data.id) >= task.data.pass).length;
+      const progress = taskItemProgress(stage.items, entry => entry.kind === "lesson" ? isDone(entry.id) : bestScore(entry.id) >= examById(entry.id).pass);
+      const done = progress.done;
       const available = tasks.some((task) => task.kind === "lesson" ? Gate.canLesson(task.data) : Gate.canExam(task.data));
       return {
         id: stage.id,
+        items: stage.items,
+        total: progress.total,
         tasks,
         done,
         available,
         title: stage.title,
         label: stage.label,
-        percent: tasks.length ? Math.round((done / tasks.length) * 100) : 0
+        percent: progress.total ? Math.round((done / progress.total) * 100) : 0
       };
     });
     const retainedStage = stages.findIndex(stage => stage.id === previousStage);
-    const activeStage = retainedStage >= 0 ? retainedStage : Math.max(0, stages.findIndex((stage) => stage.available && stage.done < stage.tasks.length));
-    const taskBoardTotal = stages.reduce((sum, stage) => sum + stage.tasks.length, 0);
+    const activeStage = retainedStage >= 0 ? retainedStage : Math.max(0, stages.findIndex((stage) => stage.available && stage.done < stage.total));
+    const taskBoardTotal = stages.reduce((sum, stage) => sum + stage.total, 0);
     const taskBoardDone = stages.reduce((sum, stage) => sum + stage.done, 0);
 
     target.innerHTML = `
@@ -1691,7 +1752,7 @@
         ${!stages.length ? `<p class="empty">暂无分配给你的任务。</p>` : ""}
         <div class="stage-tabs" role="tablist" aria-label="我的任务">
           ${stages.map((stage, index) => `
-            <button type="button" class="stage-tab ${index === activeStage ? "on" : ""} ${!stage.available ? "locked" : ""}" id="academy-stage-tab-${index}" role="tab" aria-label="${escapeHtml(stage.label || `任务 ${index + 1}`)}，${escapeHtml(stage.title)}，已完成 ${stage.done}/${stage.tasks.length} 项" aria-selected="${index === activeStage}" aria-controls="academy-stage-${index}" tabindex="${index === activeStage ? "0" : "-1"}" data-stage-target="academy-stage-${index}">
+            <button type="button" class="stage-tab ${index === activeStage ? "on" : ""} ${!stage.available ? "locked" : ""}" id="academy-stage-tab-${index}" role="tab" aria-label="${escapeHtml(stage.label || `任务 ${index + 1}`)}，${escapeHtml(stage.title)}，已完成 ${stage.done}/${stage.total} 项" aria-selected="${index === activeStage}" aria-controls="academy-stage-${index}" tabindex="${index === activeStage ? "0" : "-1"}" data-stage-target="academy-stage-${index}">
               <span>${escapeHtml(stage.label || stage.title)}</span>
             </button>`).join("")}
         </div>
@@ -1699,29 +1760,11 @@
           ${stages.map((stage, stageIndex) => `
             <section class="learning-stage" data-stage-key="${escapeHtml(stage.id)}" id="academy-stage-${stageIndex}" role="tabpanel" aria-labelledby="academy-stage-tab-${stageIndex}" ${stageIndex === activeStage ? "" : "hidden"}>
               <div class="learning-stage-head">
-                <div class="learning-stage-copy"><h4>${escapeHtml(stage.title)}</h4><small>已完成 ${stage.done}/${stage.tasks.length} 项</small></div>
+                <div class="learning-stage-copy"><h4>${escapeHtml(stage.title)}</h4><small>已完成 ${stage.done}/${stage.total} 项</small></div>
               </div>
               <div class="stage-progress" role="progressbar" aria-label="阶段进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${stage.percent}"><i style="width:${stage.percent}%"></i></div>
               <div class="task-list">
-                ${stage.tasks.map((task) => {
-                  const item = task.data;
-                  const isExam = task.kind === "exam";
-                  const locked = isExam ? !Gate.canExam(item) : !Gate.canLesson(item);
-                  const done = isExam ? bestScore(item.id) >= item.pass : isDone(item.id);
-                  const score = isExam ? bestScore(item.id) : -1;
-                  const action = locked ? "locked" : isExam ? "go" : "open-lesson";
-                  const attrs = isExam ? `data-hash="#/exam/${item.id}"` : `data-id="${item.id}"`;
-                  const meta = isExam ? `考试 · ${score >= 0 ? `${score} 分` : minutesLabel(item.minutes)}` : `${TYPE_LABEL[item.type]} · ${minutesLabel(item.minutes)}`;
-                  const result = done ? "已完成" : locked ? "待授权" : isExam ? "去考试" : "去学习";
-                  return `<button class="learning-task ${done ? "done" : ""} ${locked ? "locked" : ""}" data-act="${action}" ${attrs} aria-label="${escapeHtml(`${item.title}，${meta}，${result}`)}">
-                    <span class="task-status" aria-hidden="true">${done ? "✓" : locked ? "锁" : ""}</span>
-                    <span class="task-main">
-                      <strong>${escapeHtml(item.title)}</strong>
-                      <small>${meta}</small>
-                    </span>
-                    <span class="task-result">${done ? "" : locked ? "待授权" : `<i aria-hidden="true">›</i>`}</span>
-                  </button>`;
-                }).join("")}
+                ${renderHomeTaskItems(stage.items, stage.id, openTaskGroups)}
               </div>
             </section>`).join("")}
         </div>
@@ -1885,9 +1928,9 @@
     setTop("课程", false);
     setTab("learn");
     if (type !== "article" && type !== "video") type = "all";
-    if (groupId !== "all" && !DATA.tracks.some((group) => group.id === groupId)) groupId = "all";
+    if (groupId !== "all" && !DATA.courseGroups.some((group) => group.id === groupId)) groupId = "all";
     const chips = [["all", "全部"], ["article", "图文"], ["video", "视频"]];
-    const items = DATA.lessons.filter((item) => (type === "all" || item.type === type) && (groupId === "all" || item.track === groupId));
+    const items = DATA.lessons.filter((item) => (type === "all" || item.type === type) && (groupId === "all" || item.groupIds?.includes(groupId)));
     view().innerHTML = `
       <div class="course-search" role="search">
         <span class="course-search-icon" aria-hidden="true"></span>
@@ -1900,7 +1943,7 @@
       </div>
       <div class="chips course-group-filters" aria-label="课程分类筛选">
         <button class="chip ${groupId === "all" ? "on" : ""}" data-act="go" data-hash="#/learn?type=${type}&group=all">全部分组</button>
-        ${DATA.tracks.map((group) => `<button class="chip ${groupId === group.id ? "on" : ""}" data-act="go" data-hash="#/learn?type=${type}&group=${encodeURIComponent(group.id)}">${escapeHtml(group.title)}</button>`).join("")}
+        ${DATA.courseGroups.map((group) => `<button class="chip ${groupId === group.id ? "on" : ""}" data-act="go" data-hash="#/learn?type=${type}&group=${encodeURIComponent(group.id)}">${escapeHtml(group.name)}</button>`).join("")}
       </div>
       ${!Auth.canFull(Auth.session) ? `<p class="muted" style="margin-bottom:12px">当前是基本权限。视频和进阶课需要店长授权。</p>` : ""}
       <div id="course-search-results">${renderCourseCards(items)}</div>
@@ -2039,7 +2082,7 @@
       id: raw?.id || "",
       title: coerceString(raw?.title, ""),
       track,
-      groupIds: groupIds.length ? groupIds : (DATA.courseGroups?.[0] ? [DATA.courseGroups[0].id] : []),
+      groupIds,
       type: normalizeLessonType(raw?.type),
       minutes: Math.max(1, Math.round(coerceNumber(raw?.minutes, 3))),
       summary: coerceString(raw?.summary, ""),
@@ -2113,8 +2156,7 @@
   }
 
   function lessonGroupNames(lesson) {
-    const track = DATA.tracks.find(track => track.id === lesson?.track);
-    return track ? [track.title] : [];
+    return (lesson?.groupIds || []).filter(id => DATA.courseGroups.some(group => group.id === id)).map(courseGroupName);
   }
 
   function lessonBlockTemplates(kind) {
@@ -2271,6 +2313,8 @@
   function updateLessonDuration() {
     const input = document.getElementById("ops-lesson-minutes");
     if (!input) return;
+    const confirmation = document.getElementById("ops-lesson-require-confirmation")?.closest("label");
+    if (confirmation) confirmation.hidden = Boolean(document.getElementById("ops-lesson-required-exam")?.value);
     let blocks = [];
     try { blocks = JSON.parse(document.getElementById("ops-lesson-blocks")?.value || "[]"); } catch (_) {}
     const result = estimateLessonDuration({ blocks, type: document.getElementById("ops-lesson-type")?.value,
@@ -2614,7 +2658,7 @@
     if (!entry) return "";
     return `
       <div class="task-board-editor-item" data-task-kind="${entry.kind}" data-task-id="${escapeHtml(entry.id)}">
-        <span class="task-board-item-type">${entry.kind === "exam" ? "考试" : "课程"}</span>
+        <span class="task-board-item-type">${taskEntryLabel(entry.kind)}</span>
         <strong>${escapeHtml(entry.title)}</strong>
         <details class="task-board-menu">
           <summary aria-label="任务操作：${escapeHtml(entry.title)}"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="4" cy="10" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/><circle cx="16" cy="10" r="1.5" fill="currentColor"/></svg></summary>
@@ -2659,9 +2703,9 @@
           <p class="task-board-stage-empty" ${stage.items.length ? "hidden" : ""}>当前阶段还没有任务</p>
         </div>
         <div class="task-board-item-add">
-          <select data-task-item-select aria-label="选择课程或考试">
-            <option value="">选择课程或考试</option>
-            ${entries.map((entry) => `<option value="${escapeHtml(taskBoardEntryKey(entry.kind, entry.id))}">${entry.kind === "exam" ? "考试" : "课程"} · ${escapeHtml(entry.title)}</option>`).join("")}
+          <select data-task-item-select aria-label="选择课程、考试或分组">
+            <option value="">选择课程、考试或分组</option>
+            ${entries.map((entry) => `<option value="${escapeHtml(taskBoardEntryKey(entry.kind, entry.id))}">${taskEntryLabel(entry.kind)} · ${escapeHtml(entry.title)}</option>`).join("")}
           </select>
           <button type="button" data-act="ops-task-item-add">添加任务</button>
         </div>
@@ -2714,7 +2758,7 @@
       label: coerceString(stage.querySelector("[data-task-stage-label]")?.value, ""),
       title: coerceString(stage.querySelector("[data-task-stage-title]")?.value, `任务 ${index + 1}`),
       items: Array.from(stage.querySelectorAll(".task-board-editor-item")).map((item) => ({
-        kind: item.dataset.taskKind === "exam" ? "exam" : "lesson",
+        kind: ["exam", "lesson-group", "exam-group"].includes(item.dataset.taskKind) ? item.dataset.taskKind : "lesson",
         id: coerceString(item.dataset.taskId, "")
       }))
     }));
@@ -2750,6 +2794,7 @@
     const hasMedia = Boolean(data.mediaUrl);
     return `
       <form class="ops-editor lesson-editor" id="ops-editor">
+        <input type="hidden" id="ops-lesson-group-ids" value="${escapeHtml(JSON.stringify(data.groupIds))}">
         <input type="hidden" id="ops-lesson-track" value="${escapeHtml(data.track)}">
         <input type="hidden" id="ops-lesson-access" value="${escapeHtml(data.access)}">
         <header class="lesson-editor-title">
@@ -2769,6 +2814,7 @@
               </select>
             </label>
 
+            <div class="course-group-setting"><span>课程分组</span><button type="button" data-act="editor-course-groups" id="ops-course-group-label">${escapeHtml(data.groupIds.map(courseGroupName).join("、") || "选择或新建")} ›</button></div>
             <div class="course-duration"><div><span>预计学习</span><output id="ops-lesson-duration-output">约 ${data.minutes} 分钟</output></div><input id="ops-lesson-minutes" type="hidden" value="${data.minutes}"><input id="ops-lesson-video-duration" type="hidden" value="${data.videoDurationSeconds || 0}"><details class="course-duration-details"><summary aria-label="查看学习时长估算依据">详情</summary><p id="ops-lesson-duration-hint">根据正文、视频及关联考试估算</p></details></div>
 
           </div>
@@ -2966,13 +3012,12 @@
 
   function staffTaskProgress(user, progress) {
     return normalizeTaskBoard(DATA.taskBoard).stages.filter(task => noticeVisibleTo(task, user)).map(task => {
-      const entries = task.items.filter(entry => entry.kind === "exam" ? examById(entry.id) : lessonById(entry.id));
-      const done = entries.filter(entry => {
+      const status = taskItemProgress(task.items, entry => {
         if (entry.kind === "lesson") return lessonCompletedForProgress(lessonById(entry.id), progress);
         const exam = examById(entry.id);
         return (progress.examHistory?.[entry.id] || []).some(attempt => (Number(attempt?.score ?? attempt) || 0) >= exam.pass);
-      }).length;
-      return { id: task.id, title: task.title, done, total: entries.length, complete: entries.length > 0 && done === entries.length };
+      });
+      return { id: task.id, title: task.title, done: status.done, total: status.total, complete: status.total > 0 && status.done === status.total };
     });
   }
 
@@ -3258,11 +3303,81 @@
     requestAnimationFrame(finish);
   }
 
+  function lessonGroupDetails(lesson) {
+    return `<div class="lesson-group-details" data-course-group-summary="${escapeHtml(lesson.id)}"><span>${escapeHtml(lessonGroupNames(lesson).join("、") || "未分组")}</span>${Auth.isManager(Auth.session) ? `<button type="button" data-act="lesson-groups-edit" data-id="${escapeHtml(lesson.id)}">编辑分组</button>` : ""}</div>`;
+  }
+
+  function courseGroupEditRow(group, checked) {
+    return `<div class="course-group-edit-row" data-group-edit-id="${escapeHtml(group.id)}"><input type="checkbox" name="group" value="${escapeHtml(group.id)}" ${checked ? "checked" : ""} aria-label="选择${escapeHtml(group.name)}"><input data-group-edit-name value="${escapeHtml(group.name)}" maxlength="30" aria-label="分组名称"><button type="button" data-remove-course-group aria-label="删除${escapeHtml(group.name)}">删除</button></div>`;
+  }
+
+  function openLessonGroups(lessonId, editorMode = false) {
+    if (!Auth.isManager(Auth.session)) return;
+    const lesson = editorMode ? { groupIds: JSON.parse(document.getElementById("ops-lesson-group-ids")?.value || "[]") } : lessonById(lessonId);
+    if (!lesson) return;
+    document.getElementById("course-groups-dialog")?.remove();
+    const trigger = document.activeElement;
+    document.body.insertAdjacentHTML("beforeend", `<dialog id="course-groups-dialog" class="shortcut-permissions-dialog" aria-labelledby="course-groups-title"><form><header><button type="button" data-cancel>取消</button><h2 id="course-groups-title">课程分组</h2><button type="submit">保存</button></header><div class="shortcut-permissions-content"><div data-group-options>${DATA.courseGroups.map(group => courseGroupEditRow(group, (lesson.groupIds || []).includes(group.id))).join("")}</div><div class="course-group-create"><input data-new-group placeholder="新分组名称" maxlength="30" aria-label="新分组名称"><button type="button" data-add-group>新增</button></div><p role="status" aria-live="polite"></p></div></form></dialog>`);
+    const dialog = document.getElementById("course-groups-dialog");
+    const pendingGroups = [];
+    dialog.querySelector("[data-group-options]").addEventListener("click", event => {
+      const button = event.target.closest("[data-remove-course-group]");
+      if (!button || save.disabled) return;
+      const row = button.closest("[data-group-edit-id]");
+      const name = row.querySelector("[data-group-edit-name]").value.trim() || "未命名分组";
+      if (!confirm(`确定删除「${name}」分组吗？保存后生效，课程内容和学习记录会保留。`)) return;
+      row.remove();
+      dialog.querySelector('[role="status"]').textContent = "保存后删除分组，课程内容和学习记录保留。";
+    });
+    const save = dialog.querySelector('[type="submit"]');
+    const cancel = dialog.querySelector('[data-cancel]');
+    cancel.onclick = () => dialog.close();
+    dialog.addEventListener("cancel", event => { if (save.disabled) event.preventDefault(); });
+    dialog.addEventListener("close", () => { dialog.remove(); if (trigger?.isConnected) trigger.focus(); });
+    dialog.querySelector('[data-add-group]').onclick = () => {
+      const input = dialog.querySelector('[data-new-group]');
+      const name = input.value.trim();
+      if (!name) return;
+      if (Array.from(dialog.querySelectorAll("[data-group-edit-name]")).some(input => input.value.trim() === name)) { dialog.querySelector('[role="status"]').textContent = "此分组已存在"; return; }
+      const group = { id: coerceId("group", ""), name };
+      pendingGroups.push(group);
+      dialog.querySelector('[data-group-options]').insertAdjacentHTML("beforeend", courseGroupEditRow(group, true));
+      input.value = "";
+    };
+    dialog.querySelector('form').onsubmit = async event => {
+      event.preventDefault();
+      if (save.disabled) return;
+      const groups = Array.from(dialog.querySelectorAll("[data-group-edit-id]")).map(row => ({ id: row.dataset.groupEditId, name: row.querySelector("[data-group-edit-name]").value.trim() }));
+      if (groups.some(group => !group.name) || new Set(groups.map(group => group.name.toLocaleLowerCase())).size !== groups.length) { dialog.querySelector('[role="status"]').textContent = "请填写不重复的分组名称。"; return; }
+      save.disabled = cancel.disabled = true;
+      save.textContent = "保存中";
+      DATA.courseGroups = groups;
+      const validIds = new Set(groups.map(group => group.id));
+      DATA.lessons.forEach(course => { course.groupIds = (course.groupIds || []).filter(id => validIds.has(id)); });
+      lesson.groupIds = Array.from(dialog.querySelectorAll('input[name="group"]:checked')).map(input => input.value);
+      if (editorMode) {
+        document.getElementById("ops-lesson-group-ids").value = JSON.stringify(lesson.groupIds);
+        document.getElementById("ops-course-group-label").textContent = (lessonGroupNames(lesson).join("、") || "选择或新建") + " ›";
+        saveLessonDraft();
+      }
+      saveOpsStore();
+      try {
+        await ContentSync.publish();
+        const summary = Array.from(document.querySelectorAll('[data-course-group-summary]')).find(node => node.dataset.courseGroupSummary === lessonId);
+        if (summary) summary.querySelector('span').textContent = lessonGroupNames(lesson).join("、") || "未分组";
+        dialog.close();
+      } catch (error) { dialog.querySelector('[role="status"]').textContent = `已暂存，同步失败：${error.message || "请重试"}`; }
+      finally { if (dialog.isConnected) { save.disabled = cancel.disabled = false; save.textContent = "保存"; } }
+    };
+    dialog.showModal();
+  }
+
   function renderArticle(lesson) {
     setTop(lesson.title, true);
     view().innerHTML = `
       <article class="article">
         <p class="muted">${TYPE_LABEL.article} · ${minutesLabel(lesson.minutes)}</p>
+        ${lessonGroupDetails(lesson)}
         ${renderBlocks(lesson.blocks)}
         ${lessonCompletionPanel(lesson)}
       </article>
@@ -3379,6 +3494,7 @@
     setTop(lesson.title, true);
     view().innerHTML = `
       <article class="video-course">
+        ${lessonGroupDetails(lesson)}
         <header class="video-course-head">
           <div><span class="video-course-kicker">视频课程</span><h2>${escapeHtml(lesson.title)}</h2></div>
           <p>${escapeHtml(lesson.summary)}</p>
@@ -4106,7 +4222,7 @@
       const key = select?.value || "";
       const separator = key.indexOf(":");
       if (!stage || !select || separator < 1) return;
-      const kind = key.slice(0, separator) === "exam" ? "exam" : "lesson";
+      const kind = key.slice(0, separator);
       const id = key.slice(separator + 1);
       const entry = taskBoardEntry(kind, id);
       const duplicate = Array.from(stage.querySelectorAll(".task-board-editor-item")).some((item) =>
@@ -4327,6 +4443,8 @@
       return;
     }
     if (act === "ops-shortcut-permissions") { openOpsShortcutPermissions(btn.dataset.id); return; }
+    if (act === "editor-course-groups") { openLessonGroups("", true); return; }
+    if (act === "lesson-groups-edit") { openLessonGroups(btn.dataset.id); return; }
     if (act === "ops-role-add") {
       if (!Auth.isManager(Auth.session)) return;
       const name = prompt("岗位名称");
@@ -4425,7 +4543,7 @@
             title: coerceString(document.getElementById("ops-lesson-title")?.value, ""),
             track: coerceString(document.getElementById("ops-lesson-track")?.value, ""),
             videoDurationSeconds: Number(document.getElementById("ops-lesson-video-duration")?.value) || 0,
-      groupIds: [document.getElementById("ops-lesson-track")?.value || "onboard"],
+      groupIds: JSON.parse(document.getElementById("ops-lesson-group-ids")?.value || "[]"),
             type: rawType,
             minutes: document.getElementById("ops-lesson-minutes")?.value || "1",
             videoDurationSeconds: Number(document.getElementById("ops-lesson-video-duration")?.value) || 0,

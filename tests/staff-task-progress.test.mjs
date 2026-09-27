@@ -9,8 +9,8 @@ const tasks = [
   { id: 'empty', items: [] },
   { id: 'other', items: [{kind:'lesson',id:'l'}] }
 ];
-const calculate = new Function('DATA','normalizeTaskBoard','noticeVisibleTo','examById','lessonById','lessonCompletedForProgress',code+'; return staffTaskProgress;')(
-  {taskBoard:{stages:tasks}}, value=>value, task=>task.id !== 'other', id=>id === 'e' ? {pass:80}:null, id=>id === 'l' ? {id}:null, (lesson, progress)=>progress.done.includes(lesson.id)
+const calculate = new Function('DATA','normalizeTaskBoard','noticeVisibleTo','examById','lessonById','lessonCompletedForProgress','expandTaskItems','taskItemProgress',code+'; return staffTaskProgress;')(
+  {taskBoard:{stages:tasks}}, value=>value, task=>task.id !== 'other', id=>id === 'e' ? {pass:80}:null, id=>id === 'l' ? {id}:null, (lesson, progress)=>progress.done.includes(lesson.id), items=>items, (items, completed)=>({done:items.filter(completed).length,total:items.length})
 );
 test('task completion counts assigned content and does not require an exam',()=>{
   const result = calculate({id:'a'}, {done:['l'],examHistory:{e:[{score:60}]}});

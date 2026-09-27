@@ -96,7 +96,7 @@
 .app .learning-stage-head h4 { white-space: normal; }
 .app .task-list { padding-inline: 16px; }
 .app .learning-task { padding: 16px 0; background: transparent; min-height: 72px; }
-.app .learning-task.done .task-status { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+.app .learning-task.done .task-status, .app .learning-task-group-row.done > .task-status { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
 .app .task-main strong { white-space: normal; overflow-wrap: anywhere; }
 .app .stage-progress { margin-inline: 16px; }
 .app .stage-progress i { background: var(--accent); }
@@ -153,3 +153,21 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 @media (prefers-reduced-motion: reduce) {
   .app *, .app *::before, .app *::after { animation: none !important; transition: none !important; }
 }
+.learning-task-group { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin: 8px 0; }
+.learning-task-group > summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 60px; padding: 12px 16px; list-style: none; cursor: pointer; }
+.learning-task-group > summary::-webkit-details-marker { display: none; }
+.learning-task-group summary strong { display: block; font-size: 17px; font-weight: 600; }
+.learning-task-group summary small { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+.learning-task-group summary > span:last-child { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 15px; }
+.learning-task-group summary i { font-style: normal; font-size: 22px; }
+.learning-task-group[open] summary i { transform: rotate(90deg); }
+.learning-task-group[open] > summary { border-bottom: 1px solid var(--line); }
+.learning-task-group > div { padding: 0 8px; }
+.task-group-empty { padding: 12px 8px; font-size: 13px; color: var(--muted); }
+.learning-task-group > summary:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.learning-task-group > summary .task-group-title { flex: 1; min-width: 0; }
+.learning-task-group > summary .task-status { flex: 0 0 22px; }
+
+.app .learning-task-group-row { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: start; gap: 14px; padding: 0; }
+.learning-task-group-row > .task-status { flex: 0 0 22px; margin-top: 30px; }
+.learning-task-group-row > .learning-task-group { flex: 1; min-width: 0; }

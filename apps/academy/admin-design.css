@@ -324,3 +324,16 @@
 .course-basics .course-duration-details[open] { grid-column: 1 / -1; width: 100%; padding-bottom: 8px; }
 .course-basics .course-duration-details[open] summary { min-height: 32px; }
 .course-basics .course-duration-details p { margin: 0; padding: 4px 0 8px; }
+.lesson-group-details { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 16px 0; padding: 12px 16px; background: var(--surface); border-radius: 12px; font-size: 15px; }
+.lesson-group-details > span { color: var(--muted); }
+.lesson-group-details button { background: transparent; border: 0; color: var(--accent); min-height: 44px; font-size: 15px; }
+#course-groups-dialog [data-group-options] { padding: 0 16px; border-radius: 14px; background: var(--surface); }
+#course-groups-dialog .course-group-create { margin-top: 16px; }
+.course-group-setting { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-top: 1px solid var(--line); min-height: 48px; font-size: 15px; }
+.course-group-setting button { min-height: 44px; max-width: 70%; padding: 8px; border: 0; background: transparent; color: var(--accent); font-size: 15px; text-align: right; overflow-wrap: anywhere; }
+.course-group-edit-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; min-height: 60px; border-bottom: 1px solid var(--line); }
+.course-group-edit-row:last-child { border-bottom: 0; }
+.course-group-edit-row input[name="group"] { width: 22px; height: 22px; min-height: 0; padding: 0; flex: 0 0 22px; accent-color: var(--accent); }
+.course-group-edit-row [data-group-edit-name] { min-width: 0; flex: 1; width: 100%; min-height: 44px; border: 0; background: transparent; color: var(--text); font-size: 17px; }
+#course-groups-dialog .course-group-edit-row button { color: var(--bad); flex: 0 0 auto; }
+.lesson-editor .publish-options label[hidden] { display: none; }
