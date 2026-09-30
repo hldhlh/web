@@ -873,5 +873,8 @@
   "apps/vendor/documents/cmaps/78-RKSJ-V.bcmap",
   "apps/vendor/documents/cmaps/GBT-V.bcmap",
   "apps/vendor/documents/cmaps/UniGB-UTF32-H.bcmap",
-  "apps/vendor/documents/cmaps/UniCNS-UTF32-V.bcmap"
+  "apps/vendor/documents/cmaps/UniCNS-UTF32-V.bcmap",
+  "apps/academy/video-resilience.js",
+  "apps/academy/video-resilience.css",
+  "apps/academy/video-sources.json"
 ]

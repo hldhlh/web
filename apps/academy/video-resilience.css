@@ -1,0 +1,7 @@
+.video-network-controls { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:12px 16px; color:var(--text, #1d1d1f); }
+.video-network-controls label { display:flex; align-items:center; gap:10px; font-size:15px; }
+.video-network-controls select, .video-network-controls button, .video-network-controls a { min-height:44px; padding:10px 12px; border:1px solid var(--line, #b8bcc4); border-radius:12px; background:var(--surface, #fff); color:var(--text, #1d1d1f); font:inherit; }
+.video-network-controls a { display:inline-flex; align-items:center; box-sizing:border-box; }
+.video-network-controls [role=status] { flex-basis:100%; font-size:14px; line-height:1.5; }
+.video-network-controls [hidden], .video-network-controls [role=status]:empty { display:none; }
+.video-network-controls :focus-visible { outline:3px solid var(--accent, #007aff); outline-offset:2px; }

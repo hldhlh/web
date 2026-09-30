@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "videos": [
+    {
+      "lessonId": "lesson-fish-roe-fukubukuro-ayaka-20260929",
+      "original": "https://fmxddvjgkykuqwmasigo.supabase.co/storage/v1/object/public/cloud-files/academy/videos/fish-roe-fukubukuro-tutorial-35098124425e.mp4",
+      "sources": [
+        {
+          "url": "https://fmxddvjgkykuqwmasigo.supabase.co/storage/v1/object/public/cloud-files/academy/videos/fish-roe-fukubukuro-480p-8c2ea1ded8eb.mp4",
+          "label": "流畅",
+          "width": 480,
+          "bytes": 2309596
+        },
+        {
+          "url": "https://fmxddvjgkykuqwmasigo.supabase.co/storage/v1/object/public/cloud-files/academy/videos/fish-roe-fukubukuro-720p-25cba5ec9a9f.mp4",
+          "label": "清晰",
+          "width": 720,
+          "bytes": 4651408
+        }
+      ]
+    },
+    {
+      "lessonId": "lesson-mini-sausage-ayaka-20260929",
+      "original": "https://fmxddvjgkykuqwmasigo.supabase.co/storage/v1/object/public/cloud-files/academy/videos/mini-sausage-tutorial-f0ff76766207.mp4",
+      "sources": [
+        {
+          "url": "https://fmxddvjgkykuqwmasigo.supabase.co/storage/v1/object/public/cloud-files/academy/videos/mini-sausage-480p-c36fdafdc42c.mp4",
+          "label": "流畅",
+          "width": 480,
+          "bytes": 2998274
+        },
+        {
+          "url": "https://fmxddvjgkykuqwmasigo.supabase.co/storage/v1/object/public/cloud-files/academy/videos/mini-sausage-720p-bffe3e22f8c4.mp4",
+          "label": "清晰",
+          "width": 720,
+          "bytes": 6137776
+        }
+      ]
+    },
+    {
+      "lessonId": "lesson-shredded-crab-stick-ayaka-20260929",
+      "original": "https://fmxddvjgkykuqwmasigo.supabase.co/storage/v1/object/public/cloud-files/academy/videos/shredded-crab-stick-tutorial-24d266edc1d6.mp4",
+      "sources": [
+        {
+          "url": "https://fmxddvjgkykuqwmasigo.supabase.co/storage/v1/object/public/cloud-files/academy/videos/shredded-crab-stick-480p-c52e8f67c485.mp4",
+          "label": "流畅",
+          "width": 480,
+          "bytes": 5138681
+        },
+        {
+          "url": "https://fmxddvjgkykuqwmasigo.supabase.co/storage/v1/object/public/cloud-files/academy/videos/shredded-crab-stick-720p-e0efcc1b68e6.mp4",
+          "label": "清晰",
+          "width": 720,
+          "bytes": 10501196
+        }
+      ]
+    },
+    {
+      "lessonId": "lesson-sliced-beef-ayaka-20260929",
+      "original": "https://fmxddvjgkykuqwmasigo.supabase.co/storage/v1/object/public/cloud-files/academy/videos/sliced-beef-tutorial-fef670b0d5b4.mp4",
+      "sources": [
+        {
+          "url": "https://fmxddvjgkykuqwmasigo.supabase.co/storage/v1/object/public/cloud-files/academy/videos/sliced-beef-480p-99c7117fefcf.mp4",
+          "label": "流畅",
+          "width": 480,
+          "bytes": 8040147
+        },
+        {
+          "url": "https://fmxddvjgkykuqwmasigo.supabase.co/storage/v1/object/public/cloud-files/academy/videos/sliced-beef-720p-9994027e1662.mp4",
+          "label": "清晰",
+          "width": 720,
+          "bytes": 15634552
+        }
+      ]
+    }
+  ]
+}
