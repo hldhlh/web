@@ -29,6 +29,9 @@
   const inflightReads = new Map();
   const metrics = [];
   const unhealthyUntil = new Map();
+  const rankings = new Map();
+  let networkGeneration = 0;
+  let lastPersistedAt = 0;
 
   const normalize = (value) => String(value || '').replace(/\/+$/, '');
   const nodes = Array.from(new Map(ENDPOINTS.map((node) => {
@@ -36,10 +39,23 @@
     return [origin, { name: node.name || origin, origin }];
   })).values()).filter((node) => /^https:\/\//.test(node.origin));
 
+  // Restore only a previously verified gateway belonging to this site.
+  try {
+    const gateway = JSON.parse(localStorage.getItem('app-network-gateway-v1') || 'null');
+    if (sameOriginGateway && gateway?.origin === sameOriginGateway.origin && gateway.available
+      && !nodes.some(node => node.origin === gateway.origin)) nodes.push(sameOriginGateway);
+  } catch (_) {}
+
   function readCachedOrigin() {
     try {
       const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
-      if (cached && Date.now() - cached.savedAt < CACHE_TTL && nodes.some((node) => node.origin === cached.origin)) {
+      for (const item of Array.isArray(cached?.rankings) ? cached.rankings : []) {
+        if (nodes.some(node => node.origin === item.origin) && Number.isFinite(item.latency) && item.latency >= 0) {
+          rankings.set(item.origin, { latency: item.latency, savedAt: item.savedAt });
+        }
+      }
+      // Expired measurements remain hints, never a reason to block startup.
+      if (cached && nodes.some((node) => node.origin === cached.origin)) {
         return cached.origin;
       }
     } catch (_) { }
@@ -62,10 +78,14 @@
 
   nodes.forEach((node) => addConnectionHint(node.origin));
 
-  function remember(origin, latency) {
+  function remember(origin, latency, force = false) {
+    const changed = currentOrigin !== origin;
     currentOrigin = origin;
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ origin, latency, savedAt: Date.now() })); } catch (_) { }
-    window.dispatchEvent(new CustomEvent('app-network-change', { detail: { origin, latency } }));
+    if (!force && !changed && Date.now() - lastPersistedAt < 1000) return;
+    lastPersistedAt = Date.now();
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ origin, latency, savedAt: Date.now(),
+      rankings: [...rankings].map(([origin, item]) => ({ origin, ...item })) })); } catch (_) { }
+    if (changed) window.dispatchEvent(new CustomEvent('app-network-change', { detail: { origin, latency } }));
   }
 
   function replaceOrigin(input, targetOrigin) {
@@ -125,14 +145,16 @@
   async function probe(node) {
     const startedAt = performance.now();
     try {
-      const response = await withTimeout((signal) => nativeFetch(`${node.origin}/auth/v1/health`, {
-        method: 'GET', cache: 'no-store', mode: 'cors', signal
-      }));
-      if (!response.ok && response.status !== 401) throw new Error(`HTTP ${response.status}`);
-      const type = response.headers.get('content-type') || '';
-      if (!type.includes('json')) throw new Error('Invalid gateway response');
-      const payload = await response.json();
-      if (!payload || typeof payload !== 'object') throw new Error('Invalid gateway payload');
+      await withTimeout(async (signal) => {
+        const response = await nativeFetch(`${node.origin}/auth/v1/health`, {
+          method: 'GET', cache: 'no-store', mode: 'cors', signal
+        });
+        if (!response.ok && response.status !== 401) throw new Error(`HTTP ${response.status}`);
+        const type = response.headers.get('content-type') || '';
+        if (!type.includes('json')) throw new Error('Invalid gateway response');
+        const payload = await response.json();
+        if (!payload || typeof payload !== 'object') throw new Error('Invalid gateway payload');
+      });
       return { ...node, latency: Math.round(performance.now() - startedAt) };
     } catch (_) {
       return { ...node, latency: Infinity };
@@ -143,15 +165,23 @@
     if (benchmarking) return benchmarkPromise;
     if (nodes.length < 2 || !navigator.onLine) return currentOrigin;
     benchmarking = true;
+    const generation = networkGeneration;
     benchmarkPromise = (async () => {
-    try {
-      const results = (await Promise.all(nodes.map(probe))).filter((result) => Number.isFinite(result.latency));
-      results.sort((a, b) => a.latency - b.latency);
-      if (results[0]) remember(results[0].origin, results[0].latency);
-      return currentOrigin;
-    } finally {
-      benchmarking = false;
-    }
+      try {
+        const results = (await Promise.all(nodes.map(probe))).filter((result) => Number.isFinite(result.latency));
+        if (generation !== networkGeneration) return currentOrigin;
+        results.sort((a, b) => a.latency - b.latency);
+        results.forEach(result => {
+          rankings.set(result.origin, { latency: result.latency, savedAt: Date.now() });
+          unhealthyUntil.delete(result.origin);
+        });
+        nodes.filter(node => !results.some(result => result.origin === node.origin))
+          .forEach(node => unhealthyUntil.set(node.origin, Date.now() + FAILURE_COOLDOWN));
+        if (results[0]) remember(results[0].origin, results[0].latency, true);
+        return currentOrigin;
+      } finally {
+        benchmarking = false;
+      }
     })();
     return benchmarkPromise;
   }
@@ -166,11 +196,11 @@
     return benchmark();
   }
 
-  async function discoverSameOriginGateway() {
+  async function discoverSameOriginGateway(force = false) {
     if (!sameOriginGateway || nodes.some((node) => node.origin === sameOriginGateway.origin)) return false;
     try {
       const cached = JSON.parse(localStorage.getItem('app-network-gateway-v1') || 'null');
-      if (cached?.origin === sameOriginGateway.origin && Date.now() - cached.at < CACHE_TTL) {
+      if (!force && cached?.origin === sameOriginGateway.origin && Date.now() - cached.at < CACHE_TTL) {
         if (cached.available) nodes.push(sameOriginGateway);
         return !!cached.available;
       }
@@ -185,41 +215,80 @@
 
   function getOrderedOrigins() {
     const now = Date.now();
-    const ordered = [currentOrigin, ...nodes.map((node) => node.origin).filter((origin) => origin !== currentOrigin)];
+    const ordered = [currentOrigin, ...nodes.map((node) => node.origin).filter((origin) => origin !== currentOrigin)
+      .sort((a, b) => (rankings.get(a)?.latency ?? Infinity) - (rankings.get(b)?.latency ?? Infinity))];
     const healthy = ordered.filter((origin) => (unhealthyUntil.get(origin) || 0) <= now);
-    return healthy.length ? healthy : ordered;
+    return [...healthy, ...ordered.filter(origin => !healthy.includes(origin))];
   }
 
   function raceRead(input, init, origins, requireSuccess = false) {
     return new Promise((resolve, reject) => {
-      let failures = 0;
+      let active = 0;
+      let next = 0;
       let settled = false;
+      let timer;
       let lastError;
-
-      origins.forEach((origin, index) => {
+      const controllers = new Set();
+      const generation = networkGeneration;
+      const cleanup = (winner) => {
+        clearTimeout(timer);
+        init.signal?.removeEventListener('abort', onAbort);
+        controllers.forEach(controller => { if (controller !== winner) controller.abort(); });
+      };
+      const onAbort = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(init.signal.reason || new DOMException('Aborted', 'AbortError'));
+      };
+      const launch = () => {
+        clearTimeout(timer);
+        if (settled || next >= origins.length) return;
+        const origin = origins[next++];
+        const controller = new AbortController();
+        controllers.add(controller);
+        active++;
+        const started = performance.now();
+        if (next < origins.length) timer = setTimeout(launch, HEDGE_DELAY);
         (async () => {
           try {
-            // 缓存最优节点立即发出；只有超过阈值仍未返回才启动下一条线路。
-            if (index > 0) await delay(HEDGE_DELAY * index, init.signal);
-            if (settled) return;
-            const response = await fetchWithTimeout(replaceOrigin(input, origin), init);
+            const response = await fetchWithTimeout(replaceOrigin(input, origin), { ...init, signal: controller.signal });
             if (isRetryableResponse(response) || (requireSuccess && !response.ok)) {
+              response.body?.cancel().catch(() => {});
               throw new Error(`HTTP ${response.status}`);
             }
-            if (settled) return;
+            if (settled) {
+              response.body?.cancel().catch(() => {});
+              return;
+            }
             settled = true;
-            unhealthyUntil.delete(origin);
-            if (origin !== currentOrigin) remember(origin, null);
+            cleanup(controller); // Do not abort the winning response body/stream.
+            if (generation === networkGeneration) {
+              const latency = Math.round(performance.now() - started);
+              unhealthyUntil.delete(origin);
+              rankings.set(origin, { latency, savedAt: Date.now() });
+              remember(origin, latency);
+            }
             resolve(response);
           } catch (error) {
             if (settled) return;
             lastError = error;
-            failures++;
-            if (error?.name !== 'AbortError') unhealthyUntil.set(origin, Date.now() + FAILURE_COOLDOWN);
-            if (failures === origins.length) reject(lastError || new Error('All backend routes failed'));
+            if (generation === networkGeneration) unhealthyUntil.set(origin, Date.now() + FAILURE_COOLDOWN);
+            // A definite failure starts the next route immediately, without a probe.
+            if (next < origins.length) launch();
+          } finally {
+            active--;
+            if (!settled && active === 0 && next === origins.length) {
+              settled = true;
+              cleanup();
+              reject(lastError || new Error('All backend routes failed'));
+            }
           }
         })();
-      });
+      };
+      if (init.signal?.aborted) return onAbort();
+      init.signal?.addEventListener('abort', onAbort, { once: true });
+      launch();
     });
   }
 
@@ -332,6 +401,7 @@
     get origin() { return currentOrigin; },
     get projectOrigin() { return PROJECT_ORIGIN; },
     get endpoints() { return nodes.map((node) => ({ ...node })); },
+    get ranking() { return getOrderedOrigins().map(origin => ({ origin, ...rankings.get(origin) })); },
     benchmark,
     get metrics() { return metrics.map(item => ({ ...item })); },
     addEndpoints,
@@ -360,13 +430,23 @@
   }
 
   patchSupabase();
-  window.addEventListener('online', benchmark, { passive: true });
+  const refreshNetwork = () => {
+    networkGeneration++;
+    unhealthyUntil.clear();
+    inflightReads.clear();
+    // Requests keep using the saved list while the new network is measured.
+    const pending = benchmarkPromise;
+    Promise.resolve(pending).then(async () => {
+      await discoverSameOriginGateway(true);
+      await benchmark();
+    }).catch(() => {});
+  };
+  window.addEventListener('online', refreshNetwork, { passive: true });
+  navigator.connection?.addEventListener('change', refreshNetwork);
+
   const schedule = window.requestIdleCallback || ((callback) => setTimeout(callback, 1200));
   schedule(async () => {
     await discoverSameOriginGateway();
-    try {
-      const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
-      if (!cached || Date.now() - cached.savedAt >= CACHE_TTL) benchmark();
-    } catch (_) { benchmark(); }
+    await benchmark();
   });
 })();
