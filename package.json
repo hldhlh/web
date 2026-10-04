@@ -4,9 +4,14 @@
   "scripts": {
     "build": "node scripts/build-site.mjs",
     "check": "node scripts/validate-site.mjs",
-    "test": "node --test tests/*.test.mjs apps/log/log_manager.test.js"
+    "test": "node --test tests/*.test.mjs apps/log/log_manager.test.js",
+    "mcp:auto": "node tools/auto-office-mcp/index.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.0",
+    "zod": "3.25.76"
   }
 }
