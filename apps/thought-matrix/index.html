@@ -7,6 +7,13 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <link rel="icon" href="./icon.svg" type="image/svg+xml">
     <title>思维矩阵</title>
+    <script>
+        try {
+            document.documentElement.dataset.theme = localStorage.getItem('thought-matrix-theme') === 'light' ? 'light' : 'dark';
+        } catch (_) {
+            document.documentElement.dataset.theme = 'dark';
+        }
+    </script>
     <link rel="dns-prefetch" href="//fmxddvjgkykuqwmasigo.supabase.co">
     <link rel="preconnect" href="https://fmxddvjgkykuqwmasigo.supabase.co" crossorigin>
     <script src="../vendor/supabase.min.js" defer></script>
@@ -466,16 +473,17 @@
 
         .connection-line {
             fill: none;
-            stroke: rgba(255, 255, 255, 0.15);
-            stroke-width: 1.2;
+            stroke: var(--connection-color);
+            stroke-width: 1.15;
             stroke-linecap: round;
+            stroke-linejoin: round;
             vector-effect: non-scaling-stroke;
-            transition: all 0.3s ease;
+            transition: stroke 160ms ease, stroke-width 160ms ease;
         }
 
         .connection-group:hover .connection-line {
-            stroke: var(--primary);
-            stroke-width: 2;
+            stroke: var(--connection-active);
+            stroke-width: 1.5;
             opacity: 1;
         }
 
@@ -552,7 +560,7 @@
 
         .connection-line:hover {
             opacity: 1;
-            stroke-width: 2.5;
+            stroke-width: 1.5;
         }
 
         .line-preview {
@@ -837,6 +845,154 @@
                 padding: 20px;
             }
         }
+        :root { color-scheme: dark; }
+        :root[data-theme="light"] {
+            color-scheme: light;
+            --primary: #525252;
+            --grid-line: rgba(0, 0, 0, 0.035);
+            --grid-dot: rgba(0, 0, 0, 0.12);
+        }
+        .theme-toggle {
+            background: #171717;
+            color: #fff;
+            border-color: #383838;
+            box-shadow: none;
+            touch-action: manipulation;
+        }
+        .theme-toggle:hover { background: #262626; box-shadow: none; }
+        .theme-toggle:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
+        .theme-toggle .moon-icon { display: none; }
+        [data-theme="light"] .theme-toggle .sun-icon { display: none; }
+        [data-theme="light"] .theme-toggle .moon-icon { display: block; }
+        [data-theme="light"] body { background: #fafafa; color: #171717; }
+        [data-theme="light"] #viewport { background: #fafafa; }
+        [data-theme="light"] .tag {
+            background: rgba(255, 255, 255, 0.9);
+            border-color: rgba(0, 0, 0, 0.16);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+        }
+        [data-theme="light"] .tag:hover { background: #fff; border-color: #737373; }
+        [data-theme="light"] .tag span {
+            background: none;
+            color: #171717;
+            -webkit-text-fill-color: currentColor;
+            text-shadow: none;
+        }
+        .tag[class*="color-c"] span,
+        [data-theme="light"] .tag[class*="color-c"] span {
+            background: none;
+            color: #fff;
+            -webkit-text-fill-color: #fff;
+            text-shadow: none;
+        }
+        [data-theme="light"] .tag-add-btn { background: #f5f5f5; color: #171717; border-color: #a3a3a3; }
+        [data-theme="light"] .tag.selected { outline: 2px solid #525252; outline-offset: 3px; }
+        [data-theme="light"] .selection-box { border-color: #525252; background: rgba(0, 0, 0, 0.04); }
+        [data-theme="light"] #floatingInput { color: #171717; }
+        #floatingInput[data-colored="true"] { color: #fff; -webkit-text-fill-color: #fff; }
+        [data-theme="light"] .connection-line { stroke: var(--connection-color); }
+        [data-theme="light"] .connection-group:hover .connection-line { stroke: var(--connection-active); }
+        [data-theme="light"] .conn-label { fill: #525252; text-shadow: none; }
+        [data-theme="light"] .connection-group:hover .conn-label { fill: #171717; filter: none; }
+        [data-theme="light"] .minimal-menu,
+        [data-theme="light"] .selection-toolbar,
+        [data-theme="light"] .confirm-card { background: rgba(255, 255, 255, 0.96); border-color: #dedede; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.08); }
+        [data-theme="light"] .menu-item,
+        [data-theme="light"] .toolbar-btn,
+        [data-theme="light"] .confirm-title,
+        [data-theme="light"] .confirm-button { color: #262626; }
+        [data-theme="light"] .menu-item:hover,
+        [data-theme="light"] .toolbar-btn:hover { background: #f0f0f0; color: #000; }
+        [data-theme="light"] .menu-separator,
+        [data-theme="light"] .toolbar-divider { background: #dedede; }
+        [data-theme="light"] .color-dot.selected { border-color: #171717; }
+        [data-theme="light"] .bg-none { border-color: #737373 !important; }
+        [data-theme="light"] .bg-none::after { background: #737373; }
+        [data-theme="light"] .dev-version { color: #737373; }
+        [data-theme="light"] .fab-button { background: #fff; color: #171717; border-color: #dedede; box-shadow: none; }
+        [data-theme="light"] .fab-button:hover { background: #f0f0f0; border-color: #a3a3a3; }
+        [data-theme="light"] .confirm-description { color: #737373; }
+        [data-theme="light"] .confirm-input { background: #fafafa; color: #171717; border-color: #dedede; }
+        [data-theme="light"] .confirm-button.secondary { background: #f5f5f5; border-color: #dedede; }
+        [data-theme="light"] .confirm-button.primary { color: #fff; }
+        /* Quiet linework and a shared, precisely aligned canvas control rail. */
+        :root {
+            --connection-color: #515969;
+            --connection-active: #a9b2c2;
+            --control-surface: #171b24;
+            --control-border: #303642;
+            --control-ink: #c5cbd5;
+            --control-hover: #252b36;
+        }
+        :root[data-theme="light"] {
+            --connection-color: #a2a7ad;
+            --connection-active: #646b74;
+            --control-surface: #fff;
+            --control-border: #e4e5e7;
+            --control-ink: #565d66;
+            --control-hover: #f2f3f4;
+        }
+        .fab-container {
+            right: max(24px, env(safe-area-inset-right));
+            bottom: max(24px, env(safe-area-inset-bottom));
+            gap: 4px;
+            padding: 5px;
+            border: 1px solid var(--control-border);
+            border-radius: 14px;
+            background: var(--control-surface);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.035);
+        }
+        .fab-container::after {
+            content: '';
+            position: absolute;
+            top: 51px;
+            left: 15px;
+            right: 15px;
+            height: 1px;
+            background: var(--control-border);
+            pointer-events: none;
+        }
+        .fab-container .fab-button {
+            box-sizing: border-box;
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            border: 0;
+            border-radius: 9px;
+            background: transparent;
+            color: var(--control-ink);
+            box-shadow: none;
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+            touch-action: manipulation;
+            transition: background 160ms ease, color 160ms ease;
+        }
+        .fab-container .fab-button:hover {
+            background: var(--control-hover);
+            color: var(--connection-active);
+            transform: none;
+            box-shadow: none;
+        }
+        .fab-container .fab-button:active { background: var(--control-border); }
+        .fab-container .fab-button:focus-visible { outline: 2px solid var(--control-ink); outline-offset: -3px; }
+        .fab-container .fab-button svg {
+            display: block;
+            flex: none;
+            width: 20px;
+            height: 20px;
+            stroke-width: 1.65;
+            opacity: 1;
+        }
+        .fab-container .theme-toggle .moon-icon { display: none; }
+        [data-theme="light"] .fab-container .theme-toggle .sun-icon { display: none; }
+        [data-theme="light"] .fab-container .theme-toggle .moon-icon { display: block; }
+        .toolbar-btn svg, .menu-item svg { display: block; flex: none; stroke-width: 1.75; }
+        .menu-item:hover svg { transform: none; }
+        .conn-label { letter-spacing: 0.02em; text-shadow: none; }
+        .connection-group:hover .conn-label { filter: none; }
+        @media (prefers-reduced-motion: reduce) {
+            .connection-line, .fab-container .fab-button { transition: none; }
+        }
     </style>
 </head>
 
@@ -851,9 +1007,9 @@
                         <stop offset="0%" stop-color="#818cf8" />
                         <stop offset="100%" stop-color="#c084fc" />
                     </linearGradient>
-                    <marker id="arrowHead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"
-                        markerUnits="strokeWidth">
-                        <path d="M0,0 L0,6 L9,3 z" fill="context-stroke" />
+                    <marker id="arrowHead" viewBox="0 0 10 10" markerWidth="12" markerHeight="12"
+                        refX="3" refY="5" orient="auto" markerUnits="userSpaceOnUse" overflow="visible">
+                        <path d="M1 2 L9 5 L1 8 L3 5 Z" fill="context-stroke" stroke="none" />
                     </marker>
                 </defs>
                 <g id="lineGroups"></g>
@@ -877,11 +1033,21 @@
     <div id="syncStatus" class="sync-indicator"></div>
 
     <div class="fab-container">
-        <button id="btnCenter" class="fab-button" title="定位到中心 (Center View)">
+        <button id="btnTheme" type="button" class="fab-button theme-toggle" aria-label="切换到白天主题" title="切换到白天主题">
+            <svg class="sun-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" />
+            </svg>
+            <svg class="moon-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20.5 13A8.5 8.5 0 0 1 11 3.5 8.5 8.5 0 1 0 20.5 13Z" />
+            </svg>
+        </button>
+        <button id="btnCenter" type="button" class="fab-button" title="定位到中心" aria-label="定位到中心">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                 stroke-linejoin="round">
-                <circle cx="12" cy="12" r="9"></circle>
-                <path d="M12 8v8M8 12h8"></path>
+                <circle cx="12" cy="12" r="5.5" />
+                <path d="M12 3v3.5M12 17.5V21M3 12h3.5M17.5 12H21" />
+                <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
             </svg>
         </button>
     </div>
@@ -989,6 +1155,21 @@
         </div>
     </div>
 
+    <script>
+        const themeButton = document.getElementById('btnTheme');
+        function updateThemeButton() {
+            const label = document.documentElement.dataset.theme === 'light' ? '切换到夜间主题' : '切换到白天主题';
+            themeButton.setAttribute('aria-label', label);
+            themeButton.title = label;
+        }
+        updateThemeButton();
+        themeButton.addEventListener('click', () => {
+            const theme = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+            document.documentElement.dataset.theme = theme;
+            try { localStorage.setItem('thought-matrix-theme', theme); } catch (_) { }
+            updateThemeButton();
+        });
+    </script>
     <script type="module">
         const SUPABASE_URL = 'https://fmxddvjgkykuqwmasigo.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZteGRkdmpna3lrdXF3bWFzaWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDMzMjcsImV4cCI6MjA1OTYxOTMyN30.XCU4-03oajGh6M2-PNiBotCZSIDn_nJXkIC0Thjjfqo';
@@ -1198,7 +1379,8 @@
             const { x, y, scale } = State.transform;
             DOM.content.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
 
-            // Only redraw overlay lines during zoom if needed
+            // Arrow dimensions and endpoint spacing are measured in screen pixels.
+            if (LineManager.renderedScale !== scale) LineManager.render();
             if (State.interaction.isLinking) LineManager.renderOverlay();
 
             // Grid optimization
@@ -1490,7 +1672,13 @@
         };
 
         const LineManager = {
+            renderedScale: null,
             render() {
+                const scale = State.transform.scale;
+                const marker = document.getElementById('arrowHead');
+                marker.setAttribute('markerWidth', 12 / scale);
+                marker.setAttribute('markerHeight', 12 / scale);
+                this.renderedScale = scale;
                 DOM.svgGroup.innerHTML = '';
                 State.connections.forEach(conn => {
                     const from = document.getElementById(conn.from_id || conn.fromId);
@@ -1523,22 +1711,20 @@
                 const dx = b2.cx - b1.cx;
                 const isRight = dx > 0;
 
-                // Anchors like the mind-map image: Parent Side -> Child Side
+                // Keep the original side-to-side mind-map routing.
                 const startX = isRight ? b1.x + b1.w : b1.x;
                 const startY = b1.cy;
-
-                const endX = isRight ? b2.x : b2.x + b2.w;
+                const arrowGap = isPreview ? 0 : 12.2 / State.transform.scale;
+                const endX = isRight ? b2.x - arrowGap : b2.x + b2.w + arrowGap;
                 const endY = b2.cy;
 
                 const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
                 group.setAttribute("class", "connection-group");
                 const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
 
-                // Mind-map Style S-Curve (Cubic Bezier)
                 const offset = Math.max(Math.abs(endX - startX) * 0.5, 40);
                 const cp1x = startX + (isRight ? offset : -offset);
                 const cp2x = endX + (isRight ? -offset : offset);
-
                 const d = `M ${startX} ${startY} C ${cp1x} ${startY}, ${cp2x} ${endY}, ${endX} ${endY}`;
 
                 path.setAttribute("d", d);
@@ -1717,6 +1903,7 @@
 
                 DOM.input.style.display = 'block';
                 DOM.input.value = text;
+                DOM.input.dataset.colored = String(type === 'node' && !!entity && /(?:^|\s)color-c\d+(?:\s|$)/.test(entity.className));
                 DOM.input.placeholder = type === 'node' ? '输入内容...' : '输入关系...';
 
                 if (type === 'connection') {
