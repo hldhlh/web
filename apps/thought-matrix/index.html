@@ -212,6 +212,10 @@
         }
 
         #floatingInput {
+            resize: none;
+            overflow: hidden;
+            white-space: pre;
+            line-height: normal;
             position: fixed;
             z-index: 9999;
             background: transparent;
@@ -1030,7 +1034,7 @@
         <div class="dev-version">v1.2.0-dev</div>
     </div>
 
-    <input type="text" id="floatingInput" spellcheck="false" autocomplete="off">
+    <textarea id="floatingInput" rows="1" wrap="off" aria-label="导图文字" spellcheck="false" autocomplete="off"></textarea>
 
     <div id="syncStatus" class="sync-indicator"></div>
 
@@ -1208,7 +1212,9 @@
                     const modal = document.getElementById('pwdConfirmModal');
                     const titleEl = document.getElementById('pwdModalTitle');
                     const descEl = document.getElementById('pwdModalDesc');
-                    const input = document.getElementById('pwdModalInput');
+                    const field = document.getElementById('confirmationField');
+                    const input = document.getElementById('confirmationInputTemplate').content.firstElementChild.cloneNode(true);
+                    field.prepend(input);
                     const errorEl = document.getElementById('pwdModalError');
                     const confirmBtn = document.getElementById('pwdModalConfirm');
                     const cancelBtn = document.getElementById('pwdModalCancel');
@@ -1222,10 +1228,12 @@
                     modal.setAttribute('aria-hidden', 'false');
                     
                     // 延迟 focus 保证浏览器能调起键盘并聚焦
-                    setTimeout(() => input.focus(), 150);
+                    const focusTimer = setTimeout(() => input.focus(), 150);
 
                     const cleanup = () => {
+                        clearTimeout(focusTimer);
                         input.value = '';
+                        input.remove();
                         modal.classList.remove('is-open');
                         modal.setAttribute('aria-hidden', 'true');
                         confirmBtn.onclick = null;
@@ -2809,8 +2817,12 @@
             });
 
             DOM.input.addEventListener('keydown', e => {
-                if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+                if (e.isComposing || e.keyCode === 229) return;
+                if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); e.target.blur(); }
                 if (e.key === 'Escape') { e.preventDefault(); Input.hide(); }
+            });
+            DOM.input.addEventListener('input', () => {
+                DOM.input.value = DOM.input.value.replace(/[\r\n]+/g, ' ');
             });
             DOM.input.addEventListener('blur', () => {
                 State.interaction.lastBlurTime = Date.now();
@@ -3182,10 +3194,12 @@
             </div>
             <h3 class="confirm-title" id="pwdModalTitle">确认操作</h3>
             <p class="confirm-description" id="pwdModalDesc">此操作需要安全验证：</p>
-            <div class="confirm-field">
-                <input type="text" id="pwdModalInput" class="confirm-input" aria-label="管理员密码"
-                    placeholder="••••••" autocomplete="off" inputmode="numeric" spellcheck="false"
-                    autocapitalize="off" data-1p-ignore data-lpignore="true">
+            <div class="confirm-field" id="confirmationField">
+                <template id="confirmationInputTemplate">
+                    <input type="text" class="confirm-input" aria-label="管理员密码"
+                        placeholder="••••••" autocomplete="off" inputmode="numeric" spellcheck="false"
+                        autocapitalize="off" data-1p-ignore data-lpignore="true">
+                </template>
                 <div id="pwdModalError" class="confirm-error" role="alert">密码错误，请重试</div>
             </div>
             <div class="confirm-actions">
