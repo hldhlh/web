@@ -777,6 +777,8 @@
             text-align: center;
             user-select: text;
             -webkit-user-select: text;
+            /* 操作验证码使用视觉遮罩，避免密码管理器把导图编辑识别成登录。 */
+            -webkit-text-security: disc;
             transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
@@ -1223,6 +1225,7 @@
                     setTimeout(() => input.focus(), 150);
 
                     const cleanup = () => {
+                        input.value = '';
                         modal.classList.remove('is-open');
                         modal.setAttribute('aria-hidden', 'true');
                         confirmBtn.onclick = null;
@@ -3180,8 +3183,9 @@
             <h3 class="confirm-title" id="pwdModalTitle">确认操作</h3>
             <p class="confirm-description" id="pwdModalDesc">此操作需要安全验证：</p>
             <div class="confirm-field">
-                <input type="password" id="pwdModalInput" class="confirm-input" aria-label="管理员密码"
-                    placeholder="••••••" autocomplete="off">
+                <input type="text" id="pwdModalInput" class="confirm-input" aria-label="管理员密码"
+                    placeholder="••••••" autocomplete="off" inputmode="numeric" spellcheck="false"
+                    autocapitalize="off" data-1p-ignore data-lpignore="true">
                 <div id="pwdModalError" class="confirm-error" role="alert">密码错误，请重试</div>
             </div>
             <div class="confirm-actions">
