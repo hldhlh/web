@@ -1,10 +1,11 @@
-/* Local document readers: Mammoth 1.13.0 (BSD-2-Clause), PDF.js 4.10.38 (Apache-2.0). */
+/* Local document readers: Mammoth 1.13.0 (BSD-2-Clause), PDF.js 4.10.38 and SheetJS 0.20.3 (Apache-2.0). */
 window.AcademyDocuments = (() => {
   const base = new URL('.', document.currentScript.src);
   const vendor = new URL('../vendor/documents/', base);
-  const formats = new Set(['docx', 'pdf', 'txt']);
+  const formats = new Set(['docx', 'pdf', 'txt', 'xlsx', 'xls']);
   let mammothReady;
   let pdfReady;
+  let excelReady;
   const mounts = new WeakMap();
   function safeUrl(value) {
     try {
@@ -22,7 +23,7 @@ window.AcademyDocuments = (() => {
   function validate(file) {
     if (!file) throw new Error('请选择课程文档。');
     const format = file.name.split('.').pop().toLowerCase();
-    if (!formats.has(format)) throw new Error('支持 DOCX、PDF 和 TXT；旧版 DOC 请先另存为 DOCX 或 PDF。');
+    if (!formats.has(format)) throw new Error('支持 Excel（XLSX、XLS）、DOCX、PDF 和 TXT；旧版 DOC 请先另存为 DOCX 或 PDF。');
     if (!file.size) throw new Error('文档为空，请重新选择。');
     if (file.size > 20 * 1024 * 1024) throw new Error('文档超过20MB，请压缩或拆分后上传。');
     return format;
@@ -44,6 +45,17 @@ window.AcademyDocuments = (() => {
       return pdf;
     }).catch(error => { pdfReady = null; throw error; });
     return pdfReady;
+  }
+  function loadExcel() {
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    if (!excelReady) excelReady = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = new URL('xlsx.full.min.js', vendor).href;
+      script.onload = () => resolve(window.XLSX);
+      script.onerror = () => { excelReady = null; script.remove(); reject(new Error('Excel预览组件加载失败，请重试。')); };
+      document.head.appendChild(script);
+    });
+    return excelReady;
   }
   // Rebuild a semantic allowlist instead of injecting untrusted converted HTML.
   function sanitize(html) {
@@ -82,7 +94,7 @@ window.AcademyDocuments = (() => {
     const path = `academy/documents/${id}/${token}.${format}`;
     const origin = window.APP_NETWORK?.origin || cfg.url;
     const request = window.APP_NETWORK?.request || window.fetch.bind(window);
-    const mime = { docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', pdf: 'application/pdf', txt: 'text/plain;charset=utf-8' }[format];
+    const mime = { docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', pdf: 'application/pdf', txt: 'text/plain;charset=utf-8', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', xls: 'application/vnd.ms-excel' }[format];
     const response = await request(`${origin}/storage/v1/object/${encodeURIComponent(cfg.bucket)}/${path}`, {
       method: 'POST', appNetworkSafeWrite: true,
       headers: { apikey: cfg.key, Authorization: `Bearer ${cfg.key}`, 'Content-Type': mime, 'x-upsert': 'false', 'cache-control': '3600' }, body: file
@@ -123,6 +135,32 @@ window.AcademyDocuments = (() => {
         body.appendChild(sanitize(result.value)); text = body.textContent;
         if (!text.trim() && !body.querySelector('img')) throw new Error('Word文档没有可预览内容。');
         status.textContent = `${record.name} · Word阅读预览`;
+      } else if (record.format === 'xlsx' || record.format === 'xls') {
+        const reader = await loadExcel();
+        const workbook = reader.read(data, { type: 'array', cellHTML: false, cellFormula: false });
+        if (!current()) return null;
+        const sheets = workbook.SheetNames.filter(name => workbook.Sheets[name]?.['!ref']);
+        if (!sheets.length) throw new Error('Excel文件没有可阅读的工作表。');
+        let cells = 0;
+        for (const name of sheets) {
+          const range = reader.utils.decode_range(workbook.Sheets[name]['!ref']);
+          cells += (range.e.r - range.s.r + 1) * (range.e.c - range.s.c + 1);
+          if (cells > 100000) throw new Error('表格过大，请将课程内容拆分为较小文件。');
+        }
+        const toolbar = document.createElement('label'); toolbar.className = 'document-sheet-selector';
+        toolbar.appendChild(document.createTextNode('工作表'));
+        const select = document.createElement('select'); select.setAttribute('aria-label', '选择Excel工作表');
+        sheets.forEach(name => { const option = document.createElement('option'); option.value = name; option.textContent = name; select.appendChild(option); });
+        toolbar.appendChild(select); body.appendChild(toolbar);
+        const tableHost = document.createElement('div'); tableHost.className = 'document-table'; body.appendChild(tableHost);
+        const showSheet = () => {
+          tableHost.replaceChildren(sanitize(reader.utils.sheet_to_html(workbook.Sheets[select.value], { editable: false })));
+          status.textContent = `${record.name} · ${select.value} · ${sheets.length} 个工作表`;
+        };
+        select.onchange = showSheet; showSheet();
+        text = sheets.map(name => `${name}\n${reader.utils.sheet_to_csv(workbook.Sheets[name])}`).join('\n').slice(0, 200000);
+        host.appendChild(body);
+        return { ...record, text };
       } else if (record.format === 'txt') {
         text = new TextDecoder('utf-8', { fatal: true }).decode(data);
         const pre = document.createElement('pre'); pre.textContent = text; body.appendChild(pre);

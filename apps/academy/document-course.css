@@ -22,6 +22,8 @@
 .document-body details { margin-top: 12px; font-size: 15px; }
 .document-body summary { min-height: 44px; padding: 10px 0; cursor: pointer; }
 .document-editor-status { font-size: 13px; color: var(--muted); }
+.document-sheet-selector { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
+.document-sheet-selector select { min-height: 44px; max-width: 100%; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; }
 .front-safety-starter { display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .front-safety-starter p { margin: 6px 0; }
 @media(max-width: 600px) { .document-course-preview { padding: 12px; } .document-body h1 { font-size: 24px; } .front-safety-starter .primary { width: 100%; } }

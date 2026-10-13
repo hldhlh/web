@@ -11,6 +11,9 @@ test('document validation rejects legacy DOC, empty and oversized files with act
  const documents=api();
  assert.equal(documents.validate({name:'安全入门.DOCX',size:2048}),'docx');
  assert.equal(documents.validate({name:'安全.pdf',size:1024}),'pdf');
+ assert.equal(documents.validate({name:'用量表.XLSX',size:1024}),'xlsx');
+ assert.equal(documents.validate({name:'用量表.xls',size:1024}),'xls');
+ assert.equal(documents.normalize({url:'https://shop.example/用量表.xlsx',format:'xlsx'}).format,'xlsx');
  assert.throws(()=>documents.validate({name:'安全.doc',size:1024}),/另存为 DOCX 或 PDF/);
  assert.throws(()=>documents.validate({name:'安全.docx',size:0}),/为空/);
  assert.throws(()=>documents.validate({name:'安全.pdf',size:21*1024*1024}),/超过20MB/);

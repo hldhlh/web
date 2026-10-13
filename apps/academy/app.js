@@ -2910,8 +2910,8 @@
         </section>
 
         <section class="card editor-section document-editor-section" data-document-panel ${data.type === "document" ? "" : "hidden"}>
-          <div class="editor-section-head"><span>03</span><div><h3>课程文档</h3><p>支持 DOCX、PDF、TXT，单个文件不超过20MB。Word按标题、段落和表格重新排版，PDF保留页面布局。</p></div></div>
-          <label class="document-dropzone" for="ops-lesson-document-file"><strong>${hasDocument ? "更换课程文档" : "上传课程文档"}</strong><input id="ops-lesson-document-file" type="file" accept=".docx,.pdf,.txt"><span class="document-editor-status">${hasDocument ? escapeHtml(data.document.name) : "选择文件后可立即预览；发布时上传"}</span></label>
+          <div class="editor-section-head"><span>03</span><div><h3>课程文档</h3><p>支持 Excel、DOCX、PDF、TXT，单个文件不超过20MB。Excel可切换工作表阅读，PDF保留页面布局。</p></div></div>
+          <label class="document-dropzone" for="ops-lesson-document-file"><strong>${hasDocument ? "更换课程文档" : "上传课程文档"}</strong><input id="ops-lesson-document-file" type="file" accept=".xlsx,.xls,.docx,.pdf,.txt"><span class="document-editor-status">${hasDocument ? escapeHtml(data.document.name) : "选择文件后可立即预览；发布时上传"}</span></label>
           <input id="ops-lesson-document" type="hidden" value="${escapeHtml(JSON.stringify(data.document))}">
           <div class="document-course-preview" data-document-preview ${hasDocument ? "" : "hidden"}></div>
           <button type="button" data-act="ops-lesson-clear-document" ${hasDocument ? "" : "hidden"}>移除文档</button>
