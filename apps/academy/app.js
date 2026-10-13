@@ -4327,8 +4327,11 @@
       const item = btn.closest(".task-board-editor-item");
       const list = item?.parentElement;
       if (!item || !list) return;
-      const sibling = btn.dataset.direction === "up" ? item.previousElementSibling : item.nextElementSibling;
-      if (!sibling?.classList.contains("task-board-editor-item")) return;
+      let sibling = btn.dataset.direction === "up" ? item.previousElementSibling : item.nextElementSibling;
+      while (sibling && !sibling.classList.contains("task-board-editor-item")) {
+        sibling = btn.dataset.direction === "up" ? sibling.previousElementSibling : sibling.nextElementSibling;
+      }
+      if (!sibling) return;
       if (btn.dataset.direction === "up") list.insertBefore(item, sibling);
       else list.insertBefore(sibling, item);
       return;
