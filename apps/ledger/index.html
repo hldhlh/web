@@ -1011,9 +1011,9 @@
     <!-- Main Dashboard summary card -->
     <section class="dashboard">
       <div class="time-selector">
-        <button class="time-btn active" data-time="all">全部</button>
+        <button class="time-btn" data-time="all">全部</button>
         <button class="time-btn" data-time="year">年</button>
-        <button class="time-btn" data-time="month">月</button>
+        <button class="time-btn active" data-time="month">月</button>
         <button class="time-btn" data-time="week">周</button>
         <button class="time-btn" data-time="day">日</button>
       </div>
@@ -1162,7 +1162,7 @@
 
     // App State
     let transactions = [];
-    let currentTimeFilter = 'all'; // 'all', 'week', 'month', 'year'
+    let currentTimeFilter = 'month'; // 'all', 'day', 'week', 'month', 'year'
     let selectedType = 'expense'; // 'expense', 'income'
     let selectedCategory = '';
     let editingTransactionId = null; // null for add mode, UUID for edit mode
