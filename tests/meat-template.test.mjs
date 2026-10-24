@@ -186,7 +186,7 @@ test('typed values and legacy unconfirmed drafts are reportable without next-ite
 test('weekly report combines remaining inventory and tomorrow orders with store heading', () => {
   const draft = M.empty('tangtian');
   assert.equal(M.workflows.tangtian.compound, true);
-  assert.equal(M.ordersFor('tangtian').length, 11);
+  assert.equal(M.ordersFor('tangtian').length, 12);
   assert.equal(M.report(draft, 'tangtian'), '');
   M.setValue(draft, 'stock', 0, '2');
   M.setValue(draft, 'stock', 3, '0');
@@ -196,7 +196,7 @@ test('weekly report combines remaining inventory and tomorrow orders with store 
   M.setValue(draft, 'orders', 6, '1');
   draft.units[6] = '袋';
   assert.match(M.report(draft, 'tangtian'), /缦云店\d+月\d+日报货：\n毛肚3包\n响铃卷2袋\n番茄料包1袋$/);
-  assert.equal(M.setValue(draft, 'orders', 11, '1'), false);
+  assert.equal(M.setValue(draft, 'orders', 12, '1'), false);
   assert.deepEqual(M.restore(JSON.parse(JSON.stringify(draft)), 'tangtian'), draft);
 });
 
@@ -241,4 +241,20 @@ test('weekly dated heading uses Shanghai date and does not change meat reports',
   const weekly = M.empty('tangtian');
   M.setValue(weekly, 'orders', 0, '2');
   assert.equal(M.report(weekly, 'tangtian', new Date('2026-10-24T04:00:00Z')), '缦云店10月24日报货：\n毛肚2包');
+});
+
+
+test('weekly fried tofu skin supports boxes and extends existing drafts', () => {
+  const draft = M.restore({ itemOrderVersion: 2, stock: Array(11).fill('2'), orders: Array(11).fill('') }, 'tangtian');
+  assert.equal(draft.stock.length, 12);
+  assert.equal(draft.stock[10], '2');
+  assert.equal(draft.stock[11], '');
+  assert.equal(M.itemsFor('tangtian')[11], '炸豆皮');
+  M.setValue(draft, 'stock', 11, '1');
+  M.setValue(draft, 'orders', 11, '3');
+  draft.stockUnits[11] = '箱';
+  draft.units[11] = '箱';
+  assert.match(M.report(draft, 'tangtian'), /炸豆皮剩1箱/);
+  assert.match(M.report(draft, 'tangtian'), /炸豆皮3箱$/);
+  assert.deepEqual(M.restore(JSON.parse(JSON.stringify(draft)), 'tangtian'), draft);
 });

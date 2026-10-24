@@ -2,11 +2,11 @@
   "use strict";
   const items = ["吊龙", "板腱", "花趾", "碎肉", "胸口油", "极品雪花"];
   const orderItems = [...items, "牛大肚", "牛小肠", "牛肋条"];
-  const tangtianItems = ["毛肚", "千层肚", "牛肉丸", "虾滑150g", "响铃卷", "笋尖", "番茄料包", "酸菜金汤料包", "千丝蟹柳", "福袋", "安格斯肥牛"];
-  const tangtianUnits = ["包", "包", "", "袋", "袋", "", "", "", "", "", ""];
+  const tangtianItems = ["毛肚", "千层肚", "牛肉丸", "虾滑150g", "响铃卷", "笋尖", "番茄料包", "酸菜金汤料包", "千丝蟹柳", "福袋", "安格斯肥牛", "炸豆皮"];
+  const tangtianUnits = ["包", "包", "", "袋", "袋", "", "", "", "", "", "", ""];
   const itemsFor = kind => kind === "tangtian" ? tangtianItems : kind === "arrival" ? orderItems : kind === "morning" ? items.slice(0, -1) : items;
   const ordersFor = kind => kind === "tangtian" ? tangtianItems : orderItems;
-  const units = ["", "kg", "斤", "条", "件", "份", "包", "袋"];
+  const units = ["", "kg", "斤", "条", "件", "份", "包", "袋", "箱"];
   const workflows = {
     count: { title: "盘肉报货", storageKey: "academy-meat-count-v1", primary: "剩余库存", step: "库存", done: "已盘", pending: "待盘", zero: "无库存 · 0", verb: "盘点", preview: "报货预览", copy: "复制报货文本", compound: true },
     arrival: { title: "到货", storageKey: "academy-meat-arrival-v1", primary: "实收重量", step: "到货", done: "已核对", pending: "待核对", zero: "未到货 · 0", verb: "核对", preview: "到货预览", copy: "复制到货文本", compound: false },
