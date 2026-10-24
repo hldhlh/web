@@ -42,7 +42,7 @@ test('draft restore preserves valid values and rejects malformed numbers, units 
 });
 
 test('arrival and morning start blank and have independent storage keys', () => {
-  assert.equal(new Set(Object.values(M.workflows).map(w => w.storageKey)).size, 3);
+  assert.equal(new Set(Object.values(M.workflows).map(w => w.storageKey)).size, 4);
   for (const kind of ['arrival', 'morning']) {
     const draft = M.initial(kind);
     assert.deepEqual(draft.stock, Array(kind === 'arrival' ? 9 : 6).fill(''));
@@ -181,4 +181,64 @@ test('typed values and legacy unconfirmed drafts are reportable without next-ite
     M.setValue(restored, 'stock', 0, '');
     assert.equal(M.report(restored, kind), '');
   }
+});
+
+test('weekly report combines remaining inventory and tomorrow orders with store heading', () => {
+  const draft = M.empty('tangtian');
+  assert.equal(M.workflows.tangtian.compound, true);
+  assert.equal(M.ordersFor('tangtian').length, 11);
+  assert.equal(M.report(draft, 'tangtian'), '');
+  M.setValue(draft, 'stock', 0, '2');
+  M.setValue(draft, 'stock', 3, '0');
+  assert.equal(M.report(draft, 'tangtian', new Date('2026-10-24T04:00:00Z')), '剩余库存\n毛肚剩2包\n虾滑150g剩0袋\n\n缦云店10月24日报货：\n不需要货');
+  M.setValue(draft, 'orders', 0, '3');
+  M.setValue(draft, 'orders', 4, '2');
+  M.setValue(draft, 'orders', 6, '1');
+  draft.units[6] = '袋';
+  assert.match(M.report(draft, 'tangtian'), /缦云店\d+月\d+日报货：\n毛肚3包\n响铃卷2袋\n番茄料包1袋$/);
+  assert.equal(M.setValue(draft, 'orders', 11, '1'), false);
+  assert.deepEqual(M.restore(JSON.parse(JSON.stringify(draft)), 'tangtian'), draft);
+});
+
+
+test('weekly soup packets stay together without shifting saved item quantities', () => {
+  const raw = {
+    stock: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'],
+    orders: ['11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21'],
+    units: ['', '', '', '', '', '', '袋', '包', '件', '份', 'kg']
+  };
+  const draft = M.restore(raw, 'tangtian');
+  assert.deepEqual(M.itemsFor('tangtian').slice(6, 10), ['番茄料包', '酸菜金汤料包', '千丝蟹柳', '福袋']);
+  assert.deepEqual(draft.stock.slice(6, 10), ['7', '10', '8', '9']);
+  assert.deepEqual(draft.orders.slice(6, 10), ['17', '20', '18', '19']);
+  assert.deepEqual(draft.units.slice(6, 10), ['袋', '份', '包', '件']);
+  assert.match(M.report(draft, 'tangtian'), /番茄料包剩7\n酸菜金汤料包剩10/);
+  assert.deepEqual(M.restore(JSON.parse(JSON.stringify(draft)), 'tangtian'), draft);
+  assert.equal(M.restore({ stock: Array(9).fill('2') }, 'tangtian').stock[7], '');
+});
+
+test('weekly stock units are selectable independently of order units and persist', () => {
+  const draft = M.empty('tangtian');
+  M.setValue(draft, 'stock', 0, '2');
+  M.setValue(draft, 'orders', 0, '3');
+  draft.stockUnits[0] = '斤';
+  draft.units[0] = '袋';
+  assert.match(M.report(draft, 'tangtian'), /毛肚剩2斤/);
+  assert.match(M.report(draft, 'tangtian'), /毛肚3袋$/);
+  assert.deepEqual(M.restore(JSON.parse(JSON.stringify(draft)), 'tangtian'), draft);
+  draft.stockUnits[0] = '';
+  assert.match(M.report(draft, 'tangtian'), /毛肚剩2\n/);
+  const legacy = M.restore({ stock: ['2'], stockUnits: ['invalid'] }, 'tangtian');
+  assert.equal(legacy.stockUnits[0], '包');
+  assert.match(M.report(legacy, 'tangtian'), /毛肚剩2包/);
+});
+
+
+test('weekly dated heading uses Shanghai date and does not change meat reports', () => {
+  assert.equal(M.weeklyOrderTitle(new Date('2026-10-24T16:30:00Z')), '缦云店10月25日报货：');
+  const draft = M.initial();
+  assert.match(M.report(draft, 'count'), /明日订货：/);
+  const weekly = M.empty('tangtian');
+  M.setValue(weekly, 'orders', 0, '2');
+  assert.equal(M.report(weekly, 'tangtian', new Date('2026-10-24T04:00:00Z')), '缦云店10月24日报货：\n毛肚2包');
 });

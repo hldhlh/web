@@ -30,7 +30,7 @@
     $("orders-section").hidden = !workflow.compound;
     $("preview-title").textContent = workflow.preview;
     $("reset-title").textContent = `开始新一轮${workflow.verb}？`;
-    reset.querySelector("p").textContent = workflow.compound ? "当前盘肉库存和订货会清空，其他报货类型保留。" : `当前${workflow.title}数据会清空，其他报货类型保留。`;
+    reset.querySelector("p").textContent = workflow.compound ? `当前${workflow.title}库存和订货会清空，其他报货类型保留。` : `当前${workflow.title}数据会清空，其他报货类型保留。`;
   }
   configureWorkflow();
   function switchWorkflow(next) {
@@ -53,12 +53,14 @@
     message("");
   }
   document.querySelectorAll("[data-kind]").forEach(button => button.addEventListener("click", () => switchWorkflow(button.dataset.kind)));
-  const namesFor = rowMode => rowMode === "orders" ? M.orderItems : M.itemsFor(kind);
-  function makeRows(container, rowMode) { return M.orderItems.map((name, i) => {
+  const namesFor = rowMode => rowMode === "orders" ? M.ordersFor(kind) : M.itemsFor(kind);
+  function makeRows(container, rowMode) {
+    const capacity = Math.max(...Object.keys(M.workflows).map(key => (rowMode === "orders" ? M.ordersFor(key) : M.itemsFor(key)).length));
+    return Array.from({ length: capacity }, (_, i) => {
     const card = document.createElement("button");
     card.type = "button";
     card.className = "item-row";
-    card.innerHTML = `<span class="item-name">${name}</span><span class="item-value"></span><span class="item-state" aria-hidden="true"></span><span class="row-chevron" aria-hidden="true">›</span>`;
+    card.innerHTML = `<span class="item-name">${namesFor(rowMode)[i] || ""}</span><span class="item-value"></span><span class="item-state" aria-hidden="true"></span><span class="row-chevron" aria-hidden="true">›</span>`;
     card.addEventListener("click", () => { selectItem(i, rowMode); openEditor(); });
     container.append(card);
     return card;
@@ -85,7 +87,9 @@
     const total = M.itemsFor(kind).length;
     const count = total - M.missing(draft, kind).length;
     $("list-title").textContent = workflow.primary;
-    $("editor-context").textContent = mode === "stock" ? workflow.primary : "明日订货";
+    const orderTitle = kind === "tangtian" ? M.weeklyOrderTitle() : "明日订货";
+    $("orders-title").textContent = orderTitle;
+    $("editor-context").textContent = mode === "stock" ? workflow.primary : orderTitle;
     $("progress-label").textContent = `${workflow.done} ${count} / ${total}`;
     $("overview-action").textContent = count === total ? "预览并复制" : `${count ? "继续" : "开始"}${workflow.verb}`;
     $("preview-button").textContent = "预览";
@@ -94,7 +98,8 @@
       if (card.hidden) return;
       const value = draft[rowMode][i];
       const done = rowMode === "stock" ? M.valid(draft.stock[i]) : Number(value) > 0;
-      const unit = rowMode === "stock" && kind !== "morning" ? "kg" : draft.units[i];
+      const unit = rowMode === "stock" && kind === "tangtian" ? draft.stockUnits[i] : rowMode === "stock" && kind !== "morning" ? "kg" : draft.units[i];
+      card.querySelector(".item-name").textContent = namesFor(rowMode)[i];
       const valueNode = card.querySelector(".item-value");
       valueNode.textContent = value === "" ? (rowMode === "stock" ? "待填写" : "不订") : value;
       if (value !== "" && unit) { const small = document.createElement("small"); small.textContent = unit; valueNode.append(small); }
@@ -111,19 +116,20 @@
     $("entry-label").textContent = namesFor(mode)[index];
     $("entry-hint").textContent = `${mode === "stock" ? workflow.step : "订货"} · ${index + 1} / ${namesFor(mode).length}`;
     quantity.value = buffer;
-    $("stock-unit").hidden = mode !== "stock" || kind === "morning";
-    $("order-unit").hidden = mode !== "orders" && kind !== "morning";
-    $("order-unit").setAttribute("aria-label", kind === "morning" ? "明早订货单位" : "订货单位");
-    $("order-unit").value = draft.units[index];
+    $("stock-unit").textContent = "kg";
+    $("stock-unit").hidden = mode !== "stock" || kind === "morning" || kind === "tangtian";
+    $("order-unit").hidden = mode !== "orders" && kind !== "morning" && kind !== "tangtian";
+    $("order-unit").setAttribute("aria-label", kind === "tangtian" && mode === "stock" ? "库存单位" : kind === "morning" ? "明早订货单位" : "订货单位");
+    $("order-unit").value = kind === "tangtian" && mode === "stock" ? draft.stockUnits[index] : draft.units[index];
     $("previous-item").disabled = index === 0;
     $("zero-value").textContent = mode === "stock" ? workflow.zero : "不订此项";
-    $("next-item").textContent = mode === "stock" ? (index === M.itemsFor(kind).length - 1 ? (workflow.compound ? "去填写订货" : "预览报货") : "下一项 ›") : (index === M.orderItems.length - 1 ? "完成 · 预览报货" : "下一项 ›");
+    $("next-item").textContent = mode === "stock" ? (index === M.itemsFor(kind).length - 1 ? (workflow.compound ? "去填写订货" : "预览报货") : "下一项 ›") : (index === M.ordersFor(kind).length - 1 ? "完成 · 预览报货" : "下一项 ›");
     if (storageError) $("draft-status").textContent = "本机保存不可用，请在离开前复制报货文本。";
     else if (draft.updatedAt) {
       const time = new Date(draft.updatedAt);
       const stamp = new Intl.DateTimeFormat("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).format(time);
       $("draft-status").textContent = time.toDateString() === new Date().toDateString() ? "已存本机" : `上次草稿 · ${stamp}`;
-    } else $("draft-status").textContent = workflow.compound ? "已带入模版数值，可直接修改。" : (kind === "arrival" ? "填写实收重量，未到货填 0。" : "填写明早需订数量，不订填 0。");
+    } else $("draft-status").textContent = kind === "count" ? "已带入模版数值，可直接修改。" : (kind === "tangtian" ? "填写剩余数量，无库存填 0。" : kind === "arrival" ? "填写实收重量，未到货填 0。" : "填写明早需订数量，不订填 0。");
   }
   function openEditor() {
     if (!editor.open) editor.showModal();
@@ -157,11 +163,11 @@
   }
   function nextItem() {
     if (mode === "stock") {
-      if (!M.confirmStock(draft, index)) { message(`请先输入${kind === "morning" ? "数量" : "重量"}，或点“${workflow.zero}”。`, true); return; }
+      if (!M.confirmStock(draft, index)) { message(`请先输入${kind === "morning" || kind === "tangtian" ? "数量" : "重量"}，或点“${workflow.zero}”。`, true); return; }
       save();
       if (index === M.itemsFor(kind).length - 1) { if (workflow.compound) selectItem(0, "orders"); else { render(); openPreview(); } }
       else selectItem(index + 1);
-    } else if (index === M.orderItems.length - 1) openPreview();
+    } else if (index === M.ordersFor(kind).length - 1) openPreview();
     else selectItem(index + 1);
   }
   function openPreview() {
@@ -214,7 +220,10 @@
   $("previous-item").addEventListener("click", () => { if (index > 0) selectItem(index - 1); });
   $("next-item").addEventListener("click", nextItem);
   $("zero-value").addEventListener("click", () => { updateBuffer("0"); nextItem(); });
-  $("order-unit").addEventListener("change", event => { draft.units[index] = event.target.value; save(); render(); });
+  $("order-unit").addEventListener("change", event => {
+    const targetUnits = kind === "tangtian" && mode === "stock" ? draft.stockUnits : draft.units;
+    targetUnits[index] = event.target.value; save(); render();
+  });
   $("preview-button").addEventListener("click", openPreview);
   $("overview-action").addEventListener("click", () => {
     const missing = M.missing(draft, kind);
