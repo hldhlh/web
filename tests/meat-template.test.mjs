@@ -6,7 +6,7 @@ const M = require('../apps/academy/pages/meat-template/model.js');
 
 test('visible template values are reportable and blank counts are not zero', () => {
   const draft = M.initial();
-  assert.equal(M.missing(draft).length, 0);
+  assert.equal(M.missing(draft).length, 1);
   assert.match(M.report(draft), /吊龙：2kg/);
   assert.equal(M.confirmStock(M.empty(), 0), false);
   M.setValue(draft, 'stock', 0, '0');
@@ -17,7 +17,7 @@ test('edited stock immediately updates both stock and trailing summary', () => {
   const draft = M.initial();
   draft.stock.forEach((_, i) => M.confirmStock(draft, i));
   M.setValue(draft, 'stock', 0, '3.275');
-  assert.deepEqual(M.missing(draft), []);
+  assert.deepEqual(M.missing(draft), [6]);
   M.confirmStock(draft, 0);
   assert.match(M.report(draft), /吊龙：3.275kg/);
   assert.match(M.report(draft), /缦云吊龙剩余3.275kg$/);
@@ -28,15 +28,15 @@ test('report includes only positive orders with the user-selected unit', () => {
   M.setValue(draft, 'orders', 1, '2');
   draft.units[1] = '条';
   M.setValue(draft, 'orders', 2, '0');
-  assert.equal(M.report(draft), '缦云店报货:\n剩余库存\n吊龙：0kg\n板腱：0kg\n花趾：0kg\n碎肉：0kg\n胸口油：0kg\n极品雪花：0kg\n\n明日订货：\n板腱2条\n缦云吊龙剩余0kg');
+  assert.equal(M.report(draft), '缦云店报货:\n剩余库存\n吊龙：0kg\n板腱：0kg\n花趾：0kg\n碎肉：0kg\n胸口油：0kg\n极品雪花：0kg\n牛大肚：0kg\n\n明日订货：\n板腱2条\n缦云吊龙剩余0kg');
 });
 test('draft restore preserves valid values and rejects malformed numbers, units and confirmations', () => {
   const draft = M.initial();
   draft.stock.forEach((_, i) => M.confirmStock(draft, i));
   assert.deepEqual(M.restore(JSON.parse(JSON.stringify(draft))), draft);
   const restored = M.restore({ stock: ['-1', 'Infinity', '2.1234', '<b>', '2.500', '0'], checked: [true, true, true, true, true, 'yes'], orders: ['2'], units: ['<script>'] });
-  assert.deepEqual(restored.stock, ['', '', '', '', '2.5', '0']);
-  assert.deepEqual(restored.checked, [false, false, false, false, true, true]);
+  assert.deepEqual(restored.stock, ['', '', '', '', '2.5', '0', '']);
+  assert.deepEqual(restored.checked, [false, false, false, false, true, true, false]);
   assert.equal(restored.units[0], '');
   for (const input of ['-1', '1e3', '2.1234', '100000', 'NaN']) assert.equal(M.setValue(draft, 'stock', 0, input), false);
 });
@@ -72,7 +72,7 @@ test('arrival covers all order items and expands legacy drafts without losing re
   assert.deepEqual(M.missing(draft, 'arrival'), []);
   assert.match(M.report(draft, 'arrival'), /牛大肚：2.5kg\n牛小肠：0kg\n牛肋条：3.75kg$/);
   assert.deepEqual(M.restore(JSON.parse(JSON.stringify(draft)), 'arrival'), draft);
-  assert.equal(M.setValue(M.empty(), 'stock', 6, '1'), false);
+  assert.equal(M.setValue(M.empty(), 'stock', 7, '1'), false);
 });
 
 test('morning report uses selected units and skips zero and unfinished items', () => {
@@ -149,9 +149,9 @@ test('tomorrow orders include tripe and intestines without expanding stock items
   assert.equal(M.setValue(draft, 'orders', 7, '1.5'), true);
   draft.units[6] = '份';
   draft.units[7] = 'kg';
-  assert.equal(M.setValue(draft, 'stock', 6, '3'), false);
+  assert.equal(M.setValue(draft, 'stock', 7, '3'), false);
   assert.match(M.report(draft), /明日订货：\n牛大肚3份\n牛小肠1.5kg\n缦云吊龙剩余2kg$/);
-  assert.equal(draft.stock.length, 6);
+  assert.equal(draft.stock.length, 7);
   assert.deepEqual(M.restore(JSON.parse(JSON.stringify(draft))), draft);
   const old = M.restore({ orders: ['1', '2', '', '', '', ''], units: ['条', '', '', '', '', ''] });
   assert.deepEqual(old.orders, ['1', '2', '', '', '', '', '', '', '']);
@@ -257,4 +257,17 @@ test('weekly fried tofu skin supports boxes and extends existing drafts', () => 
   assert.match(M.report(draft, 'tangtian'), /炸豆皮剩1箱/);
   assert.match(M.report(draft, 'tangtian'), /炸豆皮3箱$/);
   assert.deepEqual(M.restore(JSON.parse(JSON.stringify(draft)), 'tangtian'), draft);
+});
+
+
+test('daily remaining stock includes tripe and safely expands legacy drafts', () => {
+  const draft = M.restore({ stock: ['1', '2', '3', '4', '5', '6'], orders: ['', '', '', '', '', '', '3'] });
+  assert.equal(M.itemsFor('count')[6], '牛大肚');
+  assert.deepEqual(draft.stock, ['1', '2', '3', '4', '5', '6', '']);
+  assert.deepEqual(M.missing(draft), [6]);
+  assert.equal(M.setValue(draft, 'stock', 6, '2.5'), true);
+  assert.match(M.report(draft), /牛大肚：2.5kg/);
+  assert.equal(draft.orders[6], '3');
+  assert.deepEqual(M.missing(draft), []);
+  assert.deepEqual(M.restore(JSON.parse(JSON.stringify(draft))), draft);
 });

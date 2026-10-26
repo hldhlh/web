@@ -1,10 +1,11 @@
 (function (root) {
   "use strict";
   const items = ["吊龙", "板腱", "花趾", "碎肉", "胸口油", "极品雪花"];
+  const countItems = [...items, "牛大肚"];
   const orderItems = [...items, "牛大肚", "牛小肠", "牛肋条"];
   const tangtianItems = ["毛肚", "千层肚", "牛肉丸", "虾滑150g", "响铃卷", "笋尖", "番茄料包", "酸菜金汤料包", "千丝蟹柳", "福袋", "安格斯肥牛", "炸豆皮"];
   const tangtianUnits = ["包", "包", "", "袋", "袋", "", "", "", "", "", "", ""];
-  const itemsFor = kind => kind === "tangtian" ? tangtianItems : kind === "arrival" ? orderItems : kind === "morning" ? items.slice(0, -1) : items;
+  const itemsFor = kind => kind === "tangtian" ? tangtianItems : kind === "arrival" ? orderItems : kind === "morning" ? items.slice(0, -1) : countItems;
   const ordersFor = kind => kind === "tangtian" ? tangtianItems : orderItems;
   const units = ["", "kg", "斤", "条", "件", "份", "包", "袋", "箱"];
   const workflows = {
@@ -15,11 +16,11 @@
   };
   const valid = value => typeof value === "string" && /^\d{1,5}(?:\.\d{1,3})?$/.test(value);
   const normalize = value => valid(value) ? String(Number(value)) : "";
-  const empty = (kind = "count") => ({ ...(kind === "tangtian" ? { itemOrderVersion: 2, stockUnits: [...tangtianUnits] } : {}), stock: (kind === "tangtian" ? tangtianItems : kind === "arrival" ? orderItems : items).map(() => ""), checked: (kind === "tangtian" ? tangtianItems : kind === "arrival" ? orderItems : items).map(() => false), orders: ordersFor(kind).map(() => ""), units: (kind === "morning" ? items : ordersFor(kind)).map((_, i) => kind === "tangtian" ? tangtianUnits[i] : kind === "morning" ? "kg" : ""), updatedAt: "" });
+  const empty = (kind = "count") => ({ ...(kind === "tangtian" ? { itemOrderVersion: 2, stockUnits: [...tangtianUnits] } : {}), stock: (kind === "tangtian" ? tangtianItems : kind === "arrival" ? orderItems : kind === "count" ? countItems : items).map(() => ""), checked: (kind === "tangtian" ? tangtianItems : kind === "arrival" ? orderItems : kind === "count" ? countItems : items).map(() => false), orders: ordersFor(kind).map(() => ""), units: (kind === "morning" ? items : ordersFor(kind)).map((_, i) => kind === "tangtian" ? tangtianUnits[i] : kind === "morning" ? "kg" : ""), updatedAt: "" });
   function initial(kind = "count") {
     const draft = empty(kind);
     if (kind !== "count") return draft;
-    draft.stock = ["2", "2.5", "0", "2.6", "1.5", "0"];
+    draft.stock = ["2", "2.5", "0", "2.6", "1.5", "0", ""];
     draft.checked = draft.stock.map(valid);
     draft.orders[1] = "2";
     return draft;
@@ -84,7 +85,7 @@
     }
     // The order template requires a real, confirmed tenderloin remainder.
     if (!confirmed(0)) return "";
-    const stock = items.flatMap((name, i) => confirmed(i) ? [`${name}：${normalize(draft.stock[i])}kg`] : []);
+    const stock = countItems.flatMap((name, i) => confirmed(i) ? [`${name}：${normalize(draft.stock[i])}kg`] : []);
     const orders = orderItems.flatMap((name, i) => valid(draft.orders[i]) && Number(draft.orders[i]) > 0 ? [`${name}${normalize(draft.orders[i])}${draft.units[i]}`] : []);
     const sections = [];
     if (stock.length) sections.push(`剩余库存\n${stock.join("\n")}`);

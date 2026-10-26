@@ -25,7 +25,7 @@
       <button type="button" data-kind="tangtian" aria-pressed="false">周订报货</button>
     </div>
     <section class="report-section" aria-labelledby="list-title">
-      <div class="progress-heading"><h2 id="list-title">剩余库存</h2><span id="progress-label">已盘 0 / 6</span></div>
+      <div class="progress-heading"><h2 id="list-title">剩余库存</h2><span id="progress-label">已盘 0 / 7</span></div>
       <div class="item-list" id="item-grid" role="group" aria-labelledby="list-title"></div>
     </section>
     <section class="report-section" id="orders-section" aria-labelledby="orders-title">
@@ -45,7 +45,7 @@
     <header class="sheet-header"><span id="editor-context">剩余库存</span><button class="text-button" id="close-entry" type="button">收起</button></header>
     <div class="editor-body">
       <div class="entry-heading">
-        <div><label id="entry-label" for="quantity">吊龙</label><span id="entry-hint">库存 · 1 / 6</span></div>
+        <div><label id="entry-label" for="quantity">吊龙</label><span id="entry-hint">库存 · 1 / 7</span></div>
         <div class="quantity-wrap">
           <input id="quantity" type="text" inputmode="none" readonly placeholder="待输入" autocomplete="off" aria-describedby="entry-hint entry-status">
           <span id="stock-unit">kg</span>
@@ -82,7 +82,7 @@
     <div class="sheet-footer"><button class="primary" id="copy-button" type="button">复制报货文本</button><p id="copy-status" role="status" aria-live="polite">复制后可直接粘贴发送。</p></div>
   </dialog>
   <dialog id="reset-dialog" class="reset-dialog" aria-labelledby="reset-title">
-    <h2 id="reset-title">开始新一轮盘点？</h2><p>当前库存和订货会清空，六个部位重新盘点。</p>
+    <h2 id="reset-title">开始新一轮盘点？</h2><p>当前库存和订货会清空，所有库存项目重新盘点。</p>
     <div class="reset-actions"><button class="secondary" id="cancel-reset" type="button" autofocus>取消</button><button class="primary" id="confirm-reset" type="button">开始新一轮</button></div>
   </dialog>
   <noscript>请启用 JavaScript 以录入库存并生成报货文本。</noscript>
