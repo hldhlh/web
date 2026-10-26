@@ -84,7 +84,7 @@
       return kind === "arrival" ? `缦云店到货:\n${lines.join("\n")}` : `缦云店明早报货:\n${lines.join("\n")}`;
     }
     // The order template requires a real, confirmed tenderloin remainder.
-    if (!confirmed(0)) return "";
+    if (!confirmed(0) || !confirmed(6)) return "";
     const stock = countItems.flatMap((name, i) => confirmed(i) ? [`${name}：${normalize(draft.stock[i])}kg`] : []);
     const orders = orderItems.flatMap((name, i) => valid(draft.orders[i]) && Number(draft.orders[i]) > 0 ? [`${name}${normalize(draft.orders[i])}${draft.units[i]}`] : []);
     const sections = [];

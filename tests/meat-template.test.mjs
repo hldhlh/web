@@ -6,7 +6,8 @@ const M = require('../apps/academy/pages/meat-template/model.js');
 
 test('visible template values are reportable and blank counts are not zero', () => {
   const draft = M.initial();
-  assert.equal(M.missing(draft).length, 1);
+  M.setValue(draft, 'stock', 6, '0');
+  assert.equal(M.missing(draft).length, 0);
   assert.match(M.report(draft), /吊龙：2kg/);
   assert.equal(M.confirmStock(M.empty(), 0), false);
   M.setValue(draft, 'stock', 0, '0');
@@ -15,15 +16,17 @@ test('visible template values are reportable and blank counts are not zero', () 
 });
 test('edited stock immediately updates both stock and trailing summary', () => {
   const draft = M.initial();
+  M.setValue(draft, 'stock', 6, '0');
   draft.stock.forEach((_, i) => M.confirmStock(draft, i));
   M.setValue(draft, 'stock', 0, '3.275');
-  assert.deepEqual(M.missing(draft), [6]);
+  assert.deepEqual(M.missing(draft), []);
   M.confirmStock(draft, 0);
   assert.match(M.report(draft), /吊龙：3.275kg/);
   assert.match(M.report(draft), /缦云吊龙剩余3.275kg$/);
 });
 test('report includes only positive orders with the user-selected unit', () => {
   const draft = M.empty();
+  M.setValue(draft, 'stock', 6, '0');
   draft.stock.forEach((_, i) => { M.setValue(draft, 'stock', i, '0'); M.confirmStock(draft, i); });
   M.setValue(draft, 'orders', 1, '2');
   draft.units[1] = '条';
@@ -32,6 +35,7 @@ test('report includes only positive orders with the user-selected unit', () => {
 });
 test('draft restore preserves valid values and rejects malformed numbers, units and confirmations', () => {
   const draft = M.initial();
+  M.setValue(draft, 'stock', 6, '0');
   draft.stock.forEach((_, i) => M.confirmStock(draft, i));
   assert.deepEqual(M.restore(JSON.parse(JSON.stringify(draft))), draft);
   const restored = M.restore({ stock: ['-1', 'Infinity', '2.1234', '<b>', '2.500', '0'], checked: [true, true, true, true, true, 'yes'], orders: ['2'], units: ['<script>'] });
@@ -95,7 +99,9 @@ test('morning excludes premium snow beef from legacy drafts and completion count
   assert.deepEqual(M.missing(restored, 'morning'), []);
   assert.doesNotMatch(M.report(restored, 'morning'), /极品雪花/);
   assert.match(M.report(restored, 'arrival'), /极品雪花：9kg/);
-  assert.match(M.report(restored, 'count'), /极品雪花：9kg/);
+  const daily = M.restore(restored);
+  M.setValue(daily, 'stock', 6, '0');
+  assert.match(M.report(daily, 'count'), /极品雪花：9kg/);
   restored.stock[5] = '';
   assert.deepEqual(M.missing(restored, 'morning'), []);
 });
@@ -103,6 +109,7 @@ test('morning excludes premium snow beef from legacy drafts and completion count
 test('partial reports omit unconfirmed rows while count retains the order template', () => {
   for (const kind of ['count', 'arrival', 'morning']) {
     const draft = M.empty(kind);
+    if (kind === 'count') M.setValue(draft, 'stock', 6, '0');
     assert.equal(M.report(draft, kind), '');
     M.setValue(draft, 'stock', 1, '2.5');
     if (kind !== 'count') assert.match(M.report(draft, kind), /板腱：2.5/);
@@ -116,11 +123,12 @@ test('partial reports omit unconfirmed rows while count retains the order templa
 
 test('tomorrow orders retain their heading and no-delivery text when blank or zero', () => {
   const draft = M.empty();
+  M.setValue(draft, 'stock', 6, '0');
   M.setValue(draft, 'stock', 1, '2.5');
   M.confirmStock(draft, 1);
   M.setValue(draft, 'stock', 0, '0');
   M.confirmStock(draft, 0);
-  const expected = '缦云店报货:\n剩余库存\n吊龙：0kg\n板腱：2.5kg\n\n明日订货：\n不需要货\n缦云吊龙剩余0kg';
+  const expected = '缦云店报货:\n剩余库存\n吊龙：0kg\n板腱：2.5kg\n牛大肚：0kg\n\n明日订货：\n不需要货\n缦云吊龙剩余0kg';
   assert.equal(M.report(draft), expected);
   M.setValue(draft, 'orders', 1, '0');
   assert.equal(M.report(draft), expected);
@@ -131,6 +139,7 @@ test('tomorrow orders retain their heading and no-delivery text when blank or ze
 
 test('tomorrow order reports always end in confirmed tenderloin remainder', () => {
   const draft = M.empty();
+  M.setValue(draft, 'stock', 6, '0');
   M.setValue(draft, 'orders', 1, '2');
   assert.equal(M.report(draft), '');
   M.setValue(draft, 'stock', 0, '3.25');
@@ -143,6 +152,7 @@ test('tomorrow order reports always end in confirmed tenderloin remainder', () =
 
 test('tomorrow orders include tripe and intestines without expanding stock items', () => {
   const draft = M.empty();
+  M.setValue(draft, 'stock', 6, '0');
   M.setValue(draft, 'stock', 0, '2');
   M.confirmStock(draft, 0);
   assert.equal(M.setValue(draft, 'orders', 6, '3'), true);
@@ -161,6 +171,7 @@ test('tomorrow orders include tripe and intestines without expanding stock items
 
 test('rib orders persist and appear before the required remainder line', () => {
   const draft = M.empty();
+  M.setValue(draft, 'stock', 6, '0');
   M.setValue(draft, 'stock', 0, '2');
   M.confirmStock(draft, 0);
   const index = M.orderItems.indexOf('牛肋条');
@@ -173,6 +184,7 @@ test('rib orders persist and appear before the required remainder line', () => {
 test('typed values and legacy unconfirmed drafts are reportable without next-item confirmation', () => {
   for (const kind of ['count', 'arrival', 'morning']) {
     const draft = M.empty(kind);
+    if (kind === 'count') M.setValue(draft, 'stock', 6, '0');
     M.setValue(draft, 'stock', 0, '2.75');
     assert.match(M.report(draft, kind), /吊龙：2.75/);
     draft.checked[0] = false;
@@ -237,6 +249,7 @@ test('weekly stock units are selectable independently of order units and persist
 test('weekly dated heading uses Shanghai date and does not change meat reports', () => {
   assert.equal(M.weeklyOrderTitle(new Date('2026-10-24T16:30:00Z')), '缦云店10月25日报货：');
   const draft = M.initial();
+  M.setValue(draft, 'stock', 6, '0');
   assert.match(M.report(draft, 'count'), /明日订货：/);
   const weekly = M.empty('tangtian');
   M.setValue(weekly, 'orders', 0, '2');
@@ -270,4 +283,17 @@ test('daily remaining stock includes tripe and safely expands legacy drafts', ()
   assert.equal(draft.orders[6], '3');
   assert.deepEqual(M.missing(draft), []);
   assert.deepEqual(M.restore(JSON.parse(JSON.stringify(draft))), draft);
+});
+
+
+test('daily report requires tripe stock, accepts zero, and blocks cleared or legacy missing stock', () => {
+  const draft = M.initial();
+  assert.equal(M.report(draft), '');
+  M.setValue(draft, 'stock', 6, '0');
+  assert.match(M.report(draft), /牛大肚：0kg/);
+  M.setValue(draft, 'stock', 6, '2.5');
+  assert.match(M.report(draft), /牛大肚：2.5kg/);
+  M.setValue(draft, 'stock', 6, '');
+  assert.equal(M.report(draft), '');
+  assert.equal(M.report(M.restore({ stock: ['2', '1', '1', '1', '1', '1'] })), '');
 });

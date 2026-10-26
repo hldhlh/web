@@ -27,6 +27,7 @@
   document.title = "报货模版 · Auto Office";
   function configureWorkflow() {
     document.querySelectorAll("[data-kind]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.kind === kind)));
+    $("daily-reminder").hidden = kind !== "count";
     $("orders-section").hidden = !workflow.compound;
     $("preview-title").textContent = workflow.preview;
     $("reset-title").textContent = `开始新一轮${workflow.verb}？`;
@@ -170,16 +171,19 @@
     } else if (index === M.ordersFor(kind).length - 1) openPreview();
     else selectItem(index + 1);
   }
+  const missingRequiredStock = () => kind === "count" ? [0, 6].find(i => !M.valid(draft.stock[i])) : undefined;
   function openPreview() {
     if (editor.open) editor.close();
     const text = M.report(draft, kind);
     $("template-text").textContent = text;
     $("template-text").hidden = !text;
-    const needsRemainder = kind === "count" && !M.valid(draft.stock[0]);
-    $("preview-hint").textContent = needsRemainder ? "明日订货末尾需附吊龙余量，请先填写。" : text ? "待填写项目已跳过。" : "暂无可预览内容，请先填写数量。";
-    $("copy-button").textContent = needsRemainder ? "填写吊龙余量" : workflow.copy;
-    $("copy-button").disabled = !text && !needsRemainder;
-    $("copy-status").textContent = needsRemainder ? "其他待填写项目仍会自动跳过。" : text ? "复制后可直接粘贴发送。" : "填写后即可复制。";
+    const requiredIndex = missingRequiredStock();
+    const needsRequired = requiredIndex !== undefined;
+    const requiredName = needsRequired ? M.itemsFor(kind)[requiredIndex] : "";
+    $("preview-hint").textContent = needsRequired ? `${requiredName}剩余库存为必填项，请先填写，无库存填 0。` : text ? "待填写项目已跳过。" : "暂无可预览内容，请先填写数量。";
+    $("copy-button").textContent = needsRequired ? `填写${requiredName}余量` : workflow.copy;
+    $("copy-button").disabled = !text && !needsRequired;
+    $("copy-status").textContent = needsRequired ? "必填库存补齐后即可复制。" : text ? "复制后可直接粘贴发送。" : "填写后即可复制。";
     $("manual-copy").hidden = true;
     preview.showModal();
   }
@@ -192,8 +196,9 @@
     try { return document.execCommand("copy"); } catch { return false; }
   }
   $("copy-button").addEventListener("click", async () => {
-    if (kind === "count" && !M.valid(draft.stock[0])) {
-      preview.close(); selectItem(0, "stock"); openEditor(); return;
+    const requiredIndex = missingRequiredStock();
+    if (requiredIndex !== undefined) {
+      preview.close(); selectItem(requiredIndex, "stock"); openEditor(); return;
     }
     const text = M.report(draft, kind);
     if (copyBusy || !text) return;
