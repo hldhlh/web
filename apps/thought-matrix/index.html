@@ -1048,7 +1048,7 @@
                 <path d="M20.5 13A8.5 8.5 0 0 1 11 3.5 8.5 8.5 0 1 0 20.5 13Z" />
             </svg>
         </button>
-        <button id="btnCenter" type="button" class="fab-button" title="定位到中心" aria-label="定位到中心">
+        <button id="btnCenter" type="button" class="fab-button" title="定位到最后编辑的节点" aria-label="定位到最后编辑的节点">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                 stroke-linejoin="round">
                 <circle cx="12" cy="12" r="5.5" />
@@ -1184,6 +1184,19 @@
         const CANVAS_CACHE_KEY = 'thought-matrix-snapshot-v1';
         const CANVAS_CACHE_TTL = 10 * 60 * 1000;
         let hasSubscribedOnce = false;
+
+        const LAST_EDITED_NODE_KEY = 'thought-matrix-last-edited-node-v1';
+        let lastEditedNodeId = null;
+        try {
+            lastEditedNodeId = localStorage.getItem(LAST_EDITED_NODE_KEY);
+        } catch (_) { }
+
+        function rememberEditedNode(node) {
+            lastEditedNodeId = node.id;
+            try {
+                localStorage.setItem(LAST_EDITED_NODE_KEY, node.id);
+            } catch (_) { }
+        }
 
         function readCanvasCache() {
             try {
@@ -1677,6 +1690,7 @@
             select(node) { node.classList.add('selected'); if (!State.interaction.selectedTags.includes(node)) State.interaction.selectedTags.push(node); },
             deselect() { State.interaction.selectedTags.forEach(t => t.classList.remove('selected')); State.interaction.selectedTags = []; },
             async updatePos(node) {
+                rememberEditedNode(node);
                 const id = node.id;
                 await SyncManager.wrap(_client.from('canvas_nodes').update({ x: parseFloat(node.dataset.x), y: parseFloat(node.dataset.y) }).eq('id', id));
             }
@@ -1853,12 +1867,23 @@
                     }
                 }
             },
+            focusLastEditedNode() {
+                const node = lastEditedNodeId && document.getElementById(lastEditedNodeId);
+                if (!node || !DOM.content.contains(node)) {
+                    this.centerContent();
+                    return;
+                }
+                const cx = parseFloat(node.dataset.x) + node.offsetWidth / 2;
+                const cy = parseFloat(node.dataset.y) + node.offsetHeight / 2;
+                this.animateTo(-cx * State.transform.scale, -cy * State.transform.scale);
+            },
             centerContent() {
                 const nodes = Array.from(DOM.content.querySelectorAll('.tag'));
                 if (nodes.length === 0) {
                     State.transform.x = 0;
                     State.transform.y = 0;
                     State.transform.scale = 1;
+                    updateMatrix();
                 } else {
                     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
                     nodes.forEach(node => {
@@ -2076,6 +2101,8 @@
                         const span = entity.querySelector('span');
                         const isNew = entity.dataset.isNew === 'true';
 
+                        if (val || !isNew) rememberEditedNode(entity);
+
                         if (val) {
                             if (span) span.textContent = val;
                             if (isNew) delete entity.dataset.isNew;
@@ -2166,6 +2193,7 @@
 
                 if (type === 'node') {
                     // Remove existing colors
+                    rememberEditedNode(entity);
                     ['orange', 'blue', 'purple', 'green', 'grey', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'].forEach(c => entity.classList.remove(`color-${c}`));
 
                     if (color !== 'none') {
@@ -2239,6 +2267,7 @@
             async toggleStyle(style) {
                 const node = State.interaction.selectedTags[0];
                 if (!node) return;
+                rememberEditedNode(node);
                 const span = node.querySelector('span');
                 if (style === 'bold') {
                     const isBold = span.style.fontWeight === 'bold';
@@ -2458,7 +2487,7 @@
             }
 
             document.getElementById('btnCenter').addEventListener('click', () => {
-                LineManager.centerContent();
+                LineManager.focusLastEditedNode();
             });
 
             // Toolbar events
