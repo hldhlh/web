@@ -1186,15 +1186,20 @@
         let hasSubscribedOnce = false;
 
         const LAST_EDITED_NODE_KEY = 'thought-matrix-last-edited-node-v1';
-        let lastEditedNodeId = null;
+        const EDITED_NODE_HISTORY_KEY = 'thought-matrix-edited-node-history-v1';
+        let editedNodeIds = [];
         try {
-            lastEditedNodeId = localStorage.getItem(LAST_EDITED_NODE_KEY);
+            const history = JSON.parse(localStorage.getItem(EDITED_NODE_HISTORY_KEY) || '[]');
+            if (Array.isArray(history)) editedNodeIds = history.filter(id => typeof id === 'string');
+            const previousId = localStorage.getItem(LAST_EDITED_NODE_KEY);
+            if (!editedNodeIds.length && previousId) editedNodeIds.push(previousId);
         } catch (_) { }
 
         function rememberEditedNode(node) {
-            lastEditedNodeId = node.id;
+            editedNodeIds = [node.id, ...editedNodeIds.filter(id => id !== node.id)];
             try {
                 localStorage.setItem(LAST_EDITED_NODE_KEY, node.id);
+                localStorage.setItem(EDITED_NODE_HISTORY_KEY, JSON.stringify(editedNodeIds));
             } catch (_) { }
         }
 
@@ -1545,6 +1550,7 @@
                 DOM.content.appendChild(node);
 
                 if (isNewDb) {
+                    rememberEditedNode(node);
                     await SyncManager.wrap(_client.from('canvas_nodes').insert({
                         id: node.id,
                         text: text,
@@ -1868,11 +1874,15 @@
                 }
             },
             focusLastEditedNode() {
-                const node = lastEditedNodeId && document.getElementById(lastEditedNodeId);
-                if (!node || !DOM.content.contains(node)) {
+                const nodes = Array.from(DOM.content.querySelectorAll('.tag'));
+                if (nodes.length === 0) {
                     this.centerContent();
                     return;
                 }
+                const nodesById = new Map(nodes.map(node => [node.id, node]));
+                // Deleted nodes must not send a non-empty canvas back to its center.
+                const node = editedNodeIds.map(id => nodesById.get(id)).find(Boolean)
+                    || nodes[nodes.length - 1];
                 const cx = parseFloat(node.dataset.x) + node.offsetWidth / 2;
                 const cy = parseFloat(node.dataset.y) + node.offsetHeight / 2;
                 this.animateTo(-cx * State.transform.scale, -cy * State.transform.scale);
