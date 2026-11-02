@@ -264,10 +264,20 @@
   const typography = window.DimensionTypography;
   typography.loaded.then(() => { if (state.image) render(); });
 
+  // Layout and hit testing use the footprint in original-image coordinates.
+  // Text itself is counter-rotated within that footprint for upright reading.
+  function measureLabel(label, maxWidth) {
+    const measured = typography.measure(context, label, renderUnit, maxWidth);
+    return { ...measured, textWidth: measured.width, textHeight: measured.height,
+      width: state.rotation % 180 ? measured.height : measured.width,
+      height: state.rotation % 180 ? measured.width : measured.height,
+      rotation: -state.rotation };
+  }
+
   function queueLabel(label, x, y, styleName = "light", above = false) {
-    const maxWidth = Math.max(24 * renderUnit, Math.min(240 * renderUnit, elements.canvas.width - 12 * renderUnit));
+    const maxWidth = Math.max(24 * renderUnit, Math.min(240 * renderUnit, (state.rotation % 180 ? elements.canvas.height : elements.canvas.width) - 12 * renderUnit));
     pendingLabels.push({ id: labelOwner, styleName, above, anchor: { x, y },
-      ...typography.measure(context, label, renderUnit, maxWidth) });
+      ...measureLabel(label, maxWidth) });
   }
 
   function paintLabels(forExport) {
@@ -405,7 +415,7 @@
 
     if (labelPosition === 'inline') {
       const label = isDraft ? '拖动标记' : item.label;
-      const measured = label ? typography.measure(context, label, renderUnit, elements.canvas.width) : null;
+      const measured = label ? measureLabel(label, state.rotation % 180 ? elements.canvas.height : elements.canvas.width) : null;
       const x = (item.start.x + item.end.x) / 2, y = (item.start.y + item.end.y) / 2;
       const fits = measured && measured.lines.length === 1 && length >= measured.width + 36 * renderUnit
         && x >= measured.width / 2 && x + measured.width / 2 <= elements.canvas.width

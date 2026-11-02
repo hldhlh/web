@@ -35,8 +35,12 @@
     const baseline = (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2;
     for (const box of boxes) {
       const style = styleFor(box.styleName);
-      if (!box.inline) nodes.push({ tag: 'rect', attrs: { x: box.x - box.width / 2, y: box.y - box.height / 2,
-        width: box.width, height: box.height, rx: tokens.radius * unit,
+      const width = box.textWidth ?? box.width, height = box.textHeight ?? box.height;
+      const rotation = box.rotation || 0;
+      const transform = rotation ? { transform: `rotate(${rotation} ${box.x} ${box.y})` } : {};
+      const firstNode = nodes.length;
+      if (!box.inline) nodes.push({ tag: 'rect', attrs: { x: box.x - width / 2, y: box.y - height / 2,
+        width, height, rx: tokens.radius * unit,
         fill: style.labelBackground, stroke: style.labelBorder, 'stroke-width': .75 * unit } });
       box.lines.forEach((text, i) => nodes.push({ tag: 'text', text, attrs: {
         x: box.x, y: box.y + (i - (box.lines.length - 1) / 2) * tokens.lineHeight * unit + baseline,
@@ -44,6 +48,11 @@
         'text-anchor': 'middle', fill: box.inline ? style.line : style.labelText,
         ...(box.inline ? { stroke: style.underLine, 'stroke-width': 3 * unit, 'stroke-linejoin': 'round', 'paint-order': 'stroke fill' } : {}),
       } }));
+      for (const node of nodes.slice(firstNode)) {
+        Object.assign(node.attrs, transform);
+        node.rotation = rotation;
+        node.center = { x: box.x, y: box.y };
+      }
     }
     return nodes;
   }
@@ -60,15 +69,22 @@
   }
   function paintCanvas(ctx, nodes, unit) {
     ctx.save(); ctx.font = font(unit); ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-    for (const { tag, attrs: a, text } of nodes) {
+    for (const { tag, attrs: a, text, rotation, center } of nodes) {
+      ctx.save();
+      if (rotation) {
+        ctx.translate(center.x, center.y);
+        ctx.rotate(rotation * Math.PI / 180);
+        ctx.translate(-center.x, -center.y);
+      }
       if (tag === 'text') {
         if (a.stroke) { ctx.strokeStyle = a.stroke; ctx.lineWidth = a['stroke-width']; ctx.lineJoin = 'round'; ctx.strokeText(text, a.x, a.y); }
-        ctx.fillStyle = a.fill; ctx.fillText(text, a.x, a.y); continue;
+        ctx.fillStyle = a.fill; ctx.fillText(text, a.x, a.y); ctx.restore(); continue;
       }
       ctx.beginPath(); ctx.strokeStyle = a.stroke; ctx.lineWidth = a['stroke-width'];
       if (tag === 'line') { ctx.moveTo(a.x1, a.y1); ctx.lineTo(a.x2, a.y2); }
       else { ctx.roundRect(a.x, a.y, a.width, a.height, a.rx); ctx.fillStyle = a.fill; ctx.fill(); }
       ctx.stroke();
+      ctx.restore();
     }
     ctx.restore();
   }
