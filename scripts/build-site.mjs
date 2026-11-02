@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const output = resolve(root, '_site');
+execFileSync(process.execPath, [resolve(root, 'scripts/package-store-model.mjs')]);
 const files = JSON.parse(readFileSync(resolve(root, 'deploy/public-files.json'), 'utf8'));
 if (!Array.isArray(files) || !files.length || new Set(files).size !== files.length) {
   throw new Error('Public file list must be a nonempty array without duplicates.');

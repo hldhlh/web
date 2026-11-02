@@ -1,3 +1,4 @@
+import { loadModel } from './download.js';
 import { repairAnisotropy } from './materials.js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -103,11 +104,30 @@ async function init(){
   for(let i=0;i<2;i++){const controller=renderer.xr.getController(i);controller.addEventListener('selectstart',()=>{vrIndex=(vrIndex+1)%3;placeVR();});rig.add(controller);}
   canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();renderer.setAnimationLoop(null);fail(new Error('WebGL context lost'));});
   const loader=new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-  const gltf=await loader.loadAsync('./assets/shop.glb?v=cookware-7',e=>{
-    $('progress').value=e.total?e.loaded/e.total*100:0;
-    $('load-message').textContent=e.total?`已下载 ${Math.round(e.loaded/e.total*100)}% · ${(e.total/1048576).toFixed(1)} MB`:`已下载 ${(e.loaded/1048576).toFixed(1)} MB`;
-    if(e.total&&e.loaded===e.total){$('load-title').textContent='正在布置空间';$('load-message').textContent='模型下载完成，正在准备材质。';}
+  const stage=(phase,title,detail)=>{
+    $('load-title').textContent=title;$('load-message').textContent=detail;
+    for(const item of document.querySelectorAll('[data-stage]')){
+      if(item.dataset.stage===phase)item.setAttribute('aria-current','step');else item.removeAttribute('aria-current');
+    }
+  };
+  const manifestResponse=await fetch('./assets/model.json',{cache:'no-cache'});
+  if(!manifestResponse.ok)throw new Error('Model manifest unavailable');
+  const manifest=await manifestResponse.json();
+  const data=await loadModel(manifest,event=>{
+    if(event.phase==='download'){
+      const percent=Math.min(100,Math.floor(event.loaded/event.total*100));
+      $('progress').value=percent;
+      stage('download',`正在下载模型 · ${percent}%`,'下载一次，之后优先使用本机缓存');
+      $('load-detail').textContent=`${(event.loaded/1000000).toFixed(1)} / ${(event.total/1000000).toFixed(1)} MB`+(event.speed>0?` · ${(event.speed/1000000).toFixed(1)} MB/s`:'');
+    }else if(event.phase==='fallback'){
+      stage('download','正在切换兼容下载','当前下载未完成，正在重试原始模型');
+    }else{
+      $('progress').value=100;stage('decode',event.phase==='cached'?'已读取本机模型':'下载完成，正在布置空间','正在解析几何与材质');
+      $('load-detail').textContent=event.phase==='cached'?'无需重复下载':'模型完整性已校验后自动进入';
+    }
   });
+  await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
+  const gltf=await loader.parseAsync(data,new URL('./assets/',location.href).href);
   // Thin glass uses alpha blending in the preview to avoid expensive refraction
   // passes on mobile and stereo WebXR render targets.
   gltf.scene.traverse(object=>{
@@ -121,6 +141,8 @@ async function init(){
   });
   scene.add(gltf.scene);renderer.shadowMap.needsUpdate=true;
   loaded=true;setView('overview');
+  stage('render','正在准备画面','正在生成材质与光照，即将进入门店');
+  await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
   await renderer.compileAsync(scene,camera);
   $('loading').hidden=true;document.querySelectorAll('[data-view],#home,#rotate,#vr').forEach(b=>b.disabled=false);
   message('模型已就绪 · 选择空间开始漫游');

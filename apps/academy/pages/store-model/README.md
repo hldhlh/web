@@ -35,7 +35,7 @@ npm run check
 npm test
 ```
 
-`scripts/store-materials/source-materials.json` 保存源节点快照；`audit-report.json` 记录颜色和粗糙度审核结果。13 类图片调色在线性空间计算，10 类程序材质按几何烘焙；两种非 Principled 水/玻璃材质保留原导出结果，未进行这类节点烘焙。旧的坐垫单项脚本已被统一烘焙流程替代。更新模型后同步递增 `app.js` 的模型缓存版本。
+`scripts/store-materials/source-materials.json` 保存源节点快照；`audit-report.json` 记录颜色和粗糙度审核结果。13 类图片调色在线性空间计算，10 类程序材质按几何烘焙；两种非 Principled 水/玻璃材质保留原导出结果，未进行这类节点烘焙。旧的坐垫单项脚本已被统一烘焙流程替代。构建时自动生成 SHA-256 版本清单与无损 gzip 文件，模型更新后自动刷新缓存。
 
 ## 验证和限制
 
@@ -50,3 +50,13 @@ npm test
 后厨地面：最后单独回填原始地砖与基层网格，保留 Float32 坐标，避免减面与低精度量化破坏亚毫米级砖缝。鸟瞰近裁剪面设为 0.5m，提升远景深度精度；店内仍为 0.05m。
 
 炒锅、汤锅、火锅与水盆：E08 炉具以及所有锅体、锅圈、锅盖、水体和提手在全局减面前分离，优化后回填原始浮点网格与法线，保留圆形薄壁和锅沿。保护脚本需要 Node 可解析 @gltf-transform/core、extensions、functions 4.x、meshoptimizer 和 sharp。
+
+## 云端分发与等待体验
+
+模型随现有 GitHub Pages 部署托管，独立页面无需 Auto Office 登录即可分享。支持 WebGL 2 的手机、桌面浏览器可进入 3D，VR 需要 HTTPS 与 WebXR 设备支持，不能保证所有旧终端或所有网络均可访问。
+
+构建自动执行 `scripts/package-store-model.mjs`，生成 `assets/model.json` 和 `shop.glb.gz`。浏览器优先下载无损 gzip（当前 23.9 MB → 16.3 MB）；解压不支持或失败时回退原始 GLB。45 秒无新数据则中止当前请求并回退/显示重试。下载完成校验 SHA-256 后写入 Cache API，按内容版本复用与淘汰；缓存拒绝、配额不足不会阻止打开。浏览器可能清理本机缓存，首次下载速度取决于用户网络。
+
+真实字节进度与速度显示仅覆盖下载阶段；解析、材质编译分别提示，支持减少动态效果。不伪造剩余时间。独立页固定视口高度避免 canvas 与 flex 互相撑高。
+
+参考：[Cache API](https://developer.mozilla.org/en-US/docs/Web/API/Cache)、[GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages)。
