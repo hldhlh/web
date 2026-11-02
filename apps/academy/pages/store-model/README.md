@@ -25,7 +25,9 @@ Auto Office 首页「快捷访问」→「门店模型预览」。路由：`#/ap
 /Applications/Blender.app/Contents/MacOS/Blender -b '/path/to/今岭缦云_发布模型.blend' --python scripts/audit-store-materials.py
 python3 scripts/bake-store-materials.py
 /Applications/Blender.app/Contents/MacOS/Blender -b '/path/to/今岭缦云_发布模型.blend' -t 4 --python scripts/bake-store-procedural.py
-gltf-transform optimize output/store-model/materials-complete.glb apps/academy/pages/store-model/assets/shop.glb --palette false --compress meshopt --simplify-error 0.01 --simplify-ratio 0.2 --texture-compress webp --texture-size 1024
+node scripts/protect-store-cookware.mjs prepare
+gltf-transform optimize output/store-model/without-cookware.glb output/store-model/without-cookware-optimized.glb --palette false --compress meshopt --simplify-error 0.01 --simplify-ratio 0.2 --texture-compress webp --texture-size 1024
+node scripts/protect-store-cookware.mjs restore
 /Applications/Blender.app/Contents/MacOS/Blender -b '/path/to/今岭缦云_发布模型.blend' --python scripts/export-store-floor.py
 python3 scripts/fix-store-floor.py
 npm run build
@@ -46,3 +48,5 @@ npm test
 坐垫颜色：导出后按 Blender「墨绿坐垫.002」中的去色、映射范围与乘色节点，在线性颜色空间烘焙墨绿皮革贴图。该处理只修改坐垫专用纹理，不调整全场景色调。
 
 后厨地面：最后单独回填原始地砖与基层网格，保留 Float32 坐标，避免减面与低精度量化破坏亚毫米级砖缝。鸟瞰近裁剪面设为 0.5m，提升远景深度精度；店内仍为 0.05m。
+
+炒锅与水盆：E08 炉具在全局减面前分离，优化后回填原始浮点网格与法线，保留圆形薄壁和锅沿。保护脚本需要 Node 可解析 @gltf-transform/core、extensions、functions 4.x、meshoptimizer 和 sharp。
