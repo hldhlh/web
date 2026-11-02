@@ -23,6 +23,7 @@ Auto Office 首页「快捷访问」→「门店模型预览」。路由：`#/ap
 
 ```sh
 gltf-transform optimize output/store-model/shop.glb apps/academy/pages/store-model/assets/shop.glb --palette false --compress meshopt --simplify-error 0.01 --simplify-ratio 0.2 --texture-compress webp --texture-size 1024
+python3 scripts/fix-store-chair-material.py
 npm run build
 npm run check
 npm test
@@ -35,3 +36,5 @@ npm test
 技术文档：[Three.js GLTFLoader](https://threejs.org/docs/pages/GLTFLoader)、[WebXRManager](https://threejs.org/docs/pages/WebXRManager)。Three.js 0.181.2 与 MeshoptDecoder 的许可证随 vendor 文件保留。
 
 材质修复：仅对同时缺少 UV 和切线的网格关闭各向异性，保留金属度、粗糙度、颜色及贴图；保持独立材质，防止合并丢失诊断信息。固定光源阴影只生成一次，避免漫游重复计算。
+
+坐垫颜色：导出后按 Blender「墨绿坐垫.002」中的去色、映射范围与乘色节点，在线性颜色空间烘焙墨绿皮革贴图。该处理只修改坐垫专用纹理，不调整全场景色调。
