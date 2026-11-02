@@ -790,7 +790,7 @@
     document.getElementById('selectionType').textContent = selected ? ({ line: '尺寸线', rect: '矩形', circle: '圆形' }[selected.type] || '标注') : '未选中';
     const isRectangle = selected?.type === "rect";
     elements.exportImage.disabled = !state.image || state.annotations.length === 0;
-    elements.copyImage.disabled = elements.exportImage.disabled;
+    elements.copyImage.disabled = !state.image;
     elements.lineLabelFields.hidden = Boolean(isRectangle);
     elements.rectLabelFields.hidden = !isRectangle;
     elements.labelInput.disabled = !state.editing || !state.annotationsVisible || !selected || isRectangle;
@@ -1239,7 +1239,7 @@
       state.selectedId = selection;
       render();
       await pending;
-      setNotice("标注图已复制，可直接粘贴使用");
+      setNotice("图片已复制，可直接粘贴使用");
     } catch (error) {
       setNotice(error.name === "NotAllowedError" ? "无法访问剪贴板，请允许剪贴板权限后重试" : (error.message || "复制失败，请重试"));
     } finally {
