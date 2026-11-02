@@ -60,6 +60,7 @@
     tool: "line",
     annotationStyle: "light",
     labelPosition: "center",
+    rotation: 0,
     zoom: 1,
     panX: 0, panY: 0,
     fitScale: 1,
@@ -124,7 +125,7 @@
     });
     if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
     Object.assign(state, { image, objectUrl, fileName: name, annotations: [], draft: null,
-      handleDrag: null, hoverHandle: null, selectedId: null, zoom: 1, panX: 0, panY: 0, editing: false, annotationsVisible: true });
+      handleDrag: null, hoverHandle: null, selectedId: null, rotation: 0, zoom: 1, panX: 0, panY: 0, editing: false, annotationsVisible: true });
     elements.canvasStage.style.transform = '';
     cancelAnimationFrame(gestureFrame); gestureFrame = null;
     pointers.clear(); gesture = null; singlePointer = null; suppressDrawing = false; deferredAnnotations = null;
@@ -176,8 +177,8 @@
     const availableWidth = Math.max(200, elements.viewport.clientWidth - 36);
     const availableHeight = Math.max(220, elements.viewport.clientHeight - 36);
     state.fitScale = Math.min(
-      availableWidth / state.image.naturalWidth,
-      availableHeight / state.image.naturalHeight,
+      availableWidth / (state.rotation % 180 ? state.image.naturalHeight : state.image.naturalWidth),
+      availableHeight / (state.rotation % 180 ? state.image.naturalWidth : state.image.naturalHeight),
       1,
     );
     if (preserveViewport && previousFitScale > 0) {
@@ -188,7 +189,7 @@
       state.zoom = Math.min(state.zoom, maximumZoom());
     }
     updateCanvasDisplaySize();
-    if (preserveViewport) panCanvas(0, 0);
+    panCanvas(0, 0);
   }
 
   function updateCanvasDisplaySize() {
@@ -210,7 +211,7 @@
     // absorb or clamp the two-finger translation on mobile browsers.
     state.panX += dx;
     state.panY += dy;
-    elements.canvasStage.style.transform = `translate(-50%, -50%) translate3d(${state.panX}px, ${state.panY}px, 0)`;
+    elements.canvasStage.style.transform = `translate(-50%, -50%) translate3d(${state.panX}px, ${state.panY}px, 0) rotate(${state.rotation}deg)`;
   }
 
   function setZoom(nextZoom, clientX, clientY, anchor) {
@@ -523,10 +524,12 @@
 
   function pointFromEvent(event) {
     const rect = elements.canvas.getBoundingClientRect();
-    return {
-      x: ((event.clientX - rect.left) / rect.width) * elements.canvas.width,
-      y: ((event.clientY - rect.top) / rect.height) * elements.canvas.height,
-    };
+    const x = (event.clientX - rect.left) / rect.width;
+    const y = (event.clientY - rect.top) / rect.height;
+    const point = state.rotation === 90 ? { x: y, y: 1 - x }
+      : state.rotation === 180 ? { x: 1 - x, y: 1 - y }
+      : state.rotation === 270 ? { x: 1 - y, y: x } : { x, y };
+    return { x: point.x * elements.canvas.width, y: point.y * elements.canvas.height };
   }
 
   function handlesFor(item) {
@@ -1189,6 +1192,20 @@
     undoLast();
   });
 
+  // Rotate a snapshot so download and clipboard match the displayed orientation.
+  function exportCanvas() {
+    const source = elements.canvas;
+    if (!state.rotation) return source;
+    const output = document.createElement('canvas');
+    output.width = state.rotation % 180 ? source.height : source.width;
+    output.height = state.rotation % 180 ? source.width : source.height;
+    const ctx = output.getContext('2d');
+    ctx.translate(output.width / 2, output.height / 2);
+    ctx.rotate(state.rotation * Math.PI / 180);
+    ctx.drawImage(source, -source.width / 2, -source.height / 2);
+    return output;
+  }
+
   let exporting = false;
   elements.exportImage.addEventListener("click", async () => {
     if (!state.image || exporting) return;
@@ -1202,7 +1219,7 @@
     try {
       setNotice("正在压缩标注图…");
       let pending;
-      try { pending = window.DimensionImages.exportCanvas(elements.canvas); }
+      try { pending = window.DimensionImages.exportCanvas(exportCanvas()); }
       finally { state.selectedId = selection; render(); }
       const result = await pending;
       const url = URL.createObjectURL(result.blob);
@@ -1233,7 +1250,7 @@
       render(true);
       // Start the clipboard write during the click gesture, including on Safari.
       const image = new Promise((resolve, reject) => {
-        elements.canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("图片生成失败，请重试")), "image/png");
+        exportCanvas().toBlob(blob => blob ? resolve(blob) : reject(new Error("图片生成失败，请重试")), "image/png");
       });
       const pending = navigator.clipboard.write([new ClipboardItem({ "image/png": image })]);
       state.selectedId = selection;
@@ -1279,6 +1296,17 @@
       setZoom(state.zoom * factor, box.x + box.width / 2, box.y + box.height / 2);
     });
   }
+  document.getElementById('rotateImage').addEventListener('click', () => {
+    if (!state.image) return;
+    if (state.draft || state.handleDrag || pointers.size) {
+      setNotice('请先结束当前操作再旋转图片'); return;
+    }
+    state.rotation = (state.rotation + 90) % 360;
+    state.zoom = 1; state.panX = 0; state.panY = 0;
+    updateFit();
+    elements.viewport.scrollTo(0, 0);
+    setNotice(`图片已顺时针旋转至 ${state.rotation}°`);
+  });
   document.getElementById('fitCanvas').addEventListener('click', () => {
     state.zoom = 1; state.panX = 0; state.panY = 0; elements.canvasStage.style.transform = '';
     updateFit(); elements.viewport.scrollTo(0, 0); setNotice('图片已适合窗口');
