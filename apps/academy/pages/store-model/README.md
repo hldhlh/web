@@ -49,4 +49,4 @@ npm test
 
 后厨地面：最后单独回填原始地砖与基层网格，保留 Float32 坐标，避免减面与低精度量化破坏亚毫米级砖缝。鸟瞰近裁剪面设为 0.5m，提升远景深度精度；店内仍为 0.05m。
 
-炒锅与水盆：E08 炉具在全局减面前分离，优化后回填原始浮点网格与法线，保留圆形薄壁和锅沿。保护脚本需要 Node 可解析 @gltf-transform/core、extensions、functions 4.x、meshoptimizer 和 sharp。
+炒锅、汤锅、火锅与水盆：E08 炉具以及所有锅体、锅圈、锅盖、水体和提手在全局减面前分离，优化后回填原始浮点网格与法线，保留圆形薄壁和锅沿。保护脚本需要 Node 可解析 @gltf-transform/core、extensions、functions 4.x、meshoptimizer 和 sharp。

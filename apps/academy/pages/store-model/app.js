@@ -103,7 +103,7 @@ async function init(){
   for(let i=0;i<2;i++){const controller=renderer.xr.getController(i);controller.addEventListener('selectstart',()=>{vrIndex=(vrIndex+1)%3;placeVR();});rig.add(controller);}
   canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();renderer.setAnimationLoop(null);fail(new Error('WebGL context lost'));});
   const loader=new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-  const gltf=await loader.loadAsync('./assets/shop.glb?v=cookware-6',e=>{
+  const gltf=await loader.loadAsync('./assets/shop.glb?v=cookware-7',e=>{
     $('progress').value=e.total?e.loaded/e.total*100:0;
     $('load-message').textContent=e.total?`已下载 ${Math.round(e.loaded/e.total*100)}% · ${(e.total/1048576).toFixed(1)} MB`:`已下载 ${(e.loaded/1048576).toFixed(1)} MB`;
     if(e.total&&e.loaded===e.total){$('load-title').textContent='正在布置空间';$('load-message').textContent='模型下载完成，正在准备材质。';}

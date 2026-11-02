@@ -1,5 +1,5 @@
 // Run with glTF Transform 4.x, meshoptimizer and sharp installed.
-// Keep the E08 thin curved cookware outside global simplification/joining.
+// Keep thin curved cookware (wok, soup pots, hot pots and handles) outside global simplification/joining.
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { cloneDocument, mergeDocuments, prune, textureCompress, unpartition } from '@gltf-transform/functions';
@@ -11,7 +11,7 @@ const base = 'output/store-model/';
 if (process.argv[2] === 'prepare') {
   const source = await io.read(base + 'materials-complete.glb');
   const protectedDoc = cloneDocument(source);
-  const keep = n => /^(?:R2_)?E08实拍_|^R2_E08_/.test(n.getName());
+  const keep = n => /^(?:R2_)?E08实拍_|^R2_E08_|锅/.test(n.getName());
   for (const n of protectedDoc.getRoot().listNodes()) if (!keep(n)) n.dispose();
   for (const n of source.getRoot().listNodes()) if (keep(n)) n.dispose();
   await protectedDoc.transform(prune(), textureCompress({encoder:sharp,targetFormat:'webp',resize:[1024,1024]}));
