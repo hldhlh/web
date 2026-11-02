@@ -1,0 +1,1190 @@
+[
+  {
+    "name": "R4_锅架拉丝不锈钢",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E02_LCD数字",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E02_橡胶脚",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E02_秤盘拉丝钢",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E02_浅灰机壳",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E02_面板深灰",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E02_浅灰按键",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E02_功能蓝键",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "窗边黑铝框",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "拉丝不锈钢",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "深灰金属",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "窗边清透玻璃",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "精修_黑色密封胶",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E04白瓷砖",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E04半透收纳盒",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E04蓝色扣手",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E04绿色厚砧板",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "浅木色",
+    "baked": [
+      "Base Color",
+      "Roughness"
+    ],
+    "unbaked": [],
+    "status": "corrected"
+  },
+  {
+    "name": "20261030_卫生间浅木",
+    "baked": [
+      "Base Color",
+      "Roughness"
+    ],
+    "unbaked": [],
+    "status": "corrected"
+  },
+  {
+    "name": "E09温控红色显示",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E11红色数码管",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E26实拍｜拉丝不锈钢｜曲线适配",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E26实拍｜拉丝不锈钢",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E26实拍｜黑塑料围挡",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E26实拍｜葱花绿",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E26实拍｜酱油深褐",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E26实拍｜蒜末浅黄",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E26实拍｜辣椒红",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E26实拍｜标签白字",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E26实拍｜柜内暗面",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E26实拍｜红色标签",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E26实拍｜消毒柜烟灰玻璃",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E26实拍｜棕瓶盖",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E26实拍｜黄瓶盖",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E26实拍｜绿灯",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E26实拍｜瓶玻璃",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "E26实拍｜黑色玻璃台面",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "R2_饭煲乳白外壳",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "照片_不锈钢拉丝",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "K05_不锈钢侧板",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "K05_数码红",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "K05_黑色门框",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "K05_银色浅香槟包边",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "K05_烟灰玻璃",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "K05_电源蓝",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "照片_绿色砧板",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "K09实拍_黑晶面",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "K09实拍_金色印刷",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "K09实拍_深灰散热壳",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "NG独立毛丝_red",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "NG独立毛丝_white",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "NG独立毛丝_yellow",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "娃娃菜｜细分叉叶脉",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "娃娃菜｜叶梗渐变_细胞褶皱_PBR",
+    "baked": [],
+    "unbaked": [],
+    "status": "procedural-baked",
+    "bakedMeshes": [
+      "娃娃菜切块_真实层叠叶肉.001",
+      "娃娃菜切块_真实层叠叶肉.002"
+    ]
+  },
+  {
+    "name": "PBR｜生菜嫩叶脉",
+    "baked": [],
+    "unbaked": [],
+    "status": "procedural-baked",
+    "bakedMeshes": [
+      "PBR生菜｜盒0_分支叶脉.001",
+      "PBR生菜｜盒3_分支叶脉.001"
+    ]
+  },
+  {
+    "name": "PBR｜鲜生菜叶",
+    "baked": [],
+    "unbaked": [],
+    "status": "procedural-baked",
+    "bakedMeshes": [
+      "PBR生菜｜盒0_卷曲薄叶.001",
+      "PBR生菜｜盒3_卷曲薄叶.001"
+    ]
+  },
+  {
+    "name": "PBR｜豆芽水润白茎",
+    "baked": [],
+    "unbaked": [],
+    "status": "procedural-baked",
+    "bakedMeshes": [
+      "PBR豆芽｜弯曲白茎_双豆瓣_细根.001"
+    ]
+  },
+  {
+    "name": "PBR｜豆芽浅黄豆瓣",
+    "baked": [],
+    "unbaked": [],
+    "status": "procedural-baked",
+    "bakedMeshes": [
+      "PBR豆芽｜弯曲白茎_双豆瓣_细根.001"
+    ]
+  },
+  {
+    "name": "PBR｜豆芽细根",
+    "baked": [],
+    "unbaked": [],
+    "status": "procedural-baked",
+    "bakedMeshes": [
+      "PBR豆芽｜弯曲白茎_双豆瓣_细根.001"
+    ]
+  },
+  {
+    "name": "窗下浅灰紫封板",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "R2_电控面板",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "R2_器具拉丝钢",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "汤炉PBR｜同系304抛光五金.001",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "汤炉实拍｜304细拉丝银钢",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "统一_黑色陶瓦",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "PBR｜热厨黑陶瓦_烧制色差_细砂孔隙",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "实拍_瓦檐暖棕木架",
+    "baked": [
+      "Base Color",
+      "Roughness"
+    ],
+    "unbaked": [],
+    "status": "corrected"
+  },
+  {
+    "name": "汤炉实拍｜304细拉丝银钢.001",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "R2灭火器箱红漆",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "20261030_卫生间白瓷",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "20261030_洗手镜",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "窗边白砖",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "照片581_儿童椅灰色座壳",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "照片581_儿童椅暖白塑料",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "照片581_儿童椅黑脚套",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "外窗基座_前厅同色石材",
+    "baked": [
+      "Base Color",
+      "Roughness"
+    ],
+    "unbaked": [],
+    "status": "corrected"
+  },
+  {
+    "name": "绿植柱深绿底",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "现状_黑色金属",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "入口整体黑柱_哑光金属",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "汤炉｜清水_折射1.333",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "精修_缎面不锈钢",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "20261030_银色五金",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "排水篦子不锈钢",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "切肉板乳白色",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "玻璃下白砖｜浅灰填缝",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "墨绿坐垫.002",
+    "baked": [
+      "Base Color"
+    ],
+    "unbaked": [],
+    "status": "corrected"
+  },
+  {
+    "name": "照片_电器白",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "灰白桌面.002",
+    "baked": [
+      "Base Color",
+      "Roughness"
+    ],
+    "unbaked": [],
+    "status": "corrected"
+  },
+  {
+    "name": "20261030_卫生间白砖",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "汤炉实拍｜黑色旋钮",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "实拍细化｜紧固件银钢",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "汤炉实拍｜刻度白",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "收银端设备黄色",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "展示牌_深红字",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "帘布｜暗红厚重麻布",
+    "baked": [],
+    "unbaked": [],
+    "status": "procedural-baked",
+    "bakedMeshes": [
+      "后厨红色双开门帘.002_自然垂褶.002",
+      "后厨红色双开门帘.003_自然垂褶.002"
+    ]
+  },
+  {
+    "name": "吧台｜近照灰底黑细粒_曲折白矿脉",
+    "baked": [],
+    "unbaked": [],
+    "status": "procedural-baked",
+    "bakedMeshes": [
+      "立方体.6590",
+      "切肉窗下整体_含10mm大理石包覆.001",
+      "窗口台面延伸_20mm.002"
+    ]
+  },
+  {
+    "name": "吧台｜真实凹槽暗木色",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "明厨透明玻璃",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "桌座黑色竖槽",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "实景灰米色抛光大理石桌面",
+    "baked": [
+      "Base Color",
+      "Roughness"
+    ],
+    "unbaked": [],
+    "status": "corrected"
+  },
+  {
+    "name": "桌沿暖金金属",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "装配白瓷",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "现状_墙面暖白",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "展示板_深红木底板",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "帘布｜米白透光轻纱",
+    "baked": [],
+    "unbaked": [],
+    "status": "procedural-baked",
+    "bakedMeshes": [
+      "外窗_浅色褶皱帘_0_自然垂褶.002",
+      "外窗_浅色褶皱帘_1_自然垂褶.002"
+    ]
+  },
+  {
+    "name": "外窗_密封胶条",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "鲜字_乳白立体字",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "20261030_黑色门把手",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "现状_水磨石",
+    "baked": [
+      "Base Color",
+      "Roughness"
+    ],
+    "unbaked": [],
+    "status": "corrected"
+  },
+  {
+    "name": "消防凸墙_白色瓷砖",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "实拍锅圈｜压制不锈钢",
+    "baked": [],
+    "unbaked": [],
+    "status": "procedural-baked",
+    "bakedMeshes": [
+      "R20外肩_R5内侧折返.003",
+      "R20外肩_R5内侧折返.004",
+      "R20外肩_R5内侧折返.005"
+    ]
+  },
+  {
+    "name": "实景椅浅木",
+    "baked": [
+      "Base Color",
+      "Roughness"
+    ],
+    "unbaked": [],
+    "status": "corrected"
+  },
+  {
+    "name": "后厨红砖_红棕0",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "后厨红砖_红棕1",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "后厨红砖_红棕2",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "后厨红砖_红棕3",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "后厨红砖_红棕4",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "后厨红砖_灰褐砖缝",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "后厨红砖_压槽底",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "现状_厨房白砖",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "装配黑塑料",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "精修_白色标签",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "收银屏蓝色",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "冷柜数码红",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "20261030_灰色活动屏风",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "20261030_屏风浅灰纹",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "实拍_餐架暖竹木",
+    "baked": [
+      "Base Color",
+      "Roughness"
+    ],
+    "unbaked": [],
+    "status": "corrected"
+  },
+  {
+    "name": "饮料瓶绿",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "收银端红门帘",
+    "baked": [
+      "Base Color",
+      "Roughness"
+    ],
+    "unbaked": [],
+    "status": "corrected"
+  },
+  {
+    "name": "精修_蓝色卡扣",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "现状_砖缝",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "汤炉实拍｜门缝与脚垫",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "汤炉实拍｜绿色指示灯",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "实拍582_消防红箱体",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "照片582_消防柜暗红内衬",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "实拍582_消火栓红字",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "照片582_消防柜磨砂玻璃",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "照片582_消防柜银框",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "实景深绿30mm坐垫",
+    "baked": [
+      "Base Color"
+    ],
+    "unbaked": [],
+    "status": "corrected"
+  },
+  {
+    "name": "电磁炉红标圈",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "烤箱｜银灰喷涂钢板.002",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "烤箱｜拉丝不锈钢.001",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "烤箱｜黑色门框及把手.001",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "烤箱｜散热孔内暗面.001",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "烤箱｜印刷浅灰",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "烤箱｜炉腔",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "烤箱｜拉丝不锈钢.001｜曲线适配",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "烤箱｜黑色玻璃_低透高光",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "烤箱｜高温警示黄",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "热水桶_清水_真实水位_IOR1333",
+    "status": "no-source-principled"
+  },
+  {
+    "name": "热水桶_清玻璃加上部结露",
+    "status": "no-source-principled"
+  },
+  {
+    "name": "电磁炉黑晶面",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "窗边红色线",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "R2箱侧提手",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "篦子孔内阴影_仅表面表现",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "米家｜浅灰丝印",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "米家｜接缝灰",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "米家｜暖白细腻ABS",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "米家｜防滑橡胶",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "米家｜隐藏白色显示",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "米家｜顶部白色面板",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "儿童椅灰塑料",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "展示板_朱红吊牌",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "刀柄木色",
+    "baked": [
+      "Base Color",
+      "Roughness"
+    ],
+    "unbaked": [],
+    "status": "corrected"
+  },
+  {
+    "name": "食品保鲜盒｜清透硬质塑料_亚克力观感",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "保鲜盒_深蓝卡扣",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "娃娃菜盒｜低反光透明亚克力",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "20261030_蹲便槽内浅灰",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "醒狮NG｜朱红漆胎",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "醒狮NG｜白绒底",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "醒狮NG｜黑漆",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "醒狮NG｜眼圈白漆",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "醒狮NG｜黄绒",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "醒狮NG｜红绒底",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "醒狮NG｜银色额镜",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "醒狮NG｜象牙白牙齿",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "醒狮NG｜金线彩绘",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "醒狮NG｜墨绿彩绘",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "实景植叶_2",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "实景植叶_3",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "实景植叶_4",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "实景植叶_5",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "实景植叶_6",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "实景植叶_7",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "冷柜清透玻璃",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  },
+  {
+    "name": "照片772_黄色食品砧板",
+    "baked": [],
+    "unbaked": [],
+    "status": "direct-source"
+  }
+]

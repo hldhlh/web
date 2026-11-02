@@ -29,6 +29,6 @@ for name,mesh,matrix in items:
 for img in bpy.data.images:
  if img.size[0]>1024 or img.size[1]>1024:
   scale=1024/max(img.size); img.scale(max(1,int(img.size[0]*scale)),max(1,int(img.size[1]*scale)))
-bpy.ops.export_scene.gltf(filepath=out+'/shop.glb',export_format='GLB',use_active_scene=True,export_apply=True,export_animations=False,export_cameras=False,export_lights=False,export_image_format='AUTO')
+bpy.ops.export_scene.gltf(filepath=out+'/source.glb',export_format='GLB',use_active_scene=True,export_apply=True,export_animations=False,export_cameras=False,export_lights=False,export_image_format='AUTO')
 with open(out+'/cameras.json','w') as f: json.dump(cams,f,ensure_ascii=False)
-print('EXPORTED',os.path.getsize(out+'/shop.glb'),flush=True)
+print('EXPORTED',os.path.getsize(out+'/source.glb'),flush=True)
