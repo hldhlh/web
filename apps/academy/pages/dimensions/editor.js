@@ -21,6 +21,7 @@
     replaceText: document.querySelector(".replace-text"),
     panelReplace: document.querySelector("#panelReplace"),
     exportImage: document.querySelector("#exportImage"),
+    copyImage: document.querySelector("#copyImage"),
     lineTool: document.querySelector("#lineTool"),
     rectTool: document.querySelector("#rectTool"),
     circleTool: document.querySelector("#circleTool"),
@@ -789,6 +790,7 @@
     document.getElementById('selectionType').textContent = selected ? ({ line: '尺寸线', rect: '矩形', circle: '圆形' }[selected.type] || '标注') : '未选中';
     const isRectangle = selected?.type === "rect";
     elements.exportImage.disabled = !state.image || state.annotations.length === 0;
+    elements.copyImage.disabled = elements.exportImage.disabled;
     elements.lineLabelFields.hidden = Boolean(isRectangle);
     elements.rectLabelFields.hidden = !isRectangle;
     elements.labelInput.disabled = !state.editing || !state.annotationsVisible || !selected || isRectangle;
@@ -1212,6 +1214,36 @@
     } catch (error) {
       setNotice(error.message || "导出失败，请重试");
     } finally {
+      exporting = false;
+      render();
+    }
+  });
+
+  elements.copyImage.addEventListener("click", async () => {
+    if (!state.image || exporting) return;
+    if (state.draft || state.handleDrag) { setNotice("请先结束当前标注操作再复制"); return; }
+    if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+      setNotice("当前浏览器不支持复制图片，请使用导出图片");
+      return;
+    }
+    exporting = true;
+    const selection = state.selectedId;
+    state.selectedId = null;
+    try {
+      render(true);
+      // Start the clipboard write during the click gesture, including on Safari.
+      const image = new Promise((resolve, reject) => {
+        elements.canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("图片生成失败，请重试")), "image/png");
+      });
+      const pending = navigator.clipboard.write([new ClipboardItem({ "image/png": image })]);
+      state.selectedId = selection;
+      render();
+      await pending;
+      setNotice("标注图已复制，可直接粘贴使用");
+    } catch (error) {
+      setNotice(error.name === "NotAllowedError" ? "无法访问剪贴板，请允许剪贴板权限后重试" : (error.message || "复制失败，请重试"));
+    } finally {
+      state.selectedId = selection;
       exporting = false;
       render();
     }
