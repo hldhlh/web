@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f2f2f7"><title>门店模型预览 · Auto Office</title>
+<link rel="icon" href="../../icon.svg" type="image/svg+xml"><link rel="stylesheet" href="../../appearance.css"><link rel="stylesheet" href="./style.css">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('app-theme')||'light'}catch{}</script>
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
+</head>
+<body>
+<main class="model-app">
+<header class="heading"><div><p class="eyebrow">AUTO OFFICE / 缦云店</p><h1>门店模型预览</h1></div><div class="header-actions"><button id="help" aria-label="操作说明">使用说明</button><button id="fullscreen">全屏</button></div></header>
+<section class="viewport" aria-label="门店三维模型"><canvas id="scene" tabindex="0" aria-label="3D 视图；拖动旋转，滚轮缩放；店内模式使用方向键移动"></canvas>
+<div class="scene-label"><span class="live-dot"></span><span id="view-label">整体鸟瞰</span><span class="model-tag">3D 实景模型</span></div>
+<div id="loading" class="loading" role="status"><span class="cube">◇</span><h2 id="load-title">正在打开缦云店</h2><p id="load-message">首次加载需要下载模型，请稍候。</p><progress id="progress" max="100" value="0"></progress><button id="retry" hidden>重新加载</button></div>
+<div class="view-tools" role="group" aria-label="视图控制"><button id="home" aria-label="恢复整体视角" disabled title="恢复整体视角">⌂ <span>复位</span></button><button id="rotate" aria-label="自动环绕" disabled aria-pressed="false">↻ <span>自动环绕</span></button></div>
+<div class="movement" hidden aria-label="店内移动"><button data-move="forward" aria-label="向前移动">↑</button><div><button data-move="left" aria-label="向左移动">←</button><button data-move="back" aria-label="向后移动">↓</button><button data-move="right" aria-label="向右移动">→</button></div></div>
+<p class="gesture" id="gesture">拖动旋转 · 双指缩放 · 右键平移</p>
+</section>
+<footer class="control-panel"><div class="tour-heading"><div><h2>探索空间</h2><p id="tour-caption">从整体布局，走进每一处细节。</p></div><button class="primary" id="vr" disabled>进入 VR</button></div>
+<nav class="views" aria-label="空间视角"><button data-view="overview" aria-pressed="true" disabled><span>01</span>整体鸟瞰</button><button data-view="hall" aria-pressed="false" disabled><span>02</span>前厅</button><button data-view="table" aria-pressed="false" disabled><span>03</span>用餐区</button><button data-view="kitchen" aria-pressed="false" disabled><span>04</span>后厨</button></nav>
+<p id="status" role="status" aria-live="polite">模型准备中</p></footer>
+</main>
+<dialog id="help-dialog"><h2>走进缦云店</h2><p>鸟瞰：拖动旋转、滚轮或双指缩放，右键平移。</p><p>店内：拖动环顾，WASD / 方向键或屏幕箭头移动。切换空间可返回固定观察点。</p><p>VR：在支持 WebXR 的头显浏览器打开线上页面，点击「进入 VR」。扳机切换前厅、用餐区、后厨；菜单键退出。</p><p>这是空间预览，漫游暂不限制穿墙。普通手机可触屏浏览；没有 VR 支持时会显示提示。</p><button id="close-help" class="primary">知道了</button></dialog>
+<noscript>请启用 JavaScript 查看三维模型。</noscript>
+<script type="module" src="./app.js"></script>
+</body></html>

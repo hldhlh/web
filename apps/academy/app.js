@@ -1484,6 +1484,7 @@
       learn: '<path d="M12 5v15M12 5C9 3 5 3 3 4v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-2-1-6-1-9 1Z"/>',
       exam: '<rect x="5" y="4" width="14" height="17" rx="2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M9 11h6M9 15h6"/>',
       notes: '<path d="M18 10V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5M8 7h6M8 11h4"/><path d="m14 16 5-5 3 3-5 5-4 1Z" stroke="var(--accent)"/>',
+      storeModel: '<path d="m12 2 9 5v10l-9 5-9-5V7ZM3 7l9 5 9-5M12 12v10"/><path d="m7.5 4.5 9 5" stroke="var(--accent)"/>',
       stockReport: '<path d="M3.5 8 6 3.5h12L20.5 8v10.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2ZM3.5 8h17M12 3.5V8M7 12h4M7 15.5h2"/><path d="m13 15.5 2 2 4-4" stroke="var(--accent)"/>',
       schedule: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 11h18"/><path d="M7 15h3M14 15h3M7 18h3" stroke="var(--accent)"/>',
       dimensions: '<path d="m4 16 12-12 4 4L8 20H4v-4Z"/><path d="m10 10 2 2m1-5 2 2m-8 4 2 2"/>',
@@ -4074,11 +4075,15 @@
       </section>`;
       return;
     }
+    // Keep the loaded WebGL scene and any active XR session during live refreshes.
+    const currentFrame = view().querySelector(".embedded-app-frame");
+    if (app.id === "store-model" && currentFrame?.getAttribute("src") === app.src) return;
     view().innerHTML = `
       <iframe
         class="embedded-app-frame"
         src="${app.src}"
         title="${app.title}"
+        ${app.id === "store-model" ? 'allow="xr-spatial-tracking; fullscreen" allowfullscreen' : ""}
         referrerpolicy="strict-origin-when-cross-origin"
       ></iframe>`;
   }

@@ -93,3 +93,11 @@ test('already applied account broadcasts do not trigger redundant reads', async 
   await f.handlers().accounts({ rev: 2 });
   assert.equal(reads, 1);
 });
+
+test('store model uses existing shortcut permission rules', () => {
+  const { auth } = fixture();
+  assert.equal(auth.shortcuts.find(s => s.id === 'store-model').title, '门店模型预览');
+  assert.equal(auth.canShortcut({ role: 'staff', access: 'basic' }, 'store-model'), true);
+  assert.equal(auth.canShortcut({ role: 'staff', access: 'full', shortcutAccess: { 'store-model': false } }, 'store-model'), false);
+  assert.equal(auth.canShortcut({ role: 'staff', access: 'blocked' }, 'store-model'), false);
+});
