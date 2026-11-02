@@ -23,7 +23,7 @@ print('EXPORT_ITEMS',len(items),'MESHES',len(cache),flush=True)
 export=bpy.data.scenes.new('Web export'); bpy.context.window.scene=export
 for name,mesh,matrix in items:
  obj=bpy.data.objects.new(name,mesh); export.collection.objects.link(obj); obj.matrix_world=matrix
- if len(mesh.polygons)>6000:
+ if len(mesh.polygons)>6000 and not name.startswith('建筑｜后厨全域红色防滑砖'):
   mod=obj.modifiers.new('Web preview reduction','DECIMATE'); mod.ratio=6000/len(mesh.polygons)
 # Limit image dimensions for phones. Source blend is never saved.
 for img in bpy.data.images:

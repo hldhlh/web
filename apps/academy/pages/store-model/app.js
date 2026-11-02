@@ -32,7 +32,7 @@ $('fullscreen').onclick=async()=>{
 document.addEventListener('fullscreenchange',()=>{$('fullscreen').textContent=document.fullscreenElement?'退出全屏':'全屏';});
 function setView(id){
   if(!loaded || session) return;
-  current=id; camera.fov=id==='overview'?40:55;camera.updateProjectionMatrix(); const v=views[id]; rotating=false; $('rotate').setAttribute('aria-pressed','false');
+  current=id; camera.near=id==='overview'?.5:.05;camera.fov=id==='overview'?40:55;camera.updateProjectionMatrix(); const v=views[id]; rotating=false; $('rotate').setAttribute('aria-pressed','false');
   rig.position.set(0,0,0); camera.position.fromArray(v.position); camera.lookAt(...v.target);
   controls.target.fromArray(v.target); controls.enabled=id==='overview'; controls.autoRotate=false;
   if(controls.enabled) controls.update();
@@ -103,7 +103,7 @@ async function init(){
   for(let i=0;i<2;i++){const controller=renderer.xr.getController(i);controller.addEventListener('selectstart',()=>{vrIndex=(vrIndex+1)%3;placeVR();});rig.add(controller);}
   canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();renderer.setAnimationLoop(null);fail(new Error('WebGL context lost'));});
   const loader=new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-  const gltf=await loader.loadAsync('./assets/shop.glb?v=materials-3',e=>{
+  const gltf=await loader.loadAsync('./assets/shop.glb?v=floor-4',e=>{
     $('progress').value=e.total?e.loaded/e.total*100:0;
     $('load-message').textContent=e.total?`已下载 ${Math.round(e.loaded/e.total*100)}% · ${(e.total/1048576).toFixed(1)} MB`:`已下载 ${(e.loaded/1048576).toFixed(1)} MB`;
     if(e.total&&e.loaded===e.total){$('load-title').textContent='正在布置空间';$('load-message').textContent='模型下载完成，正在准备材质。';}
