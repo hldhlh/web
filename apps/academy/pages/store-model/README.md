@@ -22,9 +22,7 @@ Auto Office 首页「快捷访问」→「门店模型预览」。路由：`#/ap
 原始导出位于忽略目录 `output/store-model/shop.glb`。用 glTF Transform 4.x 优化、简化，再压缩为 meshopt，输出到 `assets/shop.glb`。当前采用 1024px WebP 贴图和 meshopt；加载器与解码器本地打包，不依赖外部 CDN。
 
 ```sh
-gltf-transform optimize output/store-model/shop.glb output/store-model/optimized.glb --compress meshopt --simplify-error 0.002 --simplify-ratio 0.5 --texture-compress webp --texture-size 1024
-gltf-transform simplify output/store-model/optimized.glb output/store-model/lite.glb --ratio 0.35 --error 0.01
-gltf-transform meshopt output/store-model/lite.glb apps/academy/pages/store-model/assets/shop.glb
+gltf-transform optimize output/store-model/shop.glb apps/academy/pages/store-model/assets/shop.glb --palette false --compress meshopt --simplify-error 0.01 --simplify-ratio 0.2 --texture-compress webp --texture-size 1024
 npm run build
 npm run check
 npm test
@@ -35,3 +33,5 @@ npm test
 浏览器真实渲染与桌面入口已检查；真实 VR 头显尚未测试。漫游不提供碰撞检测；头显使用固定点切换。网页材质使用实时 PBR 近似，程序纹理无法完整复现 Blender Cycles 效果，薄玻璃使用透明混合以减少移动端双眼折射开销。
 
 技术文档：[Three.js GLTFLoader](https://threejs.org/docs/pages/GLTFLoader)、[WebXRManager](https://threejs.org/docs/pages/WebXRManager)。Three.js 0.181.2 与 MeshoptDecoder 的许可证随 vendor 文件保留。
+
+材质修复：仅对同时缺少 UV 和切线的网格关闭各向异性，保留金属度、粗糙度、颜色及贴图；保持独立材质，防止合并丢失诊断信息。固定光源阴影只生成一次，避免漫游重复计算。

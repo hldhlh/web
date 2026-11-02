@@ -1,3 +1,4 @@
+import { repairAnisotropy } from './materials.js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -86,12 +87,13 @@ $('vr').onclick=async()=>{
 };
 async function init(){
   renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
-  renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;
+  renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.85;
+  renderer.shadowMap.enabled=true;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   renderer.xr.enabled=true;renderer.xr.setReferenceSpaceType('local-floor');
   scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(55,1,.03,180);rig=new THREE.Group();rig.add(camera);scene.add(rig);
   const pmrem=new THREE.PMREMGenerator(renderer), room=new RoomEnvironment();
-  const env=pmrem.fromScene(room,.04);scene.environment=env.texture;scene.environmentIntensity=.8;room.dispose();pmrem.dispose();
-  scene.add(new THREE.HemisphereLight(0xffffff,0xa19b94,1.4));const sun=new THREE.DirectionalLight(0xfff3e6,1.8);sun.position.set(3,14,6);scene.add(sun);
+  const env=pmrem.fromScene(room,.04);scene.environment=env.texture;scene.environmentIntensity=.65;room.dispose();pmrem.dispose();
+  scene.add(new THREE.HemisphereLight(0xffffff,0xa19b94,.55));const sun=new THREE.DirectionalLight(0xfff3e6,1.2);sun.position.set(3,14,6);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-12,right:12,top:12,bottom:-12,near:.1,far:40});sun.shadow.bias=-.0002;sun.shadow.normalBias=.025;sun.target.position.set(4,0,-6);scene.add(sun.target);scene.add(sun);
   controls=new OrbitControls(camera,canvas);controls.enableDamping=!matchMedia('(prefers-reduced-motion: reduce)').matches;
   controls.minDistance=3;controls.maxDistance=50;controls.maxPolarAngle=Math.PI*.49;controls.autoRotateSpeed=.6;
   const updateTheme=()=>{scene.background=new THREE.Color(document.documentElement.dataset.theme==='dark'?0x292d31:0xe4e5e6);};updateTheme();
@@ -101,7 +103,7 @@ async function init(){
   for(let i=0;i<2;i++){const controller=renderer.xr.getController(i);controller.addEventListener('selectstart',()=>{vrIndex=(vrIndex+1)%3;placeVR();});rig.add(controller);}
   canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();renderer.setAnimationLoop(null);fail(new Error('WebGL context lost'));});
   const loader=new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-  const gltf=await loader.loadAsync('./assets/shop.glb',e=>{
+  const gltf=await loader.loadAsync('./assets/shop.glb?v=materials-2',e=>{
     $('progress').value=e.total?e.loaded/e.total*100:0;
     $('load-message').textContent=e.total?`已下载 ${Math.round(e.loaded/e.total*100)}% · ${(e.total/1048576).toFixed(1)} MB`:`已下载 ${(e.loaded/1048576).toFixed(1)} MB`;
     if(e.total&&e.loaded===e.total){$('load-title').textContent='正在布置空间';$('load-message').textContent='模型下载完成，正在准备材质。';}
@@ -110,12 +112,15 @@ async function init(){
   // passes on mobile and stereo WebXR render targets.
   gltf.scene.traverse(object=>{
     if(!object.isMesh)return;
+    object.castShadow=true;object.receiveShadow=true;
+    const repair=material=>repairAnisotropy(material,object.geometry);
+    object.material=Array.isArray(object.material)?object.material.map(repair):repair(object.material);
     for(const material of (Array.isArray(object.material)?object.material:[object.material])){
-      if(material.metalness>0.5){material.metalness=.55;material.roughnessMap=null;material.roughness=.48;material.needsUpdate=true;}
-      if(material.transmission>0){material.opacity=Math.max(.12,1-material.transmission);material.transmission=0;material.transparent=true;material.depthWrite=false;material.needsUpdate=true;}
+      if(material.transmission>0){material.opacity=Math.max(.12,1-material.transmission);material.transmission=0;material.transparent=true;material.depthWrite=false;material.needsUpdate=true;object.castShadow=false;}
     }
   });
-  scene.add(gltf.scene);loaded=true;setView('overview');
+  scene.add(gltf.scene);renderer.shadowMap.needsUpdate=true;
+  loaded=true;setView('overview');
   await renderer.compileAsync(scene,camera);
   $('loading').hidden=true;document.querySelectorAll('[data-view],#home,#rotate,#vr').forEach(b=>b.disabled=false);
   message('模型已就绪 · 选择空间开始漫游');
