@@ -124,10 +124,10 @@
   }
   function openCatalogChannel() {
     catalogChannel = sb.channel('dimensions-catalog');
-    catalogChannel.on('broadcast', { event: 'changed' }, () => { if (!session) loadProjects(); })
+    catalogChannel.on('broadcast', { event: 'changed' }, () => { if (!session) loadProjects(false, { background: true }); })
       .subscribe(state => {
         catalogConnected = state === 'SUBSCRIBED';
-        if (catalogConnected && !session) loadProjects();
+        if (catalogConnected && !session) loadProjects(false, { background: true });
       });
   }
   function icon(name) {
@@ -264,12 +264,14 @@
     $('projectList').setAttribute('aria-busy', String(loading));
     if (loading || failed) $('libraryEmpty').hidden = true;
   }
-  async function loadProjects(more = false) {
+  async function loadProjects(more = false, { background = false } = {}) {
     if (!allowed()) return;
-    if (listLoading) { if (!more) listAgain = true; return; }
+    if (listLoading) { if (!more && !background) listAgain = true; return; }
+    // Reconnect, visibility and timer events can arrive together. A background
+    // read neither queues another read nor reopens the foreground loading UI.
     listLoading = true;
     const requestId = ++catalogRequest, folderAtStart = currentFolder;
-    catalogFeedback(true, more ? '正在加载更多图片…' : projects.length ? '已显示本机记录，正在同步…' : '正在加载目录…');
+    if (!background) catalogFeedback(true, more ? '正在加载更多图片…' : projects.length ? '已显示本机记录，正在同步…' : '正在加载目录…');
     const active = () => requestId === catalogRequest && folderAtStart === currentFolder && allowed();
     try {
       const folderFilter = folderAtStart ? { 'payload->meta->>folderId': `eq.${folderAtStart}` } : { or: '(payload->meta->>folderId.is.null,payload->meta->>folderId.eq.)' };
@@ -284,11 +286,11 @@
           catalogCache.delete(folderAtStart);
           catalogCache.set(folderAtStart, { projects: [...projects], nextOffset, more: rows.length === 100 });
           if (catalogCache.size > 20) catalogCache.delete(catalogCache.keys().next().value);
-          renderLibrary(); catalogFeedback(true, '正在同步目录…');
+          renderLibrary(); if (!background) catalogFeedback(true, '正在同步目录…');
         }),
         loadFolders().then(() => {
           if (!active()) return;
-          renderFolders(); catalogFeedback(true, projects.length ? '正在同步…' : '正在读取图片列表…');
+          renderFolders(); if (!background) catalogFeedback(true, projects.length ? '正在同步…' : '正在读取图片列表…');
         })
       ]);
       if (!active()) return;
@@ -752,7 +754,7 @@
   $('discardConflict').addEventListener('click', () => { session.resolve('remote'); schedule(0); });
   document.addEventListener('click', event => { if (!$('projectHeading').contains(event.target)) $('projectHeading').open = false; });
   document.addEventListener('keydown', event => { if (event.key === 'Escape') $('projectHeading').open = false; });
-  const resume = () => { if (!document.hidden && allowed()) { if (session) refreshCurrent(); else loadProjects(); } };
+  const resume = () => { if (!document.hidden && allowed()) { if (session) refreshCurrent(); else loadProjects(false, { background: true }); } };
   document.addEventListener('visibilitychange', resume);
   window.addEventListener('online', resume);
   window.addEventListener('offline', () => { connected = false; if (session) update(session); });

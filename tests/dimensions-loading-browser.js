@@ -44,7 +44,19 @@ async page => {
   await frame.waitForFunction(()=>document.querySelectorAll('.project-preview[data-state="ready"]').length===4);
   const networkReads=imageReads;
   await frame.locator('.project-card').first().evaluate(el=>el.__retained=true);
-  const oldReads=folderReads;await frame.evaluate(()=>window.dispatchEvent(new Event('online')));
+  await frame.evaluate(()=>{
+    window.__backgroundFlashes=0;
+    new MutationObserver(()=>{if(!document.getElementById('catalogLoading').hidden)window.__backgroundFlashes++;})
+      .observe(document.getElementById('catalogLoading'),{attributes:true,attributeFilter:['hidden']});
+  });
+  const oldReads=folderReads;
+  await Promise.all([
+    page.waitForResponse(r=>r.url().includes('/rest/')&&r.url().includes(encodeURIComponent(folder))),
+    frame.evaluate(()=>{for(let i=0;i<12;i++){window.dispatchEvent(new Event('online'));document.dispatchEvent(new Event('visibilitychange'));}})
+  ]);
+  await frame.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  if(folderReads!==oldReads+1)throw Error('Background events queued repeated refreshes');
+  if(await frame.evaluate(()=>window.__backgroundFlashes))throw Error('Background synchronization displayed loading UI');
   await frame.locator('#catalogLoading').waitFor({state:'hidden'});
   if(folderReads<=oldReads||!await frame.locator('.project-card').first().evaluate(el=>el.__retained))throw Error('Unchanged refresh rebuilt cards');
   await frame.getByRole('button',{name:'资料库',exact:true}).click();
@@ -77,5 +89,5 @@ async page => {
   await frame.waitForFunction(()=>document.querySelectorAll('.project-preview[data-state="ready"]').length===4);
   if(imageReads!==networkReads)throw Error('Reload ignored persistent cache');
   if(errors.length)throw Error(errors.join(';'));
-  return {passed:true,imageReads,folderReads,checks:['parallel first load','folders visible before project response','immediate loading state','no false empty state','network preview loading','unchanged cards retained','rapid folder switching','warm folder reuse','persistent cache feedback','reduced motion','failure retains cards','explicit retry']};
+  return {passed:true,imageReads,folderReads,checks:['parallel first load','folders visible before project response','immediate loading state','no false empty state','network preview loading','unchanged cards retained','rapid folder switching','warm folder reuse','persistent cache feedback','reduced motion','failure retains cards','explicit retry','silent background sync','event storm coalescing']};
 }
