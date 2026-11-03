@@ -4075,9 +4075,9 @@
       </section>`;
       return;
     }
-    // Keep the loaded WebGL scene and any active XR session during live refreshes.
+    // Keep active annotations, folder navigation and WebGL sessions during repeated renders.
     const currentFrame = view().querySelector(".embedded-app-frame");
-    if (app.id === "store-model" && currentFrame?.getAttribute("src") === app.src) return;
+    if (["store-model", "dimensions"].includes(app.id) && currentFrame?.getAttribute("src") === app.src) return;
     view().innerHTML = `
       <iframe
         class="embedded-app-frame"

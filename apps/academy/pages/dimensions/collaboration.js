@@ -309,6 +309,7 @@
   }
   const folderPrefix = 'doc:dimension-folder:';
   async function loadFolders() {
+    const requestAtStart = catalogRequest, folderAtStart = currentFolder;
     if (!folderRead) folderRead = (async () => {
       const result = [];
       for (let offset = 0; ; offset += 100) {
@@ -316,14 +317,26 @@
         result.push(...rows.map(row => row.meta).filter(meta => meta?.kind === 'folder'));
         if (rows.length < 100) break;
       }
-      if (!allowed()) return;
-      folders = result;
-      if (currentFolder && !folders.some(f => f.id === currentFolder)) {
-        currentFolder = ''; projects = []; nextOffset = 0; listAgain = true;
-      }
+      return result;
     })().finally(() => { folderRead = null; });
-    return folderRead;
+    const result = await folderRead;
+    const active = () => allowed() && requestAtStart === catalogRequest && folderAtStart === currentFolder;
+    if (!active()) return;
+    // A shared listing may predate navigation or folder creation. Confirm an
+    // absent folder with a fresh, targeted read before changing the location.
+    if (folderAtStart && !result.some(f => f.id === folderAtStart)) {
+      const rows = await deadline(rest({ user_id: `eq.${folderPrefix}${folderAtStart}`, select: 'meta:payload->meta' }), '读取当前目录', 20000);
+      if (!active()) return;
+      const folder = rows.find(row => row.meta?.id === folderAtStart && row.meta.kind === 'folder')?.meta;
+      if (folder) folders = [...result, folder];
+      else {
+        const parentId = folders.find(f => f.id === folderAtStart)?.parentId || '';
+        folders = result;
+        enterFolder(result.some(f => f.id === parentId) ? parentId : '');
+      }
+    } else folders = result;
   }
+
   function folderPath(id) {
     const parts = [], seen = new Set();
     while (id && !seen.has(id)) {
