@@ -7,6 +7,8 @@
   let session = null, projectChannel = null, catalogChannel = null, stopped = false;
   let timer, retryTimer, pollTimer, opening = false, connected = false, listLoading = false;
   let currentFolder = '', folders = [];
+  let catalogRequest = 0, catalogPending = false, librarySignature = '', folderSignature = '', folderRead = null;
+  const catalogCache = new Map();
   let projects = [], nextOffset = 0, listAgain = false, catalogConnected = false;
   const editor = window.DimensionEditor;
   const allowed = () => !stopped && actor && auth.session?.id === actor.id && auth.canShortcut(auth.session, 'dimensions');
@@ -149,9 +151,12 @@
       if (!allowed()) return null;
       try {
         const blob = await window.DimensionImageCache.get(store.objectUrl(path) + ':preview-v1', null, async () => {
-          const response = await request(store.objectUrl(path), { headers: store.headers() });
-          if (!response.ok) throw new Error('预览下载失败');
-          return window.DimensionImages.preview(await response.blob());
+          const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 15000);
+          try {
+            const response = await request(store.objectUrl(path), { headers: store.headers(), signal: controller.signal });
+            if (!response.ok) throw new Error('预览下载失败');
+            return await window.DimensionImages.preview(await response.blob());
+          } finally { clearTimeout(timeout); }
         });
         if (!allowed()) return null;
         return URL.createObjectURL(blob);
@@ -179,10 +184,17 @@
             }
           }
           const url = await cached;
-          if (url && img.isConnected && !stopped) { img.src = url; img.hidden = false; }
+          if (url && img.isConnected && !stopped) {
+            img.src = url; await img.decode();
+            if (img.isConnected && !stopped) { img.hidden = false; img.parentElement.dataset.state = 'ready'; img.parentElement.setAttribute('aria-busy', 'false'); }
+          }
         } catch (_) {
           if (previewCache.get(key) === cached) previewCache.delete(key);
-          if (img.isConnected) img.parentElement.title = '预览暂不可用，连接恢复后自动重试';
+          if (img.isConnected) {
+            img.parentElement.title = '预览暂不可用，连接恢复后自动重试';
+            img.parentElement.dataset.state = 'error'; img.parentElement.setAttribute('aria-busy', 'false');
+            img.parentElement.querySelector('.preview-state').textContent = '预览暂不可用';
+          }
         }
         finally { previewActive--; drainPreviews(); }
       })();
@@ -201,6 +213,10 @@
     const filtered = query || $('onlyMine').checked;
     const items = projects.filter(meta => (!$('onlyMine').checked || meta.createdBy.id === actor.id) &&
       `${meta.name} ${meta.createdBy.name}`.toLocaleLowerCase().includes(query));
+    const signature = JSON.stringify([currentFolder, query, $('onlyMine').checked, items]);
+    const rebuild = signature !== librarySignature || !!document.querySelector('.project-preview[data-state="error"]');
+    librarySignature = signature;
+    if (rebuild) {
     previewObserver.disconnect(); previewQueue.length = 0;
     $('projectList').replaceChildren();
     for (const meta of items) {
@@ -208,11 +224,13 @@
       button.type = 'button'; button.className = 'project-card';
       button.setAttribute('aria-label', `${meta.name}，制作：${meta.createdBy.name}，${meta.count || 0} 条标注`);
       const preview = document.createElement('span'); preview.className = 'project-preview'; preview.append(icon('photo'));
+      preview.dataset.state = 'loading'; preview.setAttribute('aria-busy', 'true');
+      const previewState = document.createElement('span'); previewState.className = 'preview-state'; previewState.textContent = '加载中'; preview.append(previewState);
       const paths = imagePaths(meta);
       if (paths.length) {
         const img = document.createElement('img'); img.alt = ''; img.hidden = true; img.decoding = 'async'; img.onerror = () => { img.hidden = true; };
         preview.append(img); previewSources.set(preview, paths); previewObserver.observe(preview);
-      }
+      } else { preview.dataset.state = 'error'; previewState.textContent = '无可用预览'; preview.setAttribute('aria-busy', 'false'); }
       const count = document.createElement('span'); count.className = 'project-count'; count.textContent = `${meta.count || 0} 条标注`; preview.append(count);
       const info = document.createElement('span'); info.className = 'project-info';
       const name = document.createElement('strong'); name.textContent = meta.name; name.title = meta.name;
@@ -226,46 +244,83 @@
       button.addEventListener('click', () => open(meta.id).catch(reportError));
       $('projectList').append(button);
     }
+    }
     const folderCount = folders.filter(f => (f.parentId || '') === currentFolder).length;
     $('libraryMessage').textContent = [folderCount ? `${folderCount} 个文件夹` : '', items.length ? `${items.length} 张图片` : filtered ? '没有匹配的图片' : ''].filter(Boolean).join(' · ');
     $('libraryMessage').hidden = !$('libraryMessage').textContent;
-    $('libraryEmpty').hidden = items.length > 0 || folders.some(f => (f.parentId || '') === currentFolder);
+    $('libraryEmpty').hidden = catalogPending || items.length > 0 || folders.some(f => (f.parentId || '') === currentFolder);
     $('emptyTitle').textContent = filtered ? '没有找到相关项目' : '从一张图片开始';
     $('emptyDescription').textContent = filtered ? '试试其他关键词，或取消「我创建的」筛选。' : '上传需要标注的图片，和同事一起记录尺寸。';
     $('emptyCreate').hidden = Boolean(filtered);
     $('libraryEmpty').querySelector('small').hidden = Boolean(filtered);
   }
+  function catalogFeedback(loading, message = '', failed = false) {
+    catalogPending = loading;
+    $('catalogLoading').hidden = !loading && !failed;
+    $('catalogLoading').dataset.state = failed ? 'error' : 'loading';
+    $('catalogLoadingText').textContent = message;
+    $('retryCatalog').hidden = !failed;
+    $('catalogSkeleton').hidden = !loading || projects.length > 0 || folders.some(f => (f.parentId || '') === currentFolder);
+    $('projectList').setAttribute('aria-busy', String(loading));
+    if (loading || failed) $('libraryEmpty').hidden = true;
+  }
   async function loadProjects(more = false) {
     if (!allowed()) return;
     if (listLoading) { if (!more) listAgain = true; return; }
     listLoading = true;
+    const requestId = ++catalogRequest, folderAtStart = currentFolder;
+    catalogFeedback(true, more ? '正在加载更多图片…' : projects.length ? '已显示本机记录，正在同步…' : '正在加载目录…');
+    const active = () => requestId === catalogRequest && folderAtStart === currentFolder && allowed();
     try {
-      // Project summaries exclude the annotation payload; paginate large libraries.
-      const folderAtStart = currentFolder;
-      const folderFilter = currentFolder ? { 'payload->meta->>folderId': `eq.${currentFolder}` } : { or: '(payload->meta->>folderId.is.null,payload->meta->>folderId.eq.)' };
-      const rows = await rest({ ...folderFilter, user_id: `like.${prefix}*`, select: 'meta:payload->meta', order: 'updated_at.desc,user_id.asc', limit: 100, offset: more ? nextOffset : 0 });
-      if (folderAtStart !== currentFolder) { listAgain = true; return; }
-      await loadFolders();
-      if (folderAtStart !== currentFolder) { listAgain = true; return; }
-      const data = rows.map(row => row.meta).filter(meta => meta?.id && meta.createdBy);
-      projects = [...new Map((more ? [...projects, ...data] : data).map(meta => [meta.id, meta])).values()];
-      nextOffset = (more ? nextOffset : 0) + rows.length;
-      $('moreProjects').hidden = rows.length < 100;
-      renderLibrary();
+      const folderFilter = folderAtStart ? { 'payload->meta->>folderId': `eq.${folderAtStart}` } : { or: '(payload->meta->>folderId.is.null,payload->meta->>folderId.eq.)' };
+      // Independent reads start together. Render each result without waiting for the other.
+      const results = await Promise.allSettled([
+        deadline(rest({ ...folderFilter, user_id: `like.${prefix}*`, select: 'meta:payload->meta', order: 'updated_at.desc,user_id.asc', limit: 100, offset: more ? nextOffset : 0 }), '读取图片列表', 20000).then(rows => {
+          if (!active()) return;
+          const data = rows.map(row => row.meta).filter(meta => meta?.id && meta.createdBy);
+          projects = [...new Map((more ? [...projects, ...data] : data).map(meta => [meta.id, meta])).values()];
+          nextOffset = (more ? nextOffset : 0) + rows.length;
+          $('moreProjects').hidden = rows.length < 100;
+          catalogCache.delete(folderAtStart);
+          catalogCache.set(folderAtStart, { projects: [...projects], nextOffset, more: rows.length === 100 });
+          if (catalogCache.size > 20) catalogCache.delete(catalogCache.keys().next().value);
+          renderLibrary(); catalogFeedback(true, '正在同步目录…');
+        }),
+        loadFolders().then(() => {
+          if (!active()) return;
+          renderFolders(); catalogFeedback(true, projects.length ? '正在同步…' : '正在读取图片列表…');
+        })
+      ]);
+      if (!active()) return;
+      const failure = results.find(result => result.status === 'rejected');
+      if (failure) throw failure.reason;
+      catalogFeedback(false); renderLibrary();
       if (!session && !opening) { status(catalogConnected ? `已连接团队空间 · ${actor.name}` : `团队空间 · ${actor.name} · 正在恢复实时连接`, catalogConnected ? 'saved' : 'connecting'); $('retryButton').hidden = true; }
-    } catch (error) { $('libraryEmpty').hidden = true; $('libraryMessage').hidden = false; $('libraryMessage').textContent = '项目加载失败，请重试'; reportError(error); }
-    finally { listLoading = false; if (listAgain) { listAgain = false; loadProjects(); } }
+    } catch (error) {
+      if (active()) { catalogFeedback(false, projects.length ? '更新失败，当前显示本机记录' : '加载失败，请重试', true); reportError(error); }
+    } finally {
+      if (requestId === catalogRequest) {
+        listLoading = false;
+        if (listAgain) { listAgain = false; loadProjects(); }
+      }
+    }
   }
   const folderPrefix = 'doc:dimension-folder:';
   async function loadFolders() {
-    const result = [];
-    for (let offset = 0; ; offset += 100) {
-      const rows = await rest({ user_id: `like.${folderPrefix}*`, select: 'meta:payload->meta', order: 'user_id.asc', limit: 100, offset });
-      result.push(...rows.map(row => row.meta).filter(meta => meta?.kind === 'folder'));
-      if (rows.length < 100) break;
-    }
-    folders = result;
-    if (currentFolder && !folders.some(f => f.id === currentFolder)) { currentFolder = ''; listAgain = true; }
+    if (!folderRead) folderRead = (async () => {
+      const result = [];
+      for (let offset = 0; ; offset += 100) {
+        const rows = await deadline(rest({ user_id: `like.${folderPrefix}*`, select: 'meta:payload->meta', order: 'user_id.asc', limit: 100, offset }), '读取目录', 20000);
+        result.push(...rows.map(row => row.meta).filter(meta => meta?.kind === 'folder'));
+        if (rows.length < 100) break;
+      }
+      if (!allowed()) return;
+      folders = result;
+      if (currentFolder && !folders.some(f => f.id === currentFolder)) {
+        currentFolder = ''; projects = []; nextOffset = 0; listAgain = true;
+      }
+    })().finally(() => { folderRead = null; });
+    return folderRead;
   }
   function folderPath(id) {
     const parts = [], seen = new Set();
@@ -277,10 +332,19 @@
     return ['资料库', ...parts].join(' / ');
   }
   function enterFolder(id) {
-    currentFolder = id; projects = []; nextOffset = 0;
+    // Invalidate the old request; switching folders must never wait for its network response.
+    catalogRequest++; listLoading = false; listAgain = false;
+    currentFolder = id;
+    const cached = catalogCache.get(id);
+    projects = cached ? [...cached.projects] : []; nextOffset = cached?.nextOffset || 0;
+    $('moreProjects').hidden = !cached?.more;
+    catalogFeedback(true, cached ? '正在读取本机记录…' : '正在加载目录…');
     $('projectSearch').value = ''; renderLibrary(); loadProjects();
   }
   function renderFolders() {
+    const signature = JSON.stringify([currentFolder, folders]);
+    if (signature === folderSignature) return;
+    folderSignature = signature;
     $('folderBreadcrumb').replaceChildren();
     const chain = [], seen = new Set(); let id = currentFolder;
     while (id && !seen.has(id)) { seen.add(id); const f = folders.find(f => f.id === id); if (!f) break; chain.unshift(f); id = f.parentId; }
@@ -369,7 +433,7 @@
     try {
       await folderAction(managedFolder.id, operation, $('manageFolderTarget').value, managedFolder.token);
       $('manageFolderDialog').close();
-      await loadProjects();
+      catalogCache.clear(); await loadProjects();
       catalogChannel?.send({ type: 'broadcast', event: 'changed', payload: {} }).catch(() => {});
     } catch (error) {
       // Do not replay a destructive request after an uncertain network reply.
@@ -424,7 +488,7 @@
         }
         if (!saved) throw new Error('项目正在更新，请稍后重试');
       }
-      $('folderDialog').close(); await loadProjects();
+      $('folderDialog').close(); catalogCache.clear(); await loadProjects();
       catalogChannel?.send({ type: 'broadcast', event: 'changed', payload: {} }).catch(() => {});
     } catch (error) { $('folderStatus').textContent = error.message; }
     finally { $('saveFolder').disabled = false; $('cancelFolder').disabled = false; }
@@ -681,6 +745,7 @@
     (session ? $('toggleEdit') : $('newProject')).focus({ preventScroll: true });
   });
   $('retryButton').addEventListener('click', () => { if (session) { refreshCurrent(); subscribeProject(); schedule(0); } else loadProjects(); });
+  $('retryCatalog').addEventListener('click', () => loadProjects());
   $('moreProjects').addEventListener('click', () => loadProjects(true));
   $('projectSearch').addEventListener('input', renderLibrary); $('onlyMine').addEventListener('change', renderLibrary); $('allProjects').addEventListener('change', renderLibrary);
   $('copyConflict').addEventListener('click', () => { session.resolve('copy'); schedule(0); });
@@ -697,7 +762,7 @@
     sb.removeAllChannels(); stopAuth?.(); retryImageAction = null; $('imageOperation').hidden = true;
     previewObserver.disconnect(); previewQueue.length = 0;
     for (const promise of previewCache.values()) promise.then(url => { if (url) URL.revokeObjectURL(url); }).catch(() => {});
-    previewCache.clear();
+    previewCache.clear(); catalogCache.clear(); catalogRequest++;
     document.removeEventListener('visibilitychange', resume); window.removeEventListener('online', resume);
   }
   const stopAuth = auth.onChange(() => {

@@ -98,6 +98,8 @@
       </div>
       <h2 class="sr-only">项目资料库</h2>
       <div class="folder-toolbar"><nav id="folderBreadcrumb" aria-label="目录路径"></nav><button id="newFolder" class="button quiet" type="button"><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span>新建目录</span></button></div><p id="libraryMessage" class="library-count" role="status">正在加载…</p><div id="folderList" class="folder-list" aria-label="子目录"></div>
+      <div id="catalogLoading" class="catalog-loading" role="status" aria-live="polite" hidden><span class="loading-spinner" aria-hidden="true"></span><span id="catalogLoadingText">正在加载资料库…</span><button id="retryCatalog" class="button quiet" type="button" hidden>重试</button></div>
+      <div id="catalogSkeleton" class="catalog-skeleton" aria-hidden="true" hidden><span></span><span></span><span></span><span></span></div>
       <div id="projectList" class="project-grid" aria-label="共享项目"></div>
       <section id="libraryEmpty" class="library-empty" hidden>
         <div class="empty-illustration" aria-hidden="true"><div class="empty-sheet"><svg class="icon" aria-hidden="true"><use href="#photo"/></svg><span class="empty-measure"></span></div><span class="empty-pencil"><svg class="icon" aria-hidden="true"><use href="#ruler"/></svg></span></div>
