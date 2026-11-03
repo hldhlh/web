@@ -7,3 +7,4 @@ When changing any user-facing interface in this directory, read and follow `DESI
 - Use Liquid Glass only for navigation or floating control layers; keep content surfaces visually solid and simple.
 - Prefer content hierarchy and familiar platform behavior over decorative effects.
 - New navigation, controls, and motion must remain consistent with the existing system and must not communicate state through color alone.
+- Persistent user preference (2026-11-03): modern, minimal Apple-style UI is required. Follow the official HIG and the concrete directory/list, typography, spacing, and visual-review rules in `DESIGN_SYSTEM.md`. Do not substitute pill buttons, decorative glyphs, excessive bold text, or blank space for a coherent navigation hierarchy.

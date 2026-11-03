@@ -6,6 +6,7 @@
   const prefix = 'doc:dimensions:';
   let session = null, projectChannel = null, catalogChannel = null, stopped = false;
   let timer, retryTimer, pollTimer, opening = false, connected = false, listLoading = false;
+  let currentFolder = '', folders = [];
   let projects = [], nextOffset = 0, listAgain = false, catalogConnected = false;
   const editor = window.DimensionEditor;
   const allowed = () => !stopped && actor && auth.session?.id === actor.id && auth.canShortcut(auth.session, 'dimensions');
@@ -147,11 +148,11 @@
     for (const path of paths) {
       if (!allowed()) return null;
       try {
-        const response = await request(store.objectUrl(path), { headers: store.headers() });
-        if (!response.ok) continue;
-        // Decode before caching: a 200 response can still contain a broken image.
-        // Legacy projects have only original.*; generate a small local preview.
-        const blob = await window.DimensionImages.preview(await response.blob());
+        const blob = await window.DimensionImageCache.get(store.objectUrl(path) + ':preview-v1', null, async () => {
+          const response = await request(store.objectUrl(path), { headers: store.headers() });
+          if (!response.ok) throw new Error('预览下载失败');
+          return window.DimensionImages.preview(await response.blob());
+        });
         if (!allowed()) return null;
         return URL.createObjectURL(blob);
       } catch (_) { /* Try the project image if its thumbnail is missing or invalid. */ }
@@ -195,6 +196,7 @@
     drainPreviews();
   }, { rootMargin: '120px' });
   function renderLibrary() {
+    renderFolders();
     const query = $('projectSearch').value.trim().toLocaleLowerCase();
     const filtered = query || $('onlyMine').checked;
     const items = projects.filter(meta => (!$('onlyMine').checked || meta.createdBy.id === actor.id) &&
@@ -224,8 +226,10 @@
       button.addEventListener('click', () => open(meta.id).catch(reportError));
       $('projectList').append(button);
     }
-    $('libraryMessage').textContent = items.length ? `${items.length} 个项目` : filtered ? '没有匹配的项目' : '尚无项目';
-    $('libraryEmpty').hidden = items.length > 0;
+    const folderCount = folders.filter(f => (f.parentId || '') === currentFolder).length;
+    $('libraryMessage').textContent = [folderCount ? `${folderCount} 个文件夹` : '', items.length ? `${items.length} 张图片` : filtered ? '没有匹配的图片' : ''].filter(Boolean).join(' · ');
+    $('libraryMessage').hidden = !$('libraryMessage').textContent;
+    $('libraryEmpty').hidden = items.length > 0 || folders.some(f => (f.parentId || '') === currentFolder);
     $('emptyTitle').textContent = filtered ? '没有找到相关项目' : '从一张图片开始';
     $('emptyDescription').textContent = filtered ? '试试其他关键词，或取消「我创建的」筛选。' : '上传需要标注的图片，和同事一起记录尺寸。';
     $('emptyCreate').hidden = Boolean(filtered);
@@ -237,16 +241,195 @@
     listLoading = true;
     try {
       // Project summaries exclude the annotation payload; paginate large libraries.
-      const rows = await rest({ user_id: `like.${prefix}*`, select: 'meta:payload->meta', order: 'updated_at.desc,user_id.asc', limit: 100, offset: more ? nextOffset : 0 });
+      const folderAtStart = currentFolder;
+      const folderFilter = currentFolder ? { 'payload->meta->>folderId': `eq.${currentFolder}` } : { or: '(payload->meta->>folderId.is.null,payload->meta->>folderId.eq.)' };
+      const rows = await rest({ ...folderFilter, user_id: `like.${prefix}*`, select: 'meta:payload->meta', order: 'updated_at.desc,user_id.asc', limit: 100, offset: more ? nextOffset : 0 });
+      if (folderAtStart !== currentFolder) { listAgain = true; return; }
+      await loadFolders();
+      if (folderAtStart !== currentFolder) { listAgain = true; return; }
       const data = rows.map(row => row.meta).filter(meta => meta?.id && meta.createdBy);
       projects = [...new Map((more ? [...projects, ...data] : data).map(meta => [meta.id, meta])).values()];
       nextOffset = (more ? nextOffset : 0) + rows.length;
       $('moreProjects').hidden = rows.length < 100;
       renderLibrary();
       if (!session && !opening) { status(catalogConnected ? `已连接团队空间 · ${actor.name}` : `团队空间 · ${actor.name} · 正在恢复实时连接`, catalogConnected ? 'saved' : 'connecting'); $('retryButton').hidden = true; }
-    } catch (error) { $('libraryEmpty').hidden = true; $('libraryMessage').textContent = '项目加载失败，请重试'; reportError(error); }
+    } catch (error) { $('libraryEmpty').hidden = true; $('libraryMessage').hidden = false; $('libraryMessage').textContent = '项目加载失败，请重试'; reportError(error); }
     finally { listLoading = false; if (listAgain) { listAgain = false; loadProjects(); } }
   }
+  const folderPrefix = 'doc:dimension-folder:';
+  async function loadFolders() {
+    const result = [];
+    for (let offset = 0; ; offset += 100) {
+      const rows = await rest({ user_id: `like.${folderPrefix}*`, select: 'meta:payload->meta', order: 'user_id.asc', limit: 100, offset });
+      result.push(...rows.map(row => row.meta).filter(meta => meta?.kind === 'folder'));
+      if (rows.length < 100) break;
+    }
+    folders = result;
+    if (currentFolder && !folders.some(f => f.id === currentFolder)) { currentFolder = ''; listAgain = true; }
+  }
+  function folderPath(id) {
+    const parts = [], seen = new Set();
+    while (id && !seen.has(id)) {
+      seen.add(id); const folder = folders.find(f => f.id === id);
+      if (!folder) { parts.unshift('未知目录'); break; }
+      parts.unshift(folder.name); id = folder.parentId;
+    }
+    return ['资料库', ...parts].join(' / ');
+  }
+  function enterFolder(id) {
+    currentFolder = id; projects = []; nextOffset = 0;
+    $('projectSearch').value = ''; renderLibrary(); loadProjects();
+  }
+  function renderFolders() {
+    $('folderBreadcrumb').replaceChildren();
+    const chain = [], seen = new Set(); let id = currentFolder;
+    while (id && !seen.has(id)) { seen.add(id); const f = folders.find(f => f.id === id); if (!f) break; chain.unshift(f); id = f.parentId; }
+    for (const f of [{ id: '', name: '资料库' }, ...chain]) {
+      const button = document.createElement('button'); button.className = 'button quiet'; button.textContent = f.name;
+      button.type = 'button'; button.setAttribute('aria-current', f.id === currentFolder ? 'page' : 'false');
+      if (f.id === currentFolder) button.disabled = true;
+      if ($('folderBreadcrumb').childElementCount) $('folderBreadcrumb').append(icon('chevron'));
+      button.onclick = () => enterFolder(f.id); $('folderBreadcrumb').append(button);
+    }
+    $('folderList').replaceChildren();
+    for (const f of folders.filter(f => (f.parentId || '') === currentFolder).sort((a,b) => a.name.localeCompare(b.name, 'zh-CN'))) {
+      const button = document.createElement('button'); button.className = 'button folder-item'; button.type = 'button';
+      const name = document.createElement('span'); name.className = 'folder-name'; name.textContent = f.name;
+      button.append(icon('folder'), name, icon('chevron')); button.setAttribute('aria-label', f.name); button.onclick = () => enterFolder(f.id);
+      const row = document.createElement('div'); row.className = 'folder-row';
+      const more = document.createElement('button'); more.type = 'button'; more.className = 'button quiet folder-more';
+      more.textContent = '•••'; more.setAttribute('aria-label', `管理文件夹：${f.name}`); more.setAttribute('aria-haspopup', 'dialog'); more.dataset.folderActions = f.id;
+      more.onclick = () => manageFolder(f.id); row.append(button, more); $('folderList').append(row);
+    }
+  }
+  let managedFolder = null, managedMode = '', folderBusy = false, folderRequest = 0;
+  const folderDescendants = id => {
+    const ids = new Set([id]); let changed = true;
+    while (changed) { changed = false; for (const f of folders) if (ids.has(f.parentId) && !ids.has(f.id)) { ids.add(f.id); changed = true; } }
+    return ids;
+  };
+  async function folderAction(id, operation = 'inspect', target = '', token = '') {
+    ensureAllowed();
+    const response = await request(`${store.origin()}/rest/v1/rpc/dimension_folder_action`, {
+      method: 'POST', headers: store.headers({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ folder_id: id, operation, target_id: target, expected_token: token, actor })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(response.status === 404 ? '文件夹管理服务尚未启用' : data.message || '操作失败，请重试');
+    return data;
+  }
+  async function manageFolder(id) {
+    if (folderBusy) return;
+    const requestId = ++folderRequest;
+    managedFolder = null; managedMode = '';
+    $('manageFolderHeading').textContent = folders.find(f => f.id === id)?.name || '文件夹';
+    $('manageFolderStatus').textContent = '正在读取文件夹内容…';
+    $('manageFolderActions').hidden = true; $('manageFolderTargetField').hidden = true;
+    $('manageFolderDeleteField').hidden = true; $('confirmManageFolder').hidden = true;
+    $('manageFolderDialog').showModal();
+    try {
+      await loadFolders();
+      const snapshot = await folderAction(id);
+      if (!$('manageFolderDialog').open || requestId !== folderRequest) return;
+      managedFolder = { id, ...snapshot };
+      $('manageFolderHeading').textContent = snapshot.name;
+      $('manageFolderStatus').textContent = `${snapshot.folders} 个子文件夹 · ${snapshot.projects} 张图片（含全部下级）`;
+      $('manageFolderActions').hidden = false; $('chooseMoveFolder').focus();
+    } catch (error) { $('manageFolderStatus').textContent = error.message; }
+  }
+  $('chooseMoveFolder').onclick = () => {
+    managedMode = 'move'; const excluded = folderDescendants(managedFolder.id);
+    $('manageFolderTarget').replaceChildren();
+    for (const f of [{ id: '' }, ...folders]) if (!excluded.has(f.id)) {
+      const option = document.createElement('option'); option.value = f.id; option.textContent = folderPath(f.id); $('manageFolderTarget').append(option);
+    }
+    $('manageFolderTarget').value = managedFolder.parentId;
+    $('manageFolderActions').hidden = true; $('manageFolderTargetField').hidden = false;
+    $('confirmManageFolder').hidden = false; $('confirmManageFolder').textContent = '移动'; $('confirmManageFolder').className = 'button primary';
+    $('manageFolderTarget').focus();
+  };
+  $('chooseDeleteFolder').onclick = () => {
+    managedMode = 'delete'; $('manageFolderActions').hidden = true; $('manageFolderDeleteField').hidden = false;
+    document.querySelector('[name="deleteFolderMode"][value="delete_keep"]').checked = true;
+    $('confirmManageFolder').hidden = false; $('confirmManageFolder').textContent = '删除文件夹'; $('confirmManageFolder').className = 'button destructive';
+    $('cancelManageFolder').focus();
+  };
+  $('cancelManageFolder').onclick = () => $('manageFolderDialog').close();
+  $('manageFolderDialog').addEventListener('cancel', event => { if (folderBusy) event.preventDefault(); });
+  $('manageFolderDialog').addEventListener('close', () => {
+    const button = [...document.querySelectorAll('[data-folder-actions]')].find(b => b.dataset.folderActions === managedFolder?.id);
+    (button || $('newFolder')).focus({ preventScroll: true });
+  });
+  $('manageFolderForm').onsubmit = async event => {
+    event.preventDefault(); if (folderBusy || !managedFolder || !managedMode) return;
+    folderBusy = true;
+    const inputs = [...$('manageFolderForm').querySelectorAll('button, select, input')]; inputs.forEach(el => { el.disabled = true; });
+    const operation = managedMode === 'move' ? 'move' : document.querySelector('[name="deleteFolderMode"]:checked').value;
+    $('manageFolderStatus').textContent = '正在保存，请稍候…';
+    try {
+      await folderAction(managedFolder.id, operation, $('manageFolderTarget').value, managedFolder.token);
+      $('manageFolderDialog').close();
+      await loadProjects();
+      catalogChannel?.send({ type: 'broadcast', event: 'changed', payload: {} }).catch(() => {});
+    } catch (error) {
+      // Do not replay a destructive request after an uncertain network reply.
+      $('manageFolderStatus').textContent = `${error.message}。请取消并重新打开，核对最新状态后再操作。`;
+      managedMode = ''; $('confirmManageFolder').hidden = true;
+    } finally { folderBusy = false; inputs.forEach(el => { el.disabled = false; }); }
+  };
+  let folderMode = 'create', movingSession = null;
+  $('newFolder').onclick = () => {
+    folderMode = 'create'; $('folderDialogHeading').textContent = '新建目录';
+    $('folderNameField').hidden = false; $('folderName').required = true; $('folderName').value = '';
+    $('folderTargetField').hidden = true; $('folderStatus').textContent = '创建于：' + folderPath(currentFolder);
+    $('folderDialog').showModal(); $('folderName').focus();
+  };
+  $('moveProject').onclick = async () => {
+    try {
+      await loadFolders(); folderMode = 'move'; movingSession = session;
+      $('folderDialogHeading').textContent = '移动到目录'; $('folderNameField').hidden = true; $('folderName').required = false;
+      $('folderTargetField').hidden = false; $('folderTarget').replaceChildren();
+      for (const f of [{ id: '' }, ...folders]) {
+        const option = document.createElement('option'); option.value = f.id; option.textContent = folderPath(f.id); $('folderTarget').append(option);
+      }
+      $('folderTarget').value = session.row.payload.meta.folderId || '';
+      $('folderStatus').textContent = '移动后原有尺寸标注保持不变。'; $('folderDialog').showModal();
+    } catch (error) { reportError(error); }
+  };
+  $('folderDialog').addEventListener('cancel', event => { if ($('saveFolder').disabled) event.preventDefault(); });
+  $('cancelFolder').onclick = () => $('folderDialog').close();
+  $('folderForm').onsubmit = async event => {
+    event.preventDefault(); if ($('saveFolder').disabled) return; $('saveFolder').disabled = true; $('cancelFolder').disabled = true;
+    try {
+      ensureAllowed();
+      if (folderMode === 'create') {
+        const name = $('folderName').value.trim();
+        if (!name || /[\/\\]/.test(name)) throw new Error('请输入目录名称，不要包含斜杠');
+        await loadFolders();
+        if (folders.some(f => (f.parentId || '') === currentFolder && f.name === name)) throw new Error('当前目录下已有同名目录');
+        const id = crypto.randomUUID(), now = new Date().toISOString();
+        const result = await rest({}, { method: 'POST', body: JSON.stringify({ user_id: folderPrefix + id, ts: Date.now(), updated_at: now,
+          payload: { schema: 1, meta: { id, kind: 'folder', name, parentId: currentFolder, createdBy: actor, createdAt: now } } }) });
+        if (!result?.length) throw new Error('创建目录失败，请重试');
+      } else {
+        const current = movingSession, target = $('folderTarget').value;
+        if (target && !folders.some(f => f.id === target)) throw new Error('目标目录不存在');
+        let saved;
+        for (let i = 0; i < 8; i++) {
+          if (session !== current) throw new Error('项目已切换，请重试');
+          const row = await transport.read(current.row.user_id), payload = JSON.parse(JSON.stringify(row.payload));
+          payload.meta.folderId = target; payload.meta.updatedBy = actor; payload.meta.updatedAt = new Date().toISOString();
+          saved = await transport.cas(row, payload);
+          if (saved) { current.receive(saved); break; }
+        }
+        if (!saved) throw new Error('项目正在更新，请稍后重试');
+      }
+      $('folderDialog').close(); await loadProjects();
+      catalogChannel?.send({ type: 'broadcast', event: 'changed', payload: {} }).catch(() => {});
+    } catch (error) { $('folderStatus').textContent = error.message; }
+    finally { $('saveFolder').disabled = false; $('cancelFolder').disabled = false; }
+  };
+
   function setProjectLocation(id) {
     const hash = '#/apps/dimensions' + (id ? `?project=${encodeURIComponent(id)}` : '');
     window.parent.history.replaceState(window.parent.history.state, '', hash);
@@ -341,12 +524,12 @@
       const row = await deadline(transport.read(prefix + id), '读取项目');
       const meta = row.payload.meta;
       if (!meta.imagePath?.startsWith('academy/dimensions/')) throw new Error('图片路径无效');
-      imageProgress('正在打开图片', '2 / 3 · 正在下载共享图片…', meta.name);
-      const blob = await deadline((async () => {
+      imageProgress('正在打开图片', '2 / 3 · 正在读取图片缓存或下载共享图片…', meta.name);
+      const blob = await deadline(window.DimensionImageCache.get(store.objectUrl(meta.imagePath), meta.imageHash, async () => {
         const response = await request(store.objectUrl(meta.imagePath), { headers: store.headers() });
         if (!response.ok) throw new Error(`图片下载失败（${response.status}），请重试打开`);
         return response.blob();
-      })(), '下载图片');
+      }), '读取图片');
       imageProgress('正在打开图片', '3 / 3 · 正在解码图片并准备画布…');
       await showProject(row, blob);
     }, () => open(id), projects.find(meta => meta.id === id)?.name);
@@ -385,7 +568,9 @@
           if (result.ok) { thumbnailPath = path; thumbnailBytes = preview.blob.size; }
         } catch (_) { /* A preview failure must not discard the optimized main image. */ }
       }
-      const payload = pending.payload ||= { schema: 1, meta: { id, thumbnailPath, name: file.name.slice(0, 180), imagePath,
+      const imageHash = await window.DimensionImageCache.digest(main.blob);
+      await window.DimensionImageCache.put(store.objectUrl(imagePath), main.blob, imageHash);
+      const payload = pending.payload ||= { schema: 1, meta: { id, imageHash, folderId: currentFolder, thumbnailPath, name: file.name.slice(0, 180), imagePath,
         width: main.width, height: main.height, sourceWidth, sourceHeight, sourceBytes,
         imageBytes: main.blob.size, imageFormat: main.extension, thumbnailBytes,
         storedBytes: main.blob.size + thumbnailBytes,

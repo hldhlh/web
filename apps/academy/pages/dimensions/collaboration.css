@@ -289,3 +289,44 @@ body:has(.image-operation:not([hidden])) .workspace.has-image { height: auto; fl
 /* Explicit annotation deletion action, with a full touch target. */
 #workspace[data-editing="true"] .list-row .list-select { padding-right: 80px; }
 .list-row .row-delete { width: 72px; display: flex; justify-content: center; gap: 4px; color: var(--bad); font-size: .765rem; }
+
+/* Directory navigation: a single toolbar over a grouped content list. */
+.folder-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 24px 0 4px; }
+#folderBreadcrumb { display: flex; align-items: center; flex-wrap: wrap; min-width: 0; gap: 0; }
+#folderBreadcrumb .button { padding-inline: 8px; font-size: 1rem; font-weight: 400; overflow-wrap: anywhere; }
+#folderBreadcrumb .button:first-child { padding-left: 0; }
+#folderBreadcrumb .button[aria-current="page"] { color: var(--text); font-weight: 600; opacity: 1; cursor: default; background: none; }
+#folderBreadcrumb > .icon { width: 12px; height: 12px; color: var(--muted); margin-inline: 4px; }
+#newFolder { flex-shrink: 0; font-weight: 400; padding-inline: 12px; }
+#newFolder .icon { width: 18px; height: 18px; }
+.library-count { margin: 0 0 16px; color: var(--muted); font-size: .765rem; }
+.folder-list { display: flex; flex-direction: column; border-radius: 14px; background: var(--surface); overflow: hidden; margin-bottom: 24px; }
+.folder-list:empty { display: none; }
+.folder-item.button { position: relative; width: 100%; min-height: 64px; justify-content: flex-start; gap: 16px; padding: 16px 20px; border: 0; border-radius: 0; background: transparent; box-shadow: none; text-align: left; font-size: 1rem; font-weight: 400; }
+.folder-item + .folder-item::before { content: ''; position: absolute; top: 0; left: 60px; right: 0; border-top: 1px solid var(--line); }
+.folder-item > .icon:first-child { color: var(--accent); width: 1.4em; height: 1.4em; stroke-width: 1.5; }
+.folder-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.folder-item > .icon:last-child { width: .82em; height: .82em; color: var(--muted); }
+.folder-item:focus-visible { outline-offset: -3px; }
+.library-footnote { display: none; }
+@media (max-width: 600px) {
+  .folder-toolbar { gap: 8px; margin-top: 20px; }
+  #newFolder { padding-right: 0; font-size: .882rem; }
+  .folder-item.button { padding: 15px 16px; min-height: 60px; gap: 12px; }
+  .folder-item + .folder-item::before { left: 52px; }
+}
+@media (prefers-contrast: more) { .folder-list { outline: 1px solid var(--line); } }
+#folderDialog input, #folderDialog select { display: block; width: 100%; min-height: 44px; font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px; box-sizing: border-box; }
+.folder-item.button:active { background: var(--surface-2); }
+.folder-row { display: flex; align-items: center; position: relative; }
+.folder-row + .folder-row::before { content: ''; position: absolute; top: 0; left: 60px; right: 0; border-top: 1px solid var(--line); }
+.folder-row .folder-item { flex: 1; min-width: 0; }
+.folder-more.button { flex: 0 0 44px; margin-inline: 0 8px; padding: 0; letter-spacing: 2px; color: var(--muted); }
+.folder-actions { display: flex; flex-direction: column; gap: 8px; }
+.button.destructive { color: var(--bad); background: var(--surface); border-color: var(--line); }
+#manageFolderTarget { display: block; width: 100%; min-height: 44px; font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
+#manageFolderDeleteField { border: 0; margin: 0; padding: 0; }
+#manageFolderDeleteField label { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: .882rem; }
+#manageFolderDeleteField input { flex-shrink: 0; width: 20px; height: 20px; }
+#manageFolderDeleteField p { color: var(--muted); font-size: .765rem; margin-block: 12px; }
+@media (max-width: 600px) { .folder-row + .folder-row::before { left: 52px; } }

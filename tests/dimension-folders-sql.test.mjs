@@ -1,0 +1,38 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { PGlite } from '@electric-sql/pglite';
+
+test('folder transactions preserve descendants, prevent cycles and reject stale deletion', async t => {
+  const db = new PGlite(); t.after(() => db.close());
+  await db.exec(`create role anon; create role authenticated;
+    create table academy_progress(user_id text primary key,payload jsonb not null,ts bigint not null default 1,updated_at timestamptz default now());
+    grant select,insert,update,delete on academy_progress to anon;`);
+  await db.exec(readFileSync('apps/academy/sql/dimension_folders.sql', 'utf8'));
+  await db.exec('set role anon');
+  const add = (id,meta,annotations) => db.query('insert into academy_progress(user_id,payload) values($1,$2)',[id,{schema:1,meta, ...(annotations?{annotations}: {})}]);
+  const folder = (id,parentId='') => add('doc:dimension-folder:'+id,{id,name:id,parentId,kind:'folder'});
+  const call = async (id,op='inspect',target='',token='') => (await db.query('select dimension_folder_action($1,$2,$3,$4,$5) as result',[id,op,target,token,{id:'A',name:'A'}])).rows[0].result;
+  await folder('A');await folder('B','A');await folder('C','B');await folder('D');
+  await add('doc:dimensions:P',{id:'P',folderId:'C',name:'图片',imagePath:'unchanged',createdBy:{id:'original'}},{one:{id:'one',text:'120 cm'}});
+  const before=await call('A');assert.equal(before.folders,2);assert.equal(before.projects,1);
+  await assert.rejects(call('A','move','C',before.token),/子目录/);
+  await call('A','move','D',before.token);
+  assert.equal((await db.query("select payload->'meta'->>'parentId' as parent from academy_progress where user_id='doc:dimension-folder:A'")).rows[0].parent,'D');
+  assert.equal((await call('A')).projects,1);
+  const stale=await call('A');await folder('new','C');
+  await assert.rejects(call('A','delete_all','',stale.token),/内容已变化/);
+  assert.equal((await call('A')).projects,1);
+  await call('A','delete_keep','',(await call('A')).token);
+  const project=(await db.query("select payload from academy_progress where user_id='doc:dimensions:P'")).rows[0].payload;
+  assert.equal(project.meta.folderId,'D');assert.equal(project.meta.createdBy.id,'original');assert.equal(project.annotations.one.text,'120 cm');
+  assert.equal(project.meta.imagePath,'unchanged');
+  await assert.rejects(folder('late','A'),/已不存在/);
+  await call('D','delete_all','',(await call('D')).token);
+  assert.equal((await db.query('select * from academy_progress')).rows.length,0);
+  await assert.rejects(call('','delete_all'),/无效/);
+  await folder('X');await folder('Y');await folder('Z','Y');
+  await db.query("update academy_progress set payload=jsonb_set(payload,'{meta,name}','\"X\"') where user_id='doc:dimension-folder:Z'");
+  await assert.rejects(call('X','move','Y',(await call('X')).token),/同名/);
+  assert.equal((await call('X')).parentId,'');
+});

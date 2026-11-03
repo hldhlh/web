@@ -15,7 +15,28 @@
   <script src="bootstrap.js" defer></script>
 </head>
 <body data-view="library">
-  <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><symbol id="back" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></symbol><symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol><symbol id="download" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></symbol><symbol id="search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol><symbol id="refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M6.3 6.3A8 8 0 0 1 20 12M4 12a8 8 0 0 0 13.7 5.7"/></symbol><symbol id="line" viewBox="0 0 24 24"><path d="M4 18 20 6M2 15l4 6M18 3l4 6"/></symbol><symbol id="rect" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="2"/></symbol><symbol id="circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></symbol><symbol id="ruler" viewBox="0 0 24 24"><path d="m3 16 13-13 5 5L8 21H3v-5Z"/><path d="m12 7 2 2m-6 2 2 2m-6 2 2 2"/></symbol><symbol id="fit" viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><rect x="7" y="7" width="10" height="10" rx="1"/></symbol><symbol id="minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol><symbol id="photo" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1"/><path d="m3 16 5-5 5 5 3-3 5 5"/></symbol><symbol id="check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol><symbol id="cloud" viewBox="0 0 24 24"><path d="M7 18a5 5 0 1 1 .9-9.9A7 7 0 0 1 21 11a3.5 3.5 0 0 1-1 7H7Z"/></symbol></svg>
+  <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><symbol id="folder" viewBox="0 0 24 24"><path d="M3 7V5.5A1.5 1.5 0 0 1 4.5 4H9l2 3h8.5A1.5 1.5 0 0 1 21 8.5v10a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5V7Z"/></symbol><symbol id="chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol><symbol id="back" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></symbol><symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol><symbol id="download" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></symbol><symbol id="search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol><symbol id="refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M6.3 6.3A8 8 0 0 1 20 12M4 12a8 8 0 0 0 13.7 5.7"/></symbol><symbol id="line" viewBox="0 0 24 24"><path d="M4 18 20 6M2 15l4 6M18 3l4 6"/></symbol><symbol id="rect" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="2"/></symbol><symbol id="circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></symbol><symbol id="ruler" viewBox="0 0 24 24"><path d="m3 16 13-13 5 5L8 21H3v-5Z"/><path d="m12 7 2 2m-6 2 2 2m-6 2 2 2"/></symbol><symbol id="fit" viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><rect x="7" y="7" width="10" height="10" rx="1"/></symbol><symbol id="minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol><symbol id="photo" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1"/><path d="m3 16 5-5 5 5 3-3 5 5"/></symbol><symbol id="check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol><symbol id="cloud" viewBox="0 0 24 24"><path d="M7 18a5 5 0 1 1 .9-9.9A7 7 0 0 1 21 11a3.5 3.5 0 0 1-1 7H7Z"/></symbol></svg>
+  <dialog id="manageFolderDialog" class="rename-dialog" aria-labelledby="manageFolderHeading">
+    <form id="manageFolderForm">
+      <h2 id="manageFolderHeading">文件夹</h2>
+      <p id="manageFolderStatus" role="status" aria-live="polite">正在读取…</p>
+      <div id="manageFolderActions" class="folder-actions"><button id="chooseMoveFolder" class="button quiet" type="button">移动文件夹</button><button id="chooseDeleteFolder" class="button destructive" type="button">删除文件夹</button></div>
+      <label id="manageFolderTargetField" hidden>移到<select id="manageFolderTarget"></select></label>
+      <fieldset id="manageFolderDeleteField" hidden><legend>文件夹中的图片</legend>
+        <label><input type="radio" name="deleteFolderMode" value="delete_keep" checked>保留图片及标注，移到上级目录</label>
+        <label><input type="radio" name="deleteFolderMode" value="delete_all">连同所有图片项目及标注一起删除</label>
+        <p>文件夹及全部子目录将被删除。此操作无法在界面中撤销，并同步影响团队成员。</p>
+      </fieldset>
+      <div class="rename-actions"><button id="cancelManageFolder" class="button quiet" type="button">取消</button><button id="confirmManageFolder" class="button primary" type="submit" hidden>移动</button></div>
+    </form>
+  </dialog>
+  <dialog id="folderDialog" class="rename-dialog" aria-labelledby="folderDialogHeading">
+    <form id="folderForm"><h2 id="folderDialogHeading">新建目录</h2>
+    <label id="folderNameField">目录名称<input id="folderName" maxlength="80" required autocomplete="off"></label>
+    <label id="folderTargetField" hidden>目标目录<select id="folderTarget"></select></label>
+    <p id="folderStatus" role="status" aria-live="polite"></p>
+    <div class="rename-actions"><button id="cancelFolder" type="button" class="button quiet">取消</button><button id="saveFolder" class="button primary">保存</button></div></form>
+  </dialog>
   <dialog id="renameDialog" class="rename-dialog" aria-labelledby="renameHeading">
     <form id="renameForm">
       <h2 id="renameHeading">编辑项目名称</h2>
@@ -30,7 +51,7 @@
       <button id="libraryButton" aria-label="返回所有项目" class="button back-button" type="button" hidden><svg class="icon" aria-hidden="true"><use href="#back"/></svg><span>所有项目</span></button>
       <details id="projectHeading" class="project-heading" hidden>
         <summary class="project-heading-text" aria-label="项目信息"><strong id="projectTitle" title="双击编辑项目名称"></strong><span id="compactSync">同步中</span></summary>
-        <div class="project-details"><span id="projectAuthor"></span><span class="project-format">图片标注</span><span id="compactPresence"></span><button id="renameProject" class="button quiet" type="button">重命名</button></div>
+        <div class="project-details"><span id="projectAuthor"></span><span class="project-format">图片标注</span><span id="compactPresence"></span><button id="renameProject" class="button quiet" type="button">重命名</button><button id="moveProject" class="button quiet" type="button">移动目录</button></div>
       </details>
       <div class="top-actions">
         <button id="replaceImage" class="button quiet new-image" type="button"><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span class="replace-text">新建标注</span></button>
@@ -75,7 +96,8 @@
           <label class="scope-option"><input id="onlyMine" type="radio" name="projectScope" value="mine"><span>我创建的</span></label>
         </fieldset>
       </div>
-      <div class="library-section-heading"><h2>项目资料库</h2><p id="libraryMessage" role="status">正在加载…</p></div>
+      <h2 class="sr-only">项目资料库</h2>
+      <div class="folder-toolbar"><nav id="folderBreadcrumb" aria-label="目录路径"></nav><button id="newFolder" class="button quiet" type="button"><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span>新建目录</span></button></div><p id="libraryMessage" class="library-count" role="status">正在加载…</p><div id="folderList" class="folder-list" aria-label="子目录"></div>
       <div id="projectList" class="project-grid" aria-label="共享项目"></div>
       <section id="libraryEmpty" class="library-empty" hidden>
         <div class="empty-illustration" aria-hidden="true"><div class="empty-sheet"><svg class="icon" aria-hidden="true"><use href="#photo"/></svg><span class="empty-measure"></span></div><span class="empty-pencil"><svg class="icon" aria-hidden="true"><use href="#ruler"/></svg></span></div>
