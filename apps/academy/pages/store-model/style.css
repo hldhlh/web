@@ -8,12 +8,8 @@ button{transition:background-color 160ms,color 160ms,opacity 160ms;white-space:n
 button:not(:disabled):active{opacity:.65}.header-actions button{border-color:transparent;background:transparent;color:var(--accent);font-size:.9375rem}
 .view-tools button{display:flex;align-items:center;justify-content:center;gap:6px}.view-tools svg{width:20px;height:20px;flex:none}
 .loading{padding:24px;overflow:auto;justify-content:safe center}
-.load-content{width:min(100%,360px);display:flex;flex-direction:column;align-items:center;gap:12px;margin:auto}
-.load-symbol{width:40px;height:40px;color:var(--muted);flex:none;margin-bottom:4px}
-.loading h2{margin:0;font-size:1.25rem}.loading p{margin:0;font-size:.9375rem;line-height:1.5;overflow-wrap:anywhere}
-.loading .load-detail{font-size:.8125rem;font-variant-numeric:tabular-nums;min-height:1.5em}
-.load-stages{display:flex;justify-content:center;flex-wrap:wrap;gap:8px 16px;list-style:none;margin:4px 0;padding:0;font-size:.8125rem;color:var(--muted);counter-reset:stage}
-.load-stages li{counter-increment:stage}.load-stages li:before{content:counter(stage) ' ';font-variant-numeric:tabular-nums}.load-stages [aria-current=step]{color:var(--text);font-weight:600;text-decoration:underline;text-underline-offset:4px}
+.load-content{width:min(100%,220px);display:flex;flex-direction:column;align-items:center;gap:12px;margin:auto}
+.loading h2{margin:0;font-size:1.0625rem;font-weight:500}.loading p{margin:0;font-size:.9375rem;line-height:1.5;overflow-wrap:anywhere}
 .loading progress{display:block;width:100%;height:5px;margin:4px 0 0;appearance:none;border:0;border-radius:4px;overflow:hidden;background:var(--surface-2);color:var(--accent)}
 .loading progress::-webkit-progress-bar{background:var(--surface-2);border-radius:4px}.loading progress::-webkit-progress-value{background:var(--accent);border-radius:4px;transition:width 160ms linear}.loading progress::-moz-progress-bar{background:var(--accent);border-radius:4px}
 .loading progress:indeterminate{background:var(--surface-2)}.load-track[data-busy=true]:after{content:'';display:block;width:35%;height:100%;border-radius:4px;background:var(--accent);animation:load-track 1.4s ease-in-out infinite alternate}
@@ -22,8 +18,8 @@ button:not(:disabled):active{opacity:.65}.header-actions button{border-color:tra
 .gesture{white-space:normal;text-align:center;width:max-content;max-width:calc(100% - 24px);font-size:.75rem}.scene-label{font-size:.8125rem;max-width:calc(100% - 24px);flex-wrap:wrap}
 dialog{max-height:calc(100dvh - 32px);overflow:auto}dialog p{font-size:1rem}
 @media(hover:hover){button:not(:disabled):hover{background:var(--surface-2)}.primary:not(:disabled):hover{background:var(--accent);opacity:.85}}
-@media(max-width:600px){.model-app{padding:16px max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));gap:16px}h1{font-size:1.375rem}.eyebrow{font-size:.75rem}.header-actions{gap:0}.header-actions button{font-size:.8125rem;padding:8px}.viewport{min-height:340px}.loading{padding:20px}.loading h2{font-size:1.25rem}.load-stages{gap:8px 12px}.tour-heading h2{font-size:1.0625rem}.tour-heading p{font-size:.8125rem}.view-tools{top:76px}.control-panel{padding:16px}}
+@media(max-width:600px){.model-app{padding:16px max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));gap:16px}h1{font-size:1.375rem}.eyebrow{font-size:.75rem}.header-actions{gap:0}.header-actions button{font-size:.8125rem;padding:8px}.viewport{min-height:340px}.loading{padding:20px}.loading h2{font-size:1.0625rem}.tour-heading h2{font-size:1.0625rem}.tour-heading p{font-size:.8125rem}.view-tools{top:76px}.control-panel{padding:16px}}
 @media(prefers-reduced-motion:reduce){.load-track[data-busy=true]:after{animation:none;transform:translateX(90%)}.loading progress::-webkit-progress-value{transition:none}}
-@media(prefers-contrast:more){.load-symbol,.loading p,.load-stages,.eyebrow,.views span{color:var(--text)}.loading progress{outline:1px solid var(--text)}button:disabled{opacity:.65}}
+@media(prefers-contrast:more){.loading p,.eyebrow,.views span{color:var(--text)}.loading progress{outline:1px solid var(--text)}button:disabled{opacity:.65}}
 
 .load-track{position:relative;width:100%;height:5px;border-radius:4px;background:var(--surface-2);overflow:hidden;margin-top:4px;flex:none}.load-track[hidden]{display:none}.load-track progress{margin:0}.load-track[data-busy=true] progress{opacity:0}.load-track[data-busy=true]:after{position:absolute;inset:0 auto 0 0}

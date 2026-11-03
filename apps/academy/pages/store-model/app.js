@@ -20,7 +20,7 @@ const keys=new Set(), moveKeys=new Set();
 function message(text){status.textContent=text;}
 function fail(error){
   console.error(error); $('loading').hidden=false; $('load-title').textContent='模型暂时无法打开';
-  $('load-message').textContent='请检查网络并重试；如果仍失败，请使用支持 WebGL 2 的浏览器。';
+  $('load-message').hidden=false; $('load-message').textContent='请检查网络并重试；如果仍失败，请使用支持 WebGL 2 的浏览器。';
   $('progress').hidden=true;$('load-track').hidden=true; $('retry').hidden=false; message('加载失败，点击重新加载。');
 }
 $('retry').onclick=()=>location.reload();
@@ -104,15 +104,11 @@ async function init(){
   for(let i=0;i<2;i++){const controller=renderer.xr.getController(i);controller.addEventListener('selectstart',()=>{vrIndex=(vrIndex+1)%3;placeVR();});rig.add(controller);}
   canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();renderer.setAnimationLoop(null);fail(new Error('WebGL context lost'));});
   const loader=new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-  const stage=(phase,title,detail)=>{
+  const stage=(phase,title)=>{
     if($('load-title').textContent!==title)$('load-title').textContent=title;
-    $('load-message').textContent=detail;
     if(phase!=='download')$('progress').removeAttribute('value');
     $('load-track').dataset.busy=String(!$('progress').hasAttribute('value'));
     $('progress').setAttribute('aria-label',phase==='download'?'模型下载进度':title);
-    for(const item of document.querySelectorAll('[data-stage]')){
-      if(item.dataset.stage===phase)item.setAttribute('aria-current','step');else item.removeAttribute('aria-current');
-    }
   };
   const manifestResponse=await fetch('./assets/model.json',{cache:'no-cache'});
   if(!manifestResponse.ok)throw new Error('Model manifest unavailable');
@@ -121,14 +117,12 @@ async function init(){
     if(event.phase==='download'){
       const percent=Math.min(100,Math.floor(event.loaded/event.total*100));
       $('progress').value=percent;
-      stage('download','正在下载模型','下载一次，之后优先使用本机缓存');
-      $('load-detail').textContent=`${percent}% · ${(event.loaded/1000000).toFixed(1)} / ${(event.total/1000000).toFixed(1)} MB`+(event.speed>0?` · ${(event.speed/1000000).toFixed(1)} MB/s`:'');
+      stage('download','正在加载模型');
     }else if(event.phase==='fallback'){
       $('progress').removeAttribute('value');
-      stage('download','正在切换兼容下载','当前下载未完成，正在重试原始模型');
+      stage('download','正在重新连接');
     }else{
-      $('progress').value=100;stage('decode',event.phase==='cached'?'已读取本机模型':'下载完成，正在布置空间','正在解析几何与材质');
-      $('load-detail').textContent=event.phase==='cached'?'已使用本机缓存':'下载完成';
+      $('progress').value=100;stage('decode','正在准备画面');
     }
   });
   await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
@@ -146,7 +140,7 @@ async function init(){
   });
   scene.add(gltf.scene);renderer.shadowMap.needsUpdate=true;
   loaded=true;setView('overview');
-  stage('render','正在准备画面','正在生成材质与光照，即将进入门店');
+  stage('render','正在准备画面');
   await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
   await renderer.compileAsync(scene,camera);
   $('loading').hidden=true;document.querySelectorAll('[data-view],#home,#rotate,#vr').forEach(b=>b.disabled=false);
