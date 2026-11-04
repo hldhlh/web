@@ -45,6 +45,7 @@
     label('新线 25 mm');
     key('Backspace',{},document.getElementById('labelInput'));check(records.length===2,'文字输入中的删除键不删线');
     key('Delete');check(records.length===1,'Delete 就地删除选中线');
+    check(document.getElementById('canvasHint').classList.contains('is-toast') && !document.getElementById('undoDelete').hidden, '删除提示提供手机端可见的撤销入口');
     click('undoAction');check(records.length===2 && records.find(x=>x.id===created).label==='新线 25 mm','撤销删除恢复尺寸文字及标注');
     click('redoAction');check(records.length===1,'重做删除');click('undoAction');
     click('redrawSelected');move('pointerdown',[200,300]);move('pointermove',[600,450]);key('Escape');move('pointerup',[600,450]);

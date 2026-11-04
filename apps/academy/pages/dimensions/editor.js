@@ -80,7 +80,7 @@
     elements.notice.textContent = message;
     document.getElementById('undoDelete').hidden = !message.startsWith('已删除标注');
     clearTimeout(noticeTimer);
-    elements.canvasHint.classList.toggle('is-toast', /失败|导出|已复制|复制失败|不足|冲突/.test(message));
+    elements.canvasHint.classList.toggle('is-toast', /失败|导出|已复制|复制失败|不足|冲突|已删除标注|已撤销|已重做|不能覆盖/.test(message));
     noticeTimer = setTimeout(() => elements.canvasHint.classList.remove('is-toast'), 4000);
   }
   function setInspector(open) {
