@@ -37,3 +37,15 @@ test('rectangle endpoint changes rebuild renderer geometry and snapshot uses ori
  const planned=batch.plan(original,request([{...update,changes:{end:{x:200,y:200}}}]),actor);
  assert.deepEqual(planned.payload.annotations.a.points[2],{x:200,y:200});assert.equal(batch.snapshot(original).image.width,900);
 });
+
+test('curve control is validated, note supports a single anchor, and type conversion clears obsolete geometry',()=>{
+ const curve=batch.plan(row(),request([{op:'create',id:'curve',changes:{type:'curve',start:{x:10,y:10},end:{x:100,y:100},control:{x:100,y:10},label:'R20'}}]),actor);
+ assert.deepEqual(curve.payload.annotations.curve.control,{x:100,y:10});
+ assert.throws(()=>batch.plan(row(),request([{...update,changes:{type:'curve',control:{x:1000,y:10}}}]),actor),{code:'BOUNDS'});
+ const note=batch.plan(row(),request([{...update,changes:{type:'note',start:{x:50,y:50},end:{x:50,y:50},label:'模型说明'}}]),actor);
+ assert.equal(note.payload.annotations.a.type,'note');
+ const original=row();original.payload.annotations.a={...line,type:'rect',points:[line.start,{x:100,y:10},line.end,{x:10,y:100}]};
+ const converted=batch.plan(original,request([{...update,changes:{type:'curve',control:{x:50,y:20}}}]),actor);
+ assert.equal(converted.payload.annotations.a.points,undefined);
+ assert.throws(()=>batch.plan(row(),request([{...update,changes:{type:'curve'}}]),actor));
+});

@@ -8,18 +8,20 @@
   };
   const validId = value => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,120}$/.test(value) && !['__proto__','constructor','prototype'].includes(value);
   const canonical = value => JSON.stringify(value, function(k,v) { return v && typeof v==='object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(key=>[key,v[key]])) : v; });
-  const fields = ['type','start','end','points','label','labels','style','labelPosition','locked'];
+  const fields = ['type','start','end','points','control','label','labels','style','labelPosition','locked'];
   function validate(item, meta) {
-    if (!['line','rect','circle'].includes(item.type)) fail('INVALID_REQUEST','标注类型必须是 line、rect 或 circle');
+    if (!['line','rect','circle','curve','note'].includes(item.type)) fail('INVALID_REQUEST','标注类型必须是 line、rect、circle、curve 或 note');
     function point(p) {
       keys(p,['x','y']);
       if (![p.x,p.y].every(Number.isFinite) || p.x<0 || p.y<0 || p.x>meta.width || p.y>meta.height) fail('BOUNDS','坐标必须位于原图范围内');
     }
     point(item.start); point(item.end);
+    if(item.type==='curve')point(item.control);
+    if(item.control!==undefined&&item.control!==null&&item.type!=='curve')fail('GEOMETRY','控制点仅用于曲线');
     if (item.type==='circle') { const r=Math.hypot(item.end.x-item.start.x,item.end.y-item.start.y); if (item.start.x-r<0||item.start.y-r<0||item.start.x+r>meta.width||item.start.y+r>meta.height) fail('BOUNDS','圆形超出原图范围'); }
     if (item.type==='rect' && (item.start.x===item.end.x || item.start.y===item.end.y)) fail('GEOMETRY','矩形不能为零宽或零高');
-    if (item.start.x===item.end.x && item.start.y===item.end.y) fail('GEOMETRY','标注起点和终点不能重合');
-    if (item.points!==undefined) { if (item.type!=='rect' || !Array.isArray(item.points) || item.points.length!==4) fail('GEOMETRY','矩形需有四个顶点'); item.points.forEach(point); }
+    if (item.type!=='note' && item.start.x===item.end.x && item.start.y===item.end.y) fail('GEOMETRY','标注起点和终点不能重合');
+    if (item.points!==undefined && item.points!==null) { if (item.type!=='rect' || !Array.isArray(item.points) || item.points.length!==4) fail('GEOMETRY','矩形需有四个顶点'); item.points.forEach(point); }
     if (item.label!==undefined && (typeof item.label!=='string' || item.label.length>2000)) fail('INVALID_REQUEST','标注文字最多 2000 字符');
     if (item.labels!==undefined) { keys(item.labels,['top','right','bottom','left']); if (Object.values(item.labels).some(v=>typeof v!=='string'||v.length>2000)) fail('INVALID_REQUEST','边标注文字无效'); }
     if (item.style!==undefined && !['light','dark','outline'].includes(item.style)) fail('INVALID_REQUEST','标注样式无效');
@@ -65,6 +67,10 @@
         before[op.id]=old ? clone(old) : null;
         const value=op.op==='delete' ? {...old,deleted:true} : {...(old||{id:op.id,label:'',style:'light',labelPosition:'center'}),...clone(op.changes),deleted:false};
         if (op.op!=='delete') {
+          if(op.changes.type && old && op.changes.type!==old.type) {
+            if(value.type!=='rect')delete value.points;
+            if(value.type!=='curve')delete value.control;
+          }
           // A rectangle's renderer prioritizes points. Rebuild them when endpoints change.
           if (value.type==='rect' && !Object.hasOwn(op.changes,'points') && (op.changes.start||op.changes.end)) value.points=[value.start,{x:value.end.x,y:value.start.y},value.end,{x:value.start.x,y:value.end.y}].map(clone);
           validate(value,payload.meta);

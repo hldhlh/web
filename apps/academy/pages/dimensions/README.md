@@ -161,3 +161,10 @@ Delete/Backspace 删除选中标注，删除提示提供「撤销删除」。输
 - `batch.js` 是网页与本机 MCP 共用的纯校验/规划模块；`batch-ui.js` 提供网页入口。未开放跨域 postMessage、任意代码执行或公开写入服务。
 
 隔离浏览器回归：`node scripts/prepare-dimensions-batch-test.mjs` 后用本机静态服务器打开 `/output/dimensions-batch.html`；支持 `?theme=dark&large=1`。使用真实编辑器和协作模块，仅 REST 传输为假数据，无线上写入。
+
+## 轮廓标注
+
+- **描边框**：四角独立调整以贴合透视照片；选择“线内”时四边分别显示箭头与尺寸数字。top/right/bottom/left 按 points 顺序对应四条边，不是屏幕绝对方位。
+- **曲线描边**：拖出两端，选中后移动中间控制点贴合圆角。批量类型为 `curve`，必填 `start/end/control`；采用二次贝塞尔曲线。它表达照片中的投影轮廓，半径文字来自模型或实测，不能通过照片像素反算真实半径。
+- **说明**：单击放置，类型 `note`；文字定位于 start，不画引线或尺寸线，end 可与 start 相同。用于来源、不可见尺寸及厚度说明。
+- 新类型支持选择、节点调整、锁定、删除、复制、撤销、批量预览和图片导出。查看新类型前应刷新旧页面。

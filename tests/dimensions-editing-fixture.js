@@ -59,7 +59,15 @@
     click('continueDrawing');drag([100,100],[500,100]);check(records.length===4,'继续标注跨越历史线仍可绘制');
     const newest=records.at(-1);records=records.map(x=>x.id===newest.id?{...x,label:'同事修改',version:'remote'}:x);DimensionEditor.applyAnnotations(records);
     click('undoAction');check(records.length===4 && records.at(-1).label==='同事修改','撤销拒绝覆盖协作方的更新');
-    click('toggleEdit');key('Delete');check(records.length===4,'完成编辑后快捷键不写入');
+    click('curveTool');drag([200,200],[400,400]);
+    const curve=records.at(-1);check(curve.type==='curve' && curve.control,'曲线工具创建控制点');
+    label('R20');const previousControl={...records.find(x=>x.id===curve.id).control};
+    drag([previousControl.x,previousControl.y],[350,250]);check(Math.abs(records.find(x=>x.id===curve.id).control.x-350)<1,'曲线控制点可直接调整');
+    click('undoAction');check(Math.abs(records.find(x=>x.id===curve.id).control.x-previousControl.x)<1,'撤销恢复曲线控制点');check(records.find(x=>x.id===curve.id).label==='R20','调整与撤销曲线保留半径文字');
+    click('noteTool');drag([650,150],[650,150]);check(records.at(-1).type==='note','说明工具单击即可创建，无尺寸线');label('模型尺寸，非实测');
+    click('rectTool');drag([200,450],[600,600]);
+    document.querySelector('[data-label-position="inline"]').click();check(records.at(-1).labelPosition==='inline','描边框支持沿四边线内标注');
+    const count=records.length;click('toggleEdit');key('Delete');check(records.length===count,'完成编辑后快捷键不写入');
     await settle();
     window.fixtureResult={passed:true,results};
   } catch(error) {window.fixtureResult={passed:false,results,error:error.stack};}

@@ -21,7 +21,7 @@
   function scene(ctx, boxes, unit, styleFor) {
     const nodes = [];
     for (const box of boxes) {
-      if (box.inline) continue;
+      if (box.inline || box.standalone) continue;
       const style = styleFor(box.styleName);
       const points = { x1: box.anchor.x, y1: box.anchor.y,
         x2: clamp(box.anchor.x, box.x - box.width / 2, box.x + box.width / 2),

@@ -24,3 +24,9 @@ test('edge labels stay inside image and prefer the requested side when available
   assert.ok(boxes[0].x >= 70 && boxes[0].y >= 20);
   assert.ok(boxes[1].y < 300);
 });
+
+test('standalone notes remain on their anchor and constrain to image edges',()=>{
+ const labels=[{id:'note',standalone:true,anchor:{x:100,y:100},width:80,height:30},{id:'edge',standalone:true,anchor:{x:0,y:0},width:60,height:20}];
+ const boxes=layout(labels,[[{x:0,y:100},{x:300,y:100}]],300,200,1);
+ assert.equal(boxes[0].x,100);assert.equal(boxes[0].y,100);assert.equal(boxes[1].x,30);assert.equal(boxes[1].y,10);
+});

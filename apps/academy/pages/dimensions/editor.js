@@ -25,6 +25,7 @@
     lineTool: document.querySelector("#lineTool"),
     rectTool: document.querySelector("#rectTool"),
     circleTool: document.querySelector("#circleTool"),
+    curveTool: document.querySelector("#curveTool"), noteTool: document.querySelector("#noteTool"),
     styleButtons: [...document.querySelectorAll("[data-style]")],
     positionButtons: [...document.querySelectorAll("[data-label-position]")],
     lineLabelFields: document.querySelector("#lineLabelFields"),
@@ -152,7 +153,7 @@
 
   const committed = new Map(), undoStack = [], redoStack = [];
   let replaying = false, spaceHeld = false;
-  const content = item => item && JSON.stringify([item.type, item.start, item.end, item.points, item.label, item.labels, item.style, item.labelPosition, Boolean(item.locked), Boolean(item.deleted)]);
+  const content = item => item && JSON.stringify([item.type, item.start, item.end, item.points, item.control, item.label, item.labels, item.style, item.labelPosition, Boolean(item.locked), Boolean(item.deleted)]);
   function commit(item, deleted = false) {
     if (!item || !state.editing) return;
     const before = committed.get(item.id);
@@ -366,7 +367,8 @@
         const point = angle => ({ x: item.start.x + Math.cos(angle) * radius, y: item.start.y + Math.sin(angle) * radius });
         for (let i = 0; i < 48; i++) segments.push([point(i * Math.PI / 24), point((i + 1) * Math.PI / 24)]);
         segments.push([item.start, item.end]);
-      } else segments.push([item.start, item.end]);
+      } else if(item.type==='curve') { for(let i=0;i<32;i++)segments.push([curvePoint(item,i/32),curvePoint(item,(i+1)/32)]); }
+      else if(item.type!=='note')segments.push([item.start, item.end]);
     }
     labelBoxes = window.DimensionLabelLayout.layout(pendingLabels, segments, elements.canvas.width, elements.canvas.height, renderUnit);
     const scene = typography.scene(context, labelBoxes, renderUnit, visualStyle);
@@ -408,6 +410,18 @@
     queueLabel(label, (start.x + end.x) / 2, (start.y + end.y) / 2, styleName, labelPosition === "above");
   }
 
+  // Quadratic curves trace a photographed fillet; the R value comes from the model,
+  // not the control point or perspective-distorted pixels.
+  function curveControl(item) {
+    return item.control || {x:clamp((item.start.x+item.end.x)/2-(item.end.y-item.start.y)/4,0,elements.canvas.width),y:clamp((item.start.y+item.end.y)/2+(item.end.x-item.start.x)/4,0,elements.canvas.height)};
+  }
+  function curvePoint(item,t) { const c=curveControl(item),u=1-t;return {x:u*u*item.start.x+2*u*t*c.x+t*t*item.end.x,y:u*u*item.start.y+2*u*t*c.y+t*t*item.end.y}; }
+  function drawCurve(item,isDraft) {
+    const c=curveControl(item),styleName=itemStyle(item,isDraft),style=visualStyle(styleName);
+    context.save();context.beginPath();context.moveTo(item.start.x,item.start.y);context.quadraticCurveTo(c.x,c.y,item.end.x,item.end.y);
+    context.strokeStyle=style.underLine;context.lineWidth=3*renderUnit;context.stroke();context.strokeStyle=style.line;context.lineWidth=1.25*renderUnit;context.stroke();context.restore();
+    const mid=curvePoint(item,.5);if(item.label||isDraft)queueLabel(isDraft?'调整弯曲控制点':item.label,mid.x,mid.y,styleName,true);
+  }
   function drawRectangle(item, isDraft) {
     const isSelected = isDraft;
     const ratio = renderUnit * .55;
@@ -416,6 +430,10 @@
     const style = visualStyle(styleName);
     const labelPosition = itemLabelPosition(item, isDraft);
 
+    if (labelPosition==='inline' && !isDraft) {
+      ['top','right','bottom','left'].forEach((side,i)=>drawLine({...item,type:'line',start:points[i],end:points[(i+1)%4],label:item.labels?.[side]||''},false));
+      return;
+    }
     context.save();
     context.lineJoin = "round";
     context.beginPath();
@@ -550,7 +568,9 @@
 
   function drawAnnotation(item, isDraft) {
     labelOwner = item.id;
-    if (item.type === "rect") drawRectangle(item, isDraft);
+    if (item.type==='note') { queueLabel(isDraft?'说明文字':item.label||'说明',item.start.x,item.start.y,itemStyle(item,isDraft),false); pendingLabels[pendingLabels.length-1].standalone=true; }
+    else if (item.type==='curve') drawCurve(item,isDraft);
+    else if (item.type === "rect") drawRectangle(item, isDraft);
     else if (item.type === "circle") drawCircle(item, isDraft);
     else drawLine(item, isDraft);
   }
@@ -589,9 +609,11 @@
       const points = rectanglePoints(item);
       ctx.moveTo(points[0].x, points[0].y);
       points.slice(1).forEach(point => ctx.lineTo(point.x, point.y)); ctx.closePath();
-    } else if (item.type === 'circle') ctx.arc(item.start.x, item.start.y, circleRadius(item), 0, Math.PI * 2);
+    } else if (item.type==='curve') { const c=curveControl(item);ctx.moveTo(item.start.x,item.start.y);ctx.quadraticCurveTo(c.x,c.y,item.end.x,item.end.y); }
+    else if(item.type==='note') { ctx.moveTo(item.start.x,item.start.y); }
+    else if (item.type === 'circle') ctx.arc(item.start.x, item.start.y, circleRadius(item), 0, Math.PI * 2);
     else { ctx.moveTo(item.start.x, item.start.y); ctx.lineTo(item.end.x, item.end.y); }
-    if (item.type !== 'line') { ctx.fillStyle = accent; ctx.globalAlpha = .09; ctx.fill(); ctx.globalAlpha = 1; }
+    if (['rect','circle'].includes(item.type)) { ctx.fillStyle = accent; ctx.globalAlpha = .09; ctx.fill(); ctx.globalAlpha = 1; }
     ctx.strokeStyle = 'white'; ctx.lineWidth = 6 * unit; ctx.stroke();
     ctx.strokeStyle = accent; ctx.lineWidth = 2.5 * unit; ctx.stroke();
     // Shape, white halo, and explicit status also identify selection without color.
@@ -619,6 +641,8 @@
   }
 
   function handlesFor(item) {
+    if(item.type==='note')return [{key:'start',point:item.start,cursor:'move'}];
+    if(item.type==='curve')return [{key:'start',point:item.start,cursor:'move'},{key:'control',point:curveControl(item),cursor:'move'},{key:'end',point:item.end,cursor:'move'}];
     if (item.type === "rect") {
       return rectanglePoints(item).map((point, index) => ({
         key: ["nw", "ne", "se", "sw"][index], point, cursor: "move",
@@ -680,7 +704,9 @@
           distanceToSegment(point, points[2], points[3]),
           distanceToSegment(point, points[3], points[0]),
         );
-      } else if (item.type === "circle") {
+      } else if(item.type==='note') { hitDistance=Infinity; }
+      else if(item.type==='curve') { hitDistance=Math.min(...Array.from({length:32},(_,i)=>distanceToSegment(point,curvePoint(item,i/32),curvePoint(item,(i+1)/32)))); }
+      else if (item.type === "circle") {
         hitDistance = Math.abs(Math.hypot(point.x - item.start.x, point.y - item.start.y) - circleRadius(item));
       } else {
         hitDistance = distanceToSegment(point, item.start, item.end);
@@ -719,6 +745,8 @@
       y: clamp(point.y, 0, elements.canvas.height),
     };
 
+    if(item.type==='note') { item.start=nextPoint;item.end={...nextPoint};return; }
+    if(item.type==='curve') { if(!item.control)item.control=curveControl(item);item[drag.key]=nextPoint;return; }
     if (item.type === "circle") {
       if (drag.key === "center") {
         const snapshot = drag.snapshot;
@@ -788,7 +816,7 @@
     const buttons = {
       line: elements.lineTool,
       rect: elements.rectTool,
-      circle: elements.circleTool,
+      circle: elements.circleTool, curve: elements.curveTool, note: elements.noteTool,
     };
     Object.entries(buttons).forEach(([tool, button]) => {
       const active = state.tool === tool;
@@ -808,6 +836,7 @@
       line: "尺寸线模式：从起点拖动到终点",
       rect: "矩形模式：拖动框选需要标注的区域",
       circle: "圆形模式：从圆心向外拖动",
+      curve: "曲线描边：拖出两端，再选择并调整中间控制点", note: "说明模式：点击放置独立文字，不绘制尺寸线",
     };
     setNotice(notices[tool]);
     render();
@@ -838,7 +867,7 @@
     const selected = selectedAnnotation();
     const activePosition = selected?.labelPosition || state.labelPosition;
     elements.positionButtons.forEach((button) => {
-      button.disabled = !state.editing || !state.annotationsVisible || (button.dataset.labelPosition === 'inline' && (selected?.type || state.tool) !== 'line');
+      button.disabled = !state.editing || !state.annotationsVisible || (button.dataset.labelPosition === 'inline' && !['line','rect'].includes(selected?.type || state.tool));
       const active = button.dataset.labelPosition === activePosition;
       button.classList.toggle("active", active);
       button.setAttribute("aria-pressed", String(active));
@@ -877,8 +906,8 @@
     const selectionStatus = document.getElementById('selectionStatus');
     selectionStatus.hidden = !selected || !state.annotationsVisible;
     selectionStatus.textContent = selected ? `已选中 · ${state.annotations.indexOf(selected) + 1} 号标注` : '';
-    for (const button of [elements.lineTool, elements.rectTool, elements.circleTool, ...elements.styleButtons, ...elements.positionButtons, ...elements.quickLabels.querySelectorAll('button')]) button.disabled = !state.editing || !state.annotationsVisible;
-    document.getElementById('selectionType').textContent = selected ? ({ line: '尺寸线', rect: '矩形', circle: '圆形' }[selected.type] || '标注') : '未选中';
+    for (const button of [elements.lineTool, elements.rectTool, elements.circleTool, elements.curveTool, elements.noteTool, ...elements.styleButtons, ...elements.positionButtons, ...elements.quickLabels.querySelectorAll('button')]) button.disabled = !state.editing || !state.annotationsVisible;
+    document.getElementById('selectionType').textContent = selected ? ({ line: '尺寸线', rect: '描边框', circle: '圆形', curve: '曲线描边', note: '独立说明' }[selected.type] || '标注') : '未选中';
     const isRectangle = selected?.type === "rect";
     elements.exportImage.disabled = !state.image || state.annotations.length === 0;
     elements.copyImage.disabled = !state.image;
@@ -892,6 +921,8 @@
     });
     elements.editorTip.textContent = !selected ? "先在画布上拖出一条标注，再填写尺寸。" : isRectangle
       ? "四个角点可独立调节；按住 Shift 拖动可保持标准矩形。"
+      : selected?.type === "curve" ? "拖动两端和中间控制点，让曲线贴合轮廓；半径文字按模型填写。"
+      : selected?.type === "note" ? "拖动定位点移动说明；说明不会绘制尺寸线。"
       : selected?.type === "circle"
         ? "拖动圆心可整体移动；拖动外侧节点可调节半径。"
         : "尺寸线端点可自由调节；按住 Shift 可约束水平或垂直方向。";
@@ -955,6 +986,7 @@
           start: { ...item.start },
           end: { ...item.end },
           points: item.points?.map((corner) => ({ ...corner })) || null,
+          control: item.control ? {...item.control} : null,
         } : null,
       };
       state.hoverHandle = handle;
@@ -987,7 +1019,7 @@
       ? Math.abs(state.draft.end.x - state.draft.start.x) < minimum
         || Math.abs(state.draft.end.y - state.draft.start.y) < minimum
       : lineLength(state.draft) < minimum;
-    if (tooSmall) {
+    if (tooSmall && state.draft.type!=='note') {
       state.draft = null;
       if (deferredAnnotations) applyAnnotations(deferredAnnotations);
       render();
@@ -1001,6 +1033,8 @@
       style: state.annotationStyle,
       labelPosition: state.labelPosition,
     };
+    if(annotation.type==='curve')annotation.control=curveControl(annotation);
+    if(annotation.type==='note')annotation.end={...annotation.start};
     if (annotation.type === "rect") {
       annotation.start = {
         x: Math.min(state.draft.start.x, state.draft.end.x),
@@ -1020,7 +1054,7 @@
       updateInterface(); render(); setNotice('原标注已改变，请重新选择'); return;
     }
     if (original) {
-      Object.assign(annotation, { ...original, start: annotation.start, end: annotation.end, points: annotation.points });
+      Object.assign(annotation, { ...original, start: annotation.start, end: annotation.end, points: annotation.points, control: annotation.control });
       state.annotations = state.annotations.map(item => item.id === original.id ? annotation : item);
     } else state.annotations.push(annotation);
     state.redrawId = null; state.draft = null;
@@ -1029,6 +1063,7 @@
       line: "尺寸线已添加，请填写标注文字",
       rect: "矩形已添加，可填写四边文字",
       circle: "圆形已添加，请填写标注文字",
+      curve: "曲线已添加，可调整控制点并填写半径", note: "说明已添加，请填写文字",
     };
     setNotice(notices[annotation.type]);
     selectAnnotation(annotation.id, false);
@@ -1140,7 +1175,7 @@
       }
     } else if (state.handleDrag) {
       const changed = state.annotations.find(item => item.id === state.handleDrag.id);
-      const moved = JSON.stringify(state.handleDrag.snapshot) !== JSON.stringify({ start: changed.start, end: changed.end, points: changed.points || null });
+      const moved = JSON.stringify(state.handleDrag.snapshot) !== JSON.stringify({ start: changed.start, end: changed.end, points: changed.points || null, control: changed.control || null });
       state.handleDrag = null;
       if (moved) commit(changed);
       if (deferredAnnotations) applyAnnotations(deferredAnnotations);
@@ -1209,6 +1244,8 @@
   elements.lineTool.addEventListener("click", () => setTool("line"));
   elements.rectTool.addEventListener("click", () => setTool("rect"));
   elements.circleTool.addEventListener("click", () => setTool("circle"));
+  elements.curveTool.addEventListener("click", () => setTool("curve"));
+  elements.noteTool.addEventListener("click", () => setTool("note"));
 
   elements.styleButtons.forEach((button) => {
     button.addEventListener("click", () => setAnnotationStyle(button.dataset.style));
@@ -1294,7 +1331,7 @@
     const copy = structuredClone(item);
     copy.id = crypto.randomUUID(); copy.locked = false;
     for (const key of ['version','createdBy','createdAt','updatedBy','updatedAt']) delete copy[key];
-    const points = [copy.start, copy.end, ...(copy.points || [])];
+    const points = [copy.start, copy.end, ...(copy.points || []), ...(copy.control ? [copy.control] : [])];
     const dx = Math.min(20, elements.canvas.width - Math.max(...points.map(p => p.x)));
     const dy = Math.min(20, elements.canvas.height - Math.max(...points.map(p => p.y)));
     for (const point of points) { point.x += dx; point.y += dy; }

@@ -132,3 +132,5 @@ npm run check
 数据只访问 `academy_progress` 的 `doc:dimensions:<projectId>` 行，沿用网页项目结构；与通知的 `$ready` 迁移无关。每次调用仍验证店长会话，写操作遵守 `AUTO_OFFICE_READ_ONLY`。未新增数据库权限、RLS 策略或公网服务。会话与当前网页共用需用户安全注入现有会话；默认账号密码登录仍可能替换网页会话，网页批量编辑入口不发生此问题。
 
 只在最近一次 `aiBatch` 收据中保留请求签名、受影响项之前的内容及之后的版本。回包不确定时必须复用相同 requestId/expectedVersion/operations；相同 ID 不同内容报 `IDEMPOTENCY_CONFLICT`，更早批次重试报 `CONFLICT`。撤销使用新 requestId 与最新 version，不自动重试写入。原有字段完整保留，删除采用网页可兼容的 tombstone。
+
+尺寸工具同样支持 `curve`（端点 start/end、二次贝塞尔 control）和 `note`（start 定位、无尺寸线），以及 rect 的 `labelPosition: "inline"` 四边箭头。controls 不代表真实半径；R 标注需来自模型或实测。
