@@ -29,7 +29,7 @@ export class OfficeBackend {
       });
     } catch {
       // 不回传原始异常/请求体，防止密码或会话令牌出现在 AI 上下文中。
-      throw new OfficeError('NETWORK', method === 'PATCH' ? '未确认保存结果；请重新读取通知核实，勿直接重复创建。' : '服务连接失败，请检查网络或配置');
+      throw new OfficeError('NETWORK', method === 'PATCH' ? '未确认保存结果；请重新读取核实；批量操作重试必须复用 requestId。' : '服务连接失败，请检查网络或配置');
     }
     if (!response.ok) throw new OfficeError('HTTP', `服务请求失败（HTTP ${response.status}）`);
     try { return await response.json(); } catch { throw new OfficeError('RESPONSE', '服务响应格式异常'); }
@@ -86,6 +86,23 @@ export class OfficeBackend {
     if (rows.length !== 1) throw new OfficeError('CONFLICT', '内容已被其他终端修改，请重新读取并确认后重试');
     if (rows[0].payload?.token !== token || rows[0].ts !== version) throw new OfficeError('RESPONSE', '保存返回值不匹配，请重新读取核实');
     return version;
+  }
+
+  async readDimensions(projectId) {
+    const query = new URLSearchParams({ user_id: `eq.doc:dimensions:${projectId}`, select: 'user_id,payload,ts,updated_at' });
+    const rows = await this.http(`/rest/v1/academy_progress?${query}`);
+    const row = rows?.[0];
+    if (!row?.payload?.annotations || row.payload.meta?.id !== projectId || !Number.isSafeInteger(row.ts)) throw new OfficeError('NOT_FOUND', '尺寸标注项目不存在或结构无效');
+    return row;
+  }
+  async saveDimensions(row, payload) {
+    const ts = Math.max(Date.now(), row.ts + 1);
+    const query = new URLSearchParams({user_id:`eq.${row.user_id}`,ts:`eq.${row.ts}`});
+    const rows = await this.http(`/rest/v1/academy_progress?${query}`, {method:'PATCH',body:{payload,ts,updated_at:new Date(ts).toISOString()}});
+    if (!Array.isArray(rows)) throw new OfficeError('RESPONSE','未确认保存结果，请使用相同 requestId 重试核实');
+    if (!rows.length) throw new OfficeError('CONFLICT','项目已更新，请重新读取后核对');
+    if (rows.length!==1 || rows[0].ts!==ts || rows[0].payload?.aiBatch?.requestId!==payload.aiBatch.requestId) throw new OfficeError('RESPONSE','未确认保存结果，请使用相同 requestId 重试核实');
+    return rows[0];
   }
 
   async people() {

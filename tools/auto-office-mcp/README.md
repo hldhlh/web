@@ -1,6 +1,6 @@
-# Auto Office MCP（v1）
+# Auto Office MCP（v1.1）
 
-让 AI 直接查询和编辑 Auto Office，无需逐步点击浏览器。当前提供通知读写、成员查询以及课程/考试/课程分组/任务阶段摘要查询。
+让 AI 直接查询和编辑 Auto Office，无需逐步点击浏览器。当前提供通知读写、成员查询、课程/考试/课程分组/任务阶段摘要查询，以及尺寸标注批量编辑。
 
 ## 运行与接入
 
@@ -90,7 +90,7 @@
 - 更新请求带 `user_id=eq...&ts=eq...`，数据库原子比较版本；空返回判为冲突，不自动重试写请求。这样与网页 `reliable-store.js` 的保存方式兼容。
 - 更新行会触发现有 Postgres Realtime；网页也会继续按既有轮询策略拉取。编辑中的网页保持现有冲突处理，不强制刷新编辑表单。
 - 本版未修改数据库 RLS。MCP 的角色校验是本地进程内的应用控制，**不是数据库权限加固**；持有公开 key 的其他程序仍受现有数据库策略约束。若需面对不可信网络客户端，必须先将会话验证、角色判断和 CAS 写入放到同一服务端事务/RPC，并配置审计与远端授权，不能直接把本进程转发到公网。
-- 本版没有删除、任意 SQL、任意表、任意文件读写、权限管理或密码修改工具。业务内容作为不可信数据处理，不能当作给 AI 的指令。
+- 本版仅支持尺寸标注的可撤销软删除，不提供通知删除、任意 SQL、任意表、任意文件读写、权限管理或密码修改工具。业务内容作为不可信数据处理，不能当作给 AI 的指令。
 - 启动和协议验证可以离线完成；真实账号操作需要配置凭据。自动测试全部使用隔离假后端，不创建线上测试通知。
 
 ## 后续扩展规范
@@ -117,3 +117,18 @@ npm run check
 ```
 
 参考：[MCP 服务端开发](https://modelcontextprotocol.io/docs/develop/build-server)、[Supabase RPC](https://supabase.com/docs/reference/javascript/rpc)。依赖使用精确版本并提交 lockfile。
+
+## v1.1：尺寸标注接口
+
+| 工具 | 输入 | 行为 |
+| --- | --- | --- |
+| `office_dimensions_get` | `projectId` UUID | 获取原图尺寸、标注 ID/坐标/文字及文档 version |
+| `office_dimensions_preview` | `projectId, expectedVersion, requestId, operations` | 纯校验、返回修改前后差异，不写入 |
+| `office_dimensions_apply` | 同 preview | 整批 CAS 保存；相同 requestId 和内容重试去重 |
+| `office_dimensions_undo` | `projectId, expectedVersion, requestId` | 撤销最近一批 AI 修改，拒绝覆盖后来修改的标注 |
+
+先 get → preview → apply；需要浏览器视觉预览时使用网页“AI 批量编辑”。操作格式、坐标规则、限制及示例见 [尺寸标注说明](../../apps/academy/pages/dimensions/README.md#ai-批量编辑)。项目 ID 可从网页 URL 的 `project=` 取得。本版不自动上传图片、不修改项目名称或创建项目，不把“模型尺寸”伪装成实测尺寸。
+
+数据只访问 `academy_progress` 的 `doc:dimensions:<projectId>` 行，沿用网页项目结构；与通知的 `$ready` 迁移无关。每次调用仍验证店长会话，写操作遵守 `AUTO_OFFICE_READ_ONLY`。未新增数据库权限、RLS 策略或公网服务。会话与当前网页共用需用户安全注入现有会话；默认账号密码登录仍可能替换网页会话，网页批量编辑入口不发生此问题。
+
+只在最近一次 `aiBatch` 收据中保留请求签名、受影响项之前的内容及之后的版本。回包不确定时必须复用相同 requestId/expectedVersion/operations；相同 ID 不同内容报 `IDEMPOTENCY_CONFLICT`，更早批次重试报 `CONFLICT`。撤销使用新 requestId 与最新 version，不自动重试写入。原有字段完整保留，删除采用网页可兼容的 tombstone。

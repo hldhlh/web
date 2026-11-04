@@ -38,7 +38,7 @@ const result = value => JSON.parse(value.content[0].text);
 
 test('MCP protocol discovers tools and guide without accessing backend', async t => {
   const f = await fixture(t);
-  assert.equal((await f.client.listTools()).tools.length,7);
+  assert.equal((await f.client.listTools()).tools.length,11);
   assert.match((await f.client.readResource({uri:'auto-office://guide'})).contents[0].text,/version/);
   assert.equal(f.requests.length,0);
 });
@@ -116,7 +116,7 @@ test('real stdio process initializes and exposes tools without credentials or ne
   const client = new Client({name:'stdio-test',version:'1'});
   t.after(() => client.close());
   await client.connect(transport);
-  assert.equal((await client.listTools()).tools.length,7);
+  assert.equal((await client.listTools()).tools.length,11);
   const status = result(await client.callTool({name:'office_status',arguments:{}}));
   assert.equal(status.code,'CONFIG');
 });
@@ -127,4 +127,24 @@ test('write network uncertainty is surfaced without retry or leaking response da
   const snapshot={row:{ts:1,payload:{}},value:{data:{}}};
   await assert.rejects(backend.saveContent(snapshot,{notices:[]},'operation'),error=>error.code==='NETWORK' && /核实/.test(error.message) && !error.message.includes('secret'));
   assert.equal(calls,1);
+});
+
+test('dimensions MCP preview/apply/undo use CAS, retain fields and deduplicate uncertain replies', async t => {
+  const projectId='10000000-0000-4000-8000-000000000001';
+  let row={user_id:`doc:dimensions:${projectId}`,ts:10,payload:{meta:{id:projectId,width:900,height:650},annotations:{a:{id:'a',type:'line',start:{x:10,y:10},end:{x:100,y:100},label:'before',version:'v1',createdAt:'2026',unknown:1}},future:true}},writes=0,conflict=false;
+  const backend=new OfficeBackend({url:'https://project.supabase.co',key:'public',session:{userId:'u',sessionToken:'secret'},request:async(url,init)=>{
+    if(url.includes('/rpc/'))return Response.json({ok:true,user:{id:'u',name:'测试',role:'manager'}});
+    const query=new URL(url).searchParams;assert.equal(query.get('user_id'),`eq.doc:dimensions:${projectId}`);
+    if(init.method==='PATCH'){writes++;assert.equal(query.get('ts'),`eq.${row.ts}`);if(conflict)return Response.json([]);row={...row,...JSON.parse(init.body)};}
+    return Response.json([row]);
+  }});
+  const server=createServer(backend),client=new Client({name:'test',version:'1'}),[a,b]=InMemoryTransport.createLinkedPair();await server.connect(a);await client.connect(b);t.after(async()=>{await client.close();await server.close();});
+  const call=async(name,args)=>result(await client.callTool({name:`office_dimensions_${name}`,arguments:args}));
+  assert.equal((await call('get',{projectId})).annotations[0].label,'before');
+  const input={projectId,expectedVersion:10,requestId:'batch1',operations:[{op:'update',id:'a',changes:{label:'after'}}]};
+  assert.equal((await call('preview',input)).changes.length,1);assert.equal(writes,0);
+  const saved=await call('apply',input);assert.equal(saved.annotations[0].label,'after');assert.equal(saved.annotations[0].unknown,1);assert.equal(row.payload.future,true);
+  assert.equal((await call('apply',input)).alreadyApplied,true);assert.equal(writes,1);
+  conflict=true;assert.equal((await call('apply',{...input,requestId:'batch2',expectedVersion:row.ts})).code,'CONFLICT');assert.equal(writes,2);conflict=false;
+  const undone=await call('undo',{projectId,expectedVersion:row.ts,requestId:'undo1'});assert.equal(undone.annotations[0].label,'before');
 });

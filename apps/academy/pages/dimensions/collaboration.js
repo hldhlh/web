@@ -681,8 +681,34 @@
       editor.notice(`图片已优化并共享 · ${window.DimensionImages.formatBytes(main.blob.size)}`);
     }, () => create(file, pending), file.name);
   }
-  window.DimensionCollab = { actor, create, edit(item, deleted) {
-    if (!allowed() || !session) return;
+  let batchSaving = false;
+  window.DimensionCollab = { actor, create,
+    snapshot() {
+      ensureAllowed();
+      if (!session || session.dirty || session.saving || batchSaving || editor.busy()) throw new Error('请先完成当前操作并等待同步，再打开批量编辑');
+      return window.DimensionBatch.snapshot(session.row);
+    },
+    previewBatch(input) {
+      this.snapshot();
+      return window.DimensionBatch.plan(session.row,input,actor);
+    },
+    async applyBatch(input) {
+      this.snapshot();
+      const current=session;
+      batchSaving=true; current.saving=true; current.notify();
+      try {
+        const row=await transport.read(current.row.user_id);
+        ensureAllowed();
+        if (session!==current) throw new Error('项目已切换');
+        current.receive(row);
+        const plan=window.DimensionBatch.plan(row,input,actor);
+        const saved=plan.alreadyApplied ? row : await transport.cas(row,plan.payload);
+        if (!saved) throw new Error('项目已更新，请重新导出并预览');
+        current.receive(saved);
+        return window.DimensionBatch.snapshot(saved);
+      } finally { batchSaving=false; current.saving=false; current.notify(); }
+    }, edit(item, deleted) {
+    if (!allowed() || !session || batchSaving) return;
     const result = session.edit(item, deleted); schedule(); return result;
   } };
   let renameSession = null, renameBase = '', renaming = false;
@@ -771,7 +797,7 @@
   document.addEventListener('visibilitychange', resume);
   window.addEventListener('online', resume);
   window.addEventListener('offline', () => { connected = false; if (session) update(session); });
-  window.addEventListener('beforeunload', event => { if (session?.dirty || opening || renaming) { event.preventDefault(); event.returnValue = ''; } });
+  window.addEventListener('beforeunload', event => { if (session?.dirty || opening || renaming || batchSaving) { event.preventDefault(); event.returnValue = ''; } });
   function stop() {
     stopped = true; $('renameDialog').close(); clearTimeout(timer); clearTimeout(retryTimer); clearInterval(pollTimer);
     sb.removeAllChannels(); stopAuth?.(); retryImageAction = null; $('imageOperation').hidden = true;

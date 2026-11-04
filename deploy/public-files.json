@@ -348,6 +348,8 @@
   "apps/academy/icon.svg",
   "apps/academy/index.html",
   "apps/academy/materials/front-safety-onboarding.docx",
+  "apps/academy/pages/dimensions/batch-ui.js",
+  "apps/academy/pages/dimensions/batch.js",
   "apps/academy/pages/dimensions/bootstrap.js",
   "apps/academy/pages/dimensions/collaboration.css",
   "apps/academy/pages/dimensions/collaboration.js",

@@ -234,6 +234,11 @@
   }
 
   window.DimensionEditor = { openImage, applyAnnotations, fit: updateFit, notice: setNotice,
+    batchPreview(items, canvas) {
+      const original=state.annotations, selected=state.selectedId;
+      try { state.annotations=structuredClone(items); state.selectedId=null; render(true); canvas.width=elements.canvas.width; canvas.height=elements.canvas.height; canvas.getContext('2d').drawImage(elements.canvas,0,0); }
+      finally { state.annotations=original; state.selectedId=selected; render(); }
+    },
     busy: () => Boolean(state.draft || state.handleDrag) };
 
   // Match the displayed percentage: 600% of the original image, on every viewport.
@@ -1320,7 +1325,7 @@
 
   window.addEventListener("keydown", event => {
     const typing = /INPUT|TEXTAREA|SELECT/.test(event.target.tagName) || event.target.isContentEditable;
-    if (typing || !state.editing) return;
+    if (typing || !state.editing || document.querySelector('dialog[open]')) return;
     if (event.code === 'Space') { spaceHeld = true; event.preventDefault(); }
     else if (event.key === 'Escape') {
       event.preventDefault(); cancelDrawing(); state.redrawId = null; state.selectedId = null;

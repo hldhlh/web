@@ -131,3 +131,33 @@ npm run check
 Delete/Backspace 删除选中标注，删除提示提供「撤销删除」。输入框内的删除、撤销保留原生文字编辑行为。Cmd/Ctrl+Z 撤销，Cmd/Ctrl+Shift+Z 重做；新增、编辑、端点、重画、复制、锁定和删除均记录本次打开项目内最多 100 次操作。撤销使用当前版本提交，检测到同条标注内容已被更新时拒绝覆盖；继续沿用协作层的版本冲突处理。空格+鼠标拖动临时平移；Esc 取消草稿或未提交端点操作。
 
 运行 `node scripts/prepare-dimensions-test.mjs` 后从本机静态服务器打开 `/output/dimensions-editing.html`。该夹具直接加载当前页面与编辑器，模拟版本化协作回调，检查绘制隔离、触屏控件、就地删除、撤销/重做、取消重画、锁定、复制和协作修改保护；不连接生产接口。可加 `?theme=dark&large=1` 验证深色与放大字号。生成文件不进入发布清单。
+
+## AI 批量编辑
+
+展开项目标题的资料菜单 → **AI 批量编辑**。导出 JSON（原图尺寸、标注 ID、版本和示例），粘贴编辑指令 → 预览修改 → 应用并保存。该入口沿用当前网页登录，不需要 MCP 账号，也不会替换登录会话。预览显示原图方向下完整标注结果；仅用于检查落点与文字，不从照片自动推断真实尺寸。
+
+```json
+{
+  "projectId": "项目 UUID",
+  "expectedVersion": 读取或导出时的整数版本,
+  "requestId": "每批唯一 ID，重试必须复用",
+  "operations": [
+    {"op":"update","id":"已有标注ID","changes":{"label":"宽 140 mm","start":{"x":100,"y":200},"end":{"x":500,"y":200}}},
+    {"op":"create","id":"新标注ID","changes":{"type":"line","start":{"x":100,"y":200},"end":{"x":100,"y":600},"label":"高 140 mm"}},
+    {"op":"delete","id":"要删除的标注ID"}
+  ]
+}
+```
+
+- 原图左上角为 (0,0)，x 向右、y 向下；坐标不随网页缩放、滚动、旋转改变。
+- 一批 1–100 项，每个 ID 只能操作一次。changes 只支持 type、start、end、points、label、labels、style、labelPosition、locked；作者、时间、版本由系统生成。
+- 类型 line/rect/circle；circle 的 start 为圆心、end 为圆周上的点。rect 的 points 为四个有序顶点，修改 start/end 且未指定 points 时自动重建顶点。
+- 样式 light/dark/outline；文字位置 center/above/inline；矩形 labels 包含 top/right/bottom/left。
+- 越界、重复 ID、锁定项、非法字段会使整批拒绝。锁定项需先提交仅含 `locked:false` 的解锁操作。
+- 同一项目一行 CAS 保存，不通过逐条 Session.edit 排队，因此不会出现半批保存。任何文档版本冲突都需要重新读取并核对。
+- 最新批次的 requestId 和内容签名随项目保存。回包丢失时复用原请求核实，避免重复创建；更早批次的重试由旧版本检查拒绝。
+- 撤销上一批先预览，后一次保存。若该批目标标注后来被改动则拒绝撤销；其他未涉及标注保留。只保留最近一次批次收据，撤销不支持连续撤回多个批次。
+- 网页对话框关闭后保留本页未提交指令；刷新页面前请自行保留 JSON。保存期间阻止关闭对话框，离开页面有提示。
+- `batch.js` 是网页与本机 MCP 共用的纯校验/规划模块；`batch-ui.js` 提供网页入口。未开放跨域 postMessage、任意代码执行或公开写入服务。
+
+隔离浏览器回归：`node scripts/prepare-dimensions-batch-test.mjs` 后用本机静态服务器打开 `/output/dimensions-batch.html`；支持 `?theme=dark&large=1`。使用真实编辑器和协作模块，仅 REST 传输为假数据，无线上写入。

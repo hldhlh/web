@@ -30,8 +30,9 @@
     window.addEventListener('pagehide', () => observer.disconnect(), { once: true });
     if (!parent.supabase?.createClient) await load('../../../vendor/supabase.min.js');
     window.supabase = parent.supabase || window.supabase;
-    await Promise.all(['image-cache.js', 'model.js', 'image-processing.js', 'editor.js'].map(load));
+    await Promise.all(['image-cache.js', 'model.js', 'batch.js', 'image-processing.js', 'editor.js'].map(load));
     await load('collaboration.js');
+    await load('batch-ui.js');
     if (!window.DimensionCollab) throw new Error('标注工具初始化失败，请重新加载');
     if (document.getElementById('workspace').getAttribute('aria-busy') !== 'true') operation.hidden = true;
   }

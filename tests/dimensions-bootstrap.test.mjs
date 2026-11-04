@@ -36,7 +36,7 @@ for (const sharedClient of [false, true]) {
     await new Promise(resolve => setImmediate(resolve));
     assert.deepEqual(missing, [], 'Every dynamically requested script must be in the deployment allowlist');
     assert.ok(requested.includes('image-cache.js'));
-    assert.equal(requested.at(-1), 'collaboration.js');
+    assert.deepEqual(requested.slice(-2), ['collaboration.js', 'batch-ui.js']);
     assert.ok(window.DimensionCollab);
     assert.equal(node('imageOperation').hidden, true);
   });
