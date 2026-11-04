@@ -5,6 +5,17 @@
   const visible = doc => Object.values(doc.annotations || {}).filter(item => !item.deleted)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 
+  function attribution(item) {
+    const origin = item.attribution;
+    if (origin?.kind === 'ai') return 'AI标注';
+    if (origin?.kind === 'human') return `制作：${origin.actor?.name || '员工'}`;
+    // Legacy agent-created annotations have no explicit source field.
+    const actor = item.updatedBy || item.createdBy;
+    if (/^(codex|ai|assistant)$/i.test(actor?.id || '') || /^(codex|ai)$/i.test(actor?.name || '')) return 'AI标注';
+    if (/^(codex|ai|assistant)$/i.test(item.createdBy?.id || '')) return `制作：${actor?.name || '员工'}`;
+    return `制作：${item.createdBy?.name || '员工'}` + (item.updatedBy?.id && item.updatedBy.id !== item.createdBy?.id ? ` · 修改：${item.updatedBy.name}` : '');
+  }
+
   // A project is one CAS-protected row. Each annotation has its own version,
   // so independent edits merge while edits to the same annotation need review.
   class Session {
@@ -34,7 +45,8 @@
       const previous = this.pending.get(item.id);
       const value = { ...copy(item), version: crypto.randomUUID(), deleted,
         createdBy: item.createdBy || this.actor, createdAt: item.createdAt || new Date().toISOString(),
-        updatedBy: this.actor, updatedAt: new Date().toISOString() };
+        updatedBy: this.actor, updatedAt: new Date().toISOString(),
+        attribution: { kind: 'human', actor: copy(this.actor) } };
       this.pending.set(item.id, { base: previous ? previous.base : version(item), value });
       this.error = '';
       this.notify();
@@ -98,7 +110,7 @@
       finally { this.saving = false; this.notify(); }
     }
   }
-  const api = { Session, visible, version };
+  const api = { Session, visible, version, attribution };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.DimensionModel = api;
 })(globalThis);

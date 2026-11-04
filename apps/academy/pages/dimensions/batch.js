@@ -75,7 +75,7 @@
           if (value.type==='rect' && !Object.hasOwn(op.changes,'points') && (op.changes.start||op.changes.end)) value.points=[value.start,{x:value.end.x,y:value.start.y},value.end,{x:value.start.x,y:value.end.y}].map(clone);
           validate(value,payload.meta);
         }
-        payload.annotations[op.id]=stamp(value);
+        payload.annotations[op.id]=stamp({...value,attribution:{kind:'ai',actor:clone(actor)}});
         changes.push({id:op.id,action:op.op,before:before[op.id],after:clone(payload.annotations[op.id])});
       }
     }

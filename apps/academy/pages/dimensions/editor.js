@@ -949,7 +949,7 @@
       label.classList.toggle("is-placeholder", !summary);
       const author = document.createElement("small");
       author.className = "annotation-author";
-      author.textContent = `制作：${item.createdBy?.name || "员工"}` + (item.updatedBy?.id && item.updatedBy.id !== item.createdBy?.id ? ` · 修改：${item.updatedBy.name}` : '');
+      author.textContent = window.DimensionModel.attribution(item);
       selectButton.append(author);
       selectButton.addEventListener("click", () => selectAnnotation(item.id, true));
 
