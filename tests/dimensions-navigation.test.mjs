@@ -70,7 +70,7 @@ test('repeated host renders preserve the dimensions iframe, but revoking permiss
 
 test('opening a linked project and returning restores its folder and reloads navigation', async () => {
   const showProject = source.slice(source.indexOf('  async function showProject('), source.indexOf('  async function open('));
-  const backHandler = source.slice(source.indexOf("  $('libraryButton').addEventListener('click', async () => {"), source.indexOf("  $('emptyCreate').addEventListener"));
+  const backHandler = source.slice(source.indexOf('  async function returnToFolder('), source.indexOf("  $('emptyCreate').addEventListener"));
   const elements = new Map();
   const element = id => {
     if (!elements.has(id)) elements.set(id, { hidden: false, textContent: '', addEventListener(_type, fn) { this.click = fn; } });
@@ -83,6 +83,7 @@ test('opening a linked project and returning restores its folder and reloads nav
     const document = { body: { dataset: {} } }, localStorage = { getItem: () => null }, transport = {};
     const ensureAllowed = () => {}, update = () => {}, setProjectLocation = () => {}, subscribeProject = () => {}, schedule = () => {};
     const sb = { removeChannel() {} }, enterFolder = id => { returnedTo = id; };
+    const renderEditorBreadcrumb = () => {}, loadFolders = async () => {}, reportError = () => {};
     ${showProject}
     ${backHandler}
     return { showProject, back: () => $('libraryButton').click(), location: () => returnedTo };
@@ -91,4 +92,23 @@ test('opening a linked project and returning restores its folder and reloads nav
   await fixture.back();
   assert.equal(fixture.location(), 'child');
   assert.equal(element('library').hidden, false);
+});
+
+
+test('editor breadcrumb opens the selected ancestor', async () => {
+  const render = source.slice(source.indexOf('  function renderEditorBreadcrumb()'), source.indexOf('  function renderFolders()'));
+  const nav = { children: [], replaceChildren() { this.children = []; }, append(el) { this.children.push(el); }, get childElementCount() { return this.children.length; } };
+  const fixture = new Function('nav', 'folders', `
+    let currentFolder = 'child', target;
+    const $ = () => nav, icon = () => ({}), returnToFolder = id => { target = id; };
+    const document = { createElement: () => ({}) };
+    ${render}
+    return { renderEditorBreadcrumb, target: () => target };
+  `)(nav, [{...parent, name: '后厨'}, {...child, name: '小器具'}]);
+  fixture.renderEditorBreadcrumb();
+  const buttons = nav.children.filter(el => el.onclick);
+  assert.deepEqual(buttons.map(el => el.textContent), ['资料库', '后厨', '小器具']);
+  buttons[1].onclick(); assert.equal(fixture.target(), 'parent');
+  buttons[0].onclick(); assert.equal(fixture.target(), '');
+  buttons[2].onclick(); assert.equal(fixture.target(), 'child');
 });

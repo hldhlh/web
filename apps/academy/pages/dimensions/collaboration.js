@@ -70,6 +70,7 @@
       model.saving ? '正在保存团队标注…' : model.dirty ? '修改已保留在本机 · 等待同步' :
       connected ? '已保存至云端 · 实时协作中' : '已保存至云端 · 正在恢复实时连接'), model.conflicts.size ? 'conflict' : model.error || model.cacheError ? 'error' : model.dirty || model.saving ? 'saving' : connected ? 'saved' : 'connecting');
     const meta = model.row.payload.meta;
+    if (currentFolder !== (meta.folderId || '')) { currentFolder = meta.folderId || ''; renderEditorBreadcrumb(); }
     $('projectTitle').textContent = meta.name;
     $('projectAuthor').textContent = meta.createdBy.id === meta.updatedBy.id
       ? `制作：${meta.createdBy.name}` : `制作：${meta.createdBy.name} · 最近修改：${meta.updatedBy.name}`;
@@ -356,7 +357,25 @@
     catalogFeedback(true, cached ? '正在读取本机记录…' : '正在加载目录…');
     $('projectSearch').value = ''; renderLibrary(); loadProjects();
   }
+  function renderEditorBreadcrumb() {
+    const nav = $('editorBreadcrumb');
+    nav.replaceChildren();
+    const chain = [], seen = new Set(); let id = currentFolder;
+    while (id && !seen.has(id)) {
+      seen.add(id); const folder = folders.find(f => f.id === id);
+      if (!folder) break;
+      chain.unshift(folder); id = folder.parentId;
+    }
+    for (const folder of [{ id: '', name: '资料库' }, ...chain]) {
+      if (nav.childElementCount) nav.append(icon('chevron'));
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = 'button quiet'; button.textContent = folder.name;
+      button.onclick = () => returnToFolder(folder.id);
+      nav.append(button);
+    }
+  }
   function renderFolders() {
+    renderEditorBreadcrumb();
     const signature = JSON.stringify([currentFolder, folders]);
     if (signature === folderSignature) return;
     folderSignature = signature;
@@ -502,6 +521,7 @@
           if (saved) { current.receive(saved); break; }
         }
         if (!saved) throw new Error('项目正在更新，请稍后重试');
+        currentFolder = target; renderEditorBreadcrumb();
       }
       $('folderDialog').close(); catalogCache.clear(); await loadProjects();
       catalogChannel?.send({ type: 'broadcast', event: 'changed', payload: {} }).catch(() => {});
@@ -591,7 +611,9 @@
     session = new window.DimensionModel.Session({ row, actor, transport, restored,
       persist: entries => entries.length ? localStorage.setItem(key, JSON.stringify(entries)) : localStorage.removeItem(key), changed: update });
     session.checkConflicts(); session.notify();
-    $('libraryButton').hidden = false;
+    $('libraryButton').hidden = false; $('editorBreadcrumb').hidden = false;
+    renderEditorBreadcrumb();
+    loadFolders().then(renderEditorBreadcrumb).catch(reportError);
     setProjectLocation(id); subscribeProject(); if (session.dirty) schedule();
   }
   async function open(id) {
@@ -806,7 +828,7 @@
     } catch (error) { $('deleteProjectStatus').textContent = error.message || '删除失败，请重试'; }
     finally { deleting = false; $('confirmDeleteProject').disabled = false; $('cancelDeleteProject').disabled = false; }
   });
-  $('libraryButton').addEventListener('click', async () => {
+  async function returnToFolder(target) {
     if (opening) return;
     if (session?.saving) { editor.notice('正在保存，请稍后返回'); return; }
     if (session?.dirty) {
@@ -817,9 +839,10 @@
     projectChannel = null; session = null; connected = false; clearTimeout(retryTimer);
     document.body.dataset.view = 'library';
     $('workspace').hidden = true; $('projectHeading').hidden = true; $('library').hidden = false;
-    $('libraryButton').hidden = true; $('presenceStatus').textContent = ''; $('compactPresence').textContent = ''; $('projectHeading').open = false;
-    $('exportImage').disabled = true; setProjectLocation(null); enterFolder(currentFolder);
-  });
+    $('libraryButton').hidden = true; $('editorBreadcrumb').hidden = true; $('presenceStatus').textContent = ''; $('compactPresence').textContent = ''; $('projectHeading').open = false;
+    $('exportImage').disabled = true; setProjectLocation(null); enterFolder(target);
+  }
+  $('libraryButton').addEventListener('click', () => returnToFolder(currentFolder));
   $('emptyCreate').addEventListener('click', () => $('newProject').click());
   $('newProject').addEventListener('click', () => { $('fileInput').value = ''; $('fileInput').click(); });
   $('retryImageOperation').addEventListener('click', () => { if (!opening) retryImageAction?.(); });

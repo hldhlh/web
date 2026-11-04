@@ -372,3 +372,9 @@ body:has(.image-operation:not([hidden])) .workspace.has-image { height: auto; fl
 #batchPreview { width: 100%; height: min(38vh, 360px); object-fit: contain; background: var(--canvas-bg); border: 1px solid var(--line); }
 #batchStatus { overflow-wrap: anywhere; }
 @media (max-width: 480px) { .batch-dialog { padding: 16px; } }
+
+.editor-breadcrumb { display: flex; align-items: center; flex-wrap: wrap; gap: 0; padding: 0 max(24px, env(safe-area-inset-right)) 0 max(24px, env(safe-area-inset-left)); border-bottom: 1px solid var(--line); background: var(--bg); flex-shrink: 0; }
+.editor-breadcrumb .button { padding-inline: 8px; font-size: 1rem; font-weight: 400; overflow-wrap: anywhere; }
+.editor-breadcrumb .button:first-child { padding-left: 0; }
+.editor-breadcrumb > .icon { width: 12px; height: 12px; color: var(--muted); margin-inline: 4px; }
+@media (max-width: 640px) { .editor-breadcrumb { padding-inline: max(16px, env(safe-area-inset-left)); max-height: 25vh; overflow-y: auto; } }
