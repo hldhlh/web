@@ -196,7 +196,7 @@ body:has(.image-operation:not([hidden])) .workspace.has-image { height: auto; fl
   .topbar .top-actions { gap: 0; }
   .topbar .project-heading summary { padding-inline: 4px; }
   .topbar #toggleEdit { padding-inline: 10px; }
-  .project-details { left: -36px; }
+  .project-details { left: -36px; max-height: calc(100dvh - 80px - env(safe-area-inset-bottom, 0px)); overflow-y: auto; overscroll-behavior: contain; }
   .workspace.has-image { display: flex; flex-direction: column; flex: 1; height: auto; min-height: 0; margin: 0; border: 0; background: var(--bg); overflow: hidden; }
   .canvas-area { flex: 1; height: auto; min-height: 180px; background: var(--bg); }
   .canvas-viewport { padding: 24px 16px 16px; }

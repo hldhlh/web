@@ -770,16 +770,23 @@
   });
   let deleteSession = null, deleteVersion = null, deleting = false;
   $('deleteProject').addEventListener('click', async () => {
-    if (!session || deleting || !allowed()) return;
+    if (!session || deleting || !allowed() || $('deleteProjectDialog').open) return;
     const current = session;
+    deleteSession = null; deleteVersion = null;
+    $('projectHeading').open = false;
+    $('deleteProjectStatus').textContent = '正在读取最新项目，请稍候…';
+    $('confirmDeleteProject').disabled = true;
+    $('deleteProjectDialog').showModal();
     try {
       if (current.dirty) { await current.flush(); if (current.dirty) throw new Error('请先解决未同步的标注'); }
       const row = await transport.read(current.row.user_id);
-      if (session !== current) return;
+      if (session !== current || !$('deleteProjectDialog').open) return;
       current.receive(row); deleteSession = current; deleteVersion = row.ts;
       $('deleteProjectStatus').textContent = `确定删除“${row.payload.meta.name}”及其全部标注？此操作无法在界面中撤销，并会影响团队成员。`;
-      $('deleteProjectDialog').showModal();
-    } catch (error) { reportError(error); }
+      $('confirmDeleteProject').disabled = false;
+    } catch (error) {
+      if ($('deleteProjectDialog').open) $('deleteProjectStatus').textContent = `${error.message || '读取失败'}。请关闭后重试。`;
+    }
   });
   $('cancelDeleteProject').addEventListener('click', () => $('deleteProjectDialog').close());
   $('deleteProjectDialog').addEventListener('cancel', event => { if (deleting) event.preventDefault(); });
