@@ -579,6 +579,7 @@
     const meta = row.payload.meta, id = meta.id;
     await editor.openImage(blob, meta.name);
     ensureAllowed();
+    currentFolder = meta.folderId || '';
     document.body.dataset.view = 'editor';
     $('workspace').hidden = false;
     $('library').hidden = true;
@@ -806,14 +807,18 @@
     finally { deleting = false; $('confirmDeleteProject').disabled = false; $('cancelDeleteProject').disabled = false; }
   });
   $('libraryButton').addEventListener('click', async () => {
-    if (opening || session?.saving) return;
-    if (session?.dirty) { await session.flush(); if (session.dirty) return; }
+    if (opening) return;
+    if (session?.saving) { editor.notice('正在保存，请稍后返回'); return; }
+    if (session?.dirty) {
+      await session.flush();
+      if (session.dirty) { editor.notice('修改尚未同步，请处理同步问题后返回'); return; }
+    }
     if (projectChannel) sb.removeChannel(projectChannel);
     projectChannel = null; session = null; connected = false; clearTimeout(retryTimer);
     document.body.dataset.view = 'library';
     $('workspace').hidden = true; $('projectHeading').hidden = true; $('library').hidden = false;
     $('libraryButton').hidden = true; $('presenceStatus').textContent = ''; $('compactPresence').textContent = ''; $('projectHeading').open = false;
-    $('exportImage').disabled = true; setProjectLocation(null); loadProjects();
+    $('exportImage').disabled = true; setProjectLocation(null); enterFolder(currentFolder);
   });
   $('emptyCreate').addEventListener('click', () => $('newProject').click());
   $('newProject').addEventListener('click', () => { $('fileInput').value = ''; $('fileInput').click(); });

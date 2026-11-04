@@ -67,3 +67,28 @@ test('repeated host renders preserve the dimensions iframe, but revoking permiss
   render('dimensions'); render('dimensions'); assert.equal(writes, 0);
   permitted = false; render('dimensions'); assert.equal(writes, 1);
 });
+
+test('opening a linked project and returning restores its folder and reloads navigation', async () => {
+  const showProject = source.slice(source.indexOf('  async function showProject('), source.indexOf('  async function open('));
+  const backHandler = source.slice(source.indexOf("  $('libraryButton').addEventListener('click', async () => {"), source.indexOf("  $('emptyCreate').addEventListener"));
+  const elements = new Map();
+  const element = id => {
+    if (!elements.has(id)) elements.set(id, { hidden: false, textContent: '', addEventListener(_type, fn) { this.click = fn; } });
+    return elements.get(id);
+  };
+  const fixture = new Function('$', 'row', `
+    let currentFolder = '', session = null, projectChannel = null, connected = false, retryTimer, opening = false, returnedTo;
+    const editor = { openImage: async () => {}, fit() {}, notice() {} }, actor = { id: 'actor' };
+    const window = { DimensionModel: { Session: class { constructor() { this.dirty = false; } checkConflicts() {} notify() {} } } };
+    const document = { body: { dataset: {} } }, localStorage = { getItem: () => null }, transport = {};
+    const ensureAllowed = () => {}, update = () => {}, setProjectLocation = () => {}, subscribeProject = () => {}, schedule = () => {};
+    const sb = { removeChannel() {} }, enterFolder = id => { returnedTo = id; };
+    ${showProject}
+    ${backHandler}
+    return { showProject, back: () => $('libraryButton').click(), location: () => returnedTo };
+  `)(element, {});
+  await fixture.showProject({ payload: { meta: { id: 'project', folderId: 'child', name: 'image' } } }, {});
+  await fixture.back();
+  assert.equal(fixture.location(), 'child');
+  assert.equal(element('library').hidden, false);
+});
