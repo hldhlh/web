@@ -431,7 +431,7 @@
     const labelPosition = itemLabelPosition(item, isDraft);
 
     if (labelPosition==='inline' && !isDraft) {
-      ['top','right','bottom','left'].forEach((side,i)=>drawLine({...item,type:'line',start:points[i],end:points[(i+1)%4],label:item.labels?.[side]||''},false));
+      ['top','right','bottom','left'].forEach((side,i)=>drawLine({...item,type:'line',start:points[i],end:points[(i+1)%4],label:item.labels?.[side]||'', contourEdge:true},false));
       return;
     }
     context.save();
@@ -522,7 +522,7 @@
       context.strokeStyle = style.underLine; context.lineWidth = 3 * renderUnit; context.stroke();
       context.strokeStyle = style.line; context.lineWidth = 1.25 * renderUnit; context.stroke();
       const arrow = Math.min(6 * renderUnit, length / 4);
-      for (const [point, sign] of [[item.start, 1], [item.end, -1]]) {
+      for (const [point, sign] of (item.contourEdge && !label ? [] : [[item.start, 1], [item.end, -1]])) {
         context.beginPath(); context.moveTo(point.x, point.y);
         context.lineTo(point.x + sign * ux * arrow + nx * arrow * .6, point.y + sign * uy * arrow + ny * arrow * .6);
         context.lineTo(point.x + sign * ux * arrow - nx * arrow * .6, point.y + sign * uy * arrow - ny * arrow * .6);

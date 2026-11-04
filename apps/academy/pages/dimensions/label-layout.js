@@ -16,6 +16,15 @@
     }
     return true;
   }
+  // Ignore endpoint contact, but penalize leaders crossing other dimensions.
+  function crosses(a, b, c, d) {
+    const rx=b.x-a.x, ry=b.y-a.y, sx=d.x-c.x, sy=d.y-c.y;
+    const det=rx*sy-ry*sx;
+    if (Math.abs(det)<1e-8) return false;
+    const qx=c.x-a.x,qy=c.y-a.y;
+    const t=(qx*sy-qy*sx)/det,u=(qx*ry-qy*rx)/det;
+    return t>1e-5 && t<1-1e-5 && u>1e-5 && u<1-1e-5;
+  }
   function layout(labels, segments, width, height, unit) {
     const placed = labels.filter(label => label.inline || label.standalone).map(label => ({ ...label, x:clamp(label.anchor.x,label.width/2,width-label.width/2), y:clamp(label.anchor.y,label.height/2,height-label.height/2) })), gap = 5 * unit;
     for (const label of labels.filter(label => !label.inline && !label.standalone)) {
@@ -36,16 +45,25 @@
               if (overlapX > 0 && overlapY > 0) score += 100000 + overlapX * overlapY / (unit * unit);
             }
             for (const [a, b] of segments) if (intersects(box, a, b, 3 * unit)) score += 10000;
+            const leaderEnd={x:clamp(label.anchor.x,box.x-box.width/2,box.x+box.width/2),y:clamp(label.anchor.y,box.y-box.height/2,box.y+box.height/2)};
+            for(const [a,b] of segments) if(crosses(label.anchor,leaderEnd,a,b)) score+=1000;
+            for(const other of placed) {
+              if(intersects(other,label.anchor,leaderEnd,2*unit)) score+=1000;
+              if(!other.inline && !other.standalone) {
+                const end={x:clamp(other.anchor.x,other.x-other.width/2,other.x+other.width/2),y:clamp(other.anchor.y,other.y-other.height/2,other.y+other.height/2)};
+                if(crosses(label.anchor,leaderEnd,other.anchor,end))score+=1000;
+              }
+            }
             if (score < bestScore) { best = box; bestScore = score; }
           }
         }
-        if (bestScore < 10000) break;
+        if (bestScore < 1000) break;
       }
       placed.push(best);
     }
     return placed;
   }
-  const api = { layout, intersects };
+  const api = { layout, intersects, crosses };
   if (typeof module !== 'undefined') module.exports = api;
   else root.DimensionLabelLayout = api;
 })(globalThis);

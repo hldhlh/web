@@ -30,3 +30,10 @@ test('standalone notes remain on their anchor and constrain to image edges',()=>
  const boxes=layout(labels,[[{x:0,y:100},{x:300,y:100}]],300,200,1);
  assert.equal(boxes[0].x,100);assert.equal(boxes[0].y,100);assert.equal(boxes[1].x,30);assert.equal(boxes[1].y,10);
 });
+
+ test('leaders prefer an unobstructed side over crossing a nearby dimension',()=>{
+ const label={anchor:{x:200,y:200},width:60,height:24};
+ const segments=[[{x:100,y:190},{x:300,y:190}]];
+ const [box]=layout([label],segments,500,400,1);
+ assert.ok(box.y>200,'leader should use the clear lower side');
+ });
