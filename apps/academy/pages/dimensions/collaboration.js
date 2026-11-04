@@ -768,6 +768,36 @@
       if ($('renameDialog').open) $('projectNameInput').focus();
     }
   });
+  let deleteSession = null, deleteVersion = null, deleting = false;
+  $('deleteProject').addEventListener('click', async () => {
+    if (!session || deleting || !allowed()) return;
+    const current = session;
+    try {
+      if (current.dirty) { await current.flush(); if (current.dirty) throw new Error('请先解决未同步的标注'); }
+      const row = await transport.read(current.row.user_id);
+      if (session !== current) return;
+      current.receive(row); deleteSession = current; deleteVersion = row.ts;
+      $('deleteProjectStatus').textContent = `确定删除“${row.payload.meta.name}”及其全部标注？此操作无法在界面中撤销，并会影响团队成员。`;
+      $('deleteProjectDialog').showModal();
+    } catch (error) { reportError(error); }
+  });
+  $('cancelDeleteProject').addEventListener('click', () => $('deleteProjectDialog').close());
+  $('deleteProjectDialog').addEventListener('cancel', event => { if (deleting) event.preventDefault(); });
+  $('deleteProjectForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (deleting || !deleteSession || session !== deleteSession || !allowed()) return;
+    deleting = true; $('confirmDeleteProject').disabled = true; $('cancelDeleteProject').disabled = true;
+    try {
+      if (session.dirty || session.saving) throw new Error('项目有未同步的修改，请关闭后同步并重新确认。');
+      const rows = await rest({ user_id: `eq.${session.row.user_id}`, ts: `eq.${deleteVersion}` }, { method: 'DELETE' });
+      if (!rows?.length) throw new Error('项目已变化或不存在，请关闭后重新确认。');
+      $('deleteProjectDialog').close();
+      catalogCache.clear();
+      catalogChannel?.send({ type: 'broadcast', event: 'changed', payload: {} }).catch(() => {});
+      $('libraryButton').click();
+    } catch (error) { $('deleteProjectStatus').textContent = error.message || '删除失败，请重试'; }
+    finally { deleting = false; $('confirmDeleteProject').disabled = false; $('cancelDeleteProject').disabled = false; }
+  });
   $('libraryButton').addEventListener('click', async () => {
     if (opening || session?.saving) return;
     if (session?.dirty) { await session.flush(); if (session.dirty) return; }

@@ -47,6 +47,13 @@
     <canvas id="batchPreview" hidden aria-label="整批修改预览"></canvas>
     <div class="batch-buttons"><button id="closeBatch" class="button quiet" type="button">关闭</button><button id="previewBatch" class="button quiet" type="button">预览修改</button><button id="applyBatch" class="button primary" type="button" disabled>应用并保存</button></div>
   </dialog>
+  <dialog id="deleteProjectDialog" class="rename-dialog" aria-labelledby="deleteProjectHeading">
+    <form id="deleteProjectForm">
+      <h2 id="deleteProjectHeading">删除图片和标注</h2>
+      <p id="deleteProjectStatus" role="status" aria-live="polite"></p>
+      <div class="rename-actions"><button id="cancelDeleteProject" class="button quiet" type="button">取消</button><button id="confirmDeleteProject" class="button destructive" type="submit">删除</button></div>
+    </form>
+  </dialog>
   <dialog id="renameDialog" class="rename-dialog" aria-labelledby="renameHeading">
     <form id="renameForm">
       <h2 id="renameHeading">编辑项目名称</h2>
@@ -61,7 +68,7 @@
       <button id="libraryButton" aria-label="返回所有项目" class="button back-button" type="button" hidden><svg class="icon" aria-hidden="true"><use href="#back"/></svg><span>所有项目</span></button>
       <details id="projectHeading" class="project-heading" hidden>
         <summary class="project-heading-text" aria-label="项目信息"><strong id="projectTitle" title="双击编辑项目名称"></strong><span id="compactSync">同步中</span></summary>
-        <div class="project-details"><span id="projectAuthor"></span><span class="project-format">图片标注</span><span id="compactPresence"></span><button id="openBatch" class="button quiet" type="button">AI 批量编辑</button><button id="renameProject" class="button quiet" type="button">重命名</button><button id="moveProject" class="button quiet" type="button">移动目录</button></div>
+        <div class="project-details"><span id="projectAuthor"></span><span class="project-format">图片标注</span><span id="compactPresence"></span><button id="openBatch" class="button quiet" type="button">AI 批量编辑</button><button id="renameProject" class="button quiet" type="button">重命名</button><button id="moveProject" class="button quiet" type="button">移动目录</button><button id="deleteProject" class="button destructive" type="button">删除图片和标注</button></div>
       </details>
       <div class="top-actions">
         <button id="replaceImage" class="button quiet new-image" type="button"><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span class="replace-text">新建标注</span></button>
