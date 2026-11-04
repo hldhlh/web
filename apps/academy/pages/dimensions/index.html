@@ -113,14 +113,21 @@
     <section class="workspace" id="workspace" hidden>
       <div class="canvas-area">
         <div class="canvas-caption"><div class="canvas-state"><span id="interactionState">浏览模式 · 双指缩放与拖动</span><span id="selectionStatus" role="status" hidden></span></div></div>
+        <div id="editModes" class="edit-modes" role="group" aria-label="画布操作模式" hidden>
+          <button id="drawMode" type="button" aria-pressed="true">新建标注</button><button id="selectMode" type="button" aria-pressed="false">选择 / 调整</button>
+          <button id="undoAction" type="button" disabled title="撤销（⌘/Ctrl Z）">撤销</button><button id="redoAction" type="button" disabled title="重做（⌘/Ctrl Shift Z）">重做</button>
+        </div>
         <div class="canvas-viewport" id="viewport">
+          <div id="annotationActions" class="annotation-actions" role="toolbar" aria-label="选中标注操作" data-canvas-control hidden>
+            <button id="editSelected" type="button">填写尺寸</button><button id="redrawSelected" type="button">重画</button><button id="deleteSelected" type="button">删除</button><button id="duplicateSelected" type="button">复制</button><button id="lockSelected" type="button">锁定</button><button id="continueDrawing" type="button">继续标注</button>
+          </div>
           <section id="emptyState" class="empty-state"><p>正在准备画布…</p><button id="uploadButton" class="button">选择图片</button></section>
           <div class="canvas-stage" id="canvasStage" hidden><canvas id="measureCanvas" aria-label="图片标注画布，浏览模式，可缩放和移动"></canvas><canvas id="selectionCanvas" aria-hidden="true"></canvas><svg id="labelLayer" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg></div>
           <div class="drop-mask" id="dropMask" hidden><svg class="icon" aria-hidden="true"><use href="#photo"/></svg>松开以新建图片项目</div>
         </div>
         <div class="canvas-bottom">
           <button id="inspectorToggle" class="button quiet inspector-toggle" type="button" aria-expanded="false" aria-controls="sidePanel"><span>标注</span><span id="inspectorCount">0</span><svg class="icon" aria-hidden="true"><use href="#back"/></svg></button>
-          <div class="canvas-hint" id="canvasHint" hidden><span id="notice" role="status">拖动添加标注</span></div>
+          <div class="canvas-hint" id="canvasHint" hidden><span id="notice" role="status">拖动添加标注</span><button id="undoDelete" class="button quiet" type="button" hidden>撤销删除</button></div>
           <div class="zoom-controls" role="group" aria-label="画布显示与缩放">
             <button id="toggleAnnotations" class="icon-button" type="button" aria-label="显示标注" aria-pressed="true" title="隐藏标注" aria-controls="measureCanvas selectionCanvas labelLayer"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/><path class="visibility-slash" d="m4 4 16 16"/></svg><span>显示标注</span></button>
             <span class="control-divider" aria-hidden="true"></span>

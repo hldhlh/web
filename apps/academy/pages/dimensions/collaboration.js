@@ -683,7 +683,7 @@
   }
   window.DimensionCollab = { actor, create, edit(item, deleted) {
     if (!allowed() || !session) return;
-    session.edit(item, deleted); schedule();
+    const result = session.edit(item, deleted); schedule(); return result;
   } };
   let renameSession = null, renameBase = '', renaming = false;
   function openRename() {

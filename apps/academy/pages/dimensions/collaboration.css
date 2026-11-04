@@ -351,3 +351,14 @@ body:has(.image-operation:not([hidden])) .workspace.has-image { height: auto; fl
 @media (prefers-reduced-motion: reduce) {
   .loading-spinner, .project-preview[data-state="loading"]::after, .catalog-skeleton span, .project-preview[data-state="ready"] img { animation: none; }
 }
+
+/* Drawing and selection are deliberately exclusive: old marks never steal a stroke. */
+.edit-modes { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 12px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.edit-modes button, .annotation-actions button { min-width: 44px; min-height: 44px; border: 0; border-radius: 8px; padding: 8px 12px; color: var(--text); background: transparent; font-size: .8824rem; }
+.edit-modes button[aria-pressed="true"] { color: var(--accent); background: var(--surface-2); box-shadow: inset 0 -2px var(--accent); }
+.edit-modes button:disabled { opacity: .45; }
+.annotation-actions { position: absolute; z-index: 6; display: flex; flex-wrap: wrap; max-width: calc(100% - 16px); padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: 0 3px 14px #0002; touch-action: manipulation; }
+.annotation-actions button:hover, .edit-modes button:hover { background: var(--surface-2); }
+#deleteSelected { color: var(--bad); }
+@media (max-width: 640px) { .annotation-actions button { padding-inline: 8px; } .edit-modes { padding-inline: max(8px, env(safe-area-inset-left)); } }
+@media (prefers-contrast: more) { .annotation-actions { border: 2px solid currentColor; } }
