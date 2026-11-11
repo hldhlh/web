@@ -18,7 +18,7 @@ for (const sharedClient of [false, true]) {
     if (sharedClient) parent.supabase = { createClient() {} };
     const window = { parent, addEventListener() {} };
     const document = {
-      documentElement: { dataset: {} }, getElementById: node, querySelector: node,
+      documentElement: { dataset: {} }, getElementById: node, querySelector: node, querySelectorAll: () => [],
       createElement: () => ({ remove() {} }),
       head: { append(script) {
         requested.push(script.src);

@@ -7,16 +7,31 @@
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
   // Only presentation changes; the user's original text remains stored verbatim.
   const displayText = text => text.replace(/(\d)\s*(cm|mm|m|厘米|毫米)(?=$|[^a-z])/gi, '$1\u2009$2');
+  let measurements = new WeakMap();
+  const clearMeasurements = () => { measurements = new WeakMap(); };
+  document.fonts.addEventListener?.('loadingdone', clearMeasurements);
   function measure(ctx, text, unit, maxWidth) {
     ctx.font = font(unit);
+    let cache = measurements.get(ctx);
+    if (!cache) { cache = new Map(); measurements.set(ctx, cache); }
+    const key = JSON.stringify([text, unit, maxWidth, ctx.font, ctx.direction, ctx.fontKerning, ctx.letterSpacing, ctx.wordSpacing]);
+    if (cache.has(key)) {
+      const result = cache.get(key);
+      cache.delete(key); cache.set(key, result);
+      return result;
+    }
     const lines = []; let line = '';
     for (const char of displayText(text)) {
       if (line && ctx.measureText(line + char).width > maxWidth - tokens.paddingX * 2 * unit) { lines.push(line); line = ''; }
       line += char;
     }
     if (line) lines.push(line);
-    return { lines, width: Math.min(maxWidth, Math.max(0, ...lines.map(text => ctx.measureText(text).width)) + tokens.paddingX * 2 * unit),
+    const result = { lines: Object.freeze(lines), width: Math.min(maxWidth, Math.max(0, ...lines.map(text => ctx.measureText(text).width)) + tokens.paddingX * 2 * unit),
       height: (lines.length * tokens.lineHeight + tokens.paddingY * 2) * unit };
+    // Bound memory during continuous zoom and text editing; never retain canvas contexts.
+    if (cache.size >= 512) cache.delete(cache.keys().next().value);
+    cache.set(key, Object.freeze(result));
+    return result;
   }
   function scene(ctx, boxes, unit, styleFor) {
     const nodes = [];
@@ -90,6 +105,7 @@
   }
   // Load locally, never from a third-party font service. A failure keeps the system fallback usable.
   const loaded = document.fonts.load('500 13px "Dimension Sans"').catch(() => []);
+  loaded.then(clearMeasurements);
   let timer;
   const ready = Promise.race([loaded, new Promise(resolve => { timer = setTimeout(resolve, 2500); })]).finally(() => clearTimeout(timer));
   window.DimensionTypography = { tokens, font, measure, scene, paintSVG, paintCanvas, ready, loaded };

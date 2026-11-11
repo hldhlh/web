@@ -1,7 +1,18 @@
 (() => {
   'use strict';
   const pending = new Map();
-  const digest = async blob => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer())), b => b.toString(16).padStart(2, '0')).join('');
+  const digests = new WeakMap();
+  function digest(blob) {
+    // Blobs are immutable: reuse the work during upload/cache retries, without
+    // retaining image bytes. Disk reads create fresh Blobs and are still verified.
+    if (!digests.has(blob)) {
+      const work = blob.arrayBuffer().then(bytes => crypto.subtle.digest('SHA-256', bytes))
+        .then(bytes => Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2, '0')).join(''))
+        .catch(error => { digests.delete(blob); throw error; });
+      digests.set(blob, work);
+    }
+    return digests.get(blob);
+  }
   const key = value => new URL('/__dimension_cache__/' + encodeURIComponent(value), location.origin).href;
   async function storage() { try { return await caches.open('dimension-images-v1'); } catch (_) { return null; } }
   async function put(source, blob, expected) {

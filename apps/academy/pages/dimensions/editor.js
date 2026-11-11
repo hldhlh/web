@@ -1,6 +1,8 @@
 (() => {
   "use strict";
 
+  let renderFrame = null;
+
   const elements = {
     workspace: document.querySelector("#workspace"),
     viewport: document.querySelector("#viewport"),
@@ -575,7 +577,14 @@
     else drawLine(item, isDraft);
   }
 
+  function scheduleRender() {
+    if (renderFrame !== null) return;
+    renderFrame = requestAnimationFrame(() => { renderFrame = null; render(); });
+  }
+
   function render(forExport = false) {
+    // Commits, cancellation and export stay synchronous and supersede a queued drag frame.
+    if (renderFrame !== null) { cancelAnimationFrame(renderFrame); renderFrame = null; }
     if (!state.image) return;
     renderUnit = forExport ? Math.max(1, state.image.naturalWidth / 1200) : 1 / (state.fitScale * state.zoom);
     pendingLabels = [];
@@ -1149,8 +1158,8 @@
         elements.canvas.style.cursor = 'grabbing';
       }
       p.lastX = event.clientX; p.lastY = event.clientY;
-    } else if (state.handleDrag) { moveHandle(pointFromEvent(event), event.shiftKey); render(); }
-    else if (state.draft) { state.draft.end = pointFromEvent(event); render(); }
+    } else if (state.handleDrag) { moveHandle(pointFromEvent(event), event.shiftKey); scheduleRender(); }
+    else if (state.draft) { state.draft.end = pointFromEvent(event); scheduleRender(); }
   }
 
   function finishPointer(event, cancelled = false) {

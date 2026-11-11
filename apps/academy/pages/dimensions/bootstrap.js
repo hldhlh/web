@@ -1,9 +1,12 @@
 (() => {
   'use strict';
+  // Build-time content hashes live on preload links; consume exactly the same URL.
+  const assets = new Map([...document.querySelectorAll('link[data-dimension-script]')]
+    .map(link => [link.dataset.dimensionScript, link.href]));
   const load = src => new Promise((resolve, reject) => {
     const script = document.createElement('script');
     const timeout = setTimeout(() => { script.remove(); reject(new Error('标注工具加载超时，请检查网络后重新加载')); }, 45000);
-    script.src = src;
+    script.src = assets.get(src) || src;
     script.onload = () => { clearTimeout(timeout); resolve(); };
     script.onerror = () => { clearTimeout(timeout); reject(new Error('标注工具加载失败，请重新加载')); };
     document.head.append(script);
@@ -28,9 +31,9 @@
     const observer = new MutationObserver(theme);
     observer.observe(parent.document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     window.addEventListener('pagehide', () => observer.disconnect(), { once: true });
-    if (!parent.supabase?.createClient) await load('../../../vendor/supabase.min.js');
-    window.supabase = parent.supabase || window.supabase;
-    await Promise.all(['image-cache.js', 'model.js', 'batch.js', 'image-processing.js', 'editor.js'].map(load));
+    const sdkReady = parent.supabase?.createClient ? Promise.resolve() : load('../../../vendor/supabase.min.js');
+    await Promise.all([sdkReady, ...['image-cache.js', 'model.js', 'batch.js', 'image-processing.js', 'editor.js'].map(load)]);
+    window.supabase = parent.supabase?.createClient ? parent.supabase : window.supabase;
     await load('collaboration.js');
     await load('batch-ui.js');
     if (!window.DimensionCollab) throw new Error('标注工具初始化失败，请重新加载');

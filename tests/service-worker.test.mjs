@@ -61,3 +61,12 @@ test('unversioned scripts serve the current network response when it is fast', a
   assert.equal(await (await response).text(), 'updated');
   assert.equal(mode, 'no-cache');
 });
+
+test('activation removes old shell caches without deleting persistent project images', async () => {
+  const callbacks = {}, deleted = []; let work, claimed = false;
+  const ctx = { self: { clients: { claim: async () => { claimed = true; } }, addEventListener: (name, fn) => callbacks[name] = fn },
+    caches: { keys: async () => ['web-shell-old', 'dimension-images-v1', 'another-app-cache'], delete: async key => deleted.push(key) } };
+  vm.runInNewContext(readFileSync('sw.js', 'utf8'), ctx);
+  callbacks.activate({ waitUntil: promise => work = promise }); await work;
+  assert.deepEqual(deleted, ['web-shell-old']); assert.equal(claimed, true);
+});

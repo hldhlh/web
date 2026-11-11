@@ -37,7 +37,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((key) => key.startsWith('web-shell-') && key !== CACHE_NAME).map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
@@ -89,7 +89,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   // Only a release-versioned static URL is immutable. Manifests and APIs bypass us.
   const version = url.searchParams.get('v');
-  if (/^[0-9a-f]{7,40}$/i.test(version || '') && /\.(js|mjs|css)$/.test(url.pathname)) {
+  if (/^[0-9a-f]{7,40}$/i.test(version || '') && /\.(js|mjs|css|woff2?)$/.test(url.pathname)) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
       return await cache.match(event.request) || networkFirst(event.request, event);

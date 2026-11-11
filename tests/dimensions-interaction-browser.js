@@ -5,7 +5,7 @@ async page => {
     if (route.request().url().endsWith('/bootstrap.js')) return route.fulfill({contentType:'application/javascript',body:`
       window.writes=[]; window.testItems=[];
       window.DimensionCollab={actor:{id:'A'}, edit(item,deleted){ writes.push({item:structuredClone(item),deleted});testItems=testItems.filter(x=>x.id!==item.id);if(!deleted)testItems.push(structuredClone(item));DimensionEditor.applyAnnotations(testItems); }};
-      const s=document.createElement('script');s.src='editor.js';document.head.append(s);
+      const model=document.createElement('script');model.src='model.js';model.onload=()=>{const s=document.createElement('script');s.src='editor.js';document.head.append(s);};document.head.append(model);
     `});
     return route.continue();
   });
@@ -171,6 +171,7 @@ async page => {
   const drawStart={id:14,...position(.15,.65)},drawEnd={id:14,...position(.8,.65)};
   await touch('touchStart',[drawStart]);await touch('touchMove',[drawEnd]);await touch('touchEnd',[]);
   assert(await count()===1,'Immediate single-finger drawing did not create exactly one annotation');
+  if (!await page.locator('#labelInput').isVisible()) await page.locator('#inspectorToggle').click();
   await page.locator('#labelInput').fill('深 60 cm');
   await page.locator('#toggleEdit').click();
   const savedCount=await count();
@@ -227,6 +228,8 @@ async page => {
   await page.locator('.list-select').last().click();
   assert(await page.locator('#measureCanvas').evaluate(c=>c.toDataURL())===baseSelected,'Selection changed the export canvas');
   await page.locator('#toggleEdit').click();
+  if (!await page.locator('#labelInput').isVisible()) await page.locator('#inspectorToggle').click();
+  await page.locator('.list-select').last().click();
   await page.locator('#labelInput').fill('深 65 cm');await page.locator('#labelInput').blur();
   await page.locator('#toggleEdit').scrollIntoViewIfNeeded();
   await page.screenshot({path:'output/playwright/dimensions-selected-mobile.png',animations:'disabled'});
