@@ -72,6 +72,9 @@
         })();
     </script>
     <link rel="preload" href="../../../vendor/supabase.min.js" as="script">
+    <link rel="preload" href="../../../network.js?v=20260827-8" as="script">
+    <link rel="preload" href="./cart-sync.js" as="script">
+    <script type="application/json" id="app-assets">{"../../../vendor/flatpickr/flatpickr.min.js":"../../../vendor/flatpickr/flatpickr.min.js","../../../vendor/flatpickr/zh.js":"../../../vendor/flatpickr/zh.js","../../../vendor/flatpickr/flatpickr.min.css":"../../../vendor/flatpickr/flatpickr.min.css","../../../vendor/pinyin-pro.min.js":"../../../vendor/pinyin-pro.min.js","../../../vendor/html2canvas.min.js":"../../../vendor/html2canvas.min.js"}</script>
     <style>
         /* 全局变量与 Apple 风格重塑 */
         :root {
@@ -1752,6 +1755,7 @@
             products: 'jlhcdh-products-v2',
             cart: 'jlhcdh-cart-v2'
         };
+        const assetUrls = JSON.parse(document.getElementById("app-assets").textContent);
         const loadedAssets = new Map();
 
         function loadScript(src, globalName) {
@@ -1759,7 +1763,7 @@
             if (loadedAssets.has(src)) return loadedAssets.get(src);
             const promise = new Promise((resolve, reject) => {
                 const script = document.createElement('script');
-                script.src = src;
+                script.src = assetUrls[src] || src;
                 script.async = true;
                 script.onload = () => resolve(globalName ? window[globalName] : true);
                 script.onerror = () => reject(new Error(`资源加载失败: ${src}`));
@@ -1770,6 +1774,7 @@
         }
 
         function loadStylesheet(href) {
+            href = assetUrls[href] || href;
             if (document.querySelector(`link[href="${href}"]`)) return;
             const link = document.createElement('link');
             link.rel = 'stylesheet';

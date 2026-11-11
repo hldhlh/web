@@ -6,9 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>门店笔记</title>
     <link rel="icon" href="./icon.svg" type="image/svg+xml">
-    <script src="../../../vendor/pinyin-pro.min.js"></script>
-    <script src="../../../vendor/supabase.min.js"></script>
-    <script src="../../../network.js?v=20260827-8"></script>
+    <link rel="preload" href="../../../vendor/pinyin-pro.min.js" as="script">
+    <link rel="preload" href="../../../vendor/supabase.min.js" as="script">
+    <link rel="preload" href="../../../network.js?v=20260827-8" as="script">
     <style>
         :root {
             --bg: #000c18;
@@ -832,6 +832,9 @@
         </div>
     </div>
 
+    <script src="../../../vendor/pinyin-pro.min.js"></script>
+    <script src="../../../vendor/supabase.min.js"></script>
+    <script src="../../../network.js?v=20260827-8"></script>
     <script>
         // 防止脚本重复执行
         if (window.__jlbjInitialized) {

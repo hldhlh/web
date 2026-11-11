@@ -4130,9 +4130,10 @@
       </section>`;
       return;
     }
-    // Keep active annotations, folder navigation and WebGL sessions during repeated renders.
+    // Preserve every active subprogram after permission checks; repeated shell renders
+    // must not restart downloads or discard drafts.
     const currentFrame = view().querySelector(".embedded-app-frame");
-    if (["store-model", "dimensions"].includes(app.id) && currentFrame?.getAttribute("src") === app.src) return;
+    if (currentFrame?.getAttribute("src") === app.src) return;
     view().innerHTML = `
       <iframe
         class="embedded-app-frame"

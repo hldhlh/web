@@ -57,15 +57,15 @@ test('a failed directory check preserves the current location and known folders'
 });
 const appSource = readFileSync(new URL('../apps/academy/app.js', import.meta.url), 'utf8');
 const renderSource = appSource.slice(appSource.indexOf('  function renderEmbeddedApp('), appSource.indexOf('  function updateNotificationButton('));
-test('repeated host renders preserve the dimensions iframe, but revoking permission removes it', () => {
+for (const id of ['notes', 'jlhcdh', 'schedule', 'feedback', 'dimensions', 'store-model', 'meat-template']) test(`repeated host renders preserve ${id} but revoking permission removes it`, () => {
   let writes = 0, permitted = true;
-  const app = { id: 'dimensions', src: './pages/dimensions/index.html', title: '尺寸标注' };
+  const app = { id, src: `./pages/${id}/index.html`, title: id };
   const frame = { getAttribute: () => app.src };
   const view = { querySelector: () => frame, set innerHTML(value) { writes++; } };
   const render = new Function('Auth', 'view', `const setTop=()=>{}, setTab=()=>{}, escapeHtml=x=>x; ${renderSource}; return renderEmbeddedApp;`)(
     { shortcuts: [app], session: {}, canShortcut: () => permitted }, () => view);
-  render('dimensions'); render('dimensions'); assert.equal(writes, 0);
-  permitted = false; render('dimensions'); assert.equal(writes, 1);
+  render(id); render(id); assert.equal(writes, 0);
+  permitted = false; render(id); assert.equal(writes, 1);
 });
 
 test('opening a linked project and returning restores its folder and reloads navigation', async () => {

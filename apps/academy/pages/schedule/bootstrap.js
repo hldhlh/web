@@ -1,10 +1,13 @@
 (() => {
   "use strict";
 
+  const assets = JSON.parse(document.getElementById("app-assets")?.textContent || "{}");
+  const asset = src => assets[src] || src;
+
   function loadScript(src) {
     return new Promise((resolve, reject) => {
       const script = document.createElement("script");
-      script.src = src;
+      script.src = asset(src);
       script.onload = resolve;
       script.onerror = () => reject(new Error(`无法加载 ${src}`));
       document.head.appendChild(script);
@@ -34,7 +37,7 @@
       // Download dependencies together while preserving their execution order.
       for (const href of ['../../../network.js', '../../framework/reliable-store.js', '../../framework/store.js', '../../framework/secure-auth.js', '../../framework/auth.js']) {
         const link = document.createElement('link');
-        link.rel = 'preload'; link.as = 'script'; link.href = href;
+        link.rel = 'preload'; link.as = 'script'; link.href = asset(href);
         document.head.appendChild(link);
       }
       await loadScript("../../../network.js");

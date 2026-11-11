@@ -42,8 +42,34 @@ export function versionStaticAssets(root) {
       query.set('v', hashes.get(target));
       return value.split(/[?#]/)[0] + '?' + query.toString() + url.hash;
     }
-    let rendered = original.replace(/<(?:script|link)\b[^>]*>/gi, tag => {
-      if (!/^<script\b/i.test(tag) && !/\brel\s*=\s*["']stylesheet["']/i.test(tag) && !/\bdata-dimension-script=/.test(tag)) return tag;
+    let rendered = original.replace(/(<script\b[^>]*\bid=["']app-assets["'][^>]*>)([\s\S]*?)(<\/script>)/gi, (_, open, json, close) => {
+      const manifest = JSON.parse(json);
+      for (const [name, value] of Object.entries(manifest)) {
+        const next = version(value);
+        if (next) { assets.set(value, next); manifest[name] = next; count++; }
+      }
+      return open + JSON.stringify(manifest).replaceAll('<', '\\u003c') + close;
+    });
+    rendered = rendered.replace(/(<script\b[^>]*\bdata-version-modules[^>]*>)([\s\S]*?)(<\/script>)/gi, (_, open, json, close) => {
+      const map = JSON.parse(json);
+      const prefixes = Object.entries(map.imports || {}).filter(([name, value]) => name.endsWith("/") && value.endsWith("/"));
+      // Exact URL mappings cover transitive relative imports without editing
+      // vendor code or changing module identity between preload and import.
+      for (const [name, value] of Object.entries(map.imports || {})) {
+        const next = version(value); if (next) map.imports[name] = next;
+      }
+      const directory = resolve(file, '..');
+      for (const module of files.filter(path => path.startsWith(directory + '/') && /\.m?js$/.test(path))) {
+        const name = './' + relative(directory, module).split('\\').join('/');
+        map.imports[name] = version(name);
+        for (const [prefix, directory] of prefixes) {
+          if (name.startsWith(directory)) map.imports[prefix + name.slice(directory.length)] = map.imports[name];
+        }
+      }
+      return open + JSON.stringify(map).replaceAll('<', '\\u003c') + close;
+    });
+    rendered = rendered.replace(/<(?:script|link)\b[^>]*>/gi, tag => {
+      if (!/^<script\b/i.test(tag) && !/\brel\s*=\s*["'](?:stylesheet|prefetch)["']/i.test(tag) && !/\bdata-dimension-script=/.test(tag) && !/\bdata-app-module(?:\s|>)/.test(tag)) return tag;
       return tag.replace(/\b(src|href)=(['"])(.*?)\2/gi, (match, attr, quote, value) => {
         const next = version(value);
         if (!next) return match;

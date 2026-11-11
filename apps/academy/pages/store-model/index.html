@@ -5,7 +5,7 @@
 <meta name="theme-color" content="#f2f2f7"><title>门店模型预览 · Auto Office</title>
 <link rel="icon" href="../../icon.svg" type="image/svg+xml"><link rel="stylesheet" href="../../appearance.css"><link rel="stylesheet" href="./style.css">
 <script>try{document.documentElement.dataset.theme=localStorage.getItem('app-theme')||'light'}catch{}</script>
-<script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
+<script type="importmap" data-version-modules>{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
 </head>
 <body>
 <main class="model-app">
@@ -23,5 +23,14 @@
 </main>
 <dialog id="help-dialog"><h2>走进缦云店</h2><p>鸟瞰：拖动旋转、滚轮或双指缩放，右键平移。</p><p>店内：拖动环顾，WASD / 方向键或屏幕箭头移动。切换空间可返回固定观察点。</p><p>VR：在支持 WebXR 的头显浏览器打开线上页面，点击「进入 VR」。扳机切换前厅、用餐区、后厨；菜单键退出。</p><p>这是空间预览，漫游暂不限制穿墙。普通手机可触屏浏览；没有 VR 支持时会显示提示。</p><button id="close-help" class="primary">知道了</button></dialog>
 <noscript>请启用 JavaScript 查看三维模型。</noscript>
+<link rel="modulepreload" href="./vendor/three.core.js" data-app-module>
+<link rel="modulepreload" href="./vendor/three.module.js" data-app-module>
+<link rel="modulepreload" href="./vendor/addons/loaders/GLTFLoader.js" data-app-module>
+<link rel="modulepreload" href="./vendor/addons/controls/OrbitControls.js" data-app-module>
+<link rel="modulepreload" href="./vendor/addons/environments/RoomEnvironment.js" data-app-module>
+<link rel="modulepreload" href="./vendor/addons/utils/BufferGeometryUtils.js" data-app-module>
+<link rel="modulepreload" href="./vendor/meshopt_decoder.module.js" data-app-module>
+<link rel="modulepreload" href="./download.js" data-app-module>
+<link rel="modulepreload" href="./materials.js" data-app-module>
 <script type="module" src="./app.js"></script>
 </body></html>

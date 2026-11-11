@@ -11,7 +11,7 @@ test('content versions match preload, stay stable, and change with asset bytes',
   writeFileSync(join(root, 'app.js'), 'console.log(1)');
   writeFileSync(join(root, 'style.css'), 'body{}');
   writeFileSync(join(root, 'dynamic.js'), 'void 0');
-  const html = `<link rel="preload" href="./app.js?v=old" as="script"><script src="./app.js?v=old"></script><link rel="stylesheet" href="style.css"><link rel="preload" href="dynamic.js"><script src="https://cdn.example/sdk.js"></script>`;
+  const html = `<link rel="preload" href="./app.js?v=old" as="script"><script src="./app.js?v=old"></script><link rel="stylesheet" href="style.css"><link rel="prefetch" href="app.js"><link rel="preload" href="dynamic.js"><script src="https://cdn.example/sdk.js"></script>`;
   writeFileSync(join(root, 'index.html'), html);
   versionStaticAssets(root);
   const first = readFileSync(join(root, 'index.html'), 'utf8');
@@ -19,6 +19,7 @@ test('content versions match preload, stay stable, and change with asset bytes',
   assert.equal(urls.length, 2); assert.equal(urls[0][1], urls[1][1]);
   assert.match(first, /href="style.css\?v=[a-f0-9]{16}"/);
   assert.ok(first.includes('href="dynamic.js"'));
+  assert.ok(first.includes(`rel="prefetch" href="app.js?v=${urls[0][1]}"`));
   assert.ok(first.includes('src="https://cdn.example/sdk.js"'));
   versionStaticAssets(root);
   assert.equal(readFileSync(join(root, 'index.html'), 'utf8'), first);
@@ -45,4 +46,27 @@ test('dynamic preloads receive content hashes and font changes invalidate styles
   const next = readFileSync(join(root, 'index.html'), 'utf8');
   assert.notEqual(next, first);
   assert.equal(next.match(/dynamic.js\?v=([a-f0-9]+)/)[1], first.match(/dynamic.js\?v=([a-f0-9]+)/)[1]);
+});
+
+test('lazy asset maps and module graphs share exact versioned preload URLs', t => {
+  const root = mkdtempSync(join(tmpdir(), 'static-module-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  writeFileSync(join(root, 'app.js'), 'import "./dependency.js";');
+  writeFileSync(join(root, 'dependency.js'), 'export const value=1;');
+  writeFileSync(join(root, 'index.html'), '<script type="application/json" id="app-assets">{"./app.js":"./app.js"}</script><link rel="preload" href="./app.js" as="script"><script type="importmap" data-version-modules>{"imports":{"library":"./dependency.js","local/":"./"}}</script><link rel="modulepreload" href="./dependency.js" data-app-module>');
+  versionStaticAssets(root);
+  const first = readFileSync(join(root, 'index.html'), 'utf8');
+  const map = JSON.parse(first.match(/data-version-modules>(.*?)<\/script>/)[1]);
+  const lazy = JSON.parse(first.match(/id="app-assets">(.*?)<\/script>/)[1]);
+  assert.equal(map.imports.library, map.imports['./dependency.js']);
+  assert.equal(map.imports['local/dependency.js'], map.imports.library);
+  assert.ok(first.includes(`href="${map.imports.library}"`));
+  assert.ok(first.includes(`href="${lazy['./app.js']}"`));
+  versionStaticAssets(root); assert.equal(readFileSync(join(root, 'index.html'), 'utf8'), first);
+  writeFileSync(join(root, 'dependency.js'), 'export const value=2;');
+  versionStaticAssets(root);
+  const updated = readFileSync(join(root, 'index.html'), 'utf8');
+  const next = JSON.parse(updated.match(/data-version-modules>(.*?)<\/script>/)[1]);
+  assert.notEqual(next.imports.library, map.imports.library);
+  assert.equal(next.imports['./app.js'], map.imports['./app.js']);
 });
