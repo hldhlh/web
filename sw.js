@@ -1,5 +1,5 @@
 // 部署时由 scripts/generate-build-meta.mjs 替换为当前 Git 提交版本。
-const CACHE_NAME = 'web-shell-__BUILD_VERSION__-ranked-network-v5';
+const CACHE_NAME = 'web-shell-__BUILD_VERSION__-static-assets-v6';
 const SHELL = [
   './',
   './index.html',
@@ -23,21 +23,10 @@ const SHELL = [
   './apps/academy/framework/save-status.css',
   './apps/vista/icon.svg',
   './apps/svg/icon.svg',
-  './apps/vista/index.html',
   './apps/log/icon.svg',
   './apps/avatar/icon.svg',
   './apps/ledger/icon.svg',
-  './apps/gui-design-demo/icon.svg',
-  './apps/academy/pages/jlhcdh/index.html',
-  './apps/log/index.html',
-  './apps/log/styles.css',
-  './apps/log/script.js',
-  './apps/cloud/index.html',
-  './apps/cloud/style.css',
-  './apps/cloud/script.js',
-  './apps/ledger/index.html',
-  './apps/vendor/supabase.min.js',
-  './apps/network.js'
+  './apps/gui-design-demo/icon.svg'
 ];
 
 self.addEventListener('install', (event) => {
@@ -100,14 +89,14 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   // Only a release-versioned static URL is immutable. Manifests and APIs bypass us.
   const version = url.searchParams.get('v');
-  if (/^[0-9a-f]{7,40}$/i.test(version || '') && /\.(js|css)$/.test(url.pathname)) {
+  if (/^[0-9a-f]{7,40}$/i.test(version || '') && /\.(js|mjs|css)$/.test(url.pathname)) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
       return await cache.match(event.request) || networkFirst(event.request, event);
     })());
     return;
   }
-  if (event.request.mode === 'navigate' || /\.(?:html|js|css)$/.test(url.pathname)
+  if (event.request.mode === 'navigate' || /\.(?:html|js|mjs|css)$/.test(url.pathname)
     || url.pathname.includes('/apps/academy/')) {
     event.respondWith(networkFirst(event.request, event));
     return;

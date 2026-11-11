@@ -1,3 +1,4 @@
+import { versionStaticAssets } from './version-static-assets.mjs';
 import { execFileSync } from 'node:child_process';
 import { cpSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { dirname, resolve, sep } from 'node:path';
@@ -34,4 +35,5 @@ for (const file of files) {
 execFileSync(process.execPath, [resolve(root, 'scripts/generate-build-meta.mjs'), output], {
   stdio: 'inherit'
 });
+console.log(`Versioned ${versionStaticAssets(output)} static references by content.`);
 console.log(`Built ${files.length} public files plus version.json in _site/.`);

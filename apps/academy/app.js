@@ -739,6 +739,11 @@
     reconnectAttempt: 0,
     connecting: false,
     hydrated: false,
+    joining: false,
+    pullPromise: null,
+    pullAccount: null,
+    progressGate: null,
+    writeRevision: 0,
     statusTimer: 0,
     base: defaults(),
     pending: false,
@@ -806,11 +811,31 @@
         updateNotificationButton();
       }
     },
-    async pull() {
+    pull() {
+      const id = Auth.session?.id;
+      if (this.pullPromise && this.pullAccount === id) return this.pullPromise;
+      this.pullAccount = id;
+      const request = this.pullRemote().finally(() => {
+        if (this.pullPromise === request) this.pullPromise = null;
+      });
+      this.pullPromise = request;
+      return request;
+    },
+    async pullRemote() {
       const id = Auth.session?.id;
       if (!id) return false;
+      const gate = this.progressGate?.account === id
+        ? this.progressGate : (this.progressGate = { account: id, ready: false, event: null });
+      gate.ready = false;
+      const writeRevision = this.writeRevision;
       const pending = await window.AcademyStore.reliable.status();
-      this.pending = pending.entries.some(op => op.path === `progress:${id}`);
+      if (Auth.session?.id !== id || this.progressGate !== gate) return false;
+      // A local edit made while IndexedDB was being read must retain priority.
+      this.pending = this.writeRevision !== writeRevision || pending.entries.some(op => op.path === `progress:${id}`);
+      gate.ready = true;
+      const deferred = gate.event;
+      gate.event = null;
+      if (deferred) this.receiveProgress(deferred.eventType, deferred.record);
       if (this.pending) return true;
       const rows = await window.AcademyStore.restSelect(this.table(), {
         select: "user_id,payload,ts,updated_at",
@@ -828,6 +853,7 @@
     push() {
       const id = Auth.session?.id;
       if (!id) return;
+      this.writeRevision += 1;
       const snapshot = JSON.parse(JSON.stringify(state.progress));
       const base = this.base;
       this.pending = true;
@@ -859,7 +885,12 @@
       this.poll = 0;
     },
     scheduleReconnect(immediate) {
-      if (!Auth.session || this.socketLive || this.reconnectTimer) return;
+      if (!Auth.session || this.socketLive || this.joining || !navigator.onLine) return;
+      if (this.reconnectTimer) {
+        if (!immediate) return;
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = 0;
+      }
       const delay = immediate
         ? 180
         : Math.min(30000, 700 * (2 ** Math.min(this.reconnectAttempt, 5))) + Math.round(Math.random() * 300);
@@ -869,30 +900,47 @@
         this.connect();
       }, delay);
     },
+    receiveProgress(eventType, record) {
+      if (!Auth.session || record.user_id !== Auth.session.id) return;
+      const gate = this.progressGate;
+      if (!gate || gate.account !== Auth.session.id) return;
+      if (!gate.ready) {
+        // Rows are full snapshots: retain the latest delivery without growing a
+        // queue while local persistence is slow or unavailable.
+        gate.event = { eventType, record };
+        return;
+      }
+      if (eventType === "DELETE") {
+        if (this.pending) return;
+        state.progress = defaults();
+        this.rev = Date.now();
+        this.refreshView();
+        return;
+      }
+      if (Date.now() < this.skipUntil) return;
+      if (this.applyRow(record)) {
+        this.setStatus("live", "实时在线");
+        this.refreshView();
+      }
+    },
     subscribe() {
       const channel = this.sb.channel("academy-progress-live");
       this.channel = channel;
+      this.joining = true;
+      this.channelAccount = Auth.session?.id;
+      const account = this.channelAccount;
       channel.on("postgres_changes", { event: "*", schema: "public", table: this.table() }, ({ eventType, new: row, old: prev }) => {
+        if (this.channel !== channel || Auth.session?.id !== account) return;
         const record = row && Object.keys(row).length ? row : prev;
         if (!record) return;
         this.ingestStaff(record);
         if (record.user_id !== Auth.session?.id) return;
-        if (eventType === "DELETE") {
-          if (this.pending) return;
-          state.progress = defaults();
-          this.rev = Date.now();
-          this.refreshView();
-          return;
-        }
-        if (Date.now() < this.skipUntil) return;
-        if (this.applyRow(record)) {
-          this.setStatus("live", "实时在线");
-          this.refreshView();
-        }
+        this.receiveProgress(eventType, record);
       });
       channel.subscribe((status) => {
         if (this.channel !== channel) return;
         if (status === "SUBSCRIBED") {
+          this.joining = false;
           this.socketLive = true;
           this.reconnectAttempt = 0;
           clearTimeout(this.reconnectTimer);
@@ -900,6 +948,7 @@
           this.setStatus("live", "实时在线");
           this.stopPoll();
         } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          this.joining = false;
           this.socketLive = false;
           this.setStatus(navigator.onLine ? "connecting" : "offline", navigator.onLine ? "正在重连" : "离线可用");
           this.startPoll();
@@ -915,8 +964,13 @@
       }, 3500);
     },
     async connect() {
-      if (this.connecting || !Auth.session) return;
+      if (this.connecting || (this.joining && this.channelAccount === Auth.session?.id) || !Auth.session) return;
       this.connecting = true;
+      const account = Auth.session.id;
+      if (this.progressGate?.account !== account) {
+        this.progressGate = { account, ready: false, event: null };
+      }
+      const gate = this.progressGate;
       this.hydrated = false;
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = 0;
@@ -928,24 +982,25 @@
         this.socketLive = false;
         this.sb.removeChannel(oldChannel);
       }
-      try {
-        const ok = await this.pull();
-        this.hydrated = true;
-        this.setStatus(ok ? "connecting" : navigator.onLine ? "connecting" : "offline", ok ? "正在建立实时连接" : navigator.onLine ? "正在重连" : "离线可用");
-      } catch (_) {
-        this.hydrated = true;
-        this.setStatus(navigator.onLine ? "connecting" : "offline", navigator.onLine ? "正在重连" : "离线可用");
-      }
-      const cfg = window.ACADEMY_CONFIG;
-      if (!window.supabase?.createClient || !cfg) {
-        this.connecting = false;
-        this.startPoll();
-        this.scheduleReconnect();
-        return;
-      }
+      // HTTP hydration and the socket handshake are independent. A slow REST
+      // response must neither delay subscription nor overwrite a live status.
       this.sb = window.AcademyStore.realtimeClient();
       this.connecting = false;
-      this.subscribe();
+      if (this.sb && navigator.onLine) this.subscribe();
+      else {
+        this.startPoll();
+        this.scheduleReconnect();
+      }
+      try {
+        const ok = await this.pull();
+        if (this.progressGate !== gate || Auth.session?.id !== account) return;
+        if (!this.socketLive) this.setStatus(ok ? "online" : "offline", ok ? "在线同步" : "离线可用");
+      } catch (_) {
+        if (this.progressGate !== gate || Auth.session?.id !== account) return;
+        if (!this.socketLive) this.setStatus(navigator.onLine ? "connecting" : "offline", navigator.onLine ? "正在重连" : "离线可用");
+      } finally {
+        if (this.progressGate === gate && Auth.session?.id === account) this.hydrated = true;
+      }
     }
   };
 
@@ -5063,7 +5118,7 @@
       Auth.connectRealtime?.();
       ContentSync.connect();
       ScheduleStatus.connect();
-      Live.scheduleReconnect();
+      Live.scheduleReconnect(true);
     };
     if (window.supabase?.createClient) {
       activate();
