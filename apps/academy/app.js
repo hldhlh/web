@@ -2071,6 +2071,8 @@
   function renderMe() {
     setTop("我的", false);
     setTab("me");
+    const buildVersion = document.querySelector('meta[name="app-build-version"]')?.content || "";
+    const versionLabel = /^[0-9a-f]{7,40}$/i.test(buildVersion) ? buildVersion : "开发版本";
     const done = DATA.lessons.filter(lesson => isDone(lesson.id)).length;
     const passed = DATA.exams.filter((exam) => bestScore(exam.id) >= exam.pass).length;
     const remainingLessons = DATA.lessons.length - done;
@@ -2119,6 +2121,7 @@
           <button class="account-logout" data-act="logout">退出账号</button>
         </div>
       </section>
+      <p class="account-version">Auto Office · 版本 ${escapeHtml(versionLabel)}</p>
     `;
   }
 
