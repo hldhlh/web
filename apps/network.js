@@ -27,6 +27,8 @@
   let benchmarking = false;
   let benchmarkPromise;
   const inflightReads = new Map();
+  const restartReads = new Set();
+  const NETWORK_CHANGED = new Error("Network changed");
   const metrics = [];
   const unhealthyUntil = new Map();
   const rankings = new Map();
@@ -180,7 +182,7 @@
         if (results[0]) remember(results[0].origin, results[0].latency, true);
         return currentOrigin;
       } finally {
-        benchmarking = false;
+        if (generation === networkGeneration) benchmarking = false;
       }
     })();
     return benchmarkPromise;
@@ -233,7 +235,14 @@
       const cleanup = (winner) => {
         clearTimeout(timer);
         init.signal?.removeEventListener('abort', onAbort);
+        restartReads.delete(onNetworkChange);
         controllers.forEach(controller => { if (controller !== winner) controller.abort(); });
+      };
+      const onNetworkChange = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(NETWORK_CHANGED);
       };
       const onAbort = () => {
         if (settled) return;
@@ -288,6 +297,7 @@
       };
       if (init.signal?.aborted) return onAbort();
       init.signal?.addEventListener('abort', onAbort, { once: true });
+      restartReads.add(onNetworkChange);
       launch();
     });
   }
@@ -302,13 +312,21 @@
     delete requestInit.appNetworkSafeWrite;
 
     if (readable) {
-      const origins = getOrderedOrigins();
-      try {
-        return await raceRead(input, requestInit, origins, requireSuccess);
-      } catch (firstError) {
-        if (origins.length > 1 || requestInit.signal?.aborted) throw firstError;
-        await delay(160, requestInit.signal);
-        return fetchWithTimeout(replaceOrigin(input, origins[0]), requestInit, RETRY_TIMEOUT);
+      // Only reads are replayed across network changes. Keep the original promise
+      // so coalesced callers and upper-layer read locks recover together.
+      for (let switches = 0; ; switches++) {
+        const origins = getOrderedOrigins();
+        try {
+          try {
+            return await raceRead(input, requestInit, origins, requireSuccess);
+          } catch (error) {
+            if (error === NETWORK_CHANGED || origins.length > 1 || requestInit.signal?.aborted) throw error;
+            await delay(160, requestInit.signal);
+            return await raceRead(input, requestInit, getOrderedOrigins(), requireSuccess);
+          }
+        } catch (error) {
+          if (error !== NETWORK_CHANGED || requestInit.signal?.aborted || switches >= 3) throw error;
+        }
       }
     }
 
@@ -433,16 +451,24 @@
   const refreshNetwork = () => {
     networkGeneration++;
     unhealthyUntil.clear();
-    inflightReads.clear();
-    // Requests keep using the saved list while the new network is measured.
-    const pending = benchmarkPromise;
-    Promise.resolve(pending).then(async () => {
-      await discoverSameOriginGateway(true);
-      await benchmark();
-    }).catch(() => {});
+    // Old probes cannot hold a new network behind their timeout or overwrite its ranking.
+    benchmarking = false;
+    benchmarkPromise = null;
+    for (const restart of [...restartReads]) restart();
+    window.dispatchEvent(new CustomEvent('app-network-recovered', { detail: { generation: networkGeneration } }));
+    Promise.all([discoverSameOriginGateway(true), benchmark()]).catch(() => {});
   };
   window.addEventListener('online', refreshNetwork, { passive: true });
   navigator.connection?.addEventListener('change', refreshNetwork);
+  let hiddenAt = null;
+  document.addEventListener?.('visibilitychange', () => {
+    if (document.hidden) hiddenAt = Date.now();
+    else {
+      const elapsed = hiddenAt === null ? 0 : Date.now() - hiddenAt;
+      hiddenAt = null;
+      if (elapsed >= 30000 && navigator.onLine) refreshNetwork();
+    }
+  });
 
   const schedule = window.requestIdleCallback || ((callback) => setTimeout(callback, 1200));
   schedule(async () => {

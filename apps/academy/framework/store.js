@@ -103,6 +103,20 @@ window.AcademyStore = (() => {
   }
 
   const delayedChannels = new Set();
+  const reconnectChannels = new Set();
+  let networkResetTimer;
+  window.addEventListener('app-network-recovered', () => {
+    clearTimeout(networkResetTimer);
+    networkResetTimer = setTimeout(() => {
+      if (!navigator.onLine) return;
+      const previous = realtimeClient._sb;
+      realtimeClient._sb = null;
+      for (const restart of reconnectChannels) restart();
+      window.dispatchEvent(new CustomEvent('academy-realtime-reset'));
+      // Never wait for the old network's unsubscribe acknowledgement.
+      if (previous) Promise.resolve(previous.removeAllChannels()).catch(() => {});
+    }, 180);
+  });
   window.addEventListener('app-sdk-ready', () => { for (const start of [...delayedChannels]) start(); });
   function channel(name, handlers) {
     let instance;
@@ -155,6 +169,14 @@ window.AcademyStore = (() => {
         handlers.connected?.();
       });
     };
+    const restart = () => {
+      if (stopped) return;
+      clearTimeout(retryTimer); retryDelay = 1000;
+      instance = null; subscribed = false;
+      handlers.connection?.(false);
+      start();
+    };
+    reconnectChannels.add(restart);
     start();
     return {
       send: payload => {
@@ -162,7 +184,7 @@ window.AcademyStore = (() => {
         pending.set(payload.event, payload);
         return Promise.resolve('queued');
       },
-      unsubscribe() { stopped = true; clearTimeout(retryTimer); pending.clear(); subscribed = false; delayedChannels.delete(start); if (instance) realtimeClient()?.removeChannel(instance); instance = null; }
+      unsubscribe() { reconnectChannels.delete(restart); stopped = true; clearTimeout(retryTimer); pending.clear(); subscribed = false; delayedChannels.delete(start); if (instance) realtimeClient()?.removeChannel(instance); instance = null; }
     };
   }
 

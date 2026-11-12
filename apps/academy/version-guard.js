@@ -276,6 +276,11 @@
   // the next exponential reconnect timer (which can be up to 30 seconds away).
   window.addEventListener('app-sdk-ready', startVersionChecks);
   window.addEventListener('academy-sdk-ready', startVersionChecks);
+  window.addEventListener('academy-realtime-reset', () => {
+    realtimeChannel = null; realtimeConnected = false; realtimeRetryAttempt = 0;
+    clearTimeout(realtimeRetryTimer); realtimeRetryTimer = 0;
+    startVersionChecks();
+  });
   window.addEventListener('online', () => {
     connectRealtime();
     checkForUpdate(false);

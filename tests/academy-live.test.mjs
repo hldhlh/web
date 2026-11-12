@@ -103,3 +103,18 @@ test('local save during queue inspection takes priority over its stale result', 
   assert.equal(JSON.parse(f.saved.get('academy-progress-cache-a')).completed.local, true);
   assert.equal(f.reads(), 0);
 });
+
+test('network reset replaces an apparently healthy channel without waiting for stale flags', async () => {
+  const f=fixture(); f.resolveRead([]); await f.live.connect();
+  f.channels[0].status('SUBSCRIBED');
+  f.live.joining=true; f.live.reconnectAttempt=5;
+  const app=readFileSync('apps/academy/app.js','utf8');
+  const start=app.indexOf('    window.addEventListener("academy-realtime-reset"');
+  const listener=app.slice(start,app.indexOf('    window.addEventListener("app-network-change"',start));
+  let recover;
+  vm.runInNewContext(listener,{Live:f.live,window:{addEventListener:(_,fn)=>recover=fn},clearTimeout(){}});
+  recover(); await f.settle();
+  assert.equal(f.channels.length,2);assert.equal(f.live.reconnectAttempt,0);assert.equal(f.live.socketLive,false);
+  f.channels[0].status('SUBSCRIBED');assert.equal(f.live.socketLive,false);
+  f.channels[1].status('SUBSCRIBED');assert.equal(f.live.socketLive,true);
+});

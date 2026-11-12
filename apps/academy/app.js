@@ -5156,6 +5156,16 @@
     appRoot.addEventListener("pointermove", onLessonBlockPointerMove);
     appRoot.addEventListener("pointerup", onLessonBlockPointerEnd);
     appRoot.addEventListener("pointercancel", onLessonBlockPointerEnd);
+    window.addEventListener("academy-realtime-reset", () => {
+      // A socket from the previous network can still look healthy or be joining.
+      // Its state must not veto recovery on the replacement shared client.
+      Live.channel = null;
+      Live.socketLive = false;
+      Live.joining = false;
+      Live.reconnectAttempt = 0;
+      clearTimeout(Live.reconnectTimer); Live.reconnectTimer = 0;
+      Live.connect();
+    });
     window.addEventListener("app-network-change", () => {
       Live.scheduleReconnect(true);
       ContentSync.pull().catch(() => { });

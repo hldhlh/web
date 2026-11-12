@@ -133,3 +133,43 @@ test('background benchmarking persists every measured candidate', async () => {
   assert.equal(saved.rankings.length, 3);
   assert.ok(saved.rankings.every(item => Number.isFinite(item.latency)));
 });
+
+test('network switch restarts a stalled shared read without waiting for the old timeout', async () => {
+  const events = {}; let calls = 0, aborted = false;
+  const api = harness((url, init) => {
+    calls++;
+    if (calls > 1) return Promise.resolve(Response.json({fresh:true}));
+    return new Promise((resolve, reject) => init.signal.addEventListener('abort', () => { aborted = true; reject(init.signal.reason); }));
+  }, { addEventListener: (name, fn) => events[name] = fn });
+  const first = api.request(project+'/rest/v1/progress');
+  const second = api.request(project+'/rest/v1/progress');
+  events.online();
+  assert.deepEqual(await (await first).json(), {fresh:true});
+  assert.deepEqual(await (await second).json(), {fresh:true});
+  assert.equal(calls, 2); assert.equal(aborted, true);
+});
+test('network switch never aborts or replays an in-flight write', async () => {
+  const events = {}; let calls = 0, signal, finish;
+  const api = harness((url, init) => { calls++; signal=init.signal; return new Promise(resolve=>finish=resolve); },
+    { addEventListener: (name, fn) => events[name] = fn });
+  const write=api.request(project+'/rest/v1/progress',{method:'POST',body:'{}'});
+  events.online(); assert.equal(signal.aborted,false);
+  finish(Response.json({saved:true})); await write; assert.equal(calls,1);
+});
+test('new-network benchmarks do not wait for old health probes', async () => {
+  const events={}, releases=[];
+  const api=harness(url=>new Promise(resolve=>releases.push(resolve)),{...cachedOptions(),addEventListener:(name,fn)=>events[name]=fn});
+  const old=api.benchmark(); assert.equal(releases.length,3);
+  events.online(); assert.equal(releases.length,6);
+  releases.splice(0).forEach(resolve=>resolve(Response.json({ok:true}))); await old;
+});
+test('long background suspension triggers recovery while brief tab switches do not', () => {
+  const events={};let now=0,recovered=0;
+  const document={head:{querySelector:()=>true},hidden:false,addEventListener:(name,fn)=>events[name]=fn};
+  harness(async()=>Response.json({}),{document,Date:{now:()=>now},dispatchEvent:()=>recovered++});
+  const baseline=recovered;
+  document.hidden=true;events.visibilitychange();now=1000;document.hidden=false;events.visibilitychange();
+  assert.equal(recovered,baseline);
+  document.hidden=true;events.visibilitychange();now=32000;document.hidden=false;events.visibilitychange();
+  assert.equal(recovered,baseline+1);
+});
