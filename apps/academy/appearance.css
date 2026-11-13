@@ -1,6 +1,7 @@
 /* Auto Office — paired Graphite / Light appearance.
    Semantic colors are shared by the main app, admin and embedded subprograms. */
 :root {
+  --greeting-note: #66755e;
   --bg: #f2f2f7;
   --surface: #fff;
   --surface-2: #f0f1f5;
@@ -18,6 +19,7 @@
   --nav-border: #e2e3e8;
 }
 [data-theme="dark"] {
+  --greeting-note: #bcc6ae;
   --bg: #111315;
   --surface: #202428;
   --surface-2: #2c3137;
@@ -101,8 +103,8 @@
 .app .stage-progress { margin-inline: 16px; }
 .app .stage-progress i { background: var(--accent); }
 /* Relative type keeps the new surfaces legible when users enlarge text. */
-.app .home-status h2 { font-size: clamp(1.625rem, 4vw, 2.125rem); }
-.app .home-status-meta { font-size: .9375rem; }
+.app .home-status h2 { font-size: 1.5625rem; font-weight: 500; line-height: 1.4; }
+.app .home-status-meta { font-size: 1rem; gap: 2px; margin-top: 8px; }
 .app .home-shortcuts h3, .home-pending > h3 { font-size: 1.375rem; }
 .app .home-app-shortcut-copy strong, .pending-row strong { font-size: 1.0625rem; }
 .pending-action { font-size: .9375rem; white-space: normal; }

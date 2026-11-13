@@ -536,44 +536,38 @@ code, pre, .mono {
 .home-status h2 {
   color: var(--text);
   font-size: var(--type-title-1);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.4;
 }
 
 .home-status-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
+  display: grid;
+  gap: 2px;
   color: var(--muted);
-  font-size: var(--type-footnote);
-  font-weight: 500;
-  line-height: 1.35;
+  font-size: var(--type-callout, 16px);
+  font-weight: 400;
+  line-height: 1.9;
+}
+
+.home-status .home-status-meta p {
+  display: block;
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .home-status-meta time {
-  display: block;
-  white-space: nowrap;
-}
-
-.home-status-meta span {
-  white-space: nowrap;
-}
-
-.home-status-meta span::before {
-  content: "·";
-  margin-right: 6px;
-  color: var(--tertiary);
+  display: inline;
+  color: var(--text);
 }
 
 .home-status .home-rest-reminder {
   display: block;
-  margin: 0;
-  color: var(--muted);
+  margin: 8px 0 0;
+  color: var(--greeting-note, #66755e);
   font-size: var(--type-subhead);
   font-weight: 400;
-  line-height: 1.35;
+  line-height: 1.6;
 }
 
 @media (max-width: 480px) {

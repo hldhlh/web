@@ -1145,18 +1145,18 @@
       return this.pullPromise;
     },
     nextRestLabel(userId, from = new Date()) {
-      if (!userId) return "下次休息待安排";
+      if (!userId) return "下次休息还在安排中。";
       const start = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}-${String(from.getDate()).padStart(2, "0")}`;
       const nextKey = Object.keys(this.data.assignments || {}).sort().find((key) => {
         if (key < start || !/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
         return (this.data.assignments[key] || []).some((item) => item?.userId === userId && item?.shift === "off");
       });
-      if (!nextKey) return "下次休息待安排";
-      if (nextKey === start) return "今天是您的休息日";
+      if (!nextKey) return "下次休息还在安排中。";
+      if (nextKey === start) return "今天是你的休息日，好好放松一下。";
       const [year, month, day] = nextKey.split("-").map(Number);
       const date = new Date(year, month - 1, day);
       const weekday = new Intl.DateTimeFormat("zh-CN", { weekday: "short" }).format(date);
-      return `下次休息 ${month}月${day}日 ${weekday}`;
+      return `下次休息在${month}月${day}日，${weekday}。`;
     },
     connect() {
       if (!this.channel) {
@@ -1726,7 +1726,8 @@
     const next = box.urgentLessons[0] || nextLesson();
     const now = new Date();
     const todayStatus = todayStatusForHour(now.getHours());
-    const date = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "short" }).format(now);
+    const weekday = new Intl.DateTimeFormat("zh-CN", { weekday: "short" }).format(now);
+    const date = `${now.getMonth() + 1}月${now.getDate()}日，${weekday}`;
     const dateTime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const memberName = escapeHtml(Auth.session?.name || "学员");
     // Render actionable items directly, avoiding post-render dashboard replacement.
@@ -1768,12 +1769,12 @@
     target.innerHTML = `
       <header data-home-block="status" class="hello home-status" aria-label="今日状态">
         <div class="home-status-copy">
-          <h2>${todayStatus.greeting}，${memberName}</h2>
-          ${todayStatus.restReminder ? `<p class="home-rest-reminder">夜深了，早点休息</p>` : ""}
+          <h2>${todayStatus.greeting}，${memberName}。</h2>
           <div class="home-status-meta">
-            <time datetime="${dateTime}">${date}</time>
-            <span>${escapeHtml(ScheduleStatus.nextRestLabel(Auth.session?.id, now))}</span>
+            <p>今天是<time datetime="${dateTime}">${date}</time>。</p>
+            <p>${escapeHtml(ScheduleStatus.nextRestLabel(Auth.session?.id, now))}</p>
           </div>
+          ${todayStatus.restReminder ? `<p class="home-rest-reminder">夜深了，早点休息。</p>` : ""}
         </div>
         ${progressRing(completionRate())}
         <div id="home-daily-status" class="home-daily-status" hidden></div>
