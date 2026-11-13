@@ -42,9 +42,12 @@ window.AcademySecureAuth = (() => {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(),20000);
       try {
-        // Credential requests use the project HTTPS endpoint directly; never cache or replay writes.
-        const response = await window.fetch(`${cfg.url}/rest/v1/rpc/academy_auth`, {
+        // Only verify/people are replayable reads; login and other mutations
+        // use the selected trusted route exactly once, even after a lost reply.
+        const request = window.APP_NETWORK?.request || window.fetch.bind(window);
+        const response = await request(`${cfg.url}/rest/v1/rpc/academy_auth`, {
           method:'POST', cache:'no-store', signal:controller.signal,
+          ...(window.APP_NETWORK?.request ? { appNetworkSelectedRoute:true, appNetworkReadOnly:['verify','people'].includes(action) } : {}),
           headers:{ apikey:cfg.key, Authorization:`Bearer ${cfg.key}`, 'Content-Type':'application/json' },
           body:JSON.stringify({ p_action:action, p_data:data })
         });
@@ -171,6 +174,7 @@ window.AcademySecureAuth = (() => {
       const resume = () => { if (!document.hidden && window.navigator?.onLine !== false) { verifySession(); pull().catch(() => {}); } };
       document.addEventListener('visibilitychange',resume);
       window.addEventListener('online',resume);
+      window.addEventListener('app-network-recovered',resume);
       setInterval(() => { if (!document.hidden) verifySession(); },15000);
       setInterval(() => { if (!document.hidden) pull().catch(() => {}); },30000);
       await verifySession();

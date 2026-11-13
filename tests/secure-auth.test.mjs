@@ -20,7 +20,7 @@ function fixture(){
     fetch:async(url,options)=>{const {p_action,p_data}=JSON.parse(options.body);state.calls.push({action:p_action,data:p_data,options});return {ok:true,json:()=>state.reply(p_action,p_data)};}};
   const document={hidden:false,addEventListener:(k,fn)=>{state.events[k]=fn;}};
   vm.runInNewContext(source,{window,document,sessionStorage,localStorage,crypto:webcrypto,AbortController,setTimeout,clearTimeout,setInterval:()=>1});
-  return {auth:window.AcademySecureAuth.create({}),state,user,document,sessionStorage,handlers:()=>handlers};
+  return {window,auth:window.AcademySecureAuth.create({}),state,user,document,sessionStorage,handlers:()=>handlers};
 }
 test('server mode never promotes publicly exposed legacy session tokens',()=>{
   const f=fixture();assert.equal(f.sessionStorage.getItem('academy-session-v1'),null);assert.equal(f.auth.session.sessionToken,'old-token');
@@ -71,4 +71,17 @@ test('login failures do not create a session or claim that the password was chan
   await assert.rejects(f.auth.login('测试员工','incorrect'),/姓名或当前密码不正确/);
   assert.equal(f.auth.session.sessionToken,'old-token');
   await assert.rejects(f.auth.changePassword('测试员工','incorrect','new-password-strong'),/姓名或当前密码不正确/);
+});
+
+test('auth uses network recovery transport and marks only verification and people replayable', async () => {
+  const f = fixture();
+  f.window.APP_NETWORK = { request: f.window.fetch };
+  await f.auth.verifySession();
+  await f.auth.pull();
+  f.state.reply = async action => action === 'people' ? {ok:true,users:[f.user]} : {ok:true,user:f.user,sessionToken:'new-token'};
+  await f.auth.login('测试员工','correct-password');
+  for (const call of f.state.calls) {
+    assert.equal(call.options.appNetworkSelectedRoute, true);
+    assert.equal(call.options.appNetworkReadOnly, ['verify','people'].includes(call.action));
+  }
 });

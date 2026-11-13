@@ -166,10 +166,77 @@ test('new-network benchmarks do not wait for old health probes', async () => {
 test('long background suspension triggers recovery while brief tab switches do not', () => {
   const events={};let now=0,recovered=0;
   const document={head:{querySelector:()=>true},hidden:false,addEventListener:(name,fn)=>events[name]=fn};
-  harness(async()=>Response.json({}),{document,Date:{now:()=>now},dispatchEvent:()=>recovered++});
+  harness(async()=>Response.json({}),{document,navigator:{onLine:true,connection:{addEventListener(){}}},Date:{now:()=>now},dispatchEvent:()=>recovered++});
   const baseline=recovered;
   document.hidden=true;events.visibilitychange();now=1000;document.hidden=false;events.visibilitychange();
   assert.equal(recovered,baseline);
   document.hidden=true;events.visibilitychange();now=32000;document.hidden=false;events.visibilitychange();
   assert.equal(recovered,baseline+1);
+});
+
+for (const trigger of ['visibilitychange', 'pageshow']) {
+  test(`${trigger} recovers stalled reads on browsers without connection events`, async () => {
+    const events = {}; let calls = 0, aborted = false;
+    const document = { head: { querySelector: () => true }, hidden: false,
+      addEventListener: (name, fn) => events[name] = fn };
+    const api = harness((url, init) => {
+      calls++;
+      if (calls > 1) return Promise.resolve(Response.json({ fresh: true }));
+      return new Promise((resolve, reject) => init.signal.addEventListener('abort', () => {
+        aborted = true; reject(init.signal.reason);
+      }));
+    }, { document, addEventListener: (name, fn) => events[name] = fn });
+    const pending = api.request(project + '/rest/v1/progress');
+    if (trigger === 'visibilitychange') {
+      document.hidden = true; events.visibilitychange();
+      document.hidden = false; events.visibilitychange();
+    } else {
+      events.pageshow({ persisted: false });
+      assert.equal(calls, 1);
+      events.pageshow({ persisted: true });
+    }
+    assert.deepEqual(await (await pending).json(), { fresh: true });
+    assert.equal(calls, 2); assert.equal(aborted, true);
+  });
+}
+
+test('carrier handoff retries after every configured route temporarily fails', async () => {
+  let calls = 0;
+  const api = harness(async () => {
+    if (++calls <= 3) throw new TypeError('handoff');
+    return Response.json({ recovered: true });
+  }, cachedOptions());
+  assert.deepEqual(await (await api.request(project + '/rest/v1/logs')).json(), { recovered: true });
+  assert.equal(calls, 4);
+});
+test('permanent network failure has a bounded retry budget', async () => {
+  let calls = 0;
+  const api = harness(async () => { calls++; throw new TypeError('offline'); });
+  await assert.rejects(api.request(project + '/rest/v1/logs'), /offline/);
+  assert.equal(calls, 3);
+});
+test('read-only auth RPC falls back but login mutation uses selected route only once', async () => {
+  const calls = [];
+  const api = harness(async (url, init) => {
+    calls.push({url, init});
+    if (url.startsWith(backup)) throw new TypeError('route lost');
+    return Response.json({ok:true});
+  }, cachedOptions());
+  const url = project + '/rest/v1/rpc/academy_auth';
+  await assert.rejects(api.request(url, {method:'POST',body:'{"p_action":"login"}',appNetworkSelectedRoute:true}), /route lost/);
+  assert.equal(calls.length, 1); assert.ok(calls[0].url.startsWith(backup));
+  const result = await api.request(url, {method:'POST',body:'{"p_action":"verify"}',appNetworkReadOnly:true});
+  assert.equal((await result.json()).ok, true);
+  assert.equal(calls.length, 3);
+  assert.equal(calls[2].init.appNetworkReadOnly, undefined);
+});
+test('network switch clears latency measurements from the old carrier immediately', () => {
+  const events = {}, releases = [];
+  const api = harness(() => new Promise(resolve => releases.push(resolve)), {
+    ...cachedOptions(), addEventListener:(name, fn) => events[name] = fn
+  });
+  assert.ok(api.ranking.some(item => item.latency !== undefined));
+  events.online();
+  assert.ok(api.ranking.every(item => item.latency === undefined));
+  releases.forEach(resolve => resolve(Response.json({ok:true})));
 });

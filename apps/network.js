@@ -207,10 +207,14 @@
         return !!cached.available;
       }
     } catch (_) {}
+    const generation = networkGeneration;
     const result = await probe(sameOriginGateway);
+    if (generation !== networkGeneration) return false;
     try { localStorage.setItem('app-network-gateway-v1', JSON.stringify({ origin: sameOriginGateway.origin, at: Date.now(), available: Number.isFinite(result.latency) })); } catch (_) {}
     if (!Number.isFinite(result.latency)) return false;
-    nodes.push({ name: sameOriginGateway.name, origin: sameOriginGateway.origin });
+    if (!nodes.some(node => node.origin === sameOriginGateway.origin)) {
+      nodes.push({ name: sameOriginGateway.name, origin: sameOriginGateway.origin });
+    }
     addConnectionHint(sameOriginGateway.origin);
     return true;
   }
@@ -304,33 +308,40 @@
 
   async function performFetch(input, init = {}) {
     const method = String(init.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
-    const readable = method === 'GET' || method === 'HEAD';
+    const readable = method === 'GET' || method === 'HEAD' || init.appNetworkReadOnly === true;
     const requireSuccess = init.appNetworkRequireSuccess === true;
     const safeWrite = init.appNetworkSafeWrite === true;
     const requestInit = { ...init };
     delete requestInit.appNetworkRequireSuccess;
     delete requestInit.appNetworkSafeWrite;
+    delete requestInit.appNetworkReadOnly;
+    delete requestInit.appNetworkSelectedRoute;
 
     if (readable) {
       // Only reads are replayed across network changes. Keep the original promise
       // so coalesced callers and upper-layer read locks recover together.
-      for (let switches = 0; ; switches++) {
-        const origins = getOrderedOrigins();
+      let failures = 0, switches = 0;
+      for (;;) {
         try {
-          try {
-            return await raceRead(input, requestInit, origins, requireSuccess);
-          } catch (error) {
-            if (error === NETWORK_CHANGED || origins.length > 1 || requestInit.signal?.aborted) throw error;
-            await delay(160, requestInit.signal);
-            return await raceRead(input, requestInit, getOrderedOrigins(), requireSuccess);
-          }
+          return await raceRead(input, requestInit, getOrderedOrigins(), requireSuccess);
         } catch (error) {
-          if (error !== NETWORK_CHANGED || requestInit.signal?.aborted || switches >= 3) throw error;
+          if (requestInit.signal?.aborted) throw error;
+          if (error === NETWORK_CHANGED) {
+            if (++switches > 3) throw error;
+            continue;
+          }
+          // A carrier handoff can briefly break every route. Retry with fresh
+          // rankings, including gateways discovered while the request was pending.
+          if (failures >= 2) throw error;
+          await delay([400, 1200][failures++], requestInit.signal);
         }
       }
     }
 
-    if (!safeWrite) return fetchWithTimeout(replaceOrigin(input, PROJECT_ORIGIN), requestInit, 30000);
+    // Authentication mutations use the selected trusted route once only. A lost
+    // login/password response must never create a second session or mutation.
+    if (!safeWrite) return fetchWithTimeout(replaceOrigin(input,
+      init.appNetworkSelectedRoute === true ? getOrderedOrigins()[0] : PROJECT_ORIGIN), requestInit, 30000);
 
     const origins = getOrderedOrigins();
     let lastError;
@@ -451,12 +462,13 @@
   const refreshNetwork = () => {
     networkGeneration++;
     unhealthyUntil.clear();
+    rankings.clear();
     // Old probes cannot hold a new network behind their timeout or overwrite its ranking.
     benchmarking = false;
     benchmarkPromise = null;
     for (const restart of [...restartReads]) restart();
     window.dispatchEvent(new CustomEvent('app-network-recovered', { detail: { generation: networkGeneration } }));
-    Promise.all([discoverSameOriginGateway(true), benchmark()]).catch(() => {});
+    Promise.all([discoverSameOriginGateway(true).then(found => found ? benchmark() : null), benchmark()]).catch(() => {});
   };
   window.addEventListener('online', refreshNetwork, { passive: true });
   navigator.connection?.addEventListener('change', refreshNetwork);
@@ -466,8 +478,15 @@
     else {
       const elapsed = hiddenAt === null ? 0 : Date.now() - hiddenAt;
       hiddenAt = null;
-      if (elapsed >= 30000 && navigator.onLine) refreshNetwork();
+      // Safari/iOS do not expose connection.change; a quick trip to network
+      // settings can replace the transport without an offline/online event.
+      if (navigator.onLine && (elapsed >= 30000 || !navigator.connection)) refreshNetwork();
     }
+  });
+
+  // A back-forward cache restore can retain sockets from the previous network.
+  window.addEventListener('pageshow', event => {
+    if (event.persisted && navigator.onLine) refreshNetwork();
   });
 
   const schedule = window.requestIdleCallback || ((callback) => setTimeout(callback, 1200));
