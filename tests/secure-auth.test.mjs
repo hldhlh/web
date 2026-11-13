@@ -85,3 +85,12 @@ test('auth uses network recovery transport and marks only verification and peopl
     assert.equal(call.options.appNetworkReadOnly, ['verify','people'].includes(call.action));
   }
 });
+test('startup verifies the session and loads people concurrently while preserving readiness', async () => {
+  const f=fixture(), people=deferred(), verify=deferred();
+  f.state.reply=async action=>action==='people'?people.promise:verify.promise;
+  let ready=false;const started=f.auth.start().then(session=>{ready=true;return session;});
+  assert.deepEqual(f.state.calls.map(call=>call.action),['verify','people']);
+  assert.equal(ready,false);
+  verify.resolve({ok:true,user:f.user});people.resolve({ok:true,users:[f.user]});
+  const session=await started;assert.equal(session.id,f.user.id);assert.equal(f.auth.list().length,1);
+});

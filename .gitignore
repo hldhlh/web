@@ -3,3 +3,6 @@ node_modules/
 _site/
 .playwright-cli/
 output/
+
+# Temporary layout comparisons
+tmp/greeting-layouts/

@@ -180,8 +180,9 @@ window.AcademySecureAuth = (() => {
       window.addEventListener('app-network-recovered',resume);
       window.AcademyStore.poll(verifySession, { interval:15000 });
       window.AcademyStore.poll(pull, { interval: () => channel?.connected ? 60000 : 15000 });
-      await verifySession();
-      await pull().catch(() => {});
+      // Both RPCs authenticate independently. Fetch them concurrently while
+      // preserving start()'s contract: account and people data are ready together.
+      await Promise.all([verifySession(), pull().catch(() => {})]);
       return session;
     }
     return {

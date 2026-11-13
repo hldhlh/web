@@ -74,7 +74,7 @@ test('split schedule rows invalidate all subscribers but unrelated progress rows
 test('watchdog recovers a silent handshake and ignores old data callbacks', async () => {
   const f=fixture();let deliveries=0;
   const handle=f.store.realtimeClient().channel('progress').on('postgres_changes',{},()=>deliveries++).subscribe(()=>{});
-  const old=f.clients[0].channels[0];await f.advance(9000);
+  const old=f.clients[0].channels[0];await f.advance(15000);
   assert.equal(f.clients[0].channels.length,2);
   old.bindings[0].fn({});assert.equal(deliveries,0);
   f.clients[0].channels[1].bindings[0].fn({});assert.equal(deliveries,1);
@@ -131,4 +131,40 @@ test('connection diagnostics count shared subscriptions without exposing keys', 
   const f=fixture();f.store.channel('same',{});f.store.channel('same',{});
   const status=f.store.connectionStatus();assert.equal(status.transportStarts,1);assert.equal(status.subscriptions,1);
   assert.equal(JSON.stringify(status).includes('public'),false);
+});
+
+test('a healthy heartbeat preserves one socket across repeated recovery events', async () => {
+  const f=fixture();f.store.channel('a',{});
+  const client=f.clients[0];let heartbeat, sent=0;
+  // Install the socket API before creation in the next fixture transport.
+  f.window.supabase.createClient=()=>({ ...client, realtime:{
+    isConnected:()=>true, onHeartbeat:fn=>heartbeat=fn,
+    sendHeartbeat:()=>{sent++;return Promise.resolve();}
+  }});
+  f.emit('offline');await f.advance(180);
+  const starts=f.store.connectionStatus().transportStarts;
+  f.emit('app-network-recovered');f.emit('app-network-recovered');
+  assert.equal(sent,1);heartbeat('ok',125);await f.advance(1000);
+  assert.equal(f.store.connectionStatus().transportStarts,starts);
+  assert.equal(f.store.connectionStatus().reusedConnections,1);
+  assert.equal(f.store.connectionStatus().heartbeatRttMs,125);
+});
+test('missing heartbeat acknowledgement replaces an apparently open stale socket', async () => {
+  const f=fixture();let sends=0;
+  const create=f.window.supabase.createClient;
+  f.window.supabase.createClient=origin=>Object.assign(create(origin),{realtime:{
+    isConnected:()=>true,onHeartbeat(){},sendHeartbeat(){sends++;return Promise.resolve();}
+  }});
+  f.store.channel('a',{});f.clients[0].channels[0].status('SUBSCRIBED');
+  f.emit('app-network-recovered');await f.advance(3180);
+  assert.equal(sends,1);assert.equal(f.clients.length,2);
+});
+test('recovery waits for a pending heartbeat instead of issuing a destructive second one', async () => {
+  const f=fixture();let callback,sends=0;
+  const create=f.window.supabase.createClient;
+  f.window.supabase.createClient=origin=>Object.assign(create(origin),{realtime:{
+    pendingHeartbeatRef:'pending',isConnected:()=>true,onHeartbeat:fn=>callback=fn,sendHeartbeat(){sends++;}
+  }});
+  f.store.channel('a',{});f.emit('app-network-recovered');callback('ok',80);await f.advance(4000);
+  assert.equal(sends,0);assert.equal(f.clients.length,1);
 });

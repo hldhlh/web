@@ -96,6 +96,8 @@ window.AcademyStore = (() => {
   const topics = new Map();
   let rawClient = null, rawOrigin = null, networkResetTimer;
   let transportStarts = 0, recoveries = 0;
+  let probeTimer = null, probing = false, heartbeatRttMs = null, reusedConnections = 0;
+  let transportStartedAt = 0, firstSubscriptionMs = null;
   const online = () => navigator.onLine !== false;
   const selectedRealtimeOrigin = () => window.APP_NETWORK?.realtimeOrigin || window.APP_NETWORK?.projectOrigin || cfg().url;
   const safely = (fn, ...args) => { try { Promise.resolve(fn?.(...args)).catch(() => {}); } catch (_) {} };
@@ -103,10 +105,21 @@ window.AcademyStore = (() => {
     if (!rawClient && window.supabase?.createClient && online()) {
       rawOrigin = selectedRealtimeOrigin();
       transportStarts++;
+      transportStartedAt = Date.now(); firstSubscriptionMs = null;
       rawClient = window.supabase.createClient(rawOrigin, cfg().key, {
         appNetworkRealtimeDirect: true,
         auth: { persistSession: false, autoRefreshToken: false },
-        realtime: { params: { eventsPerSecond: 20 } }
+        realtime: { timeout: 12000, params: { eventsPerSecond: 20 } }
+      });
+      const created = rawClient;
+      created.realtime?.onHeartbeat?.((status, latency) => {
+        if (created !== rawClient) return;
+        if (status === 'ok') {
+          if (Number.isFinite(latency)) heartbeatRttMs = latency;
+          if (probing) { reusedConnections++; cancelProbe(); }
+        } else if (probing && ['error', 'timeout', 'disconnected'].includes(status)) {
+          cancelProbe(); resetConnections();
+        }
       });
     }
     return rawClient;
@@ -138,11 +151,12 @@ window.AcademyStore = (() => {
       joinTimer = setTimeout(() => {
         if (!valid() || joined) return;
         safely(callback, 'TIMED_OUT'); retry();
-      }, 8000);
+      }, 14000);
       current.subscribe(status => {
         if (!valid()) return;
         joined = status === 'SUBSCRIBED';
         if (joined) {
+          if (firstSubscriptionMs === null) firstSubscriptionMs = Date.now() - transportStartedAt;
           clearTimers(); attempts = 0;
           if (presence) safely(() => current.track(presence));
           for (const data of pending.values()) safely(() => current.send(data));
@@ -188,6 +202,7 @@ window.AcademyStore = (() => {
   };
   function realtimeClient() { return clientFacade; }
   function resetConnections() {
+    cancelProbe();
     clearTimeout(networkResetTimer);
     networkResetTimer = setTimeout(() => {
       recoveries++;
@@ -200,11 +215,30 @@ window.AcademyStore = (() => {
       window.dispatchEvent(new CustomEvent('academy-realtime-reset'));
     }, 180);
   }
-  window.addEventListener('app-network-recovered', resetConnections);
+  function cancelProbe() { clearTimeout(probeTimer); probeTimer = null; probing = false; }
+  function recoverConnections() {
+    refreshPolls();
+    if (probing) return;
+    const socket = rawClient?.realtime;
+    if (!online() || !socket?.isConnected?.() || !socket.onHeartbeat || !socket.sendHeartbeat) {
+      resetConnections(); return;
+    }
+    // Visibility and connection events do not prove a working socket is dead.
+    // Validate it with one heartbeat rather than paying DNS/TLS/join again.
+    probing = true;
+    probeTimer = setTimeout(() => { cancelProbe(); resetConnections(); }, 3000);
+    // Sending another heartbeat while one is pending makes this SDK close the
+    // socket. Wait for its existing acknowledgement instead.
+    if (!socket.pendingHeartbeatRef) {
+      try { Promise.resolve(socket.sendHeartbeat()).catch(() => { if (probing) { cancelProbe(); resetConnections(); } }); }
+      catch (_) { cancelProbe(); resetConnections(); }
+    }
+  }
+  window.addEventListener('app-network-recovered', recoverConnections);
   window.addEventListener('offline', resetConnections);
-  window.addEventListener('online', resetConnections);
+  window.addEventListener('online', recoverConnections);
   window.addEventListener('app-network-change', () => {
-    if (rawClient && selectedRealtimeOrigin() !== rawOrigin) resetConnections();
+    if (rawClient && selectedRealtimeOrigin() !== rawOrigin) recoverConnections();
   });
   for (const event of ['app-sdk-ready', 'academy-sdk-ready']) {
     window.addEventListener(event, () => { for (const channel of subscriptions) channel.start(); });
@@ -245,6 +279,7 @@ window.AcademyStore = (() => {
   }
   function connectionStatus() {
     return { origin: rawOrigin, online: online(), transportStarts, recoveries,
+      heartbeatRttMs, firstSubscriptionMs, reusedConnections, probing,
       subscriptions: subscriptions.size, connected: [...subscriptions].filter(channel => channel.connected).length,
       pollingJobs: polls.size, runningReads: [...polls].filter(job => job.running).length };
   }
