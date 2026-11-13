@@ -1,0 +1,54 @@
+{
+  "manifest_version": 3,
+  "name": "外卖监控",
+  "version": "1.7.2",
+  "description": "监控饿了么和美团待出餐，按目标时长与随机延迟自动上报出餐，异常时暂停。",
+  "permissions": [
+    "storage",
+    "alarms",
+    "scripting",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "https://melody.shop.ele.me/*",
+    "https://napos-order-pc.faas.ele.me/*",
+    "https://waimaie.meituan.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "外卖监控"
+  },
+  "icons": {
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://napos-order-pc.faas.ele.me/app/processing/*"
+      ],
+      "js": [
+        "timing.js",
+        "auto-click.js",
+        "content.js"
+      ],
+      "all_frames": true,
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://waimaie.meituan.com/new_fe/orderbusiness*"
+      ],
+      "js": [
+        "timing.js",
+        "auto-click.js",
+        "meituan.js"
+      ],
+      "all_frames": true,
+      "run_at": "document_idle"
+    }
+  ]
+}

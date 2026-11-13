@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark"><title>外卖监控</title><link rel="stylesheet" href="popup.css"></head>
+<body>
+  <header class="toolbar">
+    <div class="app-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 16h16M6 14a6 6 0 0 1 12 0M12 6V4M3 19h18"/></svg></div>
+    <div class="heading"><h1>外卖监控</h1></div>
+    <span class="live-pill" id="connection">连接中</span>
+  </header>
+  <main>
+    <section class="summary" aria-labelledby="summary-label">
+      <div class="summary-top"><h2 id="summary-label">待出餐总数</h2><span class="summary-caption" id="summary-caption">等待商家页面</span></div>
+      <div class="metrics"><div class="total-line"><strong id="total">—</strong><span>单待出餐</span></div><div class="urgent-metric"><strong id="overdue-total">—</strong><span>单超时</span></div></div>
+      <p id="summary-status" role="status">正在获取监听状态…</p>
+    </section>
+    
+    <section class="platforms" aria-label="平台待出餐数量">
+      <article class="platform-row" id="eleme-row">
+        <span class="platform-icon eleme" aria-hidden="true">饿</span>
+        <div class="platform-detail"><h3>饿了么</h3><p class="platform-status" id="eleme-status">等待连接</p><p class="timing-status" id="eleme-timing"></p></div>
+        <strong class="platform-count" id="eleme-count" aria-label="饿了么待出餐数量">—</strong>
+        <button class="open-button" data-platform="eleme" aria-label="打开饿了么商家页" title="打开饿了么商家页"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+      </article>
+      <article class="platform-row" id="meituan-row">
+        <span class="platform-icon meituan" aria-hidden="true">美</span>
+        <div class="platform-detail"><h3>美团外卖</h3><p class="platform-status" id="meituan-status">等待连接</p><p class="timing-status" id="meituan-timing"></p></div>
+        <strong class="platform-count" id="meituan-count" aria-label="美团待出餐数量">—</strong>
+        <button class="open-button" data-platform="meituan" aria-label="打开美团商家页" title="打开美团商家页"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+      </article>
+    </section>
+    <section class="order-details" aria-label="订单计时"><div class="orders-heading"><h2>订单计时</h2><span id="coverage"></span></div><div id="order-times"></div><p id="empty-orders" hidden>暂无待出餐订单</p></section>
+    <details class="settings" id="auto-settings">
+      <summary>自动出餐 <span id="auto-label">读取中</span></summary>
+      <div class="auto-toggle-row"><label for="auto-enabled">到点自动上报</label><input id="auto-enabled" type="checkbox" role="switch" aria-describedby="auto-help"></div>
+      <form id="auto-form" class="prep-settings">
+        <label for="auto-delay">达标后最多延迟</label>
+        <div class="prep-controls"><input id="auto-delay" type="number" min="0" max="120" step="1" required value="30" aria-describedby="auto-help"><span>秒</span><button id="save-auto" type="submit">保存</button></div>
+        <p id="auto-help">达到目标出餐时长后，再额外随机等待；不是当前订单的剩余时间。</p>
+      </form>
+      <p class="settings-note" id="auto-status" role="status">正在读取设置</p>
+      <p class="settings-note">将真实上报出餐，请确保餐品已完成。异常时自动暂停。</p>
+    </details>
+    <details class="settings"><summary>出餐目标 <span id="target-label">15 分钟</span></summary><form id="prep-form" class="prep-settings">
+      <label for="prep-minutes">目标出餐时长</label>
+      <div class="prep-controls"><input id="prep-minutes" name="prepMinutes" type="number" min="1" max="180" step="1" required inputmode="numeric" aria-describedby="prep-help"><span>分钟</span><button id="save-prep" type="submit">保存</button></div>
+      <p id="prep-help">按每单页面真实用时判断；分钟精度采用保守下限，不提前出餐。</p>
+    </form><p class="settings-note">开启自动出餐会真实上报订单状态，请确保餐品已完成。保持商家页打开、登录且按钮可见；弹窗或结果不明时暂停。</p></details>
+    <p class="feedback" id="feedback" role="status"></p>
+
+  </main>
+  <footer><span id="version">外卖监控</span><button id="update" title="检查本地热更新">检查更新</button></footer>
+  <script src="progress.js"></script><script src="popup.js"></script>
+</body></html>
