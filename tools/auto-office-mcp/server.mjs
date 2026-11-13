@@ -43,6 +43,7 @@ export function createServer(backend, { readOnly = false } = {}) {
           if (write && readOnly) throw new OfficeError('READ_ONLY', '当前 MCP 以只读模式运行');
           const actor = await backend.authorize();
           const result = await handler(input, actor);
+          if (result._imageBlocks) { const { _imageBlocks, ...metadata } = result; return {content:[{type:'text',text:JSON.stringify(metadata)},..._imageBlocks],structuredContent:metadata}; }
           return { content: [{ type: 'text', text: JSON.stringify(result) }], structuredContent: result };
         } catch (error) {
           const result = { ok: false, code: (error instanceof OfficeError || error instanceof batch.BatchError) ? error.code : 'INVALID_REQUEST', message: (error instanceof OfficeError || error instanceof batch.BatchError) ? error.message : '参数或服务处理失败，请检查输入及本机配置' };
@@ -117,5 +118,28 @@ export function createServer(backend, { readOnly = false } = {}) {
     async (input,actor)=>{const row=await backend.readDimensions(input.projectId),plan=batch.plan(row,input,actor);const saved=plan.alreadyApplied?row:await backend.saveDimensions(row,plan.payload);return {...batch.snapshot(saved),alreadyApplied:plan.alreadyApplied};});
   tool('office_dimensions_undo','撤销最近一批 AI 修改；如目标标注后来被改动则拒绝，避免覆盖。',z.object({projectId:z.string().uuid(),expectedVersion:z.number().int().nonnegative(),requestId:id}).strict(),true,
     async (input,actor)=>{const row=await backend.readDimensions(input.projectId),plan=batch.plan(row,{...input,undo:true},actor);const saved=plan.alreadyApplied?row:await backend.saveDimensions(row,plan.payload);return {...batch.snapshot(saved),alreadyApplied:plan.alreadyApplied};});
+  const projectsSchema = z.array(batchSchema).min(1).max(50).refine(items => new Set(items.map(x => x.projectId)).size === items.length, '每个项目只能出现一次');
+  const multiSchema = z.object({projects:projectsSchema}).strict();
+  const pageSchema = {offset:z.number().int().min(0).default(0),limit:z.number().int().min(1).max(100).default(100)};
+  tool('office_dimensions_folders','分页读取尺寸标注目录元数据。',z.object(pageSchema).strict(),false,
+    async input=>({folders:await backend.listDimensionFolders(input)}));
+  tool('office_dimensions_list','分页读取指定目录下的图片项目元数据；folderId省略表示根目录。',z.object({folderId:z.string().uuid().optional(),...pageSchema}).strict(),false,
+    async input=>({projects:await backend.listDimensions(input)}));
+  const errorResult = error => ({ok:false,code:(error instanceof OfficeError || error instanceof batch.BatchError) ? error.code : 'INVALID_REQUEST',message:(error instanceof OfficeError || error instanceof batch.BatchError) ? error.message : '项目处理失败，请重新读取核对'});
+  // 项目之间独立 CAS：部分成功时逐项报告，重试复用各自 requestId；不假装跨行事务。
+  async function eachProject(items, fn) {
+    return Promise.all(items.map(async item => {
+      try { return {projectId:item.projectId,ok:true,...await fn(item)}; }
+      catch (error) { return {projectId:item.projectId,...errorResult(error)}; }
+    }));
+  }
+  tool('office_dimensions_get_many','批量读取最多50个项目，逐项返回尺寸、标注与版本；失败不影响其他项目。',z.object({projectIds:z.array(z.string().uuid()).min(1).max(50).refine(ids=>new Set(ids).size===ids.length,'项目不能重复')}).strict(),false,
+    async ({projectIds})=>({results:await eachProject(projectIds.map(projectId=>({projectId})),async ({projectId})=>({snapshot:batch.snapshot(await backend.readDimensions(projectId))}))}));
+  tool('office_dimensions_images','批量获取最多8张图片，默认返回缩略图及对应原图尺寸；图片块顺序与成功结果一致，坐标仍使用原图像素。',z.object({projectIds:z.array(z.string().uuid()).min(1).max(8).refine(ids=>new Set(ids).size===ids.length,'项目不能重复'),original:z.boolean().default(false)}).strict(),false,
+    async ({projectIds,original})=>{const images=[];const results=[];for(const projectId of projectIds){try{const row=await backend.readDimensions(projectId),image=await backend.readDimensionImage(row,original);results.push({projectId,ok:true,imageIndex:images.length,width:row.payload.meta.width,height:row.payload.meta.height,source:image.source});images.push({type:'image',data:image.data,mimeType:image.mimeType});}catch(error){results.push({projectId,...errorResult(error)});}}return {results,_imageBlocks:images};});
+  tool('office_dimensions_preview_many','批量预览最多50个项目；各项目版本独立校验，不保存。',multiSchema,false,
+    async ({projects},actor)=>({results:await eachProject(projects,async input=>{const plan=batch.plan(await backend.readDimensions(input.projectId),input,actor);return {alreadyApplied:plan.alreadyApplied,changes:plan.changes};})}));
+  tool('office_dimensions_apply_many','批量保存最多50个项目；每个项目独立CAS，可能部分成功。逐项检查结果，重试复用原requestId和请求。需用户授权编辑。',multiSchema,true,
+    async ({projects},actor)=>({results:await eachProject(projects,async input=>{const row=await backend.readDimensions(input.projectId),plan=batch.plan(row,input,actor);const saved=plan.alreadyApplied?row:await backend.saveDimensions(row,plan.payload);return {snapshot:batch.snapshot(saved),alreadyApplied:plan.alreadyApplied};})}));
   return server;
 }

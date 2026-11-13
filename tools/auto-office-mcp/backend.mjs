@@ -95,6 +95,36 @@ export class OfficeBackend {
     if (!row?.payload?.annotations || row.payload.meta?.id !== projectId || !Number.isSafeInteger(row.ts)) throw new OfficeError('NOT_FOUND', '尺寸标注项目不存在或结构无效');
     return row;
   }
+  async readDimensionImage(row, preferOriginal = false) {
+    const meta = row.payload.meta, directory = `academy/dimensions/${meta.id}/`;
+    const valid = path => typeof path === 'string' && path.startsWith(directory) && /^[a-z0-9][a-z0-9._-]*\.(?:webp|jpe?g|png)$/i.test(path.slice(directory.length));
+    const paths = [...new Set((preferOriginal ? [meta.imagePath] : [meta.thumbnailPath, meta.imagePath]).filter(valid))];
+    if (!paths.length) throw new OfficeError('NOT_FOUND','项目没有可用图片路径');
+    for (const path of paths) {
+      try {
+        const response = await this.request(`${this.url}/storage/v1/object/cloud-files/${path}`, {headers:{apikey:this.key,Authorization:`Bearer ${this.key}`},redirect:'error',signal:AbortSignal.timeout(20000)});
+        if (!response.ok) continue;
+        const bytes = Buffer.from(await response.arrayBuffer());
+        if (bytes.length > 8 * 1024 * 1024) throw new OfficeError('IMAGE_TOO_LARGE','图片超过8 MB上限');
+        const mimeType = /\.png$/i.test(path) ? 'image/png' : /\.webp$/i.test(path) ? 'image/webp' : 'image/jpeg';
+        return {data:bytes.toString('base64'),mimeType,source:path === meta.thumbnailPath ? 'thumbnail' : 'image'};
+      } catch (error) { if (error instanceof OfficeError) throw error; }
+    }
+    throw new OfficeError('IMAGE_UNAVAILABLE','图片读取失败，请检查网络或存储权限');
+  }
+  async listDimensions({folderId, offset, limit}) {
+    const filter = folderId ? {'payload->meta->>folderId':`eq.${folderId}`} : {or:'(payload->meta->>folderId.is.null,payload->meta->>folderId.eq.)'};
+    const query = new URLSearchParams({...filter,user_id:'like.doc:dimensions:*',select:'meta:payload->meta',order:'payload->meta->>createdAt.desc,user_id.asc',limit:String(limit),offset:String(offset)});
+    const rows = await this.http(`/rest/v1/academy_progress?${query}`);
+    if (!Array.isArray(rows)) throw new OfficeError('RESPONSE','项目列表响应异常');
+    return rows.map(row=>row.meta).filter(Boolean);
+  }
+  async listDimensionFolders({offset, limit}) {
+    const query = new URLSearchParams({user_id:'like.doc:dimension-folder:*',select:'meta:payload->meta',order:'user_id.asc',limit:String(limit),offset:String(offset)});
+    const rows = await this.http(`/rest/v1/academy_progress?${query}`);
+    if (!Array.isArray(rows)) throw new OfficeError('RESPONSE','目录列表响应异常');
+    return rows.map(row=>row.meta).filter(meta=>meta?.kind==='folder');
+  }
   async saveDimensions(row, payload) {
     const ts = Math.max(Date.now(), row.ts + 1);
     const query = new URLSearchParams({user_id:`eq.${row.user_id}`,ts:`eq.${row.ts}`});

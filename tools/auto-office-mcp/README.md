@@ -126,6 +126,14 @@ npm run check
 | `office_dimensions_preview` | `projectId, expectedVersion, requestId, operations` | 纯校验、返回修改前后差异，不写入 |
 | `office_dimensions_apply` | 同 preview | 整批 CAS 保存；相同 requestId 和内容重试去重 |
 | `office_dimensions_undo` | `projectId, expectedVersion, requestId` | 撤销最近一批 AI 修改，拒绝覆盖后来修改的标注 |
+| `office_dimensions_folders` | `offset, limit` | 分页列出目录元数据 |
+| `office_dimensions_list` | `folderId, offset, limit` | 分页列出该目录的图片项目 |
+| `office_dimensions_get_many` | `projectIds` | 批量读取最多 50 项，各项返回 snapshot 或错误 |
+| `office_dimensions_images` | `projectIds, original?` | 返回最多 8 张 MCP 图片块及原图尺寸；默认优先缩略图，可选原图 |
+| `office_dimensions_preview_many` | `projects` | 批量预览最多 50 项，每项输入与单项目 preview 相同 |
+| `office_dimensions_apply_many` | `projects` | 批量保存，各项目独立 CAS，可能部分成功 |
+
+多项目调用一次认证，并发处理不同项目；每个项目最多 100 个操作，同一项目不能重复出现。检查每一项的 `ok` 和 `code`：成功项不会因其他项目失败而回滚。网络结果不确定时必须使用完全相同的项目请求及 requestId 重试；冲突项重新读取后决定如何修改。图片工具返回的 imageIndex 对应成功图片块的顺序；缩略图用于观察，标注坐标须换算到返回的原图宽高。服务端只读取项目元数据中的固定目录图片，单张上限 8 MB。
 
 先 get → preview → apply；需要浏览器视觉预览时使用网页“AI 批量编辑”。操作格式、坐标规则、限制及示例见 [尺寸标注说明](../../apps/academy/pages/dimensions/README.md#ai-批量编辑)。项目 ID 可从网页 URL 的 `project=` 取得。本版不自动上传图片、不修改项目名称或创建项目，不把“模型尺寸”伪装成实测尺寸。
 

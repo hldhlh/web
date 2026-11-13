@@ -38,7 +38,7 @@ const result = value => JSON.parse(value.content[0].text);
 
 test('MCP protocol discovers tools and guide without accessing backend', async t => {
   const f = await fixture(t);
-  assert.equal((await f.client.listTools()).tools.length,11);
+  assert.equal((await f.client.listTools()).tools.length,17);
   assert.match((await f.client.readResource({uri:'auto-office://guide'})).contents[0].text,/version/);
   assert.equal(f.requests.length,0);
 });
@@ -116,7 +116,7 @@ test('real stdio process initializes and exposes tools without credentials or ne
   const client = new Client({name:'stdio-test',version:'1'});
   t.after(() => client.close());
   await client.connect(transport);
-  assert.equal((await client.listTools()).tools.length,11);
+  assert.equal((await client.listTools()).tools.length,17);
   const status = result(await client.callTool({name:'office_status',arguments:{}}));
   assert.equal(status.code,'CONFIG');
 });
@@ -147,4 +147,29 @@ test('dimensions MCP preview/apply/undo use CAS, retain fields and deduplicate u
   assert.equal((await call('apply',input)).alreadyApplied,true);assert.equal(writes,1);
   conflict=true;assert.equal((await call('apply',{...input,requestId:'batch2',expectedVersion:row.ts})).code,'CONFLICT');assert.equal(writes,2);conflict=false;
   const undone=await call('undo',{projectId,expectedVersion:row.ts,requestId:'undo1'});assert.equal(undone.annotations[0].label,'before');
+});
+
+test('multi-project operations isolate conflicts and deduplicate retries', async t => {
+  const ids=['10000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000002'];
+  const rows=new Map(ids.map(id=>[id,{user_id:`doc:dimensions:${id}`,ts:10,payload:{meta:{id,width:100,height:100},annotations:{},future:true}}]));
+  let writes=0;
+  const backend={authorize:async()=>({id:'u',name:'测试',role:'manager'}),readDimensions:async id=>structuredClone(rows.get(id)),saveDimensions:async(row,payload)=>{writes++;const id=row.payload.meta.id;if(id===ids[1]) throw new (await import('../tools/auto-office-mcp/backend.mjs')).OfficeError('CONFLICT','冲突');const next={...row,ts:row.ts+1,payload};rows.set(id,next);return next;}};
+  const server=createServer(backend),client=new Client({name:'test',version:'1'}),[a,b]=InMemoryTransport.createLinkedPair();await server.connect(a);await client.connect(b);t.after(async()=>{await client.close();await server.close();});
+  const call=async(name,args)=>result(await client.callTool({name:`office_dimensions_${name}`,arguments:args}));
+  const projects=ids.map((projectId,i)=>({projectId,expectedVersion:10,requestId:`r${i}`,operations:[{op:'create',id:'x',changes:{type:'line',start:{x:1,y:1},end:{x:2,y:2},label:'待测 cm'}}]}));
+  assert.equal((await call('get_many',{projectIds:ids})).results.length,2);
+  assert.equal((await call('preview_many',{projects})).results.filter(r=>r.ok).length,2);assert.equal(writes,0);
+  const applied=await call('apply_many',{projects});assert.equal(applied.results[0].ok,true);assert.equal(applied.results[1].code,'CONFLICT');assert.equal(rows.get(ids[0]).payload.future,true);
+  const retry=await call('apply_many',{projects});assert.equal(retry.results[0].alreadyApplied,true);assert.equal(retry.results[1].code,'CONFLICT');assert.equal(writes,3);
+});
+
+test('image retrieval validates project paths and returns MCP image blocks', async t => {
+  const id='10000000-0000-4000-8000-000000000001';
+  const row={user_id:`doc:dimensions:${id}`,ts:1,payload:{meta:{id,width:100,height:80,thumbnailPath:`academy/dimensions/${id}/preview.jpg`},annotations:{}}};
+  const backend=new OfficeBackend({url:'https://project.supabase.co',key:'public',session:{userId:'u'},request:async(url)=>url.includes('/rpc/')?Response.json({ok:true,user:{id:'u',name:'测试',role:'manager'}}):url.includes('/rest/')?Response.json([row]):new Response(new Uint8Array([1,2,3]),{status:200})});
+  const server=createServer(backend),client=new Client({name:'test',version:'1'}),[a,b]=InMemoryTransport.createLinkedPair();await server.connect(a);await client.connect(b);t.after(async()=>{await client.close();await server.close();});
+  const response=await client.callTool({name:'office_dimensions_images',arguments:{projectIds:[id]}});
+  assert.equal(response.structuredContent.results[0].width,100);assert.equal(response.content[1].type,'image');assert.equal(response.content[1].mimeType,'image/jpeg');
+  row.payload.meta.thumbnailPath='academy/dimensions/other/preview.jpg';
+  const invalid=await client.callTool({name:'office_dimensions_images',arguments:{projectIds:[id]}});assert.equal(invalid.structuredContent.results[0].code,'NOT_FOUND');
 });

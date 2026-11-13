@@ -239,7 +239,7 @@
       author.append(avatar, document.createTextNode(`制作：${meta.createdBy.name}`));
       const date = document.createElement('small');
       const mobileCount = document.createElement('span'); mobileCount.className = 'mobile-project-count'; mobileCount.textContent = `${meta.count || 0} 条标注 · `;
-      date.append(mobileCount, document.createTextNode(`${new Date(meta.updatedAt).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })} 更新`));
+      date.append(mobileCount, document.createTextNode(`${new Date(meta.createdAt).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })} 上传`));
       info.append(name, author, date); button.append(preview, info);
       button.addEventListener('click', () => open(meta.id).catch(reportError));
       $('projectList').append(button);
@@ -277,7 +277,7 @@
       const folderFilter = folderAtStart ? { 'payload->meta->>folderId': `eq.${folderAtStart}` } : { or: '(payload->meta->>folderId.is.null,payload->meta->>folderId.eq.)' };
       // Independent reads start together. Render each result without waiting for the other.
       const results = await Promise.allSettled([
-        deadline(rest({ ...folderFilter, user_id: `like.${prefix}*`, select: 'meta:payload->meta', order: 'updated_at.desc,user_id.asc', limit: 100, offset: more ? nextOffset : 0 }), '读取图片列表', 20000).then(rows => {
+        deadline(rest({ ...folderFilter, user_id: `like.${prefix}*`, select: 'meta:payload->meta', order: 'payload->meta->>createdAt.desc,user_id.asc', limit: 100, offset: more ? nextOffset : 0 }), '读取图片列表', 20000).then(rows => {
           if (!active()) return;
           const data = rows.map(row => row.meta).filter(meta => meta?.id && meta.createdBy);
           projects = [...new Map((more ? [...projects, ...data] : data).map(meta => [meta.id, meta])).values()];
