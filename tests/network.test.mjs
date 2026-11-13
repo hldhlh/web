@@ -240,3 +240,13 @@ test('network switch clears latency measurements from the old carrier immediatel
   assert.ok(api.ranking.every(item => item.latency === undefined));
   releases.forEach(resolve => resolve(Response.json({ok:true})));
 });
+
+test('WebSocket routing only uses explicitly capable endpoints and fails over independently of HTTP', () => {
+  const api=harness(async()=>Response.json({ok:true}),{
+    ...cachedOptions(), APP_NETWORK_ENDPOINTS:[{origin:backup,realtime:true},{origin:third}]
+  });
+  assert.equal(api.realtimeOrigin,backup);
+  assert.equal(api.reportRealtimeFailure(backup),true);
+  assert.equal(api.realtimeOrigin,project);
+  assert.equal(api.reportRealtimeFailure('https://unknown.test'),false);
+});

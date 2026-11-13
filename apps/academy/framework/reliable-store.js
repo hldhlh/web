@@ -254,6 +254,7 @@ window.AcademyReliable = (() => {
   }
   function configure(next) { adapter = next; schedule(); emit().catch(() => {}); }
   window.addEventListener('online', () => schedule());
+  window.addEventListener('app-network-recovered', () => schedule());
   document.addEventListener('visibilitychange', () => { if (!document.hidden) schedule(); });
   return { configure, tracked, read, enqueue, flush, status: emit, resolveConflict, inspectConflict: key => adapter.one(key), merge, split, join,
     subscribe(fn) { subscribers.add(fn); emit().catch(() => {}); return () => subscribers.delete(fn); } };

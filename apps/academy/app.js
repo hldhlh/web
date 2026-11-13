@@ -762,15 +762,13 @@
         this.statusTimer = 0;
         const current = document.getElementById("live-status");
         if (current?.dataset.state === "connecting") {
-          this.setStatus(navigator.onLine ? "online" : "offline", navigator.onLine ? "在线同步" : "离线可用");
+          current.textContent = navigator.onLine ? "正在重连" : "离线可用";
           this.startPoll();
           this.scheduleReconnect();
         }
       }, 6000);
     },
-    realtimeOrigin() {
-      return window.APP_NETWORK?.projectOrigin || window.ACADEMY_CONFIG.url;
-    },
+
     table() {
       return progressTable();
     },
@@ -877,28 +875,17 @@
         }
       }); };
       check();
-      this.poll = setInterval(check, 15000);
+      this.poll = window.AcademyStore.poll(check, { interval: () => this.socketLive ? 60000 : 5000 });
     },
     stopPoll() {
       if (!this.poll) return;
-      clearInterval(this.poll);
+      this.poll.stop();
       this.poll = 0;
     },
-    scheduleReconnect(immediate) {
-      if (!Auth.session || this.socketLive || this.joining || !navigator.onLine) return;
-      if (this.reconnectTimer) {
-        if (!immediate) return;
-        clearTimeout(this.reconnectTimer);
-        this.reconnectTimer = 0;
-      }
-      const delay = immediate
-        ? 180
-        : Math.min(30000, 700 * (2 ** Math.min(this.reconnectAttempt, 5))) + Math.round(Math.random() * 300);
-      this.reconnectAttempt += 1;
-      this.reconnectTimer = setTimeout(() => {
-        this.reconnectTimer = 0;
-        this.connect();
-      }, delay);
+    scheduleReconnect() {
+      // The shared manager owns retry/backoff for an existing subscription.
+      // This hook only registers progress when boot/auth has not done so yet.
+      if (!this.channel && Auth.session && navigator.onLine) this.connect();
     },
     receiveProgress(eventType, record) {
       if (!Auth.session || record.user_id !== Auth.session.id) return;
@@ -946,8 +933,13 @@
           clearTimeout(this.reconnectTimer);
           this.reconnectTimer = 0;
           this.setStatus("live", "实时在线");
-          this.stopPoll();
-        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          this.startPoll();
+          // Rejoin is not replay: fetch anything missed during the socket gap.
+          const pending = this.pullPromise;
+          Promise.resolve(pending).catch(() => {}).then(() => {
+            if (this.channel === channel && Auth.session?.id === account) return this.pull();
+          }).catch(() => {});
+        } else if (status === "CONNECTING" || status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
           this.joining = false;
           this.socketLive = false;
           this.setStatus(navigator.onLine ? "connecting" : "offline", navigator.onLine ? "正在重连" : "离线可用");
@@ -955,13 +947,7 @@
           this.scheduleReconnect();
         }
       });
-      setTimeout(() => {
-        if (this.channel === channel && !this.socketLive) {
-          this.setStatus(navigator.onLine ? "online" : "offline", navigator.onLine ? "在线同步" : "离线可用");
-          this.startPoll();
-          this.scheduleReconnect();
-        }
-      }, 3500);
+
     },
     async connect() {
       if (this.connecting || (this.joining && this.channelAccount === Auth.session?.id) || !Auth.session) return;
@@ -986,7 +972,7 @@
       // response must neither delay subscription nor overwrite a live status.
       this.sb = window.AcademyStore.realtimeClient();
       this.connecting = false;
-      if (this.sb && navigator.onLine) this.subscribe();
+      if (this.sb) { this.subscribe(); this.startPoll(); }
       else {
         this.startPoll();
         this.scheduleReconnect();
@@ -1064,7 +1050,7 @@
       return true;
     },
     async pull() {
-      if (this.pullPromise) return this.pullPromise;
+      if (this.pullPromise) { this.pullAgain = true; return this.pullPromise; }
       this.pullPromise = (async () => {
         const payload = await window.AcademyStore.getJSON(this.path);
         if (!payload) {
@@ -1077,6 +1063,7 @@
         return await this.pullPromise;
       } finally {
         this.pullPromise = null;
+        if (this.pullAgain) { this.pullAgain = false; this.pull().catch(() => {}); }
       }
     },
     async publish() {
@@ -1097,13 +1084,17 @@
     connect() {
       if (!this.channel) {
         this.channel = window.AcademyStore.channel("academy-content-live", {
+          connected: async () => {
+            if (this.pullPromise) await this.pullPromise.catch(() => {});
+            return this.pull();
+          },
           "content-version": (payload) => {
             if (Number(payload?.rev) > contentRevision) this.pull().catch(() => { });
           }
         });
       }
       this.pull().catch(() => { });
-      if (!this.poll) this.poll = setInterval(() => { if (!document.hidden) this.pull().catch(() => { }); }, 30000);
+      if (!this.poll) this.poll = window.AcademyStore.poll(() => this.pull(), { interval: () => this.channel?.connected ? 60000 : 5000 });
       return this.channel;
     }
   };
@@ -1138,10 +1129,13 @@
       return true;
     },
     async pull() {
-      if (this.pullPromise) return this.pullPromise;
+      if (this.pullPromise) { this.pullAgain = true; return this.pullPromise; }
       this.pullPromise = window.AcademyStore.getJSON(this.path)
         .then((raw) => raw ? this.apply(raw) : false)
-        .finally(() => { this.pullPromise = null; });
+        .finally(() => {
+          this.pullPromise = null;
+          if (this.pullAgain) { this.pullAgain = false; this.pull().catch(() => {}); }
+        });
       return this.pullPromise;
     },
     nextRestLabel(userId, from = new Date()) {
@@ -1161,13 +1155,17 @@
     connect() {
       if (!this.channel) {
         this.channel = window.AcademyStore.channel("academy-schedule-live", {
+          connected: async () => {
+            if (this.pullPromise) await this.pullPromise.catch(() => {});
+            return this.pull();
+          },
           "schedule-version": (payload) => {
             if (Number(payload?.rev) > this.data.rev) this.pull().catch(() => { });
           }
         });
       }
       this.pull().catch(() => { });
-      if (!this.poll) this.poll = setInterval(() => { if (!document.hidden) this.pull().catch(() => { }); }, 30000);
+      if (!this.poll) this.poll = window.AcademyStore.poll(() => this.pull(), { interval: () => this.channel?.connected ? 60000 : 5000 });
       return this.channel;
     }
   };
@@ -5161,6 +5159,7 @@
     appRoot.addEventListener("pointerup", onLessonBlockPointerEnd);
     appRoot.addEventListener("pointercancel", onLessonBlockPointerEnd);
     window.addEventListener("academy-realtime-reset", () => {
+      if (Live.sb?.managed && Live.channel) return;
       // A socket from the previous network can still look healthy or be joining.
       // Its state must not veto recovery on the replacement shared client.
       Live.channel = null;

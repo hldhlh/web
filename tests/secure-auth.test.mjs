@@ -16,7 +16,7 @@ function fixture(){
   const state={calls:[],broadcasts:[],events:{},reply:async(action)=>action==='people'?{ok:true,users:[user]}:{ok:true,user}};
   const window={ACADEMY_CONFIG:{url:'https://example.invalid',key:'public-key'},navigator:{onLine:true},
     addEventListener:(k,fn)=>{state.events[k]=fn;},
-    AcademyStore:{channel:(_,callbacks)=>{handlers=callbacks;return {send:x=>state.broadcasts.push(x)};}},
+    AcademyStore:{poll:()=>({stop(){}}),channel:(_,callbacks)=>{handlers=callbacks;return {send:x=>state.broadcasts.push(x)};}},
     fetch:async(url,options)=>{const {p_action,p_data}=JSON.parse(options.body);state.calls.push({action:p_action,data:p_data,options});return {ok:true,json:()=>state.reply(p_action,p_data)};}};
   const document={hidden:false,addEventListener:(k,fn)=>{state.events[k]=fn;}};
   vm.runInNewContext(source,{window,document,sessionStorage,localStorage,crypto:webcrypto,AbortController,setTimeout,clearTimeout,setInterval:()=>1});

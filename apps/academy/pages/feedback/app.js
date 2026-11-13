@@ -366,11 +366,12 @@
       $("#submit-feedback").disabled = false;
       render();
       state.channel = window.AcademyStore.channel("academy-feedback-live", {
+        connected: () => pullFeedback(true),
         "feedback-version": (payload) => {
           if (Number(payload?.rev) > state.data.rev) pullFeedback(true);
         }
       });
-      const poll = setInterval(() => { if (!document.hidden) pullFeedback(true); }, 30000);
+      const poll = window.AcademyStore.poll(() => pullFeedback(true), { interval: () => state.channel?.connected ? 60000 : 5000 });
       window.addEventListener("online", () => pullFeedback(true));
       window.addEventListener("academy-data-updated", event => {
         const paths = event.detail?.paths;
@@ -384,7 +385,7 @@
         if (!session) location.reload();
         else render();
       });
-      window.addEventListener("pagehide", event => { if (!event.persisted) { clearInterval(poll); stopAuth(); state.channel?.unsubscribe?.(); } });
+      window.addEventListener("pagehide", event => { if (!event.persisted) { poll.stop(); stopAuth(); state.channel?.unsubscribe?.(); } });
       pullFeedback();
     } catch (error) {
       $("#sync-status").textContent = "暂时无法连接问题反馈服务";

@@ -22,8 +22,8 @@ test('SDK and editor dependencies start together using the exact hashed preload 
   const names = ['image-cache.js', 'model.js', 'batch.js', 'image-processing.js', 'editor.js', 'collaboration.js', 'batch-ui.js'];
   const nodes = {}, scripts = [];
   const node = id => nodes[id] ||= { hidden: true, dataset: {}, getAttribute: () => 'false' };
-  const parent = { AcademyAuth: {}, AcademyStore: {}, document: { documentElement: { dataset: {} } } };
-  const ctx = { window: { parent, addEventListener() {}, DimensionCollab: {} },
+  const parent = { dispatchEvent() {}, AcademyAuth: {}, AcademyStore: {}, document: { documentElement: { dataset: {} } } };
+  const ctx = { Event, window: { parent, addEventListener() {}, DimensionCollab: {} },
     document: { querySelectorAll: () => names.map(name => ({ dataset: { dimensionScript: name }, href: `https://example.test/${name}?v=1234567890abcdef` })),
       createElement: () => ({}), getElementById: node, documentElement: { dataset: {} }, head: { append: script => scripts.push(script) } },
     MutationObserver: class { observe() {} disconnect() {} }, setTimeout: () => 1, clearTimeout() {} };

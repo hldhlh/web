@@ -333,6 +333,7 @@
       render();
       app.setAttribute("aria-busy", "false");
       state.channel = window.AcademyStore.channel("academy-schedule-live", {
+        connected: () => pullSchedule(true),
         "schedule-version": (payload) => {
           if (Number(payload?.rev) > state.data.rev) pullSchedule(true);
         }
@@ -342,7 +343,7 @@
           render();
         }).catch(() => { });
       await Promise.all([pullSchedule(), peopleRefresh]);
-      setInterval(() => { if (!document.hidden) pullSchedule(true); }, 30000);
+      const poll = window.AcademyStore.poll(() => pullSchedule(true), { interval: () => state.channel?.connected ? 60000 : 5000 });
       window.addEventListener("academy-data-updated", event => {
         const paths = event.detail?.paths;
         if (!Array.isArray(paths) || !paths.length || paths.includes(FILE)) pullSchedule(true);
@@ -355,7 +356,7 @@
         if (!session) location.reload();
         else render();
       });
-      window.addEventListener("pagehide", event => { if (!event.persisted) { stopAuth(); state.channel?.unsubscribe?.(); } });
+      window.addEventListener("pagehide", event => { if (!event.persisted) { poll.stop(); stopAuth(); state.channel?.unsubscribe?.(); } });
     } catch (error) {
       $("#sync-status").textContent = "暂时无法连接排班服务";
       showToast(error?.message || "加载失败");

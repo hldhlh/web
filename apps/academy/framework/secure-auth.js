@@ -164,7 +164,10 @@ window.AcademySecureAuth = (() => {
           return verifySession();
         },
         accounts: async () => { if (peopleTask) await peopleTask.promise.catch(() => {}); await verifySession(); return pull().catch(() => {}); },
-        connected: () => { verifySession(); pull().catch(() => {}); }
+        connected: async () => {
+          await Promise.allSettled([check?.promise, peopleTask?.promise]);
+          await verifySession(); return pull();
+        }
       });
       return channel;
     }
@@ -175,8 +178,8 @@ window.AcademySecureAuth = (() => {
       document.addEventListener('visibilitychange',resume);
       window.addEventListener('online',resume);
       window.addEventListener('app-network-recovered',resume);
-      setInterval(() => { if (!document.hidden) verifySession(); },15000);
-      setInterval(() => { if (!document.hidden) pull().catch(() => {}); },30000);
+      window.AcademyStore.poll(verifySession, { interval:15000 });
+      window.AcademyStore.poll(pull, { interval: () => channel?.connected ? 60000 : 15000 });
       await verifySession();
       await pull().catch(() => {});
       return session;

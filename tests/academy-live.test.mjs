@@ -12,7 +12,7 @@ function fixture() {
   const saved = new Map();
   const context = { state, normalizeProgress: value => value, localStorage: { setItem: (key, value) => saved.set(key, value) }, defaults: () => ({}), Auth: { session: { id: 'a' } }, navigator: { onLine: true }, document: { hidden: false, getElementById: () => el },
     progressTable: () => 'progress', setTimeout: (fn, delay) => { timers.set(++seq, { fn, delay }); return seq; }, clearTimeout: id => timers.delete(id), setInterval: () => ++seq, clearInterval() {},
-    window: { AcademyStore: { realtimeClient: () => client, reliable: { status: async () => ({ entries: [] }) }, restSelect: () => { reads++; return response; } } } };
+    window: { AcademyStore: { poll: () => ({stop(){}}), realtimeClient: () => client, reliable: { status: async () => ({ entries: [] }) }, restSelect: () => { reads++; return response; } } } };
   vm.runInNewContext('const Live = {' + source + '\nglobalThis.live = Live;', context);
   context.live.ingestStaff = () => {};
   context.live.refreshView = () => {};
@@ -27,23 +27,21 @@ test('subscribes before slow HTTP finishes; polling and events share a read', as
   f.resolveRead([]); await connecting;
   assert.equal(f.el.dataset.state, 'live');
 });
-test('slow handshake is not destroyed by fallback timers; failure can retry', async () => {
+test('progress leaves retry ownership with the shared subscription', async () => {
   const f = fixture(); f.live.connect(); await f.settle();
   for (const timer of [...f.timers.values()]) timer.fn();
   await f.settle();
-  assert.equal(f.live.reconnectTimer, 0);
   assert.equal(f.channels.length, 1);
   f.channels[0].status('TIMED_OUT');
-  assert.ok(f.live.reconnectTimer);
+  f.live.scheduleReconnect(true);
+  assert.equal(f.live.reconnectTimer, 0);
+  assert.equal(f.channels.length, 1);
+  assert.notEqual(f.el.textContent, '在线同步');
   f.resolveRead([]);
 });
-test('SDK readiness replaces a delayed retry and offline does not retry', () => {
-  const f = fixture(); f.live.scheduleReconnect(); const previous = f.live.reconnectTimer;
-  f.live.scheduleReconnect(true);
-  assert.equal(f.timers.has(previous), false);
-  assert.equal(f.timers.get(f.live.reconnectTimer).delay, 180);
-  f.live.reconnectTimer = 0; f.navigator.onLine = false; f.live.scheduleReconnect();
-  assert.equal(f.live.reconnectTimer, 0);
+test('connection bootstrap does not register a subscription while offline', () => {
+  const f = fixture(); f.navigator.onLine = false; f.live.scheduleReconnect();
+  assert.equal(f.channels.length, 0);
 });
 function update(id = 'a', ts = 10) {
   return { eventType: 'UPDATE', new: { user_id: id, ts, payload: { completed: { remote: true } } } };
@@ -117,4 +115,11 @@ test('network reset replaces an apparently healthy channel without waiting for s
   assert.equal(f.channels.length,2);assert.equal(f.live.reconnectAttempt,0);assert.equal(f.live.socketLive,false);
   f.channels[0].status('SUBSCRIBED');assert.equal(f.live.socketLive,false);
   f.channels[1].status('SUBSCRIBED');assert.equal(f.live.socketLive,true);
+});
+test('rejoining progress reconciles data missed while disconnected', async () => {
+  const f=fixture();f.resolveRead([]);await f.live.connect();const before=f.reads();
+  f.channels[0].status('SUBSCRIBED');await f.settle();
+  assert.ok(f.reads()>before);
+  const liveReads=f.reads();f.channels[0].status('CONNECTING');
+  f.channels[0].status('SUBSCRIBED');await f.settle();assert.ok(f.reads()>liveReads);
 });

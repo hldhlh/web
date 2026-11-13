@@ -248,8 +248,9 @@
         if (!wasConnected) checkForUpdate(false);
         return;
       }
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+      if (status === 'CONNECTING' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
         realtimeConnected = false;
+        if (client.managed) { checkForUpdate(false); return; }
         realtimeChannel = null;
         try { client.removeChannel(channel); } catch (_) {}
         scheduleRealtimeReconnect();
@@ -277,6 +278,7 @@
   window.addEventListener('app-sdk-ready', startVersionChecks);
   window.addEventListener('academy-sdk-ready', startVersionChecks);
   window.addEventListener('academy-realtime-reset', () => {
+    if (realtimeChannel?.managed) { checkForUpdate(false); return; }
     realtimeChannel = null; realtimeConnected = false; realtimeRetryAttempt = 0;
     clearTimeout(realtimeRetryTimer); realtimeRetryTimer = 0;
     startVersionChecks();
@@ -291,10 +293,12 @@
       checkForUpdate(false);
     }
   });
-  setInterval(() => {
+  const checkPeriodically = () => {
     const delay = failedChecks
       ? Math.min(FAILURE_BACKOFF_MAX_MS, FALLBACK_INTERVAL_MS * 2 ** Math.min(failedChecks, 6))
       : realtimeConnected ? HEALTHY_INTERVAL_MS : FALLBACK_INTERVAL_MS;
     if (Date.now() - lastAttempt >= delay) checkForUpdate(false);
-  }, FALLBACK_INTERVAL_MS);
+  };
+  if (window.AcademyStore?.poll) window.AcademyStore.poll(checkPeriodically, { interval: FALLBACK_INTERVAL_MS });
+  else setInterval(checkPeriodically, FALLBACK_INTERVAL_MS);
 })();

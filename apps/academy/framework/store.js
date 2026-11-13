@@ -89,102 +89,212 @@ window.AcademyStore = (() => {
     return true;
   }
 
-  function realtimeClient() {
-    if (!window.supabase?.createClient) return null;
-    const selectedOrigin = window.APP_NETWORK?.projectOrigin || cfg().url;
-    if (realtimeClient._sb && realtimeClient._origin === selectedOrigin) return realtimeClient._sb;
-    realtimeClient._origin = selectedOrigin;
-    realtimeClient._sb = window.supabase.createClient(selectedOrigin, cfg().key, {
-      appNetworkRealtimeDirect: true,
-      auth: { persistSession: false, autoRefreshToken: false },
-      realtime: { params: { eventsPerSecond: 20 } }
-    });
-    return realtimeClient._sb;
+  // One transport owner per Auto Office runtime (embedded tools inherit it).
+  // Channel handles survive transport replacement; SDK callbacks are generation
+  // checked so late deliveries from an old network cannot mutate current state.
+  const subscriptions = new Set();
+  const topics = new Map();
+  let rawClient = null, rawOrigin = null, networkResetTimer;
+  let transportStarts = 0, recoveries = 0;
+  const online = () => navigator.onLine !== false;
+  const selectedRealtimeOrigin = () => window.APP_NETWORK?.realtimeOrigin || window.APP_NETWORK?.projectOrigin || cfg().url;
+  const safely = (fn, ...args) => { try { Promise.resolve(fn?.(...args)).catch(() => {}); } catch (_) {} };
+  function transportClient() {
+    if (!rawClient && window.supabase?.createClient && online()) {
+      rawOrigin = selectedRealtimeOrigin();
+      transportStarts++;
+      rawClient = window.supabase.createClient(rawOrigin, cfg().key, {
+        appNetworkRealtimeDirect: true,
+        auth: { persistSession: false, autoRefreshToken: false },
+        realtime: { params: { eventsPerSecond: 20 } }
+      });
+    }
+    return rawClient;
   }
-
-  const delayedChannels = new Set();
-  const reconnectChannels = new Set();
-  let networkResetTimer;
-  window.addEventListener('app-network-recovered', () => {
-    clearTimeout(networkResetTimer);
-    networkResetTimer = setTimeout(() => {
-      if (!navigator.onLine) return;
-      const previous = realtimeClient._sb;
-      realtimeClient._sb = null;
-      for (const restart of reconnectChannels) restart();
-      window.dispatchEvent(new CustomEvent('academy-realtime-reset'));
-      // Never wait for the old network's unsubscribe acknowledgement.
-      if (previous) Promise.resolve(previous.removeAllChannels()).catch(() => {});
-    }, 180);
-  });
-  window.addEventListener('app-sdk-ready', () => { for (const start of [...delayedChannels]) start(); });
-  function channel(name, handlers) {
-    let instance;
-    let subscribed = false;
-    let retryTimer;
-    let retryDelay = 1000;
-    let stopped = false;
-    const pending = new Map();
+  function managedChannel(name, options) {
+    const bindings = [], pending = new Map();
+    let instance = null, owner = null, callback, retryTimer, joinTimer;
+    let generation = 0, attempts = 0, active = false, stopped = false, joined = false, presence;
+    const clearTimers = () => { clearTimeout(retryTimer); clearTimeout(joinTimer); retryTimer = joinTimer = null; };
+    const detach = () => {
+      generation++; joined = false;
+      const old = instance, client = owner;
+      instance = null; owner = null;
+      if (old) safely(() => client.removeChannel(old));
+    };
+    const retry = () => {
+      if (stopped || retryTimer || !online()) return;
+      const delay = Math.min(30000, 500 * 2 ** Math.min(attempts++, 6)) + Math.floor(Math.random() * 250);
+      retryTimer = setTimeout(() => { retryTimer = null; detach(); start(); }, delay);
+    };
     const start = () => {
-      if (instance) return;
-      const sb = realtimeClient();
-      if (!sb) { delayedChannels.add(start); return; }
-      delayedChannels.delete(start);
-      instance = sb.channel(name, { config: { broadcast: { self: false } } });
-      Object.entries(handlers || {}).filter(([event]) => !['connected', 'connection'].includes(event)).forEach(([event, fn]) => instance.on('broadcast', { event }, ({ payload }) => fn(payload)));
-      const documents = {
-        'content-version': 'academy/content.json',
-        'schedule-version': 'academy/schedule.json',
-        'feedback-version': 'academy/daily-feedback.json'
-      };
-      if (Object.keys(handlers).some(event => documents[event])) {
-        instance.on('postgres_changes', { event: '*', schema: 'public', table: cfg().table || 'academy_progress' }, ({ new: row }) => {
-          for (const [event, fn] of Object.entries(handlers)) {
-            if (documents[event] && row?.user_id?.startsWith(`doc:${documents[event]}:`)) fn({ rev: Math.max(Date.now(), Number(row.ts) || 0) });
-          }
-        });
-      }
-      const activeChannel = instance;
-      instance.subscribe(status => {
-        if (stopped || instance !== activeChannel) return;
-        subscribed = status === 'SUBSCRIBED';
-        handlers.connection?.(subscribed);
-        if (!subscribed) {
-          if (["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(status) && !stopped) {
-            clearTimeout(retryTimer);
-            retryTimer = setTimeout(() => {
-              const previous = instance;
-              instance = null;
-              if (previous) sb.removeChannel(previous);
-              if (!stopped) start();
-            }, retryDelay);
-            retryDelay = Math.min(retryDelay * 2, 30000);
-          }
-          return;
+      if (stopped || !active || instance || !online()) return;
+      const client = transportClient();
+      if (!client) return; // SDK ready event resumes registrations.
+      owner = client; instance = client.channel(name, options);
+      const current = instance, token = ++generation;
+      const valid = () => !stopped && instance === current && generation === token;
+      for (const [type, filter, fn] of bindings) current.on(type, filter, (...args) => { if (valid()) safely(fn, ...args); });
+      joinTimer = setTimeout(() => {
+        if (!valid() || joined) return;
+        safely(callback, 'TIMED_OUT'); retry();
+      }, 8000);
+      current.subscribe(status => {
+        if (!valid()) return;
+        joined = status === 'SUBSCRIBED';
+        if (joined) {
+          clearTimers(); attempts = 0;
+          if (presence) safely(() => current.track(presence));
+          for (const data of pending.values()) safely(() => current.send(data));
+          pending.clear();
+        } else if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) {
+          clearTimeout(joinTimer); retry();
+          if (attempts >= 2 && window.APP_NETWORK?.reportRealtimeFailure?.(rawOrigin)) resetConnections();
         }
-        clearTimeout(retryTimer);
-        retryDelay = 1000;
-        for (const payload of pending.values()) instance.send(payload);
-        pending.clear();
-        handlers.connected?.();
+        safely(callback, status);
+        retimePolls();
       });
     };
-    const restart = () => {
-      if (stopped) return;
-      clearTimeout(retryTimer); retryDelay = 1000;
-      instance = null; subscribed = false;
-      handlers.connection?.(false);
-      start();
-    };
-    reconnectChannels.add(restart);
-    start();
-    return {
-      send: payload => {
-        if (subscribed) return instance.send(payload);
-        pending.set(payload.event, payload);
+    const handle = {
+      managed: true,
+      on(type, filter, fn) { bindings.push([type, filter, fn]); return handle; },
+      subscribe(fn) { if (active) return handle; callback = fn; active = true; start(); return handle; },
+      send(data) {
+        if (stopped) return Promise.resolve('closed');
+        if (joined && instance) return Promise.resolve(instance.send(data));
+        // Only invalidation broadcasts are retained; coalesce by event, bounded.
+        if (data?.type === 'broadcast') {
+          pending.set(data.event, data);
+          if (pending.size > 64) pending.delete(pending.keys().next().value);
+        }
         return Promise.resolve('queued');
       },
-      unsubscribe() { reconnectChannels.delete(restart); stopped = true; clearTimeout(retryTimer); pending.clear(); subscribed = false; delayedChannels.delete(start); if (instance) realtimeClient()?.removeChannel(instance); instance = null; }
+      track(data) { presence = data; return joined ? Promise.resolve(instance.track(data)) : Promise.resolve('queued'); },
+      untrack() { presence = null; return joined ? Promise.resolve(instance.untrack()) : Promise.resolve(); },
+      presenceState() { return joined && instance ? instance.presenceState() : {}; },
+      unsubscribe() { stopped = true; active = false; clearTimers(); detach(); pending.clear(); presence = null; subscriptions.delete(handle); return Promise.resolve('ok'); },
+      restart() { if (stopped) return; clearTimers(); attempts = 0; detach(); safely(callback, online() ? 'CONNECTING' : 'CLOSED'); start(); },
+      start,
+      get connected() { return joined; }
+    };
+    subscriptions.add(handle);
+    return handle;
+  }
+  const clientFacade = {
+    managed: true,
+    channel: managedChannel,
+    removeChannel: channel => channel.unsubscribe(),
+    removeAllChannels: () => Promise.all([...subscriptions].map(channel => channel.unsubscribe()))
+  };
+  function realtimeClient() { return clientFacade; }
+  function resetConnections() {
+    clearTimeout(networkResetTimer);
+    networkResetTimer = setTimeout(() => {
+      recoveries++;
+      const previous = rawClient;
+      rawClient = null; rawOrigin = null;
+      for (const channel of [...subscriptions]) channel.restart();
+      // Never block a replacement transport on an old unsubscribe acknowledgement.
+      if (previous) safely(() => previous.removeAllChannels());
+      refreshPolls();
+      window.dispatchEvent(new CustomEvent('academy-realtime-reset'));
+    }, 180);
+  }
+  window.addEventListener('app-network-recovered', resetConnections);
+  window.addEventListener('offline', resetConnections);
+  window.addEventListener('online', resetConnections);
+  window.addEventListener('app-network-change', () => {
+    if (rawClient && selectedRealtimeOrigin() !== rawOrigin) resetConnections();
+  });
+  for (const event of ['app-sdk-ready', 'academy-sdk-ready']) {
+    window.addEventListener(event, () => { for (const channel of subscriptions) channel.start(); });
+  }
+
+  // One deadline timer for all network reconciliation jobs. A job never overlaps
+  // itself; a recovery during an in-flight read schedules one follow-up pass.
+  const polls = new Set();
+  let pollTimer;
+  const visible = () => !window.document?.hidden;
+  function armPolls() {
+    clearTimeout(pollTimer); pollTimer = null;
+    if (!online() || !visible()) return;
+    const due = [...polls].filter(job => !job.running).map(job => job.due);
+    if (due.length) pollTimer = setTimeout(tickPolls, Math.max(0, Math.min(...due) - Date.now()));
+  }
+  function tickPolls() {
+    pollTimer = null;
+    if (!online() || !visible()) return;
+    for (const job of polls) {
+      if (job.running || job.due > Date.now()) continue;
+      job.running = true;
+      Promise.resolve().then(job.run).then(() => { job.failures = 0; }, () => { job.failures++; }).finally(() => {
+        job.running = false;
+        if (!polls.has(job)) return;
+        const interval = typeof job.interval === 'function' ? job.interval() : job.interval;
+        job.due = job.again ? Date.now() : Date.now() + Math.min(120000, Math.max(1000, interval) * 2 ** Math.min(job.failures, 3));
+        job.again = false; armPolls();
+      });
+    }
+    armPolls();
+  }
+  function retimePolls() {
+    for (const job of polls) {
+      if (!job.running && typeof job.interval === 'function') job.due = Math.min(job.due, Date.now() + Math.max(1000, job.interval()));
+    }
+    armPolls();
+  }
+  function connectionStatus() {
+    return { origin: rawOrigin, online: online(), transportStarts, recoveries,
+      subscriptions: subscriptions.size, connected: [...subscriptions].filter(channel => channel.connected).length,
+      pollingJobs: polls.size, runningReads: [...polls].filter(job => job.running).length };
+  }
+  function refreshPolls() {
+    for (const job of polls) { if (job.running) job.again = true; else job.due = Date.now(); }
+    armPolls();
+  }
+  function poll(run, { interval = 30000, immediate = false } = {}) {
+    const job = { run, interval, running: false, failures: 0, again: false,
+      due: immediate ? Date.now() : Date.now() + (typeof interval === 'function' ? interval() : interval) };
+    polls.add(job); armPolls();
+    return { stop() { polls.delete(job); armPolls(); }, refresh() { if (job.running) job.again = true; else job.due = Date.now(); armPolls(); } };
+  }
+  window.document?.addEventListener('visibilitychange', () => { if (visible()) refreshPolls(); else armPolls(); });
+
+  function channel(name, handlers = {}) {
+    let topic = topics.get(name);
+    if (!topic) {
+      topic = { listeners: new Set(), connected: false };
+      topics.set(name, topic);
+      topic.channel = managedChannel(name, { config: { broadcast: { self: false } } });
+      topic.channel.on('broadcast', { event: '*' }, ({event, payload}) => {
+        for (const listener of topic.listeners) safely(listener[event], payload);
+      });
+      const documents = { 'content-version': 'academy/content.json', 'schedule-version': 'academy/schedule.json', 'feedback-version': 'academy/daily-feedback.json' };
+      // Content is one row; schedule/feedback are split across rows, so retain
+      // prefix matching for those documents (Realtime has no LIKE filter).
+      const docEvent = Object.keys(handlers).find(event => documents[event]);
+      if (docEvent) topic.channel.on('postgres_changes', {
+        event: '*', schema: 'public', table: cfg().table || 'academy_progress',
+        ...(docEvent === 'content-version' ? {filter: `user_id=eq.doc:${documents[docEvent]}:value`} : {})
+      }, ({new: row, old}) => {
+        const record = row?.user_id ? row : old;
+        if (!record?.user_id?.startsWith(`doc:${documents[docEvent]}:`)) return;
+        for (const listener of topic.listeners) safely(listener[docEvent], {rev: Math.max(Date.now(), Number(record.ts) || 0)});
+      });
+      topic.channel.subscribe(status => {
+        topic.connected = status === 'SUBSCRIBED';
+        for (const listener of topic.listeners) {
+          safely(listener.connection, topic.connected);
+          if (topic.connected) safely(listener.connected);
+        }
+      });
+    }
+    topic.listeners.add(handlers);
+    if (topic.connected) { safely(handlers.connection, true); safely(handlers.connected); }
+    return {
+      get connected() { return topic.connected; },
+      send: payload => topic.channel.send(payload),
+      unsubscribe() { topic.listeners.delete(handlers); if (!topic.listeners.size) { topic.channel.unsubscribe(); topics.delete(name); } }
     };
   }
 
@@ -323,5 +433,5 @@ window.AcademyStore = (() => {
     return reliable.enqueue(`progress:${id}`, data, base);
   }
   // Progress is already a single database row, unlike the legacy JSON documents.
-  return { origin, headers, objectUrl, getJSON, putJSON, saveProgress, restSelect, restUpsert, realtimeClient, channel, reliable };
+  return { origin, headers, objectUrl, getJSON, putJSON, saveProgress, restSelect, restUpsert, realtimeClient, channel, poll, connectionStatus, reliable };
 })();

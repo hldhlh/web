@@ -34,6 +34,9 @@
     const sdkReady = parent.supabase?.createClient ? Promise.resolve() : load('../../../vendor/supabase.min.js');
     await Promise.all([sdkReady, ...['image-cache.js', 'model.js', 'batch.js', 'image-processing.js', 'editor.js'].map(load)]);
     window.supabase = parent.supabase?.createClient ? parent.supabase : window.supabase;
+    if (!parent.supabase?.createClient && window.supabase?.createClient) parent.supabase = window.supabase;
+    parent.APP_NETWORK?.patchSupabase();
+    parent.dispatchEvent(new Event('academy-sdk-ready'));
     await load('collaboration.js');
     await load('batch-ui.js');
     if (!window.DimensionCollab) throw new Error('标注工具初始化失败，请重新加载');

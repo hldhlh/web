@@ -14,7 +14,7 @@ for (const sharedClient of [false, true]) {
       if (!nodes.has(id)) nodes.set(id, { dataset: {}, hidden: true, getAttribute: () => null, focus() {} });
       return nodes.get(id);
     };
-    const parent = { AcademyAuth: {}, AcademyStore: {}, document: { documentElement: { dataset: {} } } };
+    const parent = { dispatchEvent() {}, AcademyAuth: {}, AcademyStore: {}, document: { documentElement: { dataset: {} } } };
     if (sharedClient) parent.supabase = { createClient() {} };
     const window = { parent, addEventListener() {} };
     const document = {
@@ -31,7 +31,7 @@ for (const sharedClient of [false, true]) {
         });
       } }
     };
-    vm.runInNewContext(source, { window, document, URL, setTimeout, clearTimeout,
+    vm.runInNewContext(source, { window, document, URL, Event, setTimeout, clearTimeout,
       MutationObserver: class { observe() {} disconnect() {} } });
     await new Promise(resolve => setImmediate(resolve));
     assert.deepEqual(missing, [], 'Every dynamically requested script must be in the deployment allowlist');

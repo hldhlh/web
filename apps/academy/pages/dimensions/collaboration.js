@@ -78,13 +78,7 @@
     format.title = meta.sourceBytes ? `上传前 ${window.DimensionImages.formatBytes(meta.sourceBytes)} · 云端图片与预览共 ${window.DimensionImages.formatBytes(meta.storedBytes || meta.imageBytes)}` : '';
     $('exportImage').title = !model.view().length ? '添加一条标注后即可导出' : model.dirty ? '导出包含尚未同步的本机修改' : '导出标注图';
   }
-  function makeClient() {
-    return window.supabase.createClient(window.APP_NETWORK?.projectOrigin || cfg.url, cfg.key, {
-      appNetworkRealtimeDirect: true, auth: { persistSession: false, autoRefreshToken: false },
-      realtime: { params: { eventsPerSecond: 10 } }
-    });
-  }
-  const sb = makeClient();
+  const sb = store.realtimeClient();
   let currentRead = null;
   async function refreshCurrent() {
     if (currentRead) return;
@@ -116,8 +110,8 @@
       if (channel !== projectChannel || !allowed()) return;
       connected = state === 'SUBSCRIBED';
       update(session);
-      if (connected) { channel.track({ name: actor.name }).catch(() => {}); refreshCurrent(); }
-      else if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(state)) {
+      if (connected) { channel.track({ name: actor.name }).catch(() => {}); Promise.resolve(currentRead).catch(() => {}).then(refreshCurrent); }
+      else if (!sb.managed && ['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(state)) {
         clearTimeout(retryTimer); retryTimer = setTimeout(subscribeProject, 5000);
       }
     });
@@ -835,14 +829,14 @@
   $('discardConflict').addEventListener('click', () => { session.resolve('remote'); schedule(0); });
   document.addEventListener('click', event => { if (!$('projectHeading').contains(event.target)) $('projectHeading').open = false; });
   document.addEventListener('keydown', event => { if (event.key === 'Escape') $('projectHeading').open = false; });
-  const resume = () => { if (!document.hidden && allowed()) { if (session) refreshCurrent(); else loadProjects(false, { background: true }); } };
+  const resume = () => { if (!document.hidden && allowed()) { if (session) return refreshCurrent(); return loadProjects(false, { background: true }); } };
   document.addEventListener('visibilitychange', resume);
   window.addEventListener('online', resume);
   window.addEventListener('offline', () => { connected = false; if (session) update(session); });
   window.addEventListener('beforeunload', event => { if (session?.dirty || opening || renaming || batchSaving) { event.preventDefault(); event.returnValue = ''; } });
   function stop() {
-    stopped = true; $('renameDialog').close(); clearTimeout(timer); clearTimeout(retryTimer); clearInterval(pollTimer);
-    sb.removeAllChannels(); stopAuth?.(); retryImageAction = null; $('imageOperation').hidden = true;
+    stopped = true; $('renameDialog').close(); clearTimeout(timer); clearTimeout(retryTimer); pollTimer?.stop();
+    projectChannel?.unsubscribe(); catalogChannel?.unsubscribe(); stopAuth?.(); retryImageAction = null; $('imageOperation').hidden = true;
     previewObserver.disconnect(); previewQueue.length = 0;
     for (const promise of previewCache.values()) promise.then(url => { if (url) URL.revokeObjectURL(url); }).catch(() => {});
     previewCache.clear(); catalogCache.clear(); catalogRequest++;
@@ -855,16 +849,12 @@
       status('登录或权限已变更，请返回 Auto Office 重新进入');
     }
   });
-  window.addEventListener('pagehide', stop, { once: true });
+  window.addEventListener('pagehide', event => { if (!event.persisted) stop(); });
+  window.addEventListener('pageshow', event => { if (event.persisted) resume(); });
   if (!allowed()) { status('请通过 Auto Office 登录并开通尺寸标注权限'); return; }
   setOpening(false);
   openCatalogChannel(); loadProjects();
   const projectId = new URLSearchParams(window.parent.location.hash.split('?')[1] || '').get('project');
   if (projectId) open(projectId).catch(reportError);
-  let lastPoll = Date.now();
-  pollTimer = setInterval(() => {
-    const interval = session && !connected ? 5000 : 30000;
-    if (Date.now() - lastPoll < interval || document.hidden || navigator.onLine === false) return;
-    lastPoll = Date.now(); resume();
-  }, 5000);
+  pollTimer = store.poll(resume, { interval: () => (session ? connected : catalogConnected) ? 60000 : 5000 });
 })();

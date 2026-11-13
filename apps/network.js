@@ -12,7 +12,7 @@
     ? { name: '站点边缘网关', origin: location.origin }
     : null;
   const ENDPOINTS = [
-    { name: 'Supabase Global', origin: PROJECT_ORIGIN }
+    { name: 'Supabase Global', origin: PROJECT_ORIGIN, realtime: true }
   ].concat(
     Array.isArray(window.APP_NETWORK_ENDPOINTS) ? window.APP_NETWORK_ENDPOINTS : []
   );
@@ -32,13 +32,14 @@
   const metrics = [];
   const unhealthyUntil = new Map();
   const rankings = new Map();
+  const realtimeFailures = new Map();
   let networkGeneration = 0;
   let lastPersistedAt = 0;
 
   const normalize = (value) => String(value || '').replace(/\/+$/, '');
   const nodes = Array.from(new Map(ENDPOINTS.map((node) => {
     const origin = normalize(node.origin);
-    return [origin, { name: node.name || origin, origin }];
+    return [origin, { name: node.name || origin, origin, realtime: node.realtime === true || origin === PROJECT_ORIGIN }];
   })).values()).filter((node) => /^https:\/\//.test(node.origin));
 
   // Restore only a previously verified gateway belonging to this site.
@@ -192,7 +193,7 @@
     extraEndpoints.forEach((endpoint) => {
       const origin = normalize(endpoint?.origin);
       if (!/^https:\/\//.test(origin) || nodes.some((node) => node.origin === origin)) return;
-      nodes.push({ name: endpoint.name || origin, origin });
+      nodes.push({ name: endpoint.name || origin, origin, realtime: endpoint.realtime === true });
       addConnectionHint(origin);
     });
     return benchmark();
@@ -426,9 +427,20 @@
     return true;
   }
 
+  function realtimeOrigin() {
+    const supported = getOrderedOrigins().filter(origin => nodes.some(node => node.origin === origin && node.realtime === true));
+    return supported.find(origin => (realtimeFailures.get(origin) || 0) <= Date.now()) || PROJECT_ORIGIN;
+  }
+
   window.APP_NETWORK = {
     get origin() { return currentOrigin; },
     get projectOrigin() { return PROJECT_ORIGIN; },
+    get realtimeOrigin() { return realtimeOrigin(); },
+    reportRealtimeFailure(origin) {
+      if (!nodes.some(node => node.origin === origin && node.realtime === true)) return false;
+      realtimeFailures.set(origin, Date.now() + FAILURE_COOLDOWN);
+      return realtimeOrigin() !== origin;
+    },
     get endpoints() { return nodes.map((node) => ({ ...node })); },
     get ranking() { return getOrderedOrigins().map(origin => ({ origin, ...rankings.get(origin) })); },
     benchmark,
@@ -463,6 +475,7 @@
     networkGeneration++;
     unhealthyUntil.clear();
     rankings.clear();
+    realtimeFailures.clear();
     // Old probes cannot hold a new network behind their timeout or overwrite its ranking.
     benchmarking = false;
     benchmarkPromise = null;
