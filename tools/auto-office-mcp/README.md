@@ -1,6 +1,6 @@
-# Auto Office MCP（v1.1）
+# Auto Office MCP（v1.3）
 
-让 AI 直接查询和编辑 Auto Office，无需逐步点击浏览器。当前提供通知读写、成员查询、课程/考试/课程分组/任务阶段摘要查询，以及尺寸标注批量编辑。
+让 AI 直接查询和编辑 Auto Office，无需逐步点击浏览器。当前提供通知读写、每日问题反馈查询与发布、成员查询、课程/考试/课程分组/任务阶段摘要查询，以及尺寸标注批量编辑。
 
 ## 运行与接入
 
@@ -135,10 +135,34 @@ npm run check
 
 多项目调用一次认证，并发处理不同项目；每个项目最多 100 个操作，同一项目不能重复出现。检查每一项的 `ok` 和 `code`：成功项不会因其他项目失败而回滚。网络结果不确定时必须使用完全相同的项目请求及 requestId 重试；冲突项重新读取后决定如何修改。图片工具返回的 imageIndex 对应成功图片块的顺序；缩略图用于观察，标注坐标须换算到返回的原图宽高。服务端只读取项目元数据中的固定目录图片，单张上限 8 MB。
 
-先 get → preview → apply；需要浏览器视觉预览时使用网页“AI 批量编辑”。操作格式、坐标规则、限制及示例见 [尺寸标注说明](../../apps/academy/pages/dimensions/README.md#ai-批量编辑)。项目 ID 可从网页 URL 的 `project=` 取得。本版不自动上传图片、不修改项目名称或创建项目，不把“模型尺寸”伪装成实测尺寸。
+先 get → preview → apply；需要浏览器视觉预览时使用网页“AI 批量编辑”。操作格式、坐标规则、限制及示例见 [尺寸标注说明](../../apps/academy/pages/dimensions/README.md#ai-批量编辑)。项目 ID 可从网页 URL 的 `project=` 取得。上传新图片使用下述接口；不把“模型尺寸”伪装成实测尺寸。
 
 数据只访问 `academy_progress` 的 `doc:dimensions:<projectId>` 行，沿用网页项目结构；与通知的 `$ready` 迁移无关。每次调用仍验证店长会话，写操作遵守 `AUTO_OFFICE_READ_ONLY`。未新增数据库权限、RLS 策略或公网服务。会话与当前网页共用需用户安全注入现有会话；默认账号密码登录仍可能替换网页会话，网页批量编辑入口不发生此问题。
 
 只在最近一次 `aiBatch` 收据中保留请求签名、受影响项之前的内容及之后的版本。回包不确定时必须复用相同 requestId/expectedVersion/operations；相同 ID 不同内容报 `IDEMPOTENCY_CONFLICT`，更早批次重试报 `CONFLICT`。撤销使用新 requestId 与最新 version，不自动重试写入。原有字段完整保留，删除采用网页可兼容的 tombstone。
 
 尺寸工具同样支持 `curve`（端点 start/end、二次贝塞尔 control）和 `note`（start 定位、无尺寸线），以及 rect 的 `labelPosition: "inline"` 四边箭头。controls 不代表真实半径；R 标注需来自模型或实测。
+
+## v1.2：批量上传图片
+
+`office_dimensions_upload_many` 接受 `images` 数组，每项包含 `projectId`（调用方生成并在重试时复用的 UUID）、`name`、可选的 `folderId`、`mimeType`（`image/jpeg`、`image/png` 或 `image/webp`）和标准 base64 字符串 `data`。一次最多 8 张，单张最多 8 MiB，合计最多 16 MiB。各图片独立创建项目，逐项返回 `ok`、`projectId`、`version` 或错误；部分失败不会撤回已成功项目。
+
+图片直接上传，服务端不压缩或生成缩略图；客户端应自行处理方向、尺寸与体积。JPEG EXIF 方向用于记录显示尺寸。网络错误后必须复用相同 ID、名称、目标目录和图片字节；系统先检查项目，再核对已有对象，避免覆盖或重复创建。相同 ID 用于不同内容时报 `IDEMPOTENCY_CONFLICT`。目标目录不存在时拒绝创建。上传中断可能留下无法被项目引用的存储对象；不会自动删除，重试相同请求可继续。仅店长会话可用，`AUTO_OFFICE_READ_ONLY=true` 会拒绝写入；与既有 MCP 一样，接口本身不替代数据库权限。
+
+示例（`data` 替换为完整 base64）：
+
+```json
+{"images":[{"projectId":"10000000-0000-4000-8000-000000000001","name":"零件.png","mimeType":"image/png","data":"BASE64图片内容"}]}
+```
+
+本机服务更新后需执行 `npm ci`，重启或重新连接 MCP 客户端才能加载新工具。
+
+## v1.3：每日问题反馈
+
+- `office_feedback_list({offset?,limit?,status?})`：按提交时间倒序分页，返回 `{items:[{version,item}],offset,limit}`；状态可选 `open/processing/resolved`。
+- `office_feedback_get({id})`：读取单条反馈与版本，删除标记不返回正文。
+- `office_feedback_create({requestId,title,detail,category?})`：发布到子程序「每日问题反馈」，不创建通知。全员可见，署名当前店长；初始状态 `open`。标题最多40字、详情最多500字；分类为 `service/product/environment/equipment/wish/other`，默认 `other`。
+
+每次调用验证店长会话，遵循只读模式。仅访问 `academy_progress` 中 `doc:academy/daily-feedback.json:` 前缀，须有既有 `$ready` 标记；不迁移旧数据。创建以固定 `feedback-mcp-<requestId>` 为 ID，唯一键插入作为不存在版本的 CAS，禁止 upsert。写入网络结果不确定时按 ID 回读；重试必须复用 UUID 和完整内容。相同请求返回 `alreadyApplied`，不同内容或账号返回 `IDEMPOTENCY_CONFLICT`。网页编辑可能移除请求收据，此时拒绝重发，应读取核对；删除标记不能被重试恢复。不提供修改或删除接口，不影响其他反馈或未知字段。
+
+发布后用 `office_feedback_get` 回读核对。日期由提交时间决定，网页按北京时间显示。新增工具需要客户端重连或 MCP 重载后重新发现；磁盘文件更新不代表运行中的旧进程已经加载。

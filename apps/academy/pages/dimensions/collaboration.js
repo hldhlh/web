@@ -564,8 +564,8 @@
     $('newProject').disabled = value;
     $('workspace').setAttribute('aria-busy', String(value));
     $('library').setAttribute('aria-busy', String(value));
-    $('newProject').querySelector('span').textContent = value ? '正在准备…' : '新建标注';
-    $('newProject').setAttribute('aria-label', value ? '正在准备图片' : '新建标注');
+    $('newProject').querySelector('span').textContent = value ? '正在准备…' : '上传图片';
+    $('newProject').setAttribute('aria-label', value ? '正在准备图片' : '上传图片，可多选');
     $('emptyCreate').disabled = value;
   }
   async function showProject(row, blob) {
@@ -608,11 +608,7 @@
       await showProject(row, blob);
     }, () => open(id), projects.find(meta => meta.id === id)?.name);
   }
-  async function create(file, pending = {}) {
-    if (!file || opening) return;
-    await imageOperation(async () => {
-      ensureAllowed();
-      if (session?.dirty || session?.saving) throw new Error('请先同步或处理当前项目的冲突，再新建项目');
+  async function createItem(file, pending) {
       imageProgress('正在打开新图片', '1 / 4 · 正在本机转换并压缩图片…');
       if (!pending.processed) {
         let processing = true;
@@ -644,7 +640,7 @@
       }
       const imageHash = await window.DimensionImageCache.digest(main.blob);
       await window.DimensionImageCache.put(store.objectUrl(imagePath), main.blob, imageHash);
-      const payload = pending.payload ||= { schema: 1, meta: { id, imageHash, folderId: currentFolder, thumbnailPath, name: file.name.slice(0, 180), imagePath,
+      const payload = pending.payload ||= { schema: 1, meta: { id, imageHash, folderId: pending.folderId, thumbnailPath, name: file.name.slice(0, 180), imagePath,
         width: main.width, height: main.height, sourceWidth, sourceHeight, sourceBytes,
         imageBytes: main.blob.size, imageFormat: main.extension, thumbnailBytes,
         storedBytes: main.blob.size + thumbnailBytes,
@@ -669,15 +665,38 @@
           }
         }
       }
-      imageProgress('正在打开新图片', '4 / 4 · 正在打开图片并准备画布…');
-      // Use the confirmed row and local optimized blob instead of downloading again.
-      await showProject(pending.row, main.blob);
+      catalogCache.delete(pending.folderId);
       Promise.resolve().then(() => catalogChannel?.send({ type: 'broadcast', event: 'changed', payload: { id } })).catch(() => {});
-      editor.notice(`图片已优化并共享 · ${window.DimensionImages.formatBytes(main.blob.size)}`);
-    }, () => create(file, pending), file.name);
+      return { row: pending.row, blob: main.blob };
+  }
+  async function createMany(files, state = null) {
+    if (opening || !files?.length) return;
+    const items = Array.from(files);
+    if (!state) state = { items: items.map(file => ({ file, pending: { folderId: currentFolder } })), index: 0 };
+    const retry = () => createMany(items, state);
+    await imageOperation(async () => {
+      ensureAllowed();
+      if (state.items.length > 50) throw new Error('一次最多上传 50 张图片，请分批选择');
+      if (session?.dirty || session?.saving) throw new Error('请先同步或处理当前项目的冲突，再新建项目');
+      while (state.index < state.items.length) {
+        const item = state.items[state.index];
+        $('imageOperationFile').textContent = `第 ${state.index + 1} / ${state.items.length} 张 · ${item.file.name}`;
+        $('imageOperationFile').hidden = false;
+        try { state.last = await createItem(item.file, item.pending); }
+        catch (error) { throw new Error(`第 ${state.index + 1} / ${state.items.length} 张：${error.message || '上传失败'}；已完成 ${state.index} 张。重试将继续当前图片。`); }
+        state.index++;
+      }
+      imageProgress('正在打开图片', '4 / 4 · 正在准备画布…');
+      await showProject(state.last.row, state.last.blob);
+      editor.notice(state.items.length === 1 ? '图片已优化并共享' : `已上传 ${state.items.length} 张图片`);
+    }, retry, items[0].name);
+  }
+  async function create(file, pending = {}) {
+    if (!file) return;
+    return createMany([file], { items: [{ file, pending: { folderId: currentFolder, ...pending } }], index: 0 });
   }
   let batchSaving = false;
-  window.DimensionCollab = { actor, create,
+  window.DimensionCollab = { actor, create, createMany,
     snapshot() {
       ensureAllowed();
       if (!session || session.dirty || session.saving || batchSaving || editor.busy()) throw new Error('请先完成当前操作并等待同步，再打开批量编辑');
@@ -819,6 +838,7 @@
   $('retryImageOperation').addEventListener('click', () => { if (!opening) retryImageAction?.(); });
   $('dismissImageOperation').addEventListener('click', () => {
     $('imageOperation').hidden = true; retryImageAction = null;
+    if (!session) loadProjects();
     (session ? $('toggleEdit') : $('newProject')).focus({ preventScroll: true });
   });
   $('retryButton').addEventListener('click', () => { if (session) { refreshCurrent(); subscribeProject(); schedule(0); } else loadProjects(); });

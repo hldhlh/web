@@ -1463,7 +1463,11 @@
   [elements.uploadButton, elements.replaceImage, elements.panelReplace].forEach((button) => {
     button.addEventListener("click", openFilePicker);
   });
-  elements.fileInput.addEventListener("change", () => loadFile(elements.fileInput.files[0]));
+  elements.fileInput.addEventListener("change", () => {
+    const files = Array.from(elements.fileInput.files);
+    if (files.length > 1 && window.DimensionCollab) window.DimensionCollab.createMany(files);
+    else loadFile(files[0]);
+  });
 
   elements.viewport.addEventListener("dragenter", (event) => {
     event.preventDefault();
@@ -1481,7 +1485,9 @@
     event.preventDefault();
     elements.viewport.classList.remove("is-dragging");
     elements.dropMask.hidden = true;
-    loadFile(event.dataTransfer.files[0]);
+    const files = Array.from(event.dataTransfer.files);
+    if (files.length > 1 && window.DimensionCollab) window.DimensionCollab.createMany(files);
+    else loadFile(files[0]);
   });
 
   for (const [id, factor] of [['zoomOut', .8], ['zoomIn', 1.25]]) {

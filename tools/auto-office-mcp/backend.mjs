@@ -1,9 +1,11 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
+import { imageSize } from 'image-size';
 
 // 与 framework/reliable-store.js 的 split/join 契约一致。只修改内容行，
 // 不触碰进度、排班或迁移标记；数据库 ts 是比较并交换（CAS）的版本号。
 export const CONTENT_KEY = 'doc:academy/content.json:value';
 const READY_KEY = 'doc:academy/content.json:$ready';
+const FEEDBACK_PREFIX = 'doc:academy/daily-feedback.json:';
 export class OfficeError extends Error {
   constructor(code, message) { super(message); this.code = code; }
 }
@@ -95,6 +97,66 @@ export class OfficeBackend {
     if (!row?.payload?.annotations || row.payload.meta?.id !== projectId || !Number.isSafeInteger(row.ts)) throw new OfficeError('NOT_FOUND', '尺寸标注项目不存在或结构无效');
     return row;
   }
+  async createDimensionImage(input, actor) {
+    const { projectId, name, folderId = '', data, mimeType } = input;
+    if (data.length > 8 * 1024 * 1024 * 4 / 3 + 8 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(data)) throw new OfficeError('INVALID_IMAGE', '图片必须是有效的 base64，且不超过 8 MB');
+    const bytes = Buffer.from(data, 'base64');
+    if (!bytes.length || bytes.length > 8 * 1024 * 1024 || bytes.toString('base64') !== data) throw new OfficeError('INVALID_IMAGE', '图片编码无效或超过 8 MB');
+    let size;
+    try { size = imageSize(bytes); } catch (_) { throw new OfficeError('INVALID_IMAGE', '无法读取图片尺寸'); }
+    const types = { png: ['image/png', 'png'], jpg: ['image/jpeg', 'jpg'], webp: ['image/webp', 'webp'] };
+    const format = types[size.type];
+    if (!format || format[0] !== mimeType || !size.width || !size.height || size.width * size.height > 100000000) throw new OfficeError('INVALID_IMAGE', '图片格式、尺寸或类型不受支持');
+    const rotated = size.orientation >= 5 && size.orientation <= 8;
+    const width = rotated ? size.height : size.width, height = rotated ? size.width : size.height;
+    const hash = createHash('sha256').update(bytes).digest('hex');
+    const lookup = async () => {
+      const query = new URLSearchParams({user_id:`eq.doc:dimensions:${projectId}`,select:'user_id,payload,ts,updated_at'});
+      const rows = await this.http(`/rest/v1/academy_progress?${query}`);
+      if (!Array.isArray(rows)) throw new OfficeError('RESPONSE', '无法确认项目状态');
+      return rows[0];
+    };
+    const verify = row => {
+      const meta = row?.payload?.meta;
+      if (!meta || meta.id !== projectId || meta.imageHash !== hash || meta.name !== name || (meta.folderId || '') !== folderId || meta.createdBy?.id !== actor.id) throw new OfficeError('IDEMPOTENCY_CONFLICT', '项目 ID 已用于其他图片或参数');
+      return { projectId, version: row.ts, alreadyApplied: true };
+    };
+    let row = await lookup();
+    if (row) return verify(row);
+    if (folderId) {
+      const query = new URLSearchParams({user_id:`eq.doc:dimension-folder:${folderId}`,select:'meta:payload->meta'});
+      const rows = await this.http(`/rest/v1/academy_progress?${query}`);
+      if (!Array.isArray(rows) || !rows.some(item => item.meta?.id === folderId && item.meta.kind === 'folder')) throw new OfficeError('NOT_FOUND', '目标目录不存在');
+    }
+    const path = `academy/dimensions/${projectId}/image.${format[1]}`;
+    const url = `${this.url}/storage/v1/object/cloud-files/${path}`;
+    const headers = {apikey:this.key,Authorization:`Bearer ${this.key}`};
+    let response;
+    try { response = await this.request(url, {method:'POST',headers:{...headers,'Content-Type':mimeType,'x-upsert':'false'},body:bytes,redirect:'error',signal:AbortSignal.timeout(20000)}); }
+    catch (_) { throw new OfficeError('NETWORK', '图片上传结果未确认，请使用相同项目 ID 和内容重试'); }
+    if (!response.ok) {
+      if (response.status !== 409 && response.status !== 400) throw new OfficeError('HTTP', `图片上传失败（HTTP ${response.status}）`);
+      // Never overwrite an existing object: compare its bytes before reusing it.
+      let stored;
+      try { stored = await this.request(url, {headers,redirect:'error',signal:AbortSignal.timeout(20000)}); }
+      catch (_) { throw new OfficeError('NETWORK', '无法确认已有图片，请使用相同请求重试'); }
+      if (!stored.ok) throw new OfficeError('HTTP', '上传失败且无法读取已有图片');
+      const existing = Buffer.from(await stored.arrayBuffer());
+      if (existing.length !== bytes.length || createHash('sha256').update(existing).digest('hex') !== hash) throw new OfficeError('IDEMPOTENCY_CONFLICT', '项目 ID 对应的图片内容不同');
+    }
+    const now = new Date().toISOString();
+    const payload = {schema:1,meta:{id:projectId,name,folderId,imagePath:path,imageHash:hash,width,height,sourceWidth:width,sourceHeight:height,sourceBytes:bytes.length,imageBytes:bytes.length,imageFormat:format[1],thumbnailBytes:0,storedBytes:bytes.length,createdBy:actor,updatedBy:actor,createdAt:now,updatedAt:now,count:0},annotations:{}};
+    try {
+      const rows = await this.http('/rest/v1/academy_progress', {method:'POST',body:{user_id:`doc:dimensions:${projectId}`,payload,ts:Date.now(),updated_at:now}});
+      if (!rows?.[0]) throw new OfficeError('RESPONSE', '未确认项目保存结果，请使用相同请求重试');
+      return {...verify(rows[0]),alreadyApplied:false};
+    } catch (error) {
+      // A lost acknowledgement or competing insert must be reconciled by ID.
+      try { row = await lookup(); } catch (_) { throw new OfficeError('NETWORK', '未确认项目保存结果，请使用相同请求重试'); }
+      if (row) return verify(row);
+      throw new OfficeError('NETWORK', '未确认项目保存结果，请使用相同请求重试');
+    }
+  }
   async readDimensionImage(row, preferOriginal = false) {
     const meta = row.payload.meta, directory = `academy/dimensions/${meta.id}/`;
     const valid = path => typeof path === 'string' && path.startsWith(directory) && /^[a-z0-9][a-z0-9._-]*\.(?:webp|jpe?g|png)$/i.test(path.slice(directory.length));
@@ -140,5 +202,64 @@ export class OfficeBackend {
     if (!Array.isArray(users)) throw new OfficeError('RESPONSE', '成员响应异常');
     // 只输出选接收人所需字段，不暴露账号散列、设备或登录记录。
     return users.map(({ id, name, role, access }) => ({ id, name, role, access }));
+  }
+
+  async feedbackReady() {
+    const rows = await this.http(`/rest/v1/academy_progress?${new URLSearchParams({user_id:`eq.${FEEDBACK_PREFIX}$ready`,select:'user_id'})}`);
+    if (!Array.isArray(rows) || rows.length !== 1) throw new OfficeError('NOT_READY', '请先在网页完成每日问题反馈同步，MCP 不会自动迁移');
+  }
+
+  async feedbackRow(id) {
+    const rows = await this.http(`/rest/v1/academy_progress?${new URLSearchParams({user_id:`eq.${FEEDBACK_PREFIX}${id}`,select:'user_id,payload,ts'})}`);
+    if (!Array.isArray(rows)) throw new OfficeError('RESPONSE', '反馈读取结果异常');
+    return rows[0];
+  }
+
+  feedbackResult(row) {
+    const item = row?.payload?.value;
+    if (!item || typeof item !== 'object' || !item.id || row.user_id !== FEEDBACK_PREFIX + item.id || !Number.isSafeInteger(row.ts)) throw new OfficeError('NOT_FOUND', '反馈不存在、已删除或结构无效');
+    return {version:row.ts,item};
+  }
+
+  async listFeedback({offset,limit,status}) {
+    await this.feedbackReady();
+    const query = new URLSearchParams({user_id:`like.${FEEDBACK_PREFIX}*`, 'payload->value->>id':'not.is.null',select:'user_id,payload,ts',order:'payload->value->>createdAt.desc,user_id.asc',offset:String(offset),limit:String(limit)});
+    if (status) query.set('payload->value->>status',`eq.${status}`);
+    const rows = await this.http(`/rest/v1/academy_progress?${query}`);
+    if (!Array.isArray(rows)) throw new OfficeError('RESPONSE', '反馈列表响应异常');
+    return {items:rows.map(row=>this.feedbackResult(row)),offset,limit};
+  }
+
+  async getFeedback(id) {
+    await this.feedbackReady();
+    return this.feedbackResult(await this.feedbackRow(id));
+  }
+
+  async createFeedback({requestId,title,detail,category},actor) {
+    await this.feedbackReady();
+    const id = `feedback-mcp-${requestId}`;
+    const signature = createHash('sha256').update(JSON.stringify({title,detail,category,actorId:actor.id})).digest('hex');
+    const verify = row => {
+      // Webpage edits may discard the receipt; reject that retry instead of recreating the item.
+      if (row?.payload?.mcpRequest !== signature) throw new OfficeError('IDEMPOTENCY_CONFLICT','requestId 已用于不同内容或账号');
+      return this.feedbackResult(row);
+    };
+    const existing = await this.feedbackRow(id);
+    if (existing) return {...verify(existing),alreadyApplied:true};
+    const now = Date.now();
+    const item = {id,title,detail,category,status:'open',createdAt:now,createdBy:{id:actor.id,name:actor.name},updatedAt:now,updatedBy:actor.id};
+    const row = {user_id:FEEDBACK_PREFIX+id,payload:{value:item,token:`mcp:${requestId}`,mcpRequest:signature},ts:now,updated_at:new Date(now).toISOString()};
+    try {
+      // Unique user_id is insert-only CAS: never upsert over a concurrent create or tombstone.
+      const rows = await this.http('/rest/v1/academy_progress',{method:'POST',body:row});
+      if (!Array.isArray(rows) || rows.length !== 1) throw new OfficeError('RESPONSE','未确认反馈保存结果');
+      return {...verify(rows[0]),alreadyApplied:false};
+    } catch (error) {
+      let saved;
+      try { saved = await this.feedbackRow(id); }
+      catch { throw new OfficeError('NETWORK','未确认反馈保存结果，请复用相同 requestId 和内容重试'); }
+      if (saved) return {...verify(saved),alreadyApplied:true};
+      throw error;
+    }
   }
 }

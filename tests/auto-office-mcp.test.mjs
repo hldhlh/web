@@ -38,7 +38,7 @@ const result = value => JSON.parse(value.content[0].text);
 
 test('MCP protocol discovers tools and guide without accessing backend', async t => {
   const f = await fixture(t);
-  assert.equal((await f.client.listTools()).tools.length,17);
+  assert.equal((await f.client.listTools()).tools.length,21);
   assert.match((await f.client.readResource({uri:'auto-office://guide'})).contents[0].text,/version/);
   assert.equal(f.requests.length,0);
 });
@@ -116,7 +116,7 @@ test('real stdio process initializes and exposes tools without credentials or ne
   const client = new Client({name:'stdio-test',version:'1'});
   t.after(() => client.close());
   await client.connect(transport);
-  assert.equal((await client.listTools()).tools.length,17);
+  assert.equal((await client.listTools()).tools.length,21);
   const status = result(await client.callTool({name:'office_status',arguments:{}}));
   assert.equal(status.code,'CONFIG');
 });
@@ -172,4 +172,74 @@ test('image retrieval validates project paths and returns MCP image blocks', asy
   assert.equal(response.structuredContent.results[0].width,100);assert.equal(response.content[1].type,'image');assert.equal(response.content[1].mimeType,'image/jpeg');
   row.payload.meta.thumbnailPath='academy/dimensions/other/preview.jpg';
   const invalid=await client.callTool({name:'office_dimensions_images',arguments:{projectIds:[id]}});assert.equal(invalid.structuredContent.results[0].code,'NOT_FOUND');
+});
+
+
+test('MCP uploads images independently, reconciles retries and never overwrites existing bytes', async t => {
+  const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lYkAAAAASUVORK5CYII=';
+  const id = '10000000-0000-4000-8000-000000000001', badId = '10000000-0000-4000-8000-000000000002';
+  const rows = new Map(), objects = new Map(); let posts = 0, rowWrites = 0, loseResponse = true;
+  const backend = new OfficeBackend({url:'https://project.supabase.co',key:'public',session:{userId:'u',sessionToken:'secret'},request:async(url,init)=>{
+    if(url.includes('/rpc/')) return Response.json({ok:true,user:{id:'u',name:'店长',role:'manager'}});
+    if(url.includes('/storage/')) {
+      if(init.method === 'POST') { posts++; if(objects.has(url)) return Response.json({}, {status:409}); objects.set(url,Buffer.from(init.body)); if(loseResponse){loseResponse=false;throw Error('lost');} return Response.json({}); }
+      return objects.has(url) ? new Response(objects.get(url)) : new Response('',{status:404});
+    }
+    if(init.method === 'POST') {rowWrites++; const row=JSON.parse(init.body); rows.set(row.user_id,row); return Response.json([row]);}
+    const key=new URL(url).searchParams.get('user_id').slice(3); return Response.json(rows.has(key)?[rows.get(key)]:[]);
+  }});
+  const server=createServer(backend),client=new Client({name:'test',version:'1'}),[a,b]=InMemoryTransport.createLinkedPair();await server.connect(a);await client.connect(b);t.after(async()=>{await client.close();await server.close();});
+  const call=async images=>result(await client.callTool({name:'office_dimensions_upload_many',arguments:{images}}));
+  const input={projectId:id,name:'测试.png',mimeType:'image/png',data:png};
+  const first=await call([input,{projectId:badId,name:'错误.png',mimeType:'image/png',data:'bad'}]);
+  assert.deepEqual(first.results.map(x=>x.code),['NETWORK','INVALID_IMAGE']);
+  const retry=await call([input]); assert.equal(retry.results[0].ok,true); assert.equal(rowWrites,1); assert.equal(posts,2);
+  const repeat=await call([input]); assert.equal(repeat.results[0].alreadyApplied,true); assert.equal(posts,2);
+  assert.equal((await call([{...input,name:'不同.png'}])).results[0].code,'IDEMPOTENCY_CONFLICT');
+  const row=rows.get('doc:dimensions:'+id); assert.equal(row.payload.meta.width,1);assert.equal(row.payload.meta.height,1);assert.deepEqual(row.payload.annotations,{});
+});
+
+test('read-only MCP denies image upload before authenticating', async t => {
+  const f=await fixture(t,{readOnly:true});
+  const response=await f.client.callTool({name:'office_dimensions_upload_many',arguments:{images:[{projectId:'10000000-0000-4000-8000-000000000001',name:'a.png',mimeType:'image/png',data:'AAAA'}]}});
+  assert.equal(result(response).code,'READ_ONLY'); assert.equal(f.requests.length,0);
+});
+
+test('feedback uses isolated rows, insert-only idempotency and reconciles a lost response', async t => {
+  const prefix='doc:academy/daily-feedback.json:';
+  const rows=new Map([[prefix+'$ready',{user_id:prefix+'$ready'}]]);
+  let writes=0, loseResponse=true;
+  const backend=new OfficeBackend({url:'https://project.supabase.co',key:'public',session:{userId:'u',sessionToken:'secret'},request:async(url,init)=>{
+    if(url.includes('/rpc/')) return Response.json({ok:true,user:{id:'u',name:'店长',role:'manager'}});
+    const q=new URL(url).searchParams;
+    if(init.method==='POST') {writes++;const row=JSON.parse(init.body);assert.ok(row.user_id.startsWith(prefix));assert.equal(init.headers.Prefer,'return=representation');if(rows.has(row.user_id))return new Response('',{status:409});rows.set(row.user_id,row);if(loseResponse){loseResponse=false;throw Error('lost');}return Response.json([row]);}
+    if(q.get('user_id').startsWith('eq.')) return Response.json(rows.has(q.get('user_id').slice(3))?[rows.get(q.get('user_id').slice(3))]:[]);
+    return Response.json([...rows.values()].filter(row=>row.payload?.value?.id));
+  }});
+  const server=createServer(backend), client=new Client({name:'test',version:'1'});
+  const [a,b]=InMemoryTransport.createLinkedPair();await server.connect(a);await client.connect(b);
+  t.after(async()=>{await client.close();await server.close();});
+  const args={requestId:'20000000-0000-4000-8000-000000000001',title:'汤底偏咸',detail:'10号桌反馈',category:'product'};
+  const call=(name,args)=>client.callTool({name,arguments:args});
+  const first=result(await call('office_feedback_create',args));
+  assert.equal(first.item.status,'open');assert.equal(first.item.createdBy.id,'u');assert.equal(first.alreadyApplied,true);
+  assert.equal(result(await call('office_feedback_create',args)).item.id,first.item.id);assert.equal(writes,1);
+  assert.equal(result(await call('office_feedback_create',{...args,detail:'不同'})).code,'IDEMPOTENCY_CONFLICT');
+  assert.equal(result(await call('office_feedback_get',{id:first.item.id})).version,first.version);
+  assert.equal(result(await call('office_feedback_list',{})).items.length,1);
+  assert.equal((await call('office_feedback_create',{...args,title:'长'.repeat(41)})).isError,true);
+  assert.equal((await call('office_feedback_create',{...args,createdBy:{id:'other'}})).isError,true);
+  const row=rows.get(prefix+first.item.id);row.payload.value=null;
+  assert.equal(result(await call('office_feedback_create',args)).code,'NOT_FOUND');assert.equal(writes,1);
+  rows.delete(prefix+'$ready');
+  assert.equal(result(await call('office_feedback_create',{...args,requestId:'20000000-0000-4000-8000-000000000002'})).code,'NOT_READY');assert.equal(writes,1);
+});
+
+test('feedback creation rejects readonly and staff access before data writes', async t=>{
+  const args={requestId:'20000000-0000-4000-8000-000000000001',title:'标题',detail:'正文'};
+  const f=await fixture(t,{readOnly:true});
+  assert.equal(result(await f.client.callTool({name:'office_feedback_create',arguments:args})).code,'READ_ONLY');assert.equal(f.requests.length,0);
+  const staff=await fixture(t);staff.role('staff');
+  assert.equal(result(await staff.client.callTool({name:'office_feedback_create',arguments:args})).code,'FORBIDDEN');
+  assert.ok(staff.requests.every(r=>r.url.includes('/rpc/')));
 });
