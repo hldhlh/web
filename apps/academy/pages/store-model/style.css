@@ -23,3 +23,156 @@ dialog{max-height:calc(100dvh - 32px);overflow:auto}dialog p{font-size:1rem}
 @media(prefers-contrast:more){.loading p,.eyebrow,.views span{color:var(--text)}.loading progress{outline:1px solid var(--text)}button:disabled{opacity:.65}}
 
 .load-track{position:relative;width:100%;height:5px;border-radius:4px;background:var(--surface-2);overflow:hidden;margin-top:4px;flex:none}.load-track[hidden]{display:none}.load-track progress{margin:0}.load-track[data-busy=true] progress{opacity:0}.load-track[data-busy=true]:after{position:absolute;inset:0 auto 0 0}
+
+/* Auto Office light-mist visual system: solid content, glass controls over the scene. */
+:root {
+  --model-surface: #eef1f3;
+  --model-rim: rgba(255, 255, 255, .9);
+  --model-glass: rgba(232, 242, 252, .76);
+  --model-shadow: 0 1px 3px rgba(69, 91, 116, .08), inset 0 1px 0 rgba(255, 255, 255, .72);
+}
+[data-theme="dark"] {
+  --model-surface: #202a35;
+  --model-rim: rgba(205, 225, 246, .22);
+  --model-glass: rgba(31, 46, 61, .86);
+  --model-shadow: 0 1px 3px rgba(0, 0, 0, .2), inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+body {
+  background: radial-gradient(ellipse 46% 350px at 75% 0%, rgba(174, 207, 242, .44), transparent 100%),
+              radial-gradient(ellipse 38% 280px at 15% 0%, rgba(195, 218, 242, .34), transparent 100%), var(--bg);
+  background-attachment: fixed;
+}
+[data-theme="dark"] body { background: radial-gradient(ellipse 55% 350px at 75% 0%, rgba(56, 94, 130, .3), transparent 100%), var(--bg); background-attachment: fixed; }
+.model-app { width: min(100%, 1440px); margin-inline: auto; gap: 16px; }
+.heading { min-height: 64px; }
+.eyebrow { color: var(--muted); font-size: .8125rem; }
+h1 { font-weight: 600; letter-spacing: -.035em; }
+.header-actions button { min-height: 44px; padding: 9px 14px; border: 1px solid var(--model-rim); border-radius: 14px; background: var(--model-glass); color: var(--text); box-shadow: var(--model-shadow); }
+.viewport { border: 1px solid var(--model-rim); border-radius: 24px; box-shadow: var(--model-shadow); background: #dce7f1; }
+[data-theme="dark"] .viewport { background: #263543; }
+.scene-label, .gesture, .view-tools button, .movement button {
+  border: 1px solid var(--model-rim);
+  background: var(--model-glass);
+  box-shadow: var(--model-shadow);
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+}
+.scene-label { border-radius: 16px; color: var(--text); }
+.model-tag { border-left-color: var(--line); }
+.view-tools button { border-radius: 14px; }
+.view-tools button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: var(--model-rim); }
+.gesture { border-radius: 14px; color: var(--text); }
+.loading { background: var(--model-surface); }
+.load-content { width: min(100%, 260px); }
+.load-track { background: var(--surface-2); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6); }
+.loading progress::-webkit-progress-value, .load-track[data-busy=true]::after { background: linear-gradient(105deg, #5da7f7, #a6bdf5); }
+.control-panel { background: var(--model-surface); border: 1px solid var(--model-rim); border-radius: 22px; box-shadow: var(--model-shadow); padding: 20px; }
+.tour-heading p { font-size: .875rem; }
+.views { gap: 8px; }
+.views button { min-height: 56px; border: 1px solid var(--model-rim); border-radius: 16px; background: var(--surface); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .48); }
+.views span { font-size: .75rem; }
+.views button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.views button[aria-pressed="true"] span { color: inherit; }
+#status { margin-top: 14px; padding-top: 12px; background: var(--card-divider) top / 100% 1px no-repeat; }
+dialog { background: var(--model-surface); border-color: var(--model-rim); border-radius: 22px; box-shadow: 0 16px 48px rgba(32, 55, 82, .16), var(--model-shadow); }
+dialog::backdrop { background: rgba(21, 34, 49, .42); }
+@media (hover: hover) {
+  .header-actions button:not(:disabled):hover, .view-tools button:not(:disabled):hover { background: var(--surface); }
+  .views button:not(:disabled):hover { background: var(--surface-2); }
+  .views button[aria-pressed="true"]:not(:disabled):hover { background: var(--accent-soft); }
+}
+@media (max-width: 600px) {
+  .model-app { gap: 12px; }
+  .heading { min-height: 56px; }
+  .header-actions button { padding: 8px 10px; }
+  .viewport { border-radius: 20px; }
+  .control-panel { border-radius: 20px; padding: 16px; }
+  .views button { min-height: 52px; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .scene-label, .gesture, .view-tools button, .movement button, .header-actions button { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  .viewport, .control-panel, .scene-label, .gesture, .view-tools button, .views button, .header-actions button { border-color: var(--text); }
+  .views button[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: -3px; }
+}
+
+/* Fit the viewer and its controls within the available viewport; short screens
+   may scroll instead of clipping controls or reducing touch targets. */
+.model-app { height: 100dvh; min-height: 540px; }
+.heading, .control-panel { flex: 0 0 auto; }
+.viewport { flex: 1 1 auto; height: auto; min-height: 180px; }
+.control-panel { padding: 14px 20px; }
+.views { margin-top: 10px; }
+.views button { min-height: 48px; }
+#status { margin-top: 8px; padding-top: 8px; }
+@media (max-width: 600px) {
+  .model-app { min-height: 560px; }
+  .control-panel { padding: 12px 16px; }
+  .views { margin-top: 8px; }
+  .views button { min-height: 44px; }
+  .tour-heading p { margin-top: 2px; }
+  .view-tools { top: 12px; }
+}
+@media (max-height: 600px) {
+  .viewport { min-height: 240px; }
+}
+
+#status:empty { display: none; }
+
+/* Keep the model unobstructed: one compact toolbar and a quiet corner hint. */
+.view-tools {
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--model-rim);
+  border-radius: 16px;
+  background: var(--model-glass);
+  box-shadow: var(--model-shadow);
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+}
+.view-tools button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.view-tools button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.gesture {
+  left: auto;
+  right: 16px;
+  bottom: 14px;
+  transform: none;
+  max-width: calc(100% - 32px);
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: .75rem;
+  color: var(--muted);
+  text-align: right;
+  box-shadow: none;
+}
+@media (hover: hover) { .view-tools button:not(:disabled):hover { background: var(--surface-2); } }
+@media (max-width: 600px) {
+  .view-tools { top: 12px; right: 12px; }
+  .view-tools button { width: 44px; padding: 8px; }
+  .view-tools span { display: none; }
+  .gesture { right: 12px; bottom: 10px; max-width: calc(100% - 24px); }
+  .movement { left: 12px; bottom: 46px; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .view-tools { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .view-tools button { background: transparent; }
+}
+@media (prefers-contrast: more) {
+  .view-tools { border-color: var(--text); }
+  .view-tools button[aria-pressed="true"] { outline: 2px solid currentColor; outline-offset: -3px; }
+}

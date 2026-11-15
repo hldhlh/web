@@ -38,10 +38,12 @@
     const candidates = root.querySelectorAll("[data-sync-key],[data-date],.lesson-card,.card");
     const anchor = Array.from(candidates).find(node => node.getBoundingClientRect().bottom > 0);
     const top = anchor?.getBoundingClientRect().top;
-    const x = window.scrollX, y = window.scrollY;
+    const scroller = root.closest(".app.home-scroll") ? document.getElementById("view") : window;
+    const x = scroller === window ? window.scrollX : scroller.scrollLeft;
+    const y = scroller === window ? window.scrollY : scroller.scrollTop;
     update();
-    if (anchor?.isConnected) window.scrollBy({ top: anchor.getBoundingClientRect().top - top, behavior: "instant" });
-    else window.scrollTo({ left: x, top: y, behavior: "instant" });
+    if (anchor?.isConnected) scroller.scrollBy({ top: anchor.getBoundingClientRect().top - top, behavior: "instant" });
+    else scroller.scrollTo({ left: x, top: y, behavior: "instant" });
   }
 
   function html(root, value) {

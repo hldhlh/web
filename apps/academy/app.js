@@ -30,9 +30,53 @@
 
   const view = () => document.getElementById("view");
 
+  // Fixed controls follow the visible viewport when browser zoom or UI shifts it.
+  function syncVisibleViewport() {
+    const viewport = window.visualViewport;
+    const root = document.documentElement;
+    root.style.setProperty("--visible-top", `${viewport ? Math.max(0, viewport.offsetTop) : 0}px`);
+    root.style.setProperty("--visible-bottom", `${viewport ? Math.max(0, window.innerHeight - viewport.offsetTop - viewport.height) : 0}px`);
+  }
+  window.visualViewport?.addEventListener("scroll", syncVisibleViewport, { passive: true });
+  window.visualViewport?.addEventListener("resize", syncVisibleViewport, { passive: true });
+  window.addEventListener("resize", syncVisibleViewport, { passive: true });
+  syncVisibleViewport();
+
+  // Place the background glow around the app's actual content and progress UI.
+  let glowFrame = 0;
+  function updateBackgroundGlow() {
+    glowFrame = 0;
+    const app = document.querySelector(".app");
+    if (!app) return;
+    const bounds = app.getBoundingClientRect();
+    const ring = app.classList.contains("home-scroll") ? app.querySelector(".home-status .ring-wrap") : null;
+    const ringBounds = ring?.getBoundingClientRect();
+    const root = document.documentElement.style;
+    root.setProperty("--glow-left", `${bounds.left + bounds.width * .2}px`);
+    root.setProperty("--glow-right", `${ringBounds ? ringBounds.left + ringBounds.width / 2 : bounds.left + bounds.width * .8}px`);
+    root.setProperty("--glow-center", `${bounds.left + bounds.width * .5}px`);
+    root.setProperty("--glow-small", `${Math.max(160, bounds.width * .32)}px`);
+    root.setProperty("--glow-medium", `${Math.max(220, bounds.width * .48)}px`);
+    root.setProperty("--glow-large", `${Math.max(280, bounds.width * .7)}px`);
+    root.setProperty("--glow-top", `${(parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--visible-top")) || 0) + 120}px`);
+
+  }
+  function scheduleBackgroundGlow() {
+    if (!glowFrame) glowFrame = requestAnimationFrame(updateBackgroundGlow);
+  }
+  window.addEventListener("resize", scheduleBackgroundGlow, { passive: true });
+  window.visualViewport?.addEventListener("resize", scheduleBackgroundGlow, { passive: true });
+  window.visualViewport?.addEventListener("scroll", scheduleBackgroundGlow, { passive: true });
+  const glowApp = document.querySelector(".app");
+  if (glowApp && window.ResizeObserver) new ResizeObserver(scheduleBackgroundGlow).observe(glowApp);
+  if (view()) {
+    new MutationObserver(scheduleBackgroundGlow).observe(view(), { childList: true, subtree: true });
+  }
+  scheduleBackgroundGlow();
+
   let backgroundRenderTimer = 0;
   let lastScrollAt = 0;
-  window.addEventListener("scroll", () => { lastScrollAt = Date.now(); }, { passive: true });
+  window.addEventListener("scroll", () => { lastScrollAt = Date.now(); }, { passive: true, capture: true });
   function refreshBackgroundView() {
     clearTimeout(backgroundRenderTimer);
     const route = JSON.stringify(state.route);
@@ -1529,7 +1573,7 @@
 
   function svgIcon(name) {
     const icons = {
-      back: '<path d="M15 6 9 12l6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+      back: '<path d="M19 12H5m0 0 6-6m-6 6 6 6"/>',
       sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.2 4.2l1.4 1.4m12.8 12.8 1.4 1.4M2 12h2m16 0h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>',
       moon: '<path d="M20 12.6A8 8 0 1 1 11.4 4 6.2 6.2 0 0 0 20 12.6Z"/>',
       bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"/><path d="M10 21h4"/>',
@@ -1578,17 +1622,17 @@
       return `<div class="notice-preview-list">${visible.map((item) => `
         <span class="notice-preview-line"><b>${item.number}</b><span>${escapeHtml(truncateNoticeText(item.text, 76))}</span></span>
       `).join("")}</div>
-      <div class="notice-preview-footer"><span>${items.length > visible.length ? `还有 ${items.length - visible.length} 项` : `${items.length} 项内容`}</span><b>查看全文 <i aria-hidden="true">›</i></b></div>`;
+      <div class="notice-preview-footer card-divider-top"><span>${items.length > visible.length ? `还有 ${items.length - visible.length} 项` : `${items.length} 项内容`}</span><b>查看全文 <i aria-hidden="true">›</i></b></div>`;
     }
     return `<p class="notice-preview-text">${escapeHtml(truncateNoticeText(detail, 120))}</p>
-      <div class="notice-preview-footer"><span></span><b>查看详情 <i aria-hidden="true">›</i></b></div>`;
+      <div class="notice-preview-footer card-divider-top"><span></span><b>查看详情 <i aria-hidden="true">›</i></b></div>`;
   }
 
   function renderNoticeDetail(detail) {
     const items = numberedNoticeItems(detail);
     if (!items.length) return `<p class="notice-detail-text">${escapeHtml(detail)}</p>`;
-    return `<ol class="notice-detail-list">${items.map((item) => `
-      <li><span>${item.number}</span><p>${escapeHtml(item.text)}</p></li>
+    return `<ol class="notice-detail-list">${items.map((item, index) => `
+      <li${index ? ' class="card-divider-top"' : ""}><span>${item.number}</span><p>${escapeHtml(item.text)}</p></li>
     `).join("")}</ol>`;
   }
 
@@ -1649,13 +1693,16 @@
   function setTop(title, back) {
     document.getElementById("top-title").textContent = title;
     const backBtn = document.getElementById("back-btn");
-    backBtn.hidden = !back;
+    backBtn.hidden = false;
     document.querySelector(".app").classList.toggle("focus", Boolean(back));
   }
 
   function setTab(name) {
     document.querySelectorAll(".tab").forEach((tab) => {
-      tab.classList.toggle("active", tab.dataset.tab === name);
+      const active = tab.dataset.tab === name;
+      tab.classList.toggle("active", active);
+      if (active) tab.setAttribute("aria-current", "page");
+      else tab.removeAttribute("aria-current");
     });
   }
 
@@ -1669,15 +1716,17 @@
   }
 
   function preserveTaskPosition(target, update) {
-    const x = window.scrollX, y = window.scrollY;
-    const documentTop = target.getBoundingClientRect().top + y;
+    const scroller = document.querySelector(".app.home-scroll") ? view() : null;
+    const x = scroller ? scroller.scrollLeft : window.scrollX, y = scroller ? scroller.scrollTop : window.scrollY;
+    const documentTop = target.getBoundingClientRect().top + y - (scroller ? scroller.getBoundingClientRect().top : 0);
     update();
     // A shorter stage near the page bottom must not clamp the document scroll
     // offset. Any necessary spare space belongs below the content, never above it.
-    if (document.documentElement.scrollHeight < y + window.innerHeight) {
-      target.style.minHeight = `${Math.ceil(y + window.innerHeight - documentTop)}px`;
+    const height = scroller ? scroller.clientHeight : window.innerHeight;
+    if ((scroller ? scroller.scrollHeight : document.documentElement.scrollHeight) < y + height) {
+      target.style.minHeight = `${Math.ceil(y + height - documentTop)}px`;
     }
-    window.scrollTo({left:x, top:y, behavior:'instant'});
+    (scroller || window).scrollTo({left:x, top:y, behavior:'instant'});
   }
 
   function renderHomeTaskRow(task) {
@@ -1819,7 +1868,7 @@
               <div class="learning-stage-head">
                 <div class="learning-stage-copy"><h4>${escapeHtml(stage.title)}</h4><small>已完成 ${stage.done}/${stage.total} 项</small></div>
               </div>
-              <div class="stage-progress" role="progressbar" aria-label="阶段进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${stage.percent}"><i style="width:${stage.percent}%"></i></div>
+              <div class="stage-progress" style="--progress-segments:${Math.max(1, stage.total)}" role="progressbar" aria-label="阶段进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${stage.percent}"><i style="width:${stage.percent}%"></i></div>
               <div class="task-list">
                 ${renderHomeTaskItems(stage.items, stage.id, openTaskGroups)}
               </div>
@@ -2089,11 +2138,11 @@
         <div class="account-metrics">
           <button class="account-metric" data-act="go" data-hash="#/learn" aria-label="课程已完成 ${done} 门，共 ${DATA.lessons.length} 门，查看课程">
             <span>课程完成</span><strong>${done}<small> / ${DATA.lessons.length} 门</small></strong>
-            <span class="metric-note">${remainingLessons ? `还差 ${remainingLessons} 门` : DATA.lessons.length ? "全部完成" : "暂无课程"}<i aria-hidden="true">›</i></span>
+            <span class="metric-note card-divider-top">${remainingLessons ? `还差 ${remainingLessons} 门` : DATA.lessons.length ? "全部完成" : "暂无课程"}<i aria-hidden="true">›</i></span>
           </button>
           <button class="account-metric" data-act="go" data-hash="#/exams" aria-label="考试已通过 ${passed} 场，共 ${DATA.exams.length} 场，查看考试">
             <span>考试通过</span><strong>${passed}<small> / ${DATA.exams.length} 场</small></strong>
-            <span class="metric-note">${remainingExams ? `还差 ${remainingExams} 场` : DATA.exams.length ? "全部通过" : "暂无考试"}<i aria-hidden="true">›</i></span>
+            <span class="metric-note card-divider-top">${remainingExams ? `还差 ${remainingExams} 场` : DATA.exams.length ? "全部通过" : "暂无考试"}<i aria-hidden="true">›</i></span>
           </button>
         </div>
       </section>
@@ -4078,8 +4127,8 @@
           <time>${renderDateLabel(notice.createdAt)}</time>
         </header>
         <h2>${escapeHtml(notice.title)}</h2>
-        <div class="post-detail-body">${renderNoticeDetail(notice.detail)}</div>
-        <footer><span>发送给</span><b>${escapeHtml(noticeAudienceLabel(notice))}</b></footer>
+        <div class="post-detail-body card-divider-top">${renderNoticeDetail(notice.detail)}</div>
+        <footer class="card-divider-top"><span>发送给</span><b>${escapeHtml(noticeAudienceLabel(notice))}</b></footer>
       </article>`;
   }
 
@@ -4159,6 +4208,10 @@
     if (state.video && state.route.name !== "lesson") state.video.playing = false;
     const route = state.route;
     if (route.name !== 'home') view().style.removeProperty('min-height');
+    const app = document.querySelector(".app");
+    const usesContentScroll = ["home", "learn", "exams", "me"].includes(route.name);
+    if (usesContentScroll && app && !app.classList.contains("home-scroll")) window.scrollTo(0, 0);
+    app?.classList.toggle("home-scroll", usesContentScroll);
     document.querySelector(".app")?.classList.toggle("ops-mode", route.name === "ops");
     document.querySelector(".app")?.classList.toggle("embedded-mode", route.name === "embedded-app");
     document.querySelector(".app")?.classList.toggle("dimensions-mode", route.name === "embedded-app" && route.app === "dimensions");

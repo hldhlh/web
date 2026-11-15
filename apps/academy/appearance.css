@@ -43,8 +43,8 @@
 .app .tab svg { display: block; width: 25px; height: 25px; }
 .app .tabbar::before { display: none; }
 .app .tab[data-tab="home"].active svg rect { fill: currentColor; }
-.app .primary { background: var(--accent); box-shadow: none; }
-[data-theme="dark"] .app .primary,
+:is(.app, .model-app, .model-dialog) .primary { background: var(--accent); box-shadow: none; }
+[data-theme="dark"] :is(.app, .model-app, .model-dialog) .primary,
 [data-theme="dark"] .primary-action { background: #3274de; color: #fff; }
 .app .home-status { gap: 16px; padding: 12px 0 24px; align-items: center; }
 .app .home-status-copy { flex: 1 1 180px; min-width: 0; }
@@ -184,3 +184,675 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .course-list-group-content { padding: 12px; }
 .course-list-group-content .card { box-shadow: none; }
 .course-list-group > summary:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+
+/* Soft blue atmosphere and solid, rounded surfaces shared across Auto Office. */
+:root {
+  --bg: #ededee;
+  --surface: #eef0f2;
+  --surface-2: #e4eaf1;
+  --surface-secondary: #e4eaf1;
+  --line: #dce5ef;
+  --accent: #2878db;
+  --accent-soft: #e4efff;
+  --priority-surface: #f3f8ff;
+  --nav-bg: rgba(230, 240, 252, .88);
+  --nav-border: rgba(160, 181, 206, .3);
+}
+[data-theme="dark"] {
+  --bg: #111820;
+  --surface: #202a35;
+  --surface-2: #2a3745;
+  --surface-secondary: #2a3745;
+  --line: #3b4a5b;
+  --accent: #80b5ff;
+  --accent-soft: #293f59;
+  --priority-surface: #26384b;
+  --nav-bg: rgba(25, 37, 50, .92);
+  --nav-border: #3b4a5b;
+}
+body {
+  background: radial-gradient(ellipse 75% 380px at 75% 7%, rgba(165, 203, 246, .58), transparent 75%),
+              radial-gradient(ellipse 65% 330px at 17% 3%, rgba(190, 216, 245, .65), transparent 78%),
+              radial-gradient(ellipse 80% 280px at 48% 25%, rgba(209, 226, 244, .48), transparent 80%),
+              var(--bg);
+  background-attachment: fixed;
+}
+[data-theme="dark"] body, body[data-theme="dark"] {
+  background: radial-gradient(ellipse 75% 380px at 75% 7%, rgba(49, 83, 116, .55), transparent 75%),
+              radial-gradient(ellipse 65% 330px at 17% 3%, rgba(44, 70, 96, .6), transparent 78%),
+              radial-gradient(ellipse 80% 280px at 48% 25%, rgba(34, 57, 78, .45), transparent 80%),
+              var(--bg);
+  background-attachment: fixed;
+}
+.app .home-status { padding-top: 24px; padding-bottom: 28px; }
+.app .home-status h2 { font-size: clamp(1.75rem, 5vw, 2.125rem); line-height: 1.25; letter-spacing: -.035em; }
+.app .home-status-meta { line-height: 1.6; }
+.app .home-app-shortcut, .pending-row, .account-metric,
+.app .learning-stages, .app .stage-tabs, .learning-task-group, .course-list-group {
+  border-color: var(--line);
+}
+.app .home-app-shortcut, .pending-row, .account-metric { border-radius: 20px; }
+.app .shortcut-icon { color: var(--accent); }
+:is(.app, .model-app, .model-dialog) .primary { background: #2878db; color: #fff; }
+:is(.app, .model-app, .model-dialog) .primary:hover:not(:disabled) { background: #1e68c2; }
+[data-theme="dark"] :is(.app, .model-app, .model-dialog) .primary { background: #3274de; }
+@media (prefers-contrast: more) {
+  :root { --line: #777; --muted: #454548; }
+  [data-theme="dark"] { --line: #a5b2c0; --muted: #d1d4da; }
+}
+
+/* Reference-inspired edge: a bright rim and a restrained inner highlight keep
+   solid content surfaces distinct from the soft blue page background. */
+:root {
+  --card-edge: rgba(255, 255, 255, .95);
+  --card-edge-shadow: inset 0 1px 0 rgba(255, 255, 255, .8), 0 1px 2px rgba(60, 83, 110, .08);
+}
+[data-theme="dark"] {
+  --card-edge: #526171;
+  --card-edge-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 1px 2px rgba(0, 0, 0, .2);
+}
+.app .card,
+.app .gate-card,
+.app .account-setting-group,
+.app .home-app-shortcut,
+.app .pending-row,
+.app .pending-empty,
+.app .account-metric,
+.app .stage-tabs,
+.app .learning-stages,
+.app .learning-task-group,
+.app .course-list-group {
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-edge-shadow);
+}
+/* Tabs and their content form one surface; preserve their shared seam. */
+.app .stage-tabs { border-bottom: 0; }
+.app .pending-row.is-priority { border-color: var(--accent); }
+.app .home-app-shortcut:hover { box-shadow: var(--card-edge-shadow); }
+@media (prefers-contrast: more) {
+  :root { --card-edge: #777; --card-edge-shadow: none; }
+  [data-theme="dark"] { --card-edge: #a5b2c0; }
+}
+
+/* A blue-to-periwinkle transition echoes the reference while keeping white
+   button labels legible across the full width of the control. */
+:root {
+  --primary-gradient: linear-gradient(105deg, #2469c5 0%, #426bc1 52%, #675eaa 100%);
+  --primary-gradient-hover: linear-gradient(105deg, #1c5bab 0%, #375cad 52%, #584f98 100%);
+}
+:is(.app, .model-app, .model-dialog) .primary,
+[data-theme="dark"] :is(.app, .model-app, .model-dialog) .primary,
+.app .pending-action {
+  color: #fff;
+  background: var(--primary-gradient);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), inset 0 0 0 1px rgba(255, 255, 255, .16);
+}
+:is(.app, .model-app, .model-dialog) .primary:hover:not(:disabled),
+[data-theme="dark"] :is(.app, .model-app, .model-dialog) .primary:hover:not(:disabled) {
+  background: var(--primary-gradient-hover);
+}
+@media (prefers-contrast: more) {
+  :is(.app, .model-app, .model-dialog) .primary,
+  [data-theme="dark"] :is(.app, .model-app, .model-dialog) .primary,
+  .app .pending-action { background: #174f9e; box-shadow: none; }
+}
+
+/* Wider, lighter controls with the soft blue/periwinkle transition of the reference. */
+:root {
+  --primary-gradient: linear-gradient(105deg, #72b4fb 0%, #a8bff8 100%);
+  --primary-gradient-hover: linear-gradient(105deg, #64a8f3 0%, #98b2ef 100%);
+}
+:is(.app, .model-app, .model-dialog) .primary,
+.app .pending-action {
+  color: #183956;
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), inset 0 0 0 1px rgba(255, 255, 255, .45);
+}
+.app .pending-action {
+  min-width: 128px;
+  justify-content: center;
+  text-align: center;
+  padding-inline: 24px;
+}
+[data-theme="dark"] :is(.app, .model-app, .model-dialog) .primary,
+[data-theme="dark"] .app .pending-action {
+  color: #fff;
+  background: linear-gradient(105deg, #286bbb, #615da8);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28), inset 0 0 0 1px rgba(255, 255, 255, .2);
+}
+@media (prefers-contrast: more) {
+  :is(.app, .model-app, .model-dialog) .primary,
+  [data-theme="dark"] :is(.app, .model-app, .model-dialog) .primary,
+  .app .pending-action { color: #fff; background: #174f9e; box-shadow: none; }
+}
+
+/* Layered highlights and a translucent tint give primary controls a glass edge. */
+:is(.app, .model-app, .model-dialog) .primary,
+.app .pending-action {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .23), rgba(255, 255, 255, .02) 52%, rgba(255, 255, 255, .12)),
+              linear-gradient(105deg, rgba(91, 166, 248, .62), rgba(172, 190, 250, .52));
+  border: 1px solid rgba(255, 255, 255, .72);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, .58), inset 0 -1px 1px rgba(255, 255, 255, .22), 0 1px 3px rgba(74, 112, 157, .12);
+  backdrop-filter: blur(12px) saturate(130%);
+  -webkit-backdrop-filter: blur(12px) saturate(130%);
+}
+:is(.app, .model-app, .model-dialog) .primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .3), rgba(255, 255, 255, .05) 55%, rgba(255, 255, 255, .13)),
+              linear-gradient(105deg, rgba(78, 153, 239, .72), rgba(155, 178, 244, .62));
+}
+[data-theme="dark"] :is(.app, .model-app, .model-dialog) .primary,
+[data-theme="dark"] .app .pending-action {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .16), transparent 55%),
+              linear-gradient(105deg, rgba(40, 107, 187, .65), rgba(97, 93, 168, .58));
+  border-color: rgba(255, 255, 255, .28);
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  :is(.app, .model-app, .model-dialog) .primary,
+  .app .pending-action,
+  [data-theme="dark"] :is(.app, .model-app, .model-dialog) .primary,
+  [data-theme="dark"] .app .pending-action {
+    color: #fff;
+    background: #174f9e;
+    border-color: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* The selected glass control uses the reference's light label. */
+:is(.app, .model-app, .model-dialog) .primary,
+.app .pending-action { color: #fff; }
+
+/* Keep the task and its action aligned on wide cards, while letting long labels
+   wrap without squeezing the action on narrow screens. */
+@media (min-width: 900px) {
+  .pending-list { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .pending-row { grid-template-columns: 40px minmax(0, 1fr) auto; }
+  .pending-action { grid-column: auto; justify-self: end; }
+}
+@media (max-width: 420px) {
+  .pending-row { grid-template-columns: 40px minmax(0, 1fr); }
+  .pending-action { grid-column: 2; justify-self: start; }
+}
+
+/* Compact floating navigation, shared by the learning and operations views. */
+.app .tabbar {
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  transform: none;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  width: min(520px, calc(100% - 32px));
+  height: 68px;
+  padding: 5px;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, .75);
+  border-radius: 22px;
+  background: rgba(235, 242, 250, .82);
+  box-shadow: 0 8px 24px rgba(54, 78, 108, .12), inset 0 1px 0 rgba(255, 255, 255, .7);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+}
+.app .tab {
+  min-height: 56px;
+  border-radius: 16px;
+  gap: 3px;
+  color: var(--nav-subtle);
+  font-size: 12px;
+  font-weight: 500;
+}
+.app .tab svg { width: 22px; height: 22px; }
+.app .tab.active {
+  color: #1768c4;
+  background: rgba(255, 255, 255, .62);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .65);
+  font-size: 12px;
+  font-weight: 600;
+}
+.app .tab:focus-visible { outline-offset: -3px; }
+.app .view { padding-bottom: calc(104px + env(safe-area-inset-bottom)); }
+.app.ops-mode .view { padding-bottom: calc(104px + env(safe-area-inset-bottom)); }
+[data-theme="dark"] .app .tabbar {
+  background: rgba(34, 47, 61, .88);
+  border-color: rgba(255, 255, 255, .16);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .24), inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+[data-theme="dark"] .app .tab.active { color: #a9ceff; background: rgba(255, 255, 255, .1); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12); }
+@media (prefers-reduced-transparency: reduce) {
+  .app .tabbar { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  .app .tabbar { border-color: var(--line); }
+  .app .tab.active { outline: 2px solid currentColor; outline-offset: -3px; }
+}
+
+/* Header uses the same light glass as the navigation while retaining its
+   existing height and safe-area spacing for embedded pages. */
+.app:not(.gated) .topbar {
+  gap: 12px;
+  background: rgba(229, 239, 250, .76);
+  border: 1px solid rgba(255, 255, 255, .58);
+  border-top: 0;
+  border-radius: 0 0 20px 20px;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, .28), 0 4px 18px rgba(63, 91, 126, .06);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+}
+.app:not(.gated) .topbar h1 { font-weight: 600; letter-spacing: -.025em; }
+.app:not(.gated) .topbar .icon-btn {
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .32);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .45);
+}
+.app:not(.gated) .topbar .icon-btn:hover { background: rgba(255, 255, 255, .58); color: var(--accent); }
+.app:not(.gated) .topbar .live { font-weight: 500; letter-spacing: 0; }
+[data-theme="dark"] .app:not(.gated) .topbar {
+  background: rgba(30, 44, 59, .86);
+  border-color: rgba(255, 255, 255, .12);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, .06), 0 4px 18px rgba(0, 0, 0, .12);
+}
+[data-theme="dark"] .app:not(.gated) .topbar .icon-btn { background: rgba(255, 255, 255, .08); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12); }
+@media (prefers-reduced-transparency: reduce) {
+  .app:not(.gated) .topbar { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  .app:not(.gated) .topbar { border-color: var(--line); }
+}
+
+/* Shared circular header controls for back and notifications. */
+.app:not(.gated) .topbar .icon-btn {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: var(--nav-text);
+  border: 1px solid rgba(255, 255, 255, .5);
+  background: rgba(235, 246, 255, .32);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28);
+}
+.app:not(.gated) .topbar .icon-btn > svg { width: 22px; height: 22px; }
+[data-theme="dark"] .app:not(.gated) .topbar .icon-btn { border-color: rgba(255, 255, 255, .15); }
+@media (prefers-reduced-transparency: reduce) {
+  .app:not(.gated) .topbar .icon-btn { background: var(--surface-2); }
+}
+@media (prefers-contrast: more) {
+  .app:not(.gated) .topbar .icon-btn { border-color: var(--nav-text); }
+}
+
+/* On desktop the header spans the viewport, independent of content width. */
+@media (min-width: 900px) {
+  .app:not(.gated) .topbar,
+  .app.ops-mode:not(.gated) .topbar,
+  .app.dimensions-mode:not(.gated) .topbar {
+    width: 100%;
+    max-width: none;
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+  }
+}
+
+/* The full-width desktop material frames controls aligned to the page content. */
+@media (min-width: 900px) {
+  .app:not(.gated) .topbar {
+    padding-left: max(16px, calc((100% - 760px) / 2 + 16px));
+    padding-right: max(16px, calc((100% - 760px) / 2 + 16px));
+  }
+  .app.ops-mode:not(.gated) .topbar {
+    padding-left: max(28px, calc((100% - 1320px) / 2 + 28px));
+    padding-right: max(28px, calc((100% - 1320px) / 2 + 28px));
+  }
+  .app.dimensions-mode:not(.gated) .topbar {
+    padding-left: max(24px, calc((100% - 1440px) / 2 + 24px));
+    padding-right: max(24px, calc((100% - 1440px) / 2 + 24px));
+  }
+}
+
+/* Shared inset divider for card sections. */
+:root { --card-divider: linear-gradient(90deg, transparent, rgba(255, 255, 255, .85) 4%, rgba(255, 255, 255, .85) 96%, transparent); }
+[data-theme="dark"] { --card-divider: linear-gradient(90deg, transparent, rgba(255, 255, 255, .2) 4%, rgba(255, 255, 255, .2) 96%, transparent); }
+.app .card-divider-top {
+  border-top: 0;
+  background-image: var(--card-divider);
+  background-position: top;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+.app .account-metric .metric-note { padding-top: 16px; margin-top: 8px; }
+@media (prefers-contrast: more) {
+  :root, [data-theme="dark"] { --card-divider: linear-gradient(var(--line), var(--line)); }
+}
+
+/* Keep both navigation layers anchored to the viewport while content scrolls. */
+.app:not(.gated) > .topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  transform: none;
+}
+.app:not(.gated) > .tabbar { position: fixed; }
+
+/* Translucent navigation remains anchored independently of scrolling content. */
+.app:not(.gated) > .topbar { background: rgba(229, 239, 250, .66); }
+.app:not(.gated) > .tabbar { background: rgba(235, 242, 250, .66); }
+[data-theme="dark"] .app:not(.gated) > .topbar { background: rgba(30, 44, 59, .72); }
+[data-theme="dark"] .app:not(.gated) > .tabbar { background: rgba(34, 47, 61, .72); }
+@media (prefers-reduced-transparency: reduce) {
+  .app:not(.gated) > .topbar, .app:not(.gated) > .tabbar { background: var(--surface); }
+}
+
+/* On the operations home, only the content pane scrolls between navigation. */
+html:has(.app.home-scroll:not(.gated)),
+body:has(.app.home-scroll:not(.gated)) { height: 100%; overflow: hidden; }
+.app.home-scroll:not(.gated) { height: 100dvh; min-height: 0; }
+.app.home-scroll:not(.gated) > .view {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  margin-top: var(--topbar-h);
+  padding-top: 8px;
+  padding-bottom: calc(104px + env(safe-area-inset-bottom));
+}
+
+/* Anchor navigation to the visible viewport at browser zoom and UI offsets. */
+.app:not(.gated) > .topbar { top: var(--visible-top, 0px); }
+.app:not(.gated) > .tabbar { bottom: calc(12px + env(safe-area-inset-bottom) + var(--visible-bottom, 0px)); }
+.app.home-scroll:not(.gated) > .view {
+  margin-top: calc(var(--topbar-h) + var(--visible-top, 0px));
+  margin-bottom: var(--visible-bottom, 0px);
+}
+
+/* Reference palette: cool mist, soft neutral cards and a clear blue accent. */
+:root {
+  --bg: #ececed;
+  --surface: #eef0f1;
+  --surface-2: #e5ebf1;
+  --surface-secondary: #e5ebf1;
+  --text: #191c20;
+  --muted: #626a73;
+  --accent: #287ddd;
+  --accent-soft: #e0edfb;
+  --priority-surface: #edf3fa;
+  --line: #d8e2ec;
+}
+[data-theme="dark"] {
+  --bg: #111820;
+  --surface: #202a35;
+  --surface-2: #2a3745;
+  --surface-secondary: #2a3745;
+  --text: #f5f5f7;
+  --muted: #aeb2ba;
+  --accent: #80b5ff;
+  --accent-soft: #293f59;
+  --priority-surface: #26384b;
+  --line: #3b4a5b;
+}
+:root:not([data-theme="dark"]) body {
+  background: radial-gradient(ellipse var(--glow-small, 32%) 170px at var(--glow-right, 78%) var(--glow-top, 13%), rgba(167, 200, 240, .36), transparent 100%),
+              radial-gradient(ellipse var(--glow-large, 58%) 310px at var(--glow-right, 66%) 55px, rgba(189, 214, 240, .30), transparent 100%),
+              radial-gradient(ellipse var(--glow-small, 32%) 220px at var(--glow-left, 17%) 0px, rgba(191, 216, 242, .26), transparent 100%),
+              radial-gradient(ellipse var(--glow-medium, 44%) 150px at var(--glow-center, 42%) 215px, rgba(239, 244, 248, .28), transparent 100%),
+              radial-gradient(ellipse var(--glow-small, 32%) 190px at var(--glow-right, 88%) 350px, rgba(205, 225, 244, .16), transparent 100%),
+              var(--bg);
+  background-attachment: fixed;
+}
+:root:not([data-theme="dark"]) .app .pending-row.is-priority {
+  border-color: var(--card-edge);
+  background: var(--priority-surface);
+}
+:root:not([data-theme="dark"]) .app:not(.gated) > .topbar { background: rgba(218, 233, 249, .62); }
+:root:not([data-theme="dark"]) .app:not(.gated) > .tabbar { background: rgba(229, 238, 248, .62); }
+@media (prefers-contrast: more) {
+  :root { --line: #777; --muted: #454548; }
+  [data-theme="dark"] { --line: #a5b2c0; --muted: #d1d4da; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root:not([data-theme="dark"]) .app:not(.gated) > .topbar,
+  :root:not([data-theme="dark"]) .app:not(.gated) > .tabbar { background: var(--surface); }
+}
+
+
+/* Hide scrollbar visuals throughout Auto Office while preserving scrolling. */
+html, body, .app > .view { scrollbar-width: none; }
+html::-webkit-scrollbar, body::-webkit-scrollbar, .app > .view::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+/* Shared subtle grain for interactive and status components. */
+:root { --ui-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.8'/%3E%3C/svg%3E"); }
+/* Fine grain adds a soft, tactile finish to primary glass controls. */
+:is(.app, .model-app, .model-dialog) .primary,
+.app .pending-action { position: relative; isolation: isolate; }
+:is(.app, .model-app, .model-dialog) .primary::after,
+.app .pending-action::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: .13;
+  mix-blend-mode: soft-light;
+  background-image: var(--ui-grain);
+  background-size: 128px 128px;
+}
+@media (prefers-contrast: more), (prefers-reduced-transparency: reduce) {
+  :is(.app, .model-app, .model-dialog) .primary::after, .app .pending-action::after { display: none; }
+}
+
+
+/* One status marker for both individual tasks and task groups. */
+.app .task-status {
+  position: relative;
+  isolation: isolate;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid #cbdceb;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent);
+}
+.app .learning-task.done .task-status,
+.app .learning-task-group-row.done > .task-status {
+  border-color: transparent;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.app .learning-task.locked .task-status { background: var(--surface-2); color: var(--muted); }
+.app .task-status::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: var(--ui-grain) 0 0 / 64px 64px;
+  opacity: .25;
+  mix-blend-mode: soft-light;
+}
+[data-theme="dark"] .app .task-status { border-color: #536a81; }
+[data-theme="dark"] .app .learning-task.done .task-status,
+[data-theme="dark"] .app .learning-task-group-row.done > .task-status { border-color: transparent; }
+@media (prefers-contrast: more) {
+  .app .task-status { border-color: var(--text); }
+  .app .learning-task.done .task-status,
+  .app .learning-task-group-row.done > .task-status { border-color: var(--accent); }
+}
+@media (prefers-contrast: more), (prefers-reduced-transparency: reduce) {
+  .app .task-status::after { display: none; }
+}
+
+/* Status markers echo the theme's light rim and softly tinted glass. */
+:root {
+  --task-ring: #a9cbe9;
+  --task-fill: rgba(235, 245, 253, .58);
+  --task-done-fill: #cce5ff;
+}
+[data-theme="dark"] {
+  --task-ring: #83a9cc;
+  --task-fill: rgba(180, 215, 245, .10);
+  --task-done-fill: #304e70;
+}
+.app .task-status {
+  border-color: var(--task-ring);
+  background: var(--task-fill);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, .95), inset 0 0 0 1px rgba(255, 255, 255, .38), inset 0 -1px 1px rgba(122, 153, 182, .1);
+}
+.app .learning-task.done .task-status,
+.app .learning-task-group-row.done > .task-status {
+  background: var(--task-done-fill);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, .95), inset 0 0 0 1px rgba(255, 255, 255, .48), inset 0 -1px 1px rgba(89, 145, 196, .1);
+}
+[data-theme="dark"] .app .task-status { border-color: var(--task-ring); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1); }
+[data-theme="dark"] .app .learning-task.done .task-status,
+[data-theme="dark"] .app .learning-task-group-row.done > .task-status { border-color: transparent; }
+@media (prefers-contrast: more) {
+  .app .task-status, [data-theme="dark"] .app .task-status { border-color: var(--text); }
+  .app .learning-task.done .task-status, .app .learning-task-group-row.done > .task-status,
+  [data-theme="dark"] .app .learning-task.done .task-status, [data-theme="dark"] .app .learning-task-group-row.done > .task-status { border-color: var(--accent); }
+}
+
+/* A light inner rim gives both status states a shared highlight. */
+.app .task-status {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .85), inset 0 1px 1px rgba(255, 255, 255, .85);
+}
+.app .learning-task.done .task-status,
+.app .learning-task-group-row.done > .task-status {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .9), inset 0 1px 1px rgba(255, 255, 255, .85);
+}
+[data-theme="dark"] .app .task-status,
+[data-theme="dark"] .app .learning-task.done .task-status,
+[data-theme="dark"] .app .learning-task-group-row.done > .task-status {
+  box-shadow: inset 0 0 0 1px rgba(222, 237, 255, .28), inset 0 1px 1px rgba(255, 255, 255, .18);
+}
+
+/* Completed markers are slightly larger, centered in the same list column. */
+.app .learning-task.done .task-status,
+.app .learning-task-group-row.done > .task-status {
+  transform: scale(1.25);
+  transform-origin: center;
+}
+
+/* Task rows use the same divider material, retaining the list's text inset. */
+.app .learning-task + .learning-task::before { background: var(--card-divider); }
+
+/* Segment boundaries reflect the actual task count without changing progress. */
+.app .stage-progress { position: relative; }
+.app .stage-progress::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(90deg, transparent calc(100% - 1px), rgba(255, 255, 255, .85) calc(100% - 1px));
+  background-size: calc(100% / var(--progress-segments, 1)) 100%;
+  background-repeat: repeat-x;
+}
+[data-theme="dark"] .app .stage-progress::after { opacity: .45; }
+@media (prefers-contrast: more) {
+  .app .stage-progress::after { background-image: linear-gradient(90deg, transparent calc(100% - 1px), var(--text) calc(100% - 1px)); opacity: 1; }
+}
+
+/* Reserve stable header columns even when the back control is hidden. */
+.app:not(.gated) > .topbar {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto 44px;
+  align-items: center;
+}
+.app:not(.gated) > .topbar #back-btn { grid-column: 1; grid-row: 1; }
+.app:not(.gated) > .topbar #top-title { grid-column: 2; grid-row: 1; min-width: 0; }
+.app:not(.gated) > .topbar #live-status { grid-column: 3; grid-row: 1; }
+.app:not(.gated) > .topbar #notification-btn { grid-column: 4; grid-row: 1; }
+
+/* A small light rim keeps the online indicator crisp against the glass header. */
+.app .live[data-state="live"]::before {
+  background: #27c96a;
+  box-shadow: 0 0 0 .5px rgba(255, 255, 255, .7), inset 0 1px 0 rgba(255, 255, 255, .28);
+}
+[data-theme="dark"] .app .live[data-state="live"]::before {
+  background: #55df90;
+  box-shadow: 0 0 0 .5px rgba(236, 255, 245, .4), inset 0 1px 0 rgba(255, 255, 255, .18);
+}
+
+/* Quiet, evenly spaced bottom navigation with a clear current destination. */
+.app:not(.gated) > .tabbar {
+  bottom: var(--visible-bottom, 0px);
+  width: 100%;
+  max-width: none;
+  height: calc(76px + env(safe-area-inset-bottom));
+  padding: 6px 12px env(safe-area-inset-bottom);
+  gap: 0;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, .8);
+  border-radius: 0;
+  background: rgba(252, 253, 254, .82);
+  box-shadow: 0 -1px 0 rgba(100, 119, 139, .06);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+}
+.app .tabbar .tab {
+  min-height: 64px;
+  gap: 6px;
+  color: #78818a;
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 400;
+  border-radius: 12px;
+}
+.app .tabbar .tab svg { width: 24px; height: 24px; }
+.app .tabbar .tab.active { color: #202327; background: transparent; box-shadow: none; font-weight: 600; }
+.app .tabbar .tab.active svg { stroke-width: 2; }
+[data-theme="dark"] .app:not(.gated) > .tabbar { background: rgba(29, 37, 46, .88); border-color: rgba(255, 255, 255, .12); box-shadow: none; }
+[data-theme="dark"] .app .tabbar .tab { color: #adb5bf; }
+[data-theme="dark"] .app .tabbar .tab.active { color: #f5f7fa; background: transparent; box-shadow: none; }
+@media (prefers-reduced-transparency: reduce) {
+  .app:not(.gated) > .tabbar, [data-theme="dark"] .app:not(.gated) > .tabbar { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  .app:not(.gated) > .tabbar { border-color: var(--text); }
+  .app .tabbar .tab.active { outline: 2px solid currentColor; outline-offset: -3px; }
+}
+
+/* Full-width material with navigation items kept together on wide screens. */
+.app:not(.gated) > .tabbar {
+  padding-left: max(12px, calc((100% - 760px) / 2 + 12px));
+  padding-right: max(12px, calc((100% - 760px) / 2 + 12px));
+}
+
+/* Subtle lift for the circular header controls. */
+.app:not(.gated) .topbar .icon-btn {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), 0 4px 10px rgba(58, 75, 94, .12), 0 1px 2px rgba(58, 75, 94, .08);
+}
+[data-theme="dark"] .app:not(.gated) .topbar .icon-btn {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 4px 10px rgba(0, 0, 0, .22);
+}
+@media (prefers-contrast: more) {
+  .app:not(.gated) .topbar .icon-btn { box-shadow: none; }
+}
+
+
+/* Soft, pale card surfaces with a fine light rim and restrained depth. */
+:root {
+  --surface: #f5f6f8;
+  --surface-2: #e9edf2;
+  --surface-secondary: #e9edf2;
+  --priority-surface: #f2f6fa;
+  --card-edge: rgba(255, 255, 255, .9);
+  --card-edge-shadow: inset 0 1px 0 rgba(255, 255, 255, .85), 8px 12px 22px -9px rgba(63, 78, 96, .16), 2px 4px 8px -4px rgba(63, 78, 96, .08);
+}
+[data-theme="dark"] {
+  --surface: #202a35;
+  --surface-2: #2a3745;
+  --surface-secondary: #2a3745;
+  --priority-surface: #26384b;
+  --card-edge: #526171;
+  --card-edge-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 8px 12px 22px -9px rgba(0, 0, 0, .32), 2px 4px 8px -4px rgba(0, 0, 0, .16);
+}
+@media (prefers-contrast: more) {
+  :root { --card-edge: #777; --card-edge-shadow: none; }
+  [data-theme="dark"] { --card-edge: #a5b2c0; --card-edge-shadow: none; }
+}

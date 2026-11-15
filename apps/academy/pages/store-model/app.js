@@ -26,6 +26,7 @@ function fail(error){
 $('retry').onclick=()=>location.reload();
 $('help').onclick=()=>$('help-dialog').showModal();
 $('close-help').onclick=()=>$('help-dialog').close();
+$('close-vr-info').onclick=()=>$('vr-info-dialog').close();
 $('fullscreen').onclick=async()=>{
   try { if(document.fullscreenElement) await document.exitFullscreen(); else if(document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); else message('此浏览器不支持网页全屏，可横屏浏览。'); }
   catch { message('无法全屏，请在浏览器中直接打开此页面。'); }
@@ -39,7 +40,7 @@ function setView(id){
   if(controls.enabled) controls.update();
   const e=new THREE.Euler().setFromQuaternion(camera.quaternion,'YXZ'); yaw=e.y; pitch=e.x;
   document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===id)));
-  $('view-label').textContent=v.label; document.querySelector('.movement').hidden=id==='overview';
+  document.querySelector('.movement').hidden=id==='overview';
   $('rotate').disabled=id!=='overview';
   $('gesture').textContent=id==='overview'?'拖动旋转 · 双指缩放 · 右键平移':'拖动环顾 · WASD / 箭头移动';
   $('tour-caption').textContent=id==='overview'?'从整体布局，走进每一处细节。':'视线高度约 1.65 米 · 自由观察空间';
@@ -74,7 +75,7 @@ function placeVR(){
 }
 $('vr').onclick=async()=>{
   if(session){await session.end();return;}
-  if(!xrSupported){message('当前浏览器不支持沉浸式 VR。请在支持 WebXR 的头显浏览器打开本页；仍可使用 3D 漫游。');return;}
+  if(!xrSupported){$('vr-info-dialog').showModal();return;}
   $('vr').disabled=true;
   let requested;
   try {
@@ -144,7 +145,7 @@ async function init(){
   await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
   await renderer.compileAsync(scene,camera);
   $('loading').hidden=true;document.querySelectorAll('[data-view],#home,#rotate,#vr').forEach(b=>b.disabled=false);
-  message('模型已就绪 · 选择空间开始漫游');
+  message('');
   if(navigator.xr&&isSecureContext){try{xrSupported=await navigator.xr.isSessionSupported('immersive-vr');}catch{}}
   $('vr').textContent=xrSupported?'进入 VR':'VR 设备说明';
   renderer.setAnimationLoop(time=>{
