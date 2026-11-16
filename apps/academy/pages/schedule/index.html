@@ -9,10 +9,7 @@
   <link rel="preload" href="./app.js" as="script">
   <link rel="preload" href="../../framework/stable-view.js" as="script">
   <link rel="preload" href="../../framework/save-status.js" as="script">
-  <style>
-    html, body { min-height: 100%; margin: 0; background: #f2f2f7; }
-    html[data-theme="dark"], html[data-theme="dark"] body { background: var(--bg, #111315); }
-  </style>
+  <link rel="stylesheet" href="../../ui/subprograms/bootstrap.css?v=__BUILD_VERSION__">
   <script>
     const scheduleTheme = localStorage.getItem("app-theme") || "light";
     document.documentElement.dataset.theme = scheduleTheme;
@@ -29,26 +26,17 @@
       ? window.ACADEMY_NETWORK_ENDPOINTS
       : (Array.isArray(window.APP_NETWORK_ENDPOINTS) ? window.APP_NETWORK_ENDPOINTS : []);
   </script>
-  <link rel="stylesheet" href="./style.css">
-  <link rel="stylesheet" href="../../appearance.css?v=20260907">
+  <link rel="stylesheet" href="../../ui/subprograms/schedule.css">
+  <link rel="stylesheet" href="../../ui/appearance.css?v=__BUILD_VERSION__">
   <link rel="stylesheet" href="../../framework/save-status.css">
+<link rel="stylesheet" href="../../ui/core.css?v=__BUILD_VERSION__">
 </head>
 <body>
   <div class="schedule-shell" id="schedule-app" aria-busy="true">
-    <header class="schedule-header">
-      <div>
-        <span class="permission-label" id="permission-label">正在读取权限</span>
-        <h1>排班日历</h1>
-        <p id="sync-status" role="status" aria-live="polite">正在同步最新排班…</p>
-      </div>
-      <button class="primary-action" id="edit-day" type="button" aria-label="安排当天" title="安排当天" hidden>
-        <svg class="schedule-add-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M12 5v14"/></svg>
-        <span class="primary-action-label">安排当天</span>
-      </button>
-    </header>
+    <p id="sync-status" role="status" aria-live="polite">正在同步最新排班…</p>
 
     <main class="schedule-content">
-      <section class="calendar-card" aria-labelledby="month-title">
+      <section class="calendar-card ao-card" aria-labelledby="month-title">
         <header class="calendar-toolbar">
           <div class="month-navigation">
             <button class="icon-button" id="previous-month" type="button" aria-label="上个月">
@@ -57,6 +45,10 @@
             <button class="month-title" id="month-title" type="button" aria-label="回到本月"></button>
             <button class="icon-button" id="next-month" type="button" aria-label="下个月">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+            <button class="primary-action ao-primary" id="edit-day" type="button" aria-label="安排当天" title="安排当天" hidden>
+              <svg class="schedule-add-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M12 5v14"/></svg>
+              <span class="primary-action-label">安排当天</span>
             </button>
           </div>
           <div class="view-filter" role="group" aria-label="排班筛选">
@@ -67,19 +59,22 @@
         </header>
 
         <div class="schedule-summary" id="schedule-summary"></div>
-        <div class="weekday-row" aria-hidden="true">
-          <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+        <div class="calendar-month">
+          <div class="weekday-row" aria-hidden="true">
+            <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+          </div>
+          <div class="calendar-grid" id="calendar-grid" role="grid" aria-label="月度排班"></div>
         </div>
-        <div class="calendar-grid" id="calendar-grid" role="grid" aria-label="月度排班"></div>
+        <section class="schedule-legend" id="schedule-legend" aria-label="排班人员颜色说明" hidden></section>
       </section>
 
-      <aside class="day-panel" aria-labelledby="selected-day-title">
+      <aside class="day-panel ao-popover" id="day-popover" role="dialog" aria-labelledby="selected-day-title" hidden>
         <header class="day-panel-header">
           <div>
-            <span>当天安排</span>
             <h2 id="selected-day-title"></h2>
           </div>
           <span class="day-count" id="selected-day-count"></span>
+          <button class="ao-popover__close" id="close-day-popover" type="button" aria-label="关闭当天安排">×</button>
         </header>
         <div class="day-schedule" id="day-schedule"></div>
       </aside>

@@ -6,10 +6,10 @@
   <meta name="description" content="与团队共享图片、协作标注尺寸，并记录每一位制作员工。">
   <meta name="theme-color" content="#f2f2f7">
   <title>尺寸标注 · Auto Office</title>
-  <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="../../appearance.css">
-  <link rel="stylesheet" href="collaboration.css">
-  <link rel="stylesheet" href="typography.css">
+  <link rel="stylesheet" href="../../ui/subprograms/dimensions.css">
+  <link rel="stylesheet" href="../../ui/appearance.css">
+  <link rel="stylesheet" href="../../ui/subprograms/dimensions-collaboration.css">
+  <link rel="stylesheet" href="../../ui/subprograms/dimensions-typography.css">
   <script src="label-typography.js" defer></script>
   <script src="label-layout.js" defer></script>
   <link rel="preload" as="script" href="image-cache.js" data-dimension-script="image-cache.js">
@@ -20,68 +20,69 @@
   <link rel="preload" as="script" href="collaboration.js" data-dimension-script="collaboration.js">
   <link rel="preload" as="script" href="batch-ui.js" data-dimension-script="batch-ui.js">
   <script src="bootstrap.js" defer></script>
+<link rel="stylesheet" href="../../ui/core.css?v=__BUILD_VERSION__">
 </head>
 <body data-view="library">
   <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><symbol id="folder" viewBox="0 0 24 24"><path d="M3 7V5.5A1.5 1.5 0 0 1 4.5 4H9l2 3h8.5A1.5 1.5 0 0 1 21 8.5v10a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5V7Z"/></symbol><symbol id="chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol><symbol id="back" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></symbol><symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol><symbol id="download" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></symbol><symbol id="search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol><symbol id="refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M6.3 6.3A8 8 0 0 1 20 12M4 12a8 8 0 0 0 13.7 5.7"/></symbol><symbol id="line" viewBox="0 0 24 24"><path d="M4 18 20 6M2 15l4 6M18 3l4 6"/></symbol><symbol id="rect" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="2"/></symbol><symbol id="circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></symbol><symbol id="ruler" viewBox="0 0 24 24"><path d="m3 16 13-13 5 5L8 21H3v-5Z"/><path d="m12 7 2 2m-6 2 2 2m-6 2 2 2"/></symbol><symbol id="fit" viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><rect x="7" y="7" width="10" height="10" rx="1"/></symbol><symbol id="minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol><symbol id="photo" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1"/><path d="m3 16 5-5 5 5 3-3 5 5"/></symbol><symbol id="check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol><symbol id="cloud" viewBox="0 0 24 24"><path d="M7 18a5 5 0 1 1 .9-9.9A7 7 0 0 1 21 11a3.5 3.5 0 0 1-1 7H7Z"/></symbol></svg>
-  <dialog id="manageFolderDialog" class="rename-dialog" aria-labelledby="manageFolderHeading">
+  <dialog id="manageFolderDialog" class="ao-dialog rename-dialog" aria-labelledby="manageFolderHeading">
     <form id="manageFolderForm">
       <h2 id="manageFolderHeading">文件夹</h2>
       <p id="manageFolderStatus" role="status" aria-live="polite">正在读取…</p>
-      <div id="manageFolderActions" class="folder-actions"><button id="chooseMoveFolder" class="button quiet" type="button">移动文件夹</button><button id="chooseDeleteFolder" class="button destructive" type="button">删除文件夹</button></div>
+      <div id="manageFolderActions" class="folder-actions"><button id="chooseMoveFolder" class="button quiet ao-button ao-button--quiet" type="button">移动文件夹</button><button id="chooseDeleteFolder" class="button destructive ao-button ao-button--danger" type="button">删除文件夹</button></div>
       <label id="manageFolderTargetField" hidden>移到<select id="manageFolderTarget"></select></label>
       <fieldset id="manageFolderDeleteField" hidden><legend>文件夹中的图片</legend>
         <label><input type="radio" name="deleteFolderMode" value="delete_keep" checked>保留图片及标注，移到上级目录</label>
         <label><input type="radio" name="deleteFolderMode" value="delete_all">连同所有图片项目及标注一起删除</label>
         <p>文件夹及全部子目录将被删除。此操作无法在界面中撤销，并同步影响团队成员。</p>
       </fieldset>
-      <div class="rename-actions"><button id="cancelManageFolder" class="button quiet" type="button">取消</button><button id="confirmManageFolder" class="button primary" type="submit" hidden>移动</button></div>
+      <div class="rename-actions"><button id="cancelManageFolder" class="button quiet ao-button ao-button--quiet" type="button">取消</button><button id="confirmManageFolder" class="button primary ao-primary" type="submit" hidden>移动</button></div>
     </form>
   </dialog>
-  <dialog id="folderDialog" class="rename-dialog" aria-labelledby="folderDialogHeading">
+  <dialog id="folderDialog" class="ao-dialog rename-dialog" aria-labelledby="folderDialogHeading">
     <form id="folderForm"><h2 id="folderDialogHeading">新建目录</h2>
     <label id="folderNameField">目录名称<input id="folderName" maxlength="80" required autocomplete="off"></label>
     <label id="folderTargetField" hidden>目标目录<select id="folderTarget"></select></label>
     <p id="folderStatus" role="status" aria-live="polite"></p>
-    <div class="rename-actions"><button id="cancelFolder" type="button" class="button quiet">取消</button><button id="saveFolder" class="button primary">保存</button></div></form>
+    <div class="rename-actions"><button id="cancelFolder" type="button" class="button quiet ao-button ao-button--quiet">取消</button><button id="saveFolder" class="button primary ao-primary">保存</button></div></form>
   </dialog>
-  <dialog id="batchDialog" class="rename-dialog batch-dialog" aria-labelledby="batchHeading">
+  <dialog id="batchDialog" class="ao-dialog rename-dialog batch-dialog" aria-labelledby="batchHeading">
     <h2 id="batchHeading">AI 批量编辑</h2>
     <p>导出项目交给 AI，粘贴编辑指令后预览。坐标使用原图像素。</p>
-    <div class="batch-buttons"><button id="exportBatch" class="button quiet" type="button">导出项目 JSON</button><button id="undoBatch" class="button quiet" type="button">撤销上一批</button></div>
+    <div class="batch-buttons"><button id="exportBatch" class="button quiet ao-button ao-button--quiet" type="button">导出项目 JSON</button><button id="undoBatch" class="button quiet ao-button ao-button--quiet" type="button">撤销上一批</button></div>
     <label for="batchInput">编辑指令 JSON</label><textarea id="batchInput" rows="9" spellcheck="false"></textarea>
     <p id="batchStatus" role="status" aria-live="polite"></p>
     <ul id="batchChanges"></ul>
     <canvas id="batchPreview" hidden aria-label="整批修改预览"></canvas>
-    <div class="batch-buttons"><button id="closeBatch" class="button quiet" type="button">关闭</button><button id="previewBatch" class="button quiet" type="button">预览修改</button><button id="applyBatch" class="button primary" type="button" disabled>应用并保存</button></div>
+    <div class="batch-buttons"><button id="closeBatch" class="button quiet ao-button ao-button--quiet" type="button">关闭</button><button id="previewBatch" class="button quiet ao-button ao-button--quiet" type="button">预览修改</button><button id="applyBatch" class="button primary ao-primary" type="button" disabled>应用并保存</button></div>
   </dialog>
-  <dialog id="deleteProjectDialog" class="rename-dialog" aria-labelledby="deleteProjectHeading">
+  <dialog id="deleteProjectDialog" class="ao-dialog rename-dialog" aria-labelledby="deleteProjectHeading">
     <form id="deleteProjectForm">
       <h2 id="deleteProjectHeading">删除图片和标注</h2>
       <p id="deleteProjectStatus" role="status" aria-live="polite"></p>
-      <div class="rename-actions"><button id="cancelDeleteProject" class="button quiet" type="button">取消</button><button id="confirmDeleteProject" class="button destructive" type="submit">删除</button></div>
+      <div class="rename-actions"><button id="cancelDeleteProject" class="button quiet ao-button ao-button--quiet" type="button">取消</button><button id="confirmDeleteProject" class="button destructive ao-button ao-button--danger" type="submit">删除</button></div>
     </form>
   </dialog>
-  <dialog id="renameDialog" class="rename-dialog" aria-labelledby="renameHeading">
+  <dialog id="renameDialog" class="ao-dialog rename-dialog" aria-labelledby="renameHeading">
     <form id="renameForm">
       <h2 id="renameHeading">编辑项目名称</h2>
       <label for="projectNameInput">项目名称</label>
       <input id="projectNameInput" name="projectName" type="text" maxlength="180" required autocomplete="off" enterkeyhint="done" aria-describedby="renameStatus">
       <p id="renameStatus" role="status" aria-live="polite">名称会同步给项目成员。</p>
-      <div class="rename-actions"><button id="cancelRename" class="button quiet" type="button">取消</button><button id="saveRename" class="button primary" type="submit">保存</button></div>
+      <div class="rename-actions"><button id="cancelRename" class="button quiet ao-button ao-button--quiet" type="button">取消</button><button id="saveRename" class="button primary ao-primary" type="submit">保存</button></div>
     </form>
   </dialog>
   <main class="app-shell">
     <header class="topbar" aria-label="项目操作">
-      <button id="libraryButton" aria-label="返回所在目录" class="button back-button" type="button" hidden><svg class="icon" aria-hidden="true"><use href="#back"/></svg><span>返回所在目录</span></button>
+      <button id="libraryButton" aria-label="返回所在目录" class="button back-button ao-button ao-button--quiet" type="button" hidden><svg class="icon" aria-hidden="true"><use href="#back"/></svg><span>返回所在目录</span></button>
       <details id="projectHeading" class="project-heading" hidden>
         <summary class="project-heading-text" aria-label="项目信息"><strong id="projectTitle" title="双击编辑项目名称"></strong><span id="compactSync">同步中</span></summary>
-        <div class="project-details"><span id="projectAuthor"></span><span class="project-format">图片标注</span><span id="compactPresence"></span><button id="openBatch" class="button quiet" type="button">AI 批量编辑</button><button id="renameProject" class="button quiet" type="button">重命名</button><button id="moveProject" class="button quiet" type="button">移动目录</button><button id="deleteProject" class="button destructive" type="button">删除图片和标注</button></div>
+        <div class="project-details"><span id="projectAuthor"></span><span class="project-format">图片标注</span><span id="compactPresence"></span><button id="openBatch" class="button quiet ao-button ao-button--quiet" type="button">AI 批量编辑</button><button id="renameProject" class="button quiet ao-button ao-button--quiet" type="button">重命名</button><button id="moveProject" class="button quiet ao-button ao-button--quiet" type="button">移动目录</button><button id="deleteProject" class="button destructive ao-button ao-button--danger" type="button">删除图片和标注</button></div>
       </details>
       <div class="top-actions">
-        <button id="replaceImage" class="button quiet new-image" type="button"><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span class="replace-text">新建标注</span></button>
-        <button id="exportImage" aria-label="导出图片" class="button quiet" type="button" disabled title="添加一条标注后即可导出"><svg class="icon" aria-hidden="true"><use href="#download"/></svg><span>导出图片</span></button>
-        <button id="copyImage" class="button quiet" type="button" disabled title="复制图片，无需添加标注">复制图片</button>
-        <button id="toggleEdit" class="button quiet" type="button" aria-pressed="false">编辑</button>
+        <button id="replaceImage" class="button quiet ao-button ao-button--quiet new-image" type="button"><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span class="replace-text">新建标注</span></button>
+        <button id="exportImage" aria-label="导出图片" class="button quiet ao-button ao-button--quiet" type="button" disabled title="添加一条标注后即可导出"><svg class="icon" aria-hidden="true"><use href="#download"/></svg><span>导出图片</span></button>
+        <button id="copyImage" class="button quiet ao-button ao-button--quiet" type="button" disabled title="复制图片，无需添加标注">复制图片</button>
+        <button id="toggleEdit" class="button quiet ao-button ao-button--quiet" type="button" aria-pressed="false">编辑</button>
       </div>
     </header>
     <div class="sync-bar" data-status="connecting">
@@ -100,20 +101,20 @@
         <p id="imageOperationFile" class="operation-file" hidden></p>
         <p id="imageOperationMessage" class="operation-message"></p>
       </div>
-      <div class="image-operation-actions"><button id="retryImageOperation" class="button primary" type="button" hidden>重试打开</button><button id="dismissImageOperation" class="button quiet" type="button" hidden>关闭</button></div>
+      <div class="image-operation-actions"><button id="retryImageOperation" class="button primary ao-primary" type="button" hidden>重试打开</button><button id="dismissImageOperation" class="button quiet ao-button ao-button--quiet" type="button" hidden>关闭</button></div>
     </section>
     <section id="conflictPanel" class="conflict-panel" hidden role="alert">
       <strong>有一处修改需要你确认</strong>
       <p>同一条标注已被同事修改。你的版本已保留，可以另存为新标注，或使用团队版本。删除冲突会保留团队版本。</p>
-      <div><button id="copyConflict" class="button primary" type="button" ><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span>另存我的标注</span></button><button id="discardConflict" class="button">使用团队版本</button></div>
+      <div><button id="copyConflict" class="button primary ao-primary" type="button" ><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span>另存我的标注</span></button><button id="discardConflict" class="button ao-button">使用团队版本</button></div>
     </section>
     <section id="library" class="project-library" aria-labelledby="libraryTitle">
       <div class="library-heading">
         <div><p class="eyebrow">团队工作空间</p><h1 id="libraryTitle">尺寸项目</h1><p class="library-intro">图片、尺寸与制作记录，和团队保持同步。</p></div>
-        <button id="newProject" class="button primary" type="button" aria-label="上传图片，可多选" title="上传图片，可多选" disabled><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span>正在加载…</span></button>
+        <button id="newProject" class="button primary ao-primary" type="button" aria-label="上传图片，可多选" title="上传图片，可多选" disabled><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span>正在加载…</span></button>
       </div>
       <div class="library-tools">
-        <label class="search-field" for="projectSearch"><svg class="icon" aria-hidden="true"><use href="#search"/></svg><span class="sr-only">搜索项目或制作员工</span><input id="projectSearch" type="search" placeholder="搜索项目或制作员工" autocomplete="off"></label>
+        <label class="search-field ao-control ao-control--inset" for="projectSearch"><svg class="icon" aria-hidden="true"><use href="#search"/></svg><span class="sr-only">搜索项目或制作员工</span><input id="projectSearch" type="search" placeholder="搜索项目或制作员工" autocomplete="off"></label>
         <fieldset class="project-scope">
           <legend class="sr-only">项目范围</legend>
           <label class="scope-option"><input id="allProjects" type="radio" name="projectScope" value="all" checked><span>全部</span></label>
@@ -121,17 +122,17 @@
         </fieldset>
       </div>
       <h2 class="sr-only">项目资料库</h2>
-      <div class="folder-toolbar"><nav id="folderBreadcrumb" aria-label="目录路径"></nav><button id="newFolder" class="button quiet" type="button"><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span>新建目录</span></button></div><p id="libraryMessage" class="library-count" role="status">正在加载…</p><div id="folderList" class="folder-list" aria-label="子目录"></div>
-      <div id="catalogLoading" class="catalog-loading" role="status" aria-live="polite" hidden><span class="loading-spinner" aria-hidden="true"></span><span id="catalogLoadingText">正在加载资料库…</span><button id="retryCatalog" class="button quiet" type="button" hidden>重试</button></div>
+      <div class="folder-toolbar"><nav id="folderBreadcrumb" aria-label="目录路径"></nav><button id="newFolder" class="button quiet ao-button ao-button--quiet" type="button"><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span>新建目录</span></button></div><p id="libraryMessage" class="library-count" role="status">正在加载…</p><div id="folderList" class="folder-list" aria-label="子目录"></div>
+      <div id="catalogLoading" class="catalog-loading" role="status" aria-live="polite" hidden><span class="loading-spinner" aria-hidden="true"></span><span id="catalogLoadingText">正在加载资料库…</span><button id="retryCatalog" class="button quiet ao-button ao-button--quiet" type="button" hidden>重试</button></div>
       <div id="catalogSkeleton" class="catalog-skeleton" aria-hidden="true" hidden><span></span><span></span><span></span><span></span></div>
       <div id="projectList" class="project-grid" aria-label="共享项目"></div>
       <section id="libraryEmpty" class="library-empty" hidden>
         <div class="empty-illustration" aria-hidden="true"><div class="empty-sheet"><svg class="icon" aria-hidden="true"><use href="#photo"/></svg><span class="empty-measure"></span></div><span class="empty-pencil"><svg class="icon" aria-hidden="true"><use href="#ruler"/></svg></span></div>
         <h3 id="emptyTitle">从一张图片开始</h3><p id="emptyDescription">上传需要标注的图片，和同事一起记录尺寸。</p>
-        <button id="emptyCreate" class="button primary" type="button" disabled><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span>创建第一个项目</span></button>
+        <button id="emptyCreate" class="button primary ao-primary" type="button" disabled><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span>创建第一个项目</span></button>
         <small>自动转换压缩 · 支持 JPG、PNG、WebP · 原图最大 15 MB</small>
       </section>
-      <button id="moreProjects" class="button more-projects" hidden>载入更多项目</button>
+      <button id="moreProjects" class="button ao-button more-projects" hidden>载入更多项目</button>
       <div class="library-footnote"><svg class="icon" aria-hidden="true"><use href="#cloud"/></svg><span>团队共享 · 自动保存每一次修改</span></div>
     </section>
     <section class="workspace" id="workspace" hidden>
@@ -145,22 +146,22 @@
           <div id="annotationActions" class="annotation-actions" role="toolbar" aria-label="选中标注操作" data-canvas-control hidden>
             <button id="editSelected" type="button">填写尺寸</button><button id="redrawSelected" type="button">重画</button><button id="deleteSelected" type="button">删除</button><button id="duplicateSelected" type="button">复制</button><button id="lockSelected" type="button">锁定</button><button id="continueDrawing" type="button">继续标注</button>
           </div>
-          <section id="emptyState" class="empty-state"><p>正在准备画布…</p><button id="uploadButton" class="button">选择图片</button></section>
+          <section id="emptyState" class="empty-state"><p>正在准备画布…</p><button id="uploadButton" class="button ao-button">选择图片</button></section>
           <div class="canvas-stage" id="canvasStage" hidden><canvas id="measureCanvas" aria-label="图片标注画布，浏览模式，可缩放和移动"></canvas><canvas id="selectionCanvas" aria-hidden="true"></canvas><svg id="labelLayer" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg></div>
           <div class="drop-mask" id="dropMask" hidden><svg class="icon" aria-hidden="true"><use href="#photo"/></svg>松开以上传图片（可多张）</div>
         </div>
         <div class="canvas-bottom">
-          <button id="inspectorToggle" class="button quiet inspector-toggle" type="button" aria-expanded="false" aria-controls="sidePanel"><span>标注</span><span id="inspectorCount">0</span><svg class="icon" aria-hidden="true"><use href="#back"/></svg></button>
-          <div class="canvas-hint" id="canvasHint" hidden><span id="notice" role="status">拖动添加标注</span><button id="undoDelete" class="button quiet" type="button" hidden>撤销删除</button></div>
+          <button id="inspectorToggle" class="button quiet ao-button ao-button--quiet inspector-toggle" type="button" aria-expanded="false" aria-controls="sidePanel"><span>标注</span><span id="inspectorCount">0</span><svg class="icon" aria-hidden="true"><use href="#back"/></svg></button>
+          <div class="canvas-hint" id="canvasHint" hidden><span id="notice" role="status">拖动添加标注</span><button id="undoDelete" class="button quiet ao-button ao-button--quiet" type="button" hidden>撤销删除</button></div>
           <div class="zoom-controls" role="group" aria-label="画布显示与缩放">
-            <button id="toggleAnnotations" class="icon-button" type="button" aria-label="显示标注" aria-pressed="true" title="隐藏标注" aria-controls="measureCanvas selectionCanvas labelLayer"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/><path class="visibility-slash" d="m4 4 16 16"/></svg><span>显示标注</span></button>
+            <button id="toggleAnnotations" class="icon-button ao-icon-button ao-icon-button--auxiliary" type="button" aria-label="显示标注" aria-pressed="true" title="隐藏标注" aria-controls="measureCanvas selectionCanvas labelLayer"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/><path class="visibility-slash" d="m4 4 16 16"/></svg><span>显示标注</span></button>
             <span class="control-divider" aria-hidden="true"></span>
-            <button id="zoomOut" class="icon-button" type="button" aria-label="缩小画布" title="缩小画布"><svg class="icon" aria-hidden="true"><use href="#minus"/></svg><span>缩小</span></button>
+            <button id="zoomOut" class="icon-button ao-icon-button ao-icon-button--auxiliary" type="button" aria-label="缩小画布" title="缩小画布"><svg class="icon" aria-hidden="true"><use href="#minus"/></svg><span>缩小</span></button>
             <output id="zoomValue" aria-live="off">100%</output>
-            <button id="zoomIn" class="icon-button" type="button" aria-label="放大画布" title="放大画布"><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span>放大</span></button>
+            <button id="zoomIn" class="icon-button ao-icon-button ao-icon-button--auxiliary" type="button" aria-label="放大画布" title="放大画布"><svg class="icon" aria-hidden="true"><use href="#plus"/></svg><span>放大</span></button>
             <span class="control-divider"></span>
-            <button id="fitCanvas" class="icon-button" type="button" aria-label="图片适合窗口" title="图片适合窗口"><svg class="icon" aria-hidden="true"><use href="#fit"/></svg><span>适合窗口</span></button>
-            <button id="rotateImage" class="icon-button" type="button" aria-label="图片顺时针旋转90度" title="顺时针旋转90°"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 3v6h-6M20 9a8 8 0 1 0 0 6"/></svg><span>旋转图片</span></button>
+            <button id="fitCanvas" class="icon-button ao-icon-button ao-icon-button--auxiliary" type="button" aria-label="图片适合窗口" title="图片适合窗口"><svg class="icon" aria-hidden="true"><use href="#fit"/></svg><span>适合窗口</span></button>
+            <button id="rotateImage" class="icon-button ao-icon-button ao-icon-button--auxiliary" type="button" aria-label="图片顺时针旋转90度" title="顺时针旋转90°"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 3v6h-6M20 9a8 8 0 1 0 0 6"/></svg><span>旋转图片</span></button>
           </div>
         </div>
       </div>

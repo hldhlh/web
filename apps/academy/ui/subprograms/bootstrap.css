@@ -1,0 +1,3 @@
+/* Shared first-paint background while a subprogram restores its theme. */
+html, body { min-height: 100%; margin: 0; background: #f2f2f7; }
+html[data-theme="dark"], html[data-theme="dark"] body { background: var(--bg, #111315); }

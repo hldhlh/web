@@ -6,11 +6,12 @@
   <meta name="theme-color" content="#f2f2f7">
   <title>报货模版 · Auto Office</title>
   <link rel="icon" href="../../icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="../../appearance.css">
-  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="../../ui/appearance.css">
+  <link rel="stylesheet" href="../../ui/subprograms/meat-template.css">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('app-theme') || 'light'; } catch {}</script>
   <script defer src="./model.js"></script>
   <script defer src="./app.js"></script>
+<link rel="stylesheet" href="../../ui/core.css?v=__BUILD_VERSION__">
 </head>
 <body>
   <main class="count-shell">
@@ -38,7 +39,7 @@
   <footer class="overview-footer">
     <div class="overview-actions">
       <button class="secondary" id="preview-button" type="button">预览</button>
-      <button class="primary" id="overview-action" type="button">开始盘点</button>
+      <button class="primary ao-primary" id="overview-action" type="button">开始盘点</button>
     </div>
   </footer>
 
@@ -67,7 +68,7 @@
         <button type="button" data-key="backspace" aria-label="退格"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5-7 7 7 7h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2ZM12 9l6 6m0-6-6 6"/></svg></button>
       </div>
       <div class="dock-actions">
-        <button class="primary" id="next-item" type="button">下一项 <span aria-hidden="true">›</span></button>
+        <button class="primary ao-primary" id="next-item" type="button">下一项 <span aria-hidden="true">›</span></button>
       </div>
       <p class="entry-status" id="entry-status" role="status" aria-live="polite"></p>
     </div>
@@ -80,11 +81,11 @@
       <pre id="template-text"></pre>
       <div id="manual-copy" hidden><label for="manual-text">长按文字或按 ⌘C / Ctrl+C 复制</label><textarea id="manual-text" readonly aria-label="手动复制报货文本"></textarea></div>
     </div>
-    <div class="sheet-footer"><button class="primary" id="copy-button" type="button">复制报货文本</button><p id="copy-status" role="status" aria-live="polite">复制后可直接粘贴发送。</p></div>
+    <div class="sheet-footer"><button class="primary ao-primary" id="copy-button" type="button">复制报货文本</button><p id="copy-status" role="status" aria-live="polite">复制后可直接粘贴发送。</p></div>
   </dialog>
   <dialog id="reset-dialog" class="reset-dialog" aria-labelledby="reset-title">
     <h2 id="reset-title">开始新一轮盘点？</h2><p>当前库存和订货会清空，所有库存项目重新盘点。</p>
-    <div class="reset-actions"><button class="secondary" id="cancel-reset" type="button" autofocus>取消</button><button class="primary" id="confirm-reset" type="button">开始新一轮</button></div>
+    <div class="reset-actions"><button class="secondary" id="cancel-reset" type="button" autofocus>取消</button><button class="primary ao-primary" id="confirm-reset" type="button">开始新一轮</button></div>
   </dialog>
   <noscript>请启用 JavaScript 以录入库存并生成报货文本。</noscript>
 </body>

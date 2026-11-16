@@ -215,7 +215,7 @@
     $('projectList').replaceChildren();
     for (const meta of items) {
       const button = document.createElement('button');
-      button.type = 'button'; button.className = 'project-card';
+      button.type = 'button'; button.className = 'project-card ao-card';
       button.setAttribute('aria-label', `${meta.name}，制作：${meta.createdBy.name}，${meta.count || 0} 条标注`);
       const preview = document.createElement('span'); preview.className = 'project-preview'; preview.append(icon('photo'));
       preview.dataset.state = 'loading'; preview.setAttribute('aria-busy', 'true');
@@ -358,7 +358,7 @@
     const chain = [], seen = new Set(); let id = currentFolder;
     while (id && !seen.has(id)) { seen.add(id); const f = folders.find(f => f.id === id); if (!f) break; chain.unshift(f); id = f.parentId; }
     for (const f of [{ id: '', name: '资料库' }, ...chain]) {
-      const button = document.createElement('button'); button.className = 'button quiet'; button.textContent = f.name;
+      const button = document.createElement('button'); button.className = 'button quiet ao-button ao-button--quiet'; button.textContent = f.name;
       button.type = 'button'; button.setAttribute('aria-current', f.id === currentFolder ? 'page' : 'false');
       if (f.id === currentFolder) button.disabled = true;
       if ($('folderBreadcrumb').childElementCount) $('folderBreadcrumb').append(icon('chevron'));
@@ -370,7 +370,7 @@
       const name = document.createElement('span'); name.className = 'folder-name'; name.textContent = f.name;
       button.append(icon('folder'), name, icon('chevron')); button.setAttribute('aria-label', f.name); button.onclick = () => enterFolder(f.id);
       const row = document.createElement('div'); row.className = 'folder-row';
-      const more = document.createElement('button'); more.type = 'button'; more.className = 'button quiet folder-more';
+      const more = document.createElement('button'); more.type = 'button'; more.className = 'button quiet ao-button ao-button--quiet folder-more';
       more.textContent = '•••'; more.setAttribute('aria-label', `管理文件夹：${f.name}`); more.setAttribute('aria-haspopup', 'dialog'); more.dataset.folderActions = f.id;
       more.onclick = () => manageFolder(f.id); row.append(button, more); $('folderList').append(row);
     }
@@ -418,13 +418,13 @@
     }
     $('manageFolderTarget').value = managedFolder.parentId;
     $('manageFolderActions').hidden = true; $('manageFolderTargetField').hidden = false;
-    $('confirmManageFolder').hidden = false; $('confirmManageFolder').textContent = '移动'; $('confirmManageFolder').className = 'button primary';
+    $('confirmManageFolder').hidden = false; $('confirmManageFolder').textContent = '移动'; $('confirmManageFolder').className = 'button primary ao-primary';
     $('manageFolderTarget').focus();
   };
   $('chooseDeleteFolder').onclick = () => {
     managedMode = 'delete'; $('manageFolderActions').hidden = true; $('manageFolderDeleteField').hidden = false;
     document.querySelector('[name="deleteFolderMode"][value="delete_keep"]').checked = true;
-    $('confirmManageFolder').hidden = false; $('confirmManageFolder').textContent = '删除文件夹'; $('confirmManageFolder').className = 'button destructive';
+    $('confirmManageFolder').hidden = false; $('confirmManageFolder').textContent = '删除文件夹'; $('confirmManageFolder').className = 'button destructive ao-button ao-button--danger';
     $('cancelManageFolder').focus();
   };
   $('cancelManageFolder').onclick = () => $('manageFolderDialog').close();

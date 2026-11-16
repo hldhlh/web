@@ -15,7 +15,9 @@ async page => {
         const actor={id:'test',name:'测试员工',role:'manager'};
         window.AcademyAuth={session:actor,canShortcut:()=>true,isManager:()=>true,list:()=>[actor],onChange:()=>()=>{},start:async()=>{},pull:async()=>{},connectRealtime(){}};
         window.ACADEMY_CONFIG={url:'https://mock.invalid',table:'academy_progress',bucket:'cloud-files',key:'test'};
-        window.AcademyStore={getJSON:async()=>({rev:1,items:[],assignments:{}}),headers:x=>x||{},objectUrl:p=>'https://mock.invalid/storage/'+p,channel:()=>({unsubscribe(){},send:async()=>{}})};
+        const channel=()=>({on(){return this},subscribe(){return this},unsubscribe(){},send:async()=>{},presenceState:()=>({}),track:async()=>{}});
+        const realtime={managed:true,channel,removeChannel(){}};
+        window.AcademyStore={getJSON:async()=>({rev:1,items:[],assignments:{}}),origin:()=>ACADEMY_CONFIG.url,headers:x=>x||{},objectUrl:p=>'https://mock.invalid/storage/'+p,channel,realtimeClient:()=>realtime,poll:()=>({stop(){}})};
         </script><iframe style="width:100%;height:900px;border:0" src="/_site/apps/academy/pages/${name}/index.html"></iframe>`});
     }
     return route.continue();
@@ -31,16 +33,28 @@ async page => {
     else if(name==='jlhcdh') {
       await frame.waitForFunction(()=>!!window.OrderCartSync);
       await frame.waitForFunction(()=>state.products.length>0);
+      const sort = frame.locator('#sortBtn');
+      if (!(await sort.textContent()).includes('排序：定位')) throw Error('initial sort label missing');
+      await sort.click();
+      if (!(await sort.textContent()).includes('排序：标签')) throw Error('sort label did not update');
+      await sort.click();
+      if (!(await sort.textContent()).includes('排序：定位')) throw Error('sort did not return to location');
       await frame.locator('#searchInput').fill('beef');
       await frame.waitForFunction(()=>!!window.pinyinPro);
       await frame.evaluate(()=>initDatePickers());
     }
     else if(name==='store-model') await frame.locator('#loading').waitFor({state:'hidden',timeout:90000});
     else await frame.waitForFunction(()=>!!window.MeatTemplate && document.getElementById('item-grid').children.length>0);
+    const styles = await frame.evaluate(() => {
+      const links = Array.from(document.querySelectorAll('link[rel="stylesheet"]')).map(link => link.href).filter(href => href.includes('/academy/ui/'));
+      const loaded = new Set(Array.from(document.styleSheets).map(sheet => sheet.href).filter(Boolean));
+      return { links, missing: links.filter(href => !loaded.has(href)) };
+    });
+    if (styles.links.length < 2 || styles.missing.length) throw Error(name + ': shared UI styles failed to load ' + JSON.stringify(styles));
     const resources=await frame.evaluate(()=>performance.getEntriesByType('resource').filter(r=>/\.m?js(?:\?|$)/.test(r.name)).map(r=>({url:r.name,count:performance.getEntriesByName(r.name).length})));
     if(resources.some(r=>r.count>1))throw Error(name+': duplicate script request');
     if(resources.some(r=>!/[?&]v=[a-f0-9]{16}/.test(r.url)))throw Error(name+': unversioned script '+JSON.stringify(resources));
-    results.push({name,scripts:resources.length,hashed:true,duplicates:0});
+    results.push({name,scripts:resources.length,styles:styles.links.length,hashed:true,duplicates:0});
   }
   if(errors.length)throw Error(JSON.stringify(errors));
   return {passed:true,results,productionWrites:0};

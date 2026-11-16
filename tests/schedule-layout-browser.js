@@ -18,7 +18,7 @@ async page => {
       const cloud=new Promise(resolve=>window.resolveSchedule=()=>resolve({rev:1,assignments:{[key]:people.map(p=>({userId:p.id,shift:'morning'}))}}));
       window.AcademyStore={getJSON:async(path,options)=>options?.cached?null:cloud,channel:()=>({unsubscribe(){}})};
     },variant);
-    const geometry=()=>page.evaluate(()=>Object.fromEntries(['.schedule-header','.calendar-card','#calendar-grid','.day-panel','.calendar-day .day-number'].map(selector=>{const r=document.querySelector(selector).getBoundingClientRect();return [selector,{x:r.x,y:r.y,width:r.width,height:r.height}]})));
+    const geometry=()=>page.evaluate(()=>Object.fromEntries(['.calendar-toolbar','.calendar-card','#calendar-grid','.day-panel','.calendar-day .day-number'].map(selector=>{const r=document.querySelector(selector).getBoundingClientRect();return [selector,{x:r.x,y:r.y,width:r.width,height:r.height}]})));
     const initial=await geometry();
     await page.addScriptTag({url:base+'/apps/academy/framework/stable-view.js'});
     await page.addScriptTag({url:base+'/apps/academy/pages/schedule/app.js'});
@@ -27,7 +27,7 @@ async page => {
     await page.evaluate(()=>window.resolveSchedule());
     await page.waitForFunction(()=>document.getElementById('sync-status').textContent==='');
     const cloud=await geometry();
-    for(const selector of ['.schedule-header','.calendar-card','#calendar-grid','.calendar-day .day-number']) {
+    for(const selector of ['.calendar-toolbar','.calendar-card','#calendar-grid','.calendar-day .day-number']) {
       for(const field of ['x','y','width','height']) for(const stage of [cached,cloud]) {
         if(Math.abs(initial[selector][field]-stage[selector][field])>1) throw Error(JSON.stringify({variant,selector,field,initial:initial[selector],actual:stage[selector]}));
       }

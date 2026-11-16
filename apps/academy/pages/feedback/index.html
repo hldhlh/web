@@ -9,10 +9,7 @@
   <link rel="preload" href="./app.js" as="script">
   <link rel="preload" href="../../framework/stable-view.js" as="script">
   <link rel="preload" href="../../framework/save-status.js" as="script">
-  <style>
-    html, body { min-height: 100%; margin: 0; background: #f2f2f7; }
-    html[data-theme="dark"], html[data-theme="dark"] body { background: var(--bg, #111315); }
-  </style>
+  <link rel="stylesheet" href="../../ui/subprograms/bootstrap.css?v=__BUILD_VERSION__">
   <script>
     const feedbackTheme = localStorage.getItem("app-theme") || "light";
     document.documentElement.dataset.theme = feedbackTheme;
@@ -29,9 +26,10 @@
       ? window.ACADEMY_NETWORK_ENDPOINTS
       : (Array.isArray(window.APP_NETWORK_ENDPOINTS) ? window.APP_NETWORK_ENDPOINTS : []);
   </script>
-  <link rel="stylesheet" href="./style.css">
-  <link rel="stylesheet" href="../../appearance.css?v=20260907">
+  <link rel="stylesheet" href="../../ui/subprograms/feedback.css">
+  <link rel="stylesheet" href="../../ui/appearance.css?v=__BUILD_VERSION__">
   <link rel="stylesheet" href="../../framework/save-status.css">
+<link rel="stylesheet" href="../../ui/core.css?v=__BUILD_VERSION__">
 </head>
 <body>
   <div class="feedback-shell" id="feedback-app" aria-busy="true">
@@ -41,7 +39,7 @@
         <h1>每日问题反馈</h1>
         <p id="sync-status" role="status" aria-live="polite">正在同步最新问题…</p>
       </div>
-      <button class="primary-action" id="open-compose" type="button">
+      <button class="primary-action ao-primary" id="open-compose" type="button">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
         反馈问题
       </button>

@@ -24,6 +24,8 @@
 
   const $ = (selector) => document.querySelector(selector);
   const app = $("#schedule-app");
+  const wideDetails = window.matchMedia("(min-width: 960px)");
+  let detailsWide = null;
 
   function startOfMonth(value) {
     return new Date(value.getFullYear(), value.getMonth(), 1);
@@ -47,9 +49,21 @@
   }
 
   function personColor(id) {
-    let hash = 0;
-    for (const char of String(id || "")) hash = ((hash << 5) - hash + char.charCodeAt(0)) | 0;
-    return COLORS[Math.abs(hash) % COLORS.length];
+    const ids = [...new Set(state.people.map((person) => String(person.id)))].sort();
+    const assigned = new Map(), used = new Set();
+    for (const personId of ids) {
+      let hash = 0;
+      for (const char of personId) hash = ((hash << 5) - hash + char.charCodeAt(0)) | 0;
+      let index = (hash >>> 0) % COLORS.length;
+      if (used.size < COLORS.length) {
+        while (used.has(index)) index = (index + 1) % COLORS.length;
+        used.add(index);
+        assigned.set(personId, COLORS[index]);
+      } else {
+        assigned.set(personId, `hsl(${Math.round((ids.indexOf(personId) * 137.508) % 360)} 65% 38%)`);
+      }
+    }
+    return assigned.get(String(id)) || COLORS[0];
   }
 
   function escapeHtml(value) {
@@ -104,7 +118,6 @@
 
   function renderHeader() {
     const manager = isManager();
-    $("#permission-label").textContent = manager ? "店长权限 · 可编辑" : "员工视图 · 只读";
     $("#edit-day").hidden = !manager;
     $("#month-title").textContent = formatMonth(state.month);
   }
@@ -142,13 +155,28 @@
       const label = `${formatDay(date)}，${assignments.length ? `${assignments.length}项安排` : "暂无安排"}`;
       cells.push(`
         <button class="calendar-day ${outside ? "outside" : ""} ${key === today ? "today" : ""} ${key === state.selected ? "selected" : ""}"
-          type="button" role="gridcell" data-date="${key}" aria-label="${escapeHtml(label)}" aria-selected="${key === state.selected}">
+          type="button" role="gridcell" data-date="${key}" aria-label="${escapeHtml(label)}" aria-selected="${key === state.selected}" aria-controls="day-popover" ${wideDetails.matches ? "" : `aria-haspopup="dialog" aria-expanded="${!$("#day-popover").hidden && key === state.selected}"`}>
           <span class="day-number">${date.getDate()}</span>
           <span class="calendar-events">${eventRows}</span>
-          ${assignments.length > 3 ? `<span class="more-events">另有 ${assignments.length - 3} 项</span>` : ""}
+          ${assignments.length > 1 ? `<span class="more-events">+${assignments.length - 1}</span>` : ""}
         </button>`);
     }
     window.AcademyStableView.html($("#calendar-grid"), cells.join(""));
+  }
+
+  function renderLegend() {
+    const first = new Date(state.month.getFullYear(), state.month.getMonth(), 1);
+    first.setDate(1 - (first.getDay() + 6) % 7);
+    const visibleIds = new Set();
+    for (let index = 0; index < 42; index += 1) {
+      const date = new Date(first);
+      date.setDate(first.getDate() + index);
+      activeAssignments(dateKey(date)).forEach((assignment) => visibleIds.add(assignment.userId));
+    }
+    const people = state.people.filter((person) => visibleIds.has(person.id));
+    const legend = $("#schedule-legend");
+    legend.hidden = people.length === 0;
+    window.AcademyStableView.html(legend, people.length ? `<span class="schedule-legend__title">排班人员</span><div class="schedule-legend__items">${people.map((person) => `<span class="schedule-legend__item"><i aria-hidden="true" style="--person-color:${personColor(person.id)}"></i><span>${escapeHtml(person.name)}</span></span>`).join("")}</div>` : "");
   }
 
   function renderSelectedDay() {
@@ -156,10 +184,11 @@
     const assignments = activeAssignments(state.selected);
     $("#selected-day-title").textContent = formatDay(date);
     $("#editor-title").textContent = formatDay(date);
-    $("#selected-day-count").textContent = assignments.length ? `${assignments.length} 项` : "未安排";
+    $("#selected-day-count").textContent = assignments.length ? `${assignments.length} 人` : "";
+    $("#selected-day-count").hidden = !assignments.length;
     if (!assignments.length) {
-      const message = state.filter === "mine" ? "你当天暂无排班" : state.filter === "off" ? "当天没有休息安排" : "当天还没有排班";
-      window.AcademyStableView.html($("#day-schedule"), `<div class="empty-state">${message}${isManager() ? "，可点击“安排当天”进行设置。" : "。"}</div>`);
+      const message = state.filter === "mine" ? "当天没有你的排班" : state.filter === "off" ? "当天没有休息安排" : "当天暂无排班";
+      window.AcademyStableView.html($("#day-schedule"), `<div class="empty-state">${message}</div>`);
       return;
     }
     window.AcademyStableView.html($("#day-schedule"), assignments.map((assignment) => {
@@ -168,26 +197,68 @@
       const shift = SHIFTS[assignment.shift];
       return `<article class="schedule-person" data-sync-key="${escapeHtml(person.id)}" style="--person-color:${personColor(person.id)}">
         <span class="person-avatar">${escapeHtml(person.name.slice(0, 1))}</span>
-        <span class="person-copy"><strong>${escapeHtml(person.name)}</strong><span>${person.role === "manager" ? "店长" : "员工"}</span></span>
+        <span class="person-copy"><strong>${escapeHtml(person.name)}</strong></span>
         <span class="shift-badge ${assignment.shift === "off" ? "off" : ""}">${shift.label}</span>
       </article>`;
     }).join(""));
   }
 
   function render() {
+    syncDetailsMode();
     state.renderDay = new Date().toDateString();
     renderHeader();
     renderSummary();
     renderCalendar();
+    renderLegend();
     renderSelectedDay();
     document.querySelectorAll("[data-filter]").forEach((button) => {
       button.classList.toggle("active", button.dataset.filter === state.filter);
       button.setAttribute("aria-pressed", String(button.dataset.filter === state.filter));
     });
+    placeDayPopover();
+  }
+
+  function syncDetailsMode() {
+    const popover = $("#day-popover");
+    const wide = wideDetails.matches;
+    if (detailsWide === wide) return;
+    detailsWide = wide;
+    popover.hidden = !wide;
+    popover.setAttribute("role", wide ? "region" : "dialog");
+    $("#close-day-popover").hidden = wide;
+    for (const property of ["width", "maxHeight", "left", "top"]) popover.style[property] = "";
+  }
+
+  function placeDayPopover() {
+    const popover = $("#day-popover");
+    if (popover.hidden || wideDetails.matches) return;
+    const anchor = $("#calendar-grid").querySelector(`[data-date="${state.selected}"]`);
+    if (!anchor) return closeDayPopover();
+    const rect = anchor.getBoundingClientRect();
+    const gap = 8, edge = 12;
+    const width = Math.min(320, window.innerWidth - edge * 2);
+    popover.style.width = `${width}px`;
+    popover.style.maxHeight = `${Math.max(120, window.innerHeight - edge * 2)}px`;
+    const height = popover.offsetHeight;
+    const below = window.innerHeight - rect.bottom - gap - edge;
+    const above = rect.top - gap - edge;
+    const top = below >= height || below >= above ? rect.bottom + gap : rect.top - height - gap;
+    popover.style.left = `${Math.max(edge, Math.min(rect.left + rect.width / 2 - width / 2, window.innerWidth - width - edge))}px`;
+    popover.style.top = `${Math.max(edge, Math.min(top, window.innerHeight - height - edge))}px`;
+  }
+
+  function closeDayPopover(restoreFocus = false) {
+    const popover = $("#day-popover");
+    if (popover.hidden || wideDetails.matches) return;
+    popover.hidden = true;
+    const anchor = $("#calendar-grid").querySelector(`[data-date="${state.selected}"]`);
+    anchor?.setAttribute("aria-expanded", "false");
+    if (restoreFocus) anchor?.focus();
   }
 
   function openEditor() {
     if (!isManager()) return showToast("只有店长可以编辑排班");
+    closeDayPopover();
     state.editBase = JSON.parse(JSON.stringify(state.data));
     state.editDay = state.selected;
     const current = new Map((state.data.assignments[state.selected] || []).map((item) => [item.userId, item.shift]));
@@ -276,16 +347,19 @@
 
   function bindEvents() {
     $("#previous-month").addEventListener("click", () => {
+      closeDayPopover();
       state.month = new Date(state.month.getFullYear(), state.month.getMonth() - 1, 1);
       state.selected = dateKey(state.month);
       render();
     });
     $("#next-month").addEventListener("click", () => {
+      closeDayPopover();
       state.month = new Date(state.month.getFullYear(), state.month.getMonth() + 1, 1);
       state.selected = dateKey(state.month);
       render();
     });
     $("#month-title").addEventListener("click", () => {
+      closeDayPopover();
       state.month = startOfMonth(new Date());
       state.selected = dateKey(new Date());
       render();
@@ -298,18 +372,34 @@
       if (selectedDate.getMonth() !== state.month.getMonth() || selectedDate.getFullYear() !== state.month.getFullYear()) {
         state.month = startOfMonth(selectedDate);
       }
+      $("#day-popover").hidden = false;
       render();
+      if (event.detail === 0 && !wideDetails.matches) $("#close-day-popover").focus({ preventScroll: true });
+      else if (event.detail === 0) $("#calendar-grid").querySelector(`[data-date="${state.selected}"]`)?.focus({ preventScroll: true });
+      placeDayPopover();
     });
     document.querySelectorAll("[data-filter]").forEach((button) => button.addEventListener("click", () => {
       state.filter = button.dataset.filter;
       render();
+      placeDayPopover();
     }));
+    $("#close-day-popover").addEventListener("click", () => closeDayPopover(true));
+    document.addEventListener("click", (event) => {
+      const path = event.composedPath();
+      if (!path.includes($("#day-popover")) && !path.includes($("#calendar-grid"))) closeDayPopover();
+    });
+    window.addEventListener("resize", () => {
+      if (detailsWide !== wideDetails.matches) render();
+      else placeDayPopover();
+    });
+    window.addEventListener("scroll", placeDayPopover, { passive: true });
     $("#edit-day").addEventListener("click", openEditor);
     $("#cancel-edit").addEventListener("click", closeEditor);
     $("#editor-backdrop").addEventListener("click", closeEditor);
     $("#save-edit").addEventListener("click", saveEditor);
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && !$("#editor-sheet").hidden) closeEditor();
+      else if (event.key === "Escape") closeDayPopover(true);
     });
   }
 

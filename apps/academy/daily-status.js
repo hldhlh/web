@@ -27,7 +27,7 @@ window.AcademyDailyStatus = (() => {
     if (!host || !Auth.session) return;
     const status = current();
     host.hidden = !status.text;
-    host.innerHTML = `<span class="daily-status-label">${status.temporary ? '今日安排' : `${DAYS[status.index]}固定安排`}</span><p>${escape(status.text)}</p>`;
+    host.innerHTML = `<span class="ao-notice__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg></span><div class="ao-notice__content"><span class="ao-notice__label">${status.temporary ? '今日安排' : `${DAYS[status.index]}固定安排`}</span><p class="ao-notice__body">${escape(status.text)}</p></div>`;
   }
   async function pull() {
     if (pending) return pending;

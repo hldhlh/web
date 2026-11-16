@@ -6,11 +6,9 @@
 }
 body { color: var(--text); background: var(--bg); }
 .app-shell { min-height: 100svh; display: flex; flex-direction: column; }
-.button { padding: 10px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--text); font-size: .882rem; font-weight: 600; line-height: 1.3; transition: background .16s, box-shadow .16s; }
-.button.primary { background: var(--accent); color: #fff; border-color: transparent; }
-.button.quiet, .back-button { color: var(--accent); background: transparent; border-color: transparent; }
+.button { font-size: .882rem; line-height: 1.3; transition: background .16s, box-shadow .16s; }
 .button:disabled { opacity: .45; }
-.button:not(:disabled):hover { background: var(--surface-2); }.button.primary:not(:disabled):hover { background: color-mix(in srgb, var(--accent), black 9%); }
+
 .button:not(:disabled):active { filter: brightness(.94); }
 .topbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; min-height: 64px; padding: max(8px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) 8px max(24px, env(safe-area-inset-left)); border-bottom: 1px solid var(--line); background: var(--nav-bg); backdrop-filter: blur(20px); }
 .top-actions { display: flex; align-items: center; gap: 8px; }.back-button { padding-left: 0; }
@@ -271,8 +269,7 @@ body:has(.image-operation:not([hidden])) .workspace.has-image { height: auto; fl
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
 
 /* Project naming uses a solid, accessible system-style dialog. */
-.rename-dialog { width: min(420px, calc(100% - 32px)); max-height: calc(100svh - 48px); overflow: auto; margin: auto; padding: 24px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--text); }
-.rename-dialog::backdrop { background: rgb(0 0 0 / 35%); }
+
 .rename-dialog form { display: grid; gap: 12px; }
 .rename-dialog h2 { margin: 0 0 8px; font-size: 1.176rem; }
 .rename-dialog label { font-size: .882rem; }
@@ -323,7 +320,7 @@ body:has(.image-operation:not([hidden])) .workspace.has-image { height: auto; fl
 .folder-row .folder-item { flex: 1; min-width: 0; }
 .folder-more.button { flex: 0 0 44px; margin-inline: 0 8px; padding: 0; letter-spacing: 2px; color: var(--muted); }
 .folder-actions { display: flex; flex-direction: column; gap: 8px; }
-.button.destructive { color: var(--bad); background: var(--surface); border-color: var(--line); }
+
 #manageFolderTarget { display: block; width: 100%; min-height: 44px; font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
 #manageFolderDeleteField { border: 0; margin: 0; padding: 0; }
 #manageFolderDeleteField label { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: .882rem; }
@@ -372,3 +369,9 @@ body:has(.image-operation:not([hidden])) .workspace.has-image { height: auto; fl
 #batchPreview { width: 100%; height: min(38vh, 360px); object-fit: contain; background: var(--canvas-bg); border: 1px solid var(--line); }
 #batchStatus { overflow-wrap: anywhere; }
 @media (max-width: 480px) { .batch-dialog { padding: 16px; } }
+
+/* The phone library is a list; preserve its row geometry with shared surfaces. */
+@media (max-width: 640px) {
+  .library-heading .ao-primary { --ao-primary-padding: 0; }
+  .project-card.project-card.ao-card { border: 0; border-radius: 0; box-shadow: none; }
+}

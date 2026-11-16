@@ -6665,10 +6665,8 @@ textarea:focus-visible {
 
 /* Daily store arrangements share the existing greeting panel. */
 .home-status { flex-wrap: wrap; }
-.home-daily-status { flex: 0 0 100%; min-width: 0; padding-top: 14px; border-top: 1px solid var(--line); }
+.home-daily-status { flex: 0 0 100%; min-width: 0; }
 .home-daily-status[hidden] { display: none; }
-.daily-status-label { color: var(--muted); font-size: 13px; }
-.home-status .home-daily-status p { margin: 6px 0 0; color: var(--text); font-size: 17px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .daily-status-form { max-width: 820px; color: var(--text); }
 .daily-status-section, .daily-status-preview { margin-bottom: 20px; padding: 20px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
 .daily-status-section h3 { margin: 0 0 8px; font-size: 20px; }
@@ -6737,3 +6735,6 @@ textarea:focus-visible {
 .app.dimensions-mode { max-width: 1440px; }
 .app.dimensions-mode > .topbar { width: min(100%, 1440px); }
 .app.dimensions-mode.embedded-mode .view { max-width: 1440px; }
+
+/* Allow the embedded schedule to use the available desktop width. */
+.app.schedule-mode.embedded-mode .view { max-width: 1180px; }

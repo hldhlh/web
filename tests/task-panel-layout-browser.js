@@ -1,7 +1,7 @@
 async page => {
   const base='http://127.0.0.1:8772';
   const source=await (await page.request.get(base+'/apps/academy/app.js')).text();
-  await page.route('**/task-layout-fixture',r=>r.fulfill({contentType:'text/html',body:`<!doctype html><link rel="stylesheet" href="/apps/academy/style.css"><link rel="stylesheet" href="/apps/academy/appearance.css"><body><div class="app"><main id="view"></main></div></body>`}));
+  await page.route('**/task-layout-fixture',r=>r.fulfill({contentType:'text/html',body:`<!doctype html><link rel="stylesheet" href="/apps/academy/ui/app-layout.css"><link rel="stylesheet" href="/apps/academy/ui/appearance.css"><body><div class="app"><main id="view"></main></div></body>`}));
   const results=[];
   for(const variant of [{width:390,theme:'light'},{width:1280,theme:'dark'},{width:320,theme:'light',large:true}]) {
     await page.setViewportSize({width:variant.width,height:800});

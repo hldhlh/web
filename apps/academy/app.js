@@ -59,7 +59,6 @@
     root.setProperty("--glow-medium", `${Math.max(220, bounds.width * .48)}px`);
     root.setProperty("--glow-large", `${Math.max(280, bounds.width * .7)}px`);
     root.setProperty("--glow-top", `${(parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--visible-top")) || 0) + 120}px`);
-
   }
   function scheduleBackgroundGlow() {
     if (!glowFrame) glowFrame = requestAnimationFrame(updateBackgroundGlow);
@@ -1641,15 +1640,13 @@
   }
 
   function progressRing(percent) {
-    const r = 26;
-    const c = 2 * Math.PI * r;
-    const offset = c - (percent / 100) * c;
-    return `<div class="ring-wrap" aria-label="总进度 ${percent}%">
-      <svg viewBox="0 0 64 64">
-        <circle cx="32" cy="32" r="${r}" fill="none" stroke="currentColor" stroke-opacity=".12" stroke-width="6"/>
-        <circle cx="32" cy="32" r="${r}" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${offset}"/>
+    const value = Math.max(0, Math.min(100, Number(percent) || 0));
+    return `<div class="ring-wrap ao-progress-disc" role="progressbar" aria-label="总学习进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${value}">
+      <svg class="ao-progress-disc__ring" viewBox="0 0 64 64" aria-hidden="true">
+        <circle class="ao-progress-disc__track" cx="32" cy="32" r="30.4" pathLength="100"/>
+        <circle class="ao-progress-disc__value" cx="32" cy="32" r="30.4" pathLength="100" stroke-dasharray="${value} 100"/>
       </svg>
-      <span>${percent}%</span>
+      <span>${value}%</span>
     </div>`;
   }
 
@@ -1824,7 +1821,7 @@
           ${todayStatus.restReminder ? `<p class="home-rest-reminder">夜深了，早点休息。</p>` : ""}
         </div>
         ${progressRing(completionRate())}
-        <div id="home-daily-status" class="home-daily-status" hidden></div>
+        <div id="home-daily-status" class="home-daily-status ao-notice" hidden></div>
       </header>
       <section data-home-block="shortcuts" class="home-shortcuts" aria-labelledby="home-shortcuts-title">
         <header class="home-shortcuts-head">
@@ -4215,6 +4212,7 @@
     document.querySelector(".app")?.classList.toggle("ops-mode", route.name === "ops");
     document.querySelector(".app")?.classList.toggle("embedded-mode", route.name === "embedded-app");
     document.querySelector(".app")?.classList.toggle("dimensions-mode", route.name === "embedded-app" && route.app === "dimensions");
+    document.querySelector(".app")?.classList.toggle("schedule-mode", route.name === "embedded-app" && route.app === "schedule");
     updateNotificationButton();
     if (route.name === "home") return renderHome();
     if (route.name === "messages") return renderMessages();

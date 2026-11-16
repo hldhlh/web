@@ -9,10 +9,10 @@ import { MeshoptDecoder } from './vendor/meshopt_decoder.module.js';
 const $ = id => document.getElementById(id);
 const canvas = $('scene'), status = $('status');
 const views = {
-  overview: { label:'整体鸟瞰', position:[15,16,11], target:[4.3,0.7,-5.8] },
-  hall: { label:'前厅', position:[7.25,1.65,-0.45], target:[6.99,1.65,-1.38] },
-  table: { label:'用餐区', position:[7.3,1.65,-2.6], target:[6.84,1.65,-3.32] },
-  kitchen: { label:'后厨', position:[1.35,1.82,-3.1], target:[1.35,1.82,-4.08] }
+  overview: { position:[15,16,11], target:[4.3,0.7,-5.8] },
+  hall: { position:[7.25,1.65,-0.45], target:[6.99,1.65,-1.38] },
+  table: { position:[7.3,1.65,-2.6], target:[6.84,1.65,-3.32] },
+  kitchen: { position:[1.35,1.82,-3.1], target:[1.35,1.82,-4.08] }
 };
 let renderer, controls, scene, camera, rig, current='overview', loaded=false, xrSupported=false, vrIndex=0;
 let yaw=0, pitch=0, pointer=null, previous=0, rotating=false, session=null;

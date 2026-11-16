@@ -1,0 +1,756 @@
+:root {
+            --border: var(--line);
+            --content-text: var(--muted);
+            --highlight: var(--accent);
+            --overlay-bg: var(--nav-bg);
+            --panel-bg: var(--surface);
+            --field-bg: var(--surface-2);
+            --danger: var(--bad, #d13c35);
+            --danger-highlight: var(--bad, #d13c35);
+            --glow: rgba(95, 179, 255, 0.18);
+            --danger-glow: rgba(217, 108, 117, 0.2);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .top-bar {
+            position: sticky;
+            top: 0;
+            background: var(--bg);
+            z-index: 10;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .input-group {
+            flex: 1;
+        }
+
+        input {
+            background: transparent;
+            border: none;
+            color: var(--text);
+            font-size: 16px;
+            width: 100%;
+            outline: none;
+            font-family: inherit;
+        }
+
+        input::placeholder {
+            color: var(--muted);
+        }
+
+        /* Contenteditable div 样式 */
+        .form-content {
+            min-height: 120px;
+            max-height: 400px;
+            overflow-y: auto;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-size: 16px;
+            width: 100%;
+            outline: none;
+            font-family: inherit;
+            padding: 10px;
+            box-sizing: border-box;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .form-content:empty::before {
+            content: attr(placeholder);
+            color: var(--muted);
+            pointer-events: none;
+        }
+
+        .form-content:focus {
+            border-color: var(--highlight);
+        }
+
+        .form-content img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+
+        .form-content.disabled {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .btn-icon {
+            cursor: pointer;
+            color: var(--muted);
+            font-size: 20px;
+            user-select: none;
+            transition: all 0.3s ease;
+            padding: 4px 8px;
+            border: 1px solid transparent;
+            position: relative;
+        }
+
+        .btn-icon:hover {
+            color: var(--highlight);
+            border-color: var(--border);
+            box-shadow: 0 0 10px var(--glow);
+        }
+
+        .btn-icon:active {
+            transform: scale(0.95);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--muted);
+            transition: background-color 0.3s ease, box-shadow 0.2s ease, transform 0.2s ease;
+            margin-right: 8px;
+            cursor: pointer;
+            flex: 0 0 auto;
+        }
+
+        .status-dot:hover {
+            box-shadow: 0 0 10px var(--glow);
+            transform: scale(1.25);
+        }
+
+        .status-dot:active {
+            transform: scale(1);
+        }
+
+        /* 编辑面板遮罩 */
+        #panelOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1000;
+            background-color: var(--overlay-bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        #panelOverlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .panel {
+            width: 90%;
+            max-width: 600px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            padding: 20px;
+            transform: scale(0.9) translateY(20px);
+            transition: transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+        }
+
+        #panelOverlay.active .panel {
+            transform: scale(1) translateY(0);
+        }
+
+        /* 全局加载遮罩 */
+        #loadingOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2000;
+            background: rgba(0, 12, 24, 0.86);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s;
+            color: var(--highlight);
+            font-size: 16px;
+        }
+
+        #loadingOverlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(95, 179, 255, 0.2);
+            border-top-color: var(--highlight);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .form-row {
+            margin-bottom: 14px;
+        }
+
+        .form-label {
+            font-size: 12px;
+            color: var(--highlight);
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .form-input {
+            width: 100%;
+            background: var(--field-bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 8px 10px;
+            font-family: inherit;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+            border-color: var(--highlight);
+            outline: none;
+        }
+
+        textarea.form-input {
+            min-height: 120px;
+            max-height: 60vh;
+            resize: vertical;
+            overflow-y: auto;
+            line-height: 1.5;
+        }
+
+        .btn-save {
+            background: var(--panel-bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 8px 20px;
+            font-family: inherit;
+            cursor: pointer;
+            margin-top: 6px;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-save::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, var(--glow), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .btn-save:hover:not(:disabled) {
+            background: var(--border);
+            color: var(--bg);
+            border-color: var(--highlight);
+            box-shadow: 0 0 12px var(--glow);
+        }
+
+        .btn-save:hover:not(:disabled)::before {
+            left: 100%;
+        }
+
+        .btn-save:active:not(:disabled) {
+            transform: translateY(1px);
+            box-shadow: 0 0 8px var(--glow);
+        }
+
+        .btn-save:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            border-color: var(--muted);
+        }
+
+        /* 取消按钮样式 */
+        .btn-cancel {
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid transparent;
+            padding: 8px 20px;
+            font-family: inherit;
+            cursor: pointer;
+            margin-top: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-cancel:hover {
+            color: var(--text);
+            border-color: var(--border);
+            box-shadow: 0 0 10px var(--glow);
+        }
+
+        .btn-cancel:active {
+            transform: translateY(1px);
+        }
+
+        /* 删除按钮样式（面板中） */
+        .btn-danger {
+            background: transparent;
+            color: var(--danger);
+            border: 1px solid transparent;
+            padding: 8px 20px;
+            font-family: inherit;
+            cursor: pointer;
+            margin-top: 6px;
+            transition: all 0.2s ease;
+            float: right;
+        }
+
+        .btn-danger:hover {
+            color: var(--danger-highlight);
+            border-color: var(--danger);
+            box-shadow: 0 0 10px var(--danger-glow);
+        }
+
+        .btn-danger:active {
+            transform: translateY(1px);
+        }
+
+        .list-item {
+            padding: 15px 0;
+            border-bottom: 1px solid var(--line);
+            cursor: pointer;
+        }
+
+        .list-item>.item-header:hover>.title {
+            color: var(--highlight);
+        }
+
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            cursor: pointer;
+        }
+
+        .title {
+            font-size: 16px;
+            transition: color 0.2s;
+        }
+
+        .tag {
+            font-size: 11px;
+            color: var(--muted);
+            border: 1px solid var(--muted);
+            padding: 2px 6px;
+            text-transform: uppercase;
+        }
+
+        .content {
+            display: none;
+            margin-top: 10px;
+            color: var(--content-text);
+            font-size: 14px;
+            padding-left: 12px;
+            border-left: 2px solid var(--border);
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+
+        .content img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 10px 0;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+        }
+
+        .list-item.expanded .content {
+            display: block;
+        }
+
+        .list-item.expanded>.item-header>.title {
+            color: var(--highlight);
+        }
+
+        .btn-delete {
+            float: right;
+            font-size: 12px;
+            color: var(--danger);
+            margin-top: 10px;
+            border: 1px solid transparent;
+            background: none;
+            cursor: pointer;
+            display: none;
+            padding: 4px 8px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-delete:hover {
+            color: var(--danger-highlight);
+            border-color: var(--danger);
+            box-shadow: 0 0 10px var(--danger-glow);
+        }
+
+        .btn-delete:active {
+            transform: translateY(1px);
+        }
+
+        .list-item.expanded .btn-delete {
+            display: inline-block;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--highlight);
+        }
+
+        /* WEBAPP 小程序容器样式 */
+        .webapp-container {
+            margin: 18px 0 15px;
+            padding: 15px;
+            background: rgba(95, 179, 255, 0.05);
+            border: 1px dashed var(--border);
+            border-radius: 6px;
+            position: relative;
+            min-height: 40px;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            overflow: visible;
+        }
+
+        .webapp-container.webapp-active {
+            background: rgba(95, 179, 255, 0.08);
+            border-style: solid;
+            border-color: var(--highlight);
+            box-shadow: 0 0 8px rgba(95, 179, 255, 0.2);
+            padding: 0;
+        }
+
+        .webapp-container::before {
+            content: '小程序';
+            position: absolute;
+            top: -12px;
+            left: 18px;
+            display: block;
+            background-color: var(--bg);
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%235fb3ff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='7' height='7' rx='1.5'/%3E%3Crect x='14' y='3' width='7' height='7' rx='1.5'/%3E%3Crect x='3' y='14' width='7' height='7' rx='1.5'/%3E%3Crect x='14' y='14' width='7' height='7' rx='1.5'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: 10px center;
+            padding: 0 12px 0 30px;
+            font-size: 12px;
+            line-height: 22px;
+            color: var(--highlight);
+            letter-spacing: 0.5px;
+            z-index: 3;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        /* WEBAPP 内容隔离包装器 */
+        .webapp-isolate {
+            /* 重置所有继承的样式 */
+            all: initial;
+
+            /* 重新设置必要的基础样式 */
+            display: block;
+            position: relative;
+
+            /* 确保使用标准盒模型 */
+            box-sizing: border-box;
+
+            /* 重置字体和文本样式 */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-size: 16px;
+            line-height: 1.5;
+            color: var(--text);
+
+            /* 重置背景 */
+            background: var(--panel-bg);
+
+            /* 确保内容可见 */
+            overflow: auto;
+
+            /* 1:1 显示 - 不缩放 */
+            width: 100%;
+            max-width: 100%;
+            min-height: 40px;
+        }
+
+        /* 重置 WEBAPP 内部所有元素的样式继承 */
+        .webapp-isolate * {
+            all: unset;
+            display: revert;
+            box-sizing: border-box;
+            max-width: 100%;
+        }
+
+        /* 恢复常用 HTML 元素的默认样式 */
+        .webapp-isolate div,
+        .webapp-isolate span,
+        .webapp-isolate p,
+        .webapp-isolate a,
+        .webapp-isolate button,
+        .webapp-isolate input,
+        .webapp-isolate textarea,
+        .webapp-isolate select,
+        .webapp-isolate img,
+        .webapp-isolate canvas,
+        .webapp-isolate svg {
+            all: revert;
+            box-sizing: border-box;
+        }
+
+        /* 密码输入弹窗 */
+        #passwordOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 3000;
+            background-color: var(--overlay-bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        #passwordOverlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* 删除确认弹窗 */
+        #confirmOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 3000;
+            background-color: var(--overlay-bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        #confirmOverlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .password-panel {
+            width: 90%;
+            max-width: 400px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            padding: 20px;
+            transform: scale(0.9) translateY(20px);
+            transition: transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+        }
+
+        #passwordOverlay.active .password-panel,
+        #confirmOverlay.active .password-panel {
+            transform: scale(1) translateY(0);
+        }
+
+        .password-title {
+            font-size: 14px;
+            color: var(--highlight);
+            margin-bottom: 15px;
+        }
+
+        .password-input {
+            width: 100%;
+            background: var(--field-bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 8px 10px;
+            font-family: inherit;
+            box-sizing: border-box;
+            margin-bottom: 15px;
+        }
+
+        .password-input:focus {
+            border-color: var(--highlight);
+            outline: none;
+        }
+
+        .password-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .password-btn {
+            flex: 1;
+            background: var(--panel-bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 8px 20px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .password-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, var(--glow), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .password-btn:hover {
+            background: var(--border);
+            color: var(--bg);
+            border-color: var(--highlight);
+            box-shadow: 0 0 12px var(--glow);
+        }
+
+        .password-btn:hover::before {
+            left: 100%;
+        }
+
+        .password-btn:active {
+            transform: translateY(1px);
+            box-shadow: 0 0 8px var(--glow);
+        }
+
+        .password-btn.cancel {
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid transparent;
+        }
+
+        .password-btn.cancel:hover {
+            color: var(--text);
+            border-color: var(--border);
+            box-shadow: 0 0 10px var(--glow);
+        }
+
+        .password-btn.cancel::before {
+            display: none;
+        }
+
+        .password-btn.delete {
+            background: transparent;
+            color: var(--danger);
+            border: 1px solid transparent;
+        }
+
+        .password-btn.delete:hover {
+            color: var(--danger-highlight);
+            border-color: var(--danger);
+            box-shadow: 0 0 10px var(--danger-glow);
+        }
+
+        .password-btn.delete::before {
+            display: none;
+        }
+
+        .password-error {
+            color: var(--danger);
+            font-size: 12px;
+            margin-top: -10px;
+            margin-bottom: 10px;
+            display: none;
+        }
+
+        @keyframes shake {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            25% {
+                transform: translateX(-8px);
+            }
+
+            75% {
+                transform: translateX(8px);
+            }
+        }
+
+        /* 搜索匹配高亮下划线样式 */
+        .search-highlight {
+            text-decoration: underline;
+            text-decoration-color: var(--highlight);
+            text-decoration-thickness: 2px;
+            text-underline-offset: 3px;
+            color: var(--highlight);
+            font-weight: 500;
+        }
+
+
+/* Notes uses the shared card surface while retaining editor-specific layout. */
+.top-bar.ao-card { position: sticky; padding: 8px 12px; margin-bottom: 16px; gap: 12px; }
+.top-bar .input-group { min-width: 0; }
+.top-bar .input-group input { min-height: 44px; }
+.top-bar .btn-icon { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 12px; background: var(--surface-2); color: var(--text); font: inherit; font-size: 24px; }
+.top-bar .btn-icon:hover { background: var(--accent-soft); color: var(--accent); box-shadow: none; }
+.top-bar .status-dot { position: relative; margin-inline: 10px 4px; }
+.top-bar .status-dot::before { content: ""; position: absolute; inset: -18px; }
+.top-bar .btn-icon:focus-visible, .top-bar .status-dot:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.list-item.ao-card { padding: 16px; margin-bottom: 10px; border: 1px solid var(--card-edge); }
+.list-item .tag { border-color: var(--line); border-radius: 8px; }
+@media (prefers-reduced-motion: reduce) { .top-bar .btn-icon, .top-bar .status-dot { transition: none; } }
+
+#panelOverlay { padding: 16px; background: rgba(28, 41, 57, .3); }
+.panel.ao-card { width: min(100%, 600px); max-height: calc(100dvh - 32px); overflow-y: auto; border-color: var(--card-edge); border-radius: 20px; box-shadow: var(--card-edge-shadow); }
+.panel .form-label { color: var(--text); font-size: 14px; }
+.panel .form-input, .panel .form-content { border-radius: 12px; padding: 10px 12px; }
+.panel .form-input { min-height: 44px; }
+.panel .form-input:focus-visible, .panel .form-content:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.panel .btn-cancel, .panel .btn-danger { min-height: 44px; border-radius: 12px; }
