@@ -5,6 +5,7 @@
   "apps/academy/admin-design.css",
   "apps/academy/app.js",
   "apps/academy/appearance.css",
+  "apps/academy/assets/ui-grain.svg",
   "apps/academy/content.js",
   "apps/academy/daily-status.js",
   "apps/academy/dashboard-workbench.js",
