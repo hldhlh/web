@@ -28,7 +28,7 @@ function fixture() {
   const context = {window,navigator,URL,CustomEvent:class{constructor(type){this.type=type;}},
     Date:{now:()=>now},Math,
     setTimeout:(fn,delay=0)=>{timers.set(++seq,{fn,at:now+delay});return seq;},clearTimeout:id=>timers.delete(id),localStorage:{getItem:()=>null}};
-  vm.runInNewContext(readFileSync('apps/academy/framework/store.js','utf8'),context);
+  vm.runInNewContext(readFileSync('apps/academy/network/store.js','utf8'),context);
   const settle = async () => {for(let i=0;i<10;i++) await Promise.resolve();};
   const advance = async ms => {
     const end=now+ms;

@@ -83,3 +83,5 @@ textarea { margin-top: 12px; width: 100%; min-height: 280px; padding: 16px; back
 @media (prefers-reduced-transparency: reduce) { .overview-footer { background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none; } }
 @media (prefers-contrast: more) { :root { --muted: #37373b; --line: #707078; --accent: #005ac1; } [data-theme="dark"] { --muted: #e0e2e7; --line: #9da4ae; --accent: #8bb6ff; } .overview-footer { background: var(--bg); } .item-list, .keypad button { outline: 1px solid var(--line); } }
 @media (max-width: 360px) { .item-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 14px 8px; } .item-value { text-align: right; } }
+
+.keypad .ao-button.ao-button { font-size: 1.625rem; font-weight: 500; }

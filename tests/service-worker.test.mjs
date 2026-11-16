@@ -70,3 +70,42 @@ test('activation removes old shell caches without deleting persistent project im
   callbacks.activate({ waitUntil: promise => work = promise }); await work;
   assert.deepEqual(deleted, ['web-shell-old']); assert.equal(claimed, true);
 });
+
+test('content-hashed assets survive a deployment while changed assets are fetched', async () => {
+  const stores = new Map(), calls = [];
+  const caches = {
+    async open(name) {
+      if (!stores.has(name)) stores.set(name, new Map());
+      const entries = stores.get(name);
+      return {
+        match: async request => entries.get(request.url)?.clone(),
+        put: async (request, response) => entries.set(request.url, response.clone()),
+        keys: async () => [...entries.keys()].map(url => new Request(url)),
+        delete: async request => entries.delete(request.url)
+      };
+    },
+    keys: async () => [...stores.keys()],
+    delete: async name => stores.delete(name)
+  };
+  function release(version) {
+    const callbacks = {};
+    const ctx = { URL, Request, Promise, caches, setTimeout, clearTimeout,
+      fetch: async request => { calls.push(request.url); return basicResponse(request.url); },
+      self: { location: { origin: 'https://example.test' }, clients: { claim: async () => {} }, addEventListener: (name, fn) => callbacks[name] = fn } };
+    vm.runInNewContext(readFileSync('sw.js', 'utf8').replace('__BUILD_VERSION__', version), ctx);
+    return {
+      async activate() { let work; callbacks.activate({ waitUntil: promise => { work = promise; } }); await work; },
+      async request(url) {
+        let response; const waits = [];
+        callbacks.fetch({ request: new Request(url), respondWith: promise => { response = promise; }, waitUntil: promise => waits.push(promise) });
+        await response; await Promise.all(waits);
+      }
+    };
+  }
+  const asset = 'https://example.test/apps/academy/app.js?v=0123456789abcdef';
+  const changed = 'https://example.test/apps/academy/app.js?v=fedcba9876543210';
+  const old = release('1111111'); await old.activate(); await old.request(asset);
+  const next = release('2222222'); await next.activate(); await next.request(asset); await next.request(changed);
+  assert.deepEqual(calls, [asset, changed]);
+  assert.ok(stores.has('web-content-assets-v1'));
+});

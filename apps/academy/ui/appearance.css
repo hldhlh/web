@@ -43,8 +43,8 @@
 .app .tab svg { display: block; width: 25px; height: 25px; }
 .app .tabbar::before { display: none; }
 .app .tab[data-tab="home"].active svg rect { fill: currentColor; }
-:is(.app .primary, .model-app .primary, .model-dialog .primary) { background: var(--accent); box-shadow: none; }
-[data-theme="dark"] :is(.app .primary, .model-app .primary, .model-dialog .primary),
+:is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)) { background: var(--accent); box-shadow: none; }
+[data-theme="dark"] :is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)),
 [data-theme="dark"] .primary-action { background: #3274de; color: #fff; }
 .app .home-status { gap: 16px; padding: 12px 0 24px; align-items: center; }
 .app .home-status-copy { flex: 1 1 180px; min-width: 0; }
@@ -233,9 +233,9 @@ body {
 }
 .app .home-app-shortcut, .pending-row, .account-metric { border-radius: 20px; }
 .app .shortcut-icon { color: var(--accent); }
-:is(.app .primary, .model-app .primary, .model-dialog .primary) { background: #2878db; color: #fff; }
-:is(.app .primary, .model-app .primary, .model-dialog .primary):hover:not(:disabled) { background: #1e68c2; }
-[data-theme="dark"] :is(.app .primary, .model-app .primary, .model-dialog .primary) { background: #3274de; }
+:is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)) { background: #2878db; color: #fff; }
+:is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)):hover:not(:disabled) { background: #1e68c2; }
+[data-theme="dark"] :is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)) { background: #3274de; }
 @media (prefers-contrast: more) {
   :root { --line: #777; --muted: #454548; }
   [data-theme="dark"] { --line: #a5b2c0; --muted: #d1d4da; }
@@ -280,21 +280,21 @@ body {
   --primary-gradient: linear-gradient(105deg, #2469c5 0%, #426bc1 52%, #675eaa 100%);
   --primary-gradient-hover: linear-gradient(105deg, #1c5bab 0%, #375cad 52%, #584f98 100%);
 }
-:is(.app .primary, .model-app .primary, .model-dialog .primary),
-[data-theme="dark"] :is(.app .primary, .model-app .primary, .model-dialog .primary),
-.app .pending-action {
+:is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)),
+[data-theme="dark"] :is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)),
+.app .pending-action:not(.ao-primary) {
   color: #fff;
   background: var(--primary-gradient);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), inset 0 0 0 1px rgba(255, 255, 255, .16);
 }
-:is(.app .primary, .model-app .primary, .model-dialog .primary):hover:not(:disabled),
-[data-theme="dark"] :is(.app .primary, .model-app .primary, .model-dialog .primary):hover:not(:disabled) {
+:is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)):hover:not(:disabled),
+[data-theme="dark"] :is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)):hover:not(:disabled) {
   background: var(--primary-gradient-hover);
 }
 @media (prefers-contrast: more) {
-  :is(.app .primary, .model-app .primary, .model-dialog .primary),
-  [data-theme="dark"] :is(.app .primary, .model-app .primary, .model-dialog .primary),
-  .app .pending-action { background: #174f9e; box-shadow: none; }
+  :is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)),
+  [data-theme="dark"] :is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)),
+  .app .pending-action:not(.ao-primary) { background: #174f9e; box-shadow: none; }
 }
 
 /* Wider, lighter controls with the soft blue/periwinkle transition of the reference. */
@@ -302,8 +302,8 @@ body {
   --primary-gradient: linear-gradient(105deg, #72b4fb 0%, #a8bff8 100%);
   --primary-gradient-hover: linear-gradient(105deg, #64a8f3 0%, #98b2ef 100%);
 }
-:is(.app .primary, .model-app .primary, .model-dialog .primary),
-.app .pending-action {
+:is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)),
+.app .pending-action:not(.ao-primary) {
   color: #183956;
   border-radius: 999px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), inset 0 0 0 1px rgba(255, 255, 255, .45);
@@ -314,21 +314,21 @@ body {
   text-align: center;
   padding-inline: 24px;
 }
-[data-theme="dark"] :is(.app .primary, .model-app .primary, .model-dialog .primary),
-[data-theme="dark"] .app .pending-action {
+[data-theme="dark"] :is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)),
+[data-theme="dark"] .app .pending-action:not(.ao-primary) {
   color: #fff;
   background: linear-gradient(105deg, #286bbb, #615da8);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28), inset 0 0 0 1px rgba(255, 255, 255, .2);
 }
 @media (prefers-contrast: more) {
-  :is(.app .primary, .model-app .primary, .model-dialog .primary),
-  [data-theme="dark"] :is(.app .primary, .model-app .primary, .model-dialog .primary),
-  .app .pending-action { color: #fff; background: #174f9e; box-shadow: none; }
+  :is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)),
+  [data-theme="dark"] :is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)),
+  .app .pending-action:not(.ao-primary) { color: #fff; background: #174f9e; box-shadow: none; }
 }
 
 /* Layered highlights and a translucent tint give primary controls a glass edge. */
-:is(.app .primary, .model-app .primary, .model-dialog .primary),
-.app .pending-action {
+:is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)),
+.app .pending-action:not(.ao-primary) {
   background: linear-gradient(180deg, rgba(255, 255, 255, .23), rgba(255, 255, 255, .02) 52%, rgba(255, 255, 255, .12)),
               linear-gradient(105deg, rgba(91, 166, 248, .62), rgba(172, 190, 250, .52));
   border: 1px solid rgba(255, 255, 255, .72);
@@ -336,21 +336,21 @@ body {
   backdrop-filter: blur(12px) saturate(130%);
   -webkit-backdrop-filter: blur(12px) saturate(130%);
 }
-:is(.app .primary, .model-app .primary, .model-dialog .primary):hover:not(:disabled) {
+:is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)):hover:not(:disabled) {
   background: linear-gradient(180deg, rgba(255, 255, 255, .3), rgba(255, 255, 255, .05) 55%, rgba(255, 255, 255, .13)),
               linear-gradient(105deg, rgba(78, 153, 239, .72), rgba(155, 178, 244, .62));
 }
-[data-theme="dark"] :is(.app .primary, .model-app .primary, .model-dialog .primary),
-[data-theme="dark"] .app .pending-action {
+[data-theme="dark"] :is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)),
+[data-theme="dark"] .app .pending-action:not(.ao-primary) {
   background: linear-gradient(180deg, rgba(255, 255, 255, .16), transparent 55%),
               linear-gradient(105deg, rgba(40, 107, 187, .65), rgba(97, 93, 168, .58));
   border-color: rgba(255, 255, 255, .28);
 }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  :is(.app .primary, .model-app .primary, .model-dialog .primary),
-  .app .pending-action,
-  [data-theme="dark"] :is(.app .primary, .model-app .primary, .model-dialog .primary),
-  [data-theme="dark"] .app .pending-action {
+  :is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)),
+  .app .pending-action:not(.ao-primary),
+  [data-theme="dark"] :is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)),
+  [data-theme="dark"] .app .pending-action:not(.ao-primary) {
     color: #fff;
     background: #174f9e;
     border-color: transparent;
@@ -361,8 +361,8 @@ body {
 }
 
 /* The selected glass control uses the reference's light label. */
-:is(.app .primary, .model-app .primary, .model-dialog .primary),
-.app .pending-action { color: #fff; }
+:is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)),
+.app .pending-action:not(.ao-primary) { color: #fff; }
 
 /* Keep the task and its action aligned on wide cards, while letting long labels
    wrap without squeezing the action on narrow screens. */
@@ -626,10 +626,10 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, .app > .view::-webkit-scrollba
 /* Shared subtle grain for interactive and status components. */
 :root { --ui-grain: url("./assets/ui-grain.svg"); }
 /* Fine grain adds a soft, tactile finish to primary glass controls. */
-:is(.app .primary, .model-app .primary, .model-dialog .primary),
-.app .pending-action { position: relative; isolation: isolate; }
-:is(.app .primary, .model-app .primary, .model-dialog .primary)::after,
-.app .pending-action::after {
+:is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary)),
+.app .pending-action:not(.ao-primary) { position: relative; isolation: isolate; }
+:is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary))::after,
+.app .pending-action:not(.ao-primary)::after {
   content: "";
   position: absolute;
   inset: 1px;
@@ -641,7 +641,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, .app > .view::-webkit-scrollba
   background-size: 128px 128px;
 }
 @media (prefers-contrast: more), (prefers-reduced-transparency: reduce) {
-  :is(.app .primary, .model-app .primary, .model-dialog .primary)::after, .app .pending-action::after { display: none; }
+  :is(.app .primary:not(.ao-primary), .model-app .primary:not(.ao-primary), .model-dialog .primary:not(.ao-primary))::after, .app .pending-action:not(.ao-primary)::after { display: none; }
 }
 
 

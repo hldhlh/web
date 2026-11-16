@@ -376,12 +376,10 @@
       render();
       if (event.detail === 0 && !wideDetails.matches) $("#close-day-popover").focus({ preventScroll: true });
       else if (event.detail === 0) $("#calendar-grid").querySelector(`[data-date="${state.selected}"]`)?.focus({ preventScroll: true });
-      placeDayPopover();
     });
     document.querySelectorAll("[data-filter]").forEach((button) => button.addEventListener("click", () => {
       state.filter = button.dataset.filter;
       render();
-      placeDayPopover();
     }));
     $("#close-day-popover").addEventListener("click", () => closeDayPopover(true));
     document.addEventListener("click", (event) => {

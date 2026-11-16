@@ -2,21 +2,24 @@ async page => {
   const origin = 'http://127.0.0.1:8772';
   const sources = {};
   for (const name of ['schedule','feedback']) {
-    for (const file of ['index.html','bootstrap.js','app.js']) {
+    for (const file of ['index.html','app.js']) {
       const path = `/apps/academy/pages/${name}/${file}`;
       sources[path] = await (await page.request.get(origin + path)).text();
     }
   }
+  const bootPath = '/apps/academy/network/subprogram-bootstrap.js';
+  sources[bootPath] = await (await page.request.get(origin + bootPath)).text();
   const stablePath = '/apps/academy/framework/stable-view.js';
   sources[stablePath] = await (await page.request.get(origin + stablePath)).text();
   let optimized = false;
   const requests = [];
   const mocks = {
     '/apps/network.js': 'window.APP_NETWORK={patchSupabase(){}};',
-    '/apps/academy/framework/reliable-store.js': 'window.AcademyReliable={};',
-    '/apps/academy/framework/store.js': `window.AcademyStore={getJSON:async()=>({rev:1,assignments:{},items:[]}),channel:()=>({unsubscribe(){}})};`,
-    '/apps/academy/framework/auth.js': `window.AcademyAuth={session:{id:'test',name:'测试店长',role:'manager'},start:async()=>{},pull:async()=>{},list:()=>[{id:'test',name:'测试店长',role:'manager'}],isManager:()=>true,onChange:()=>()=>{},connectRealtime(){}};`,
-    '/apps/academy/framework/save-status.js': '',
+    '/apps/academy/network/reliable-store.js': 'window.AcademyReliable={};',
+    '/apps/academy/network/store.js': `window.AcademyStore={getJSON:async()=>({rev:1,assignments:{},items:[]}),channel:()=>({unsubscribe(){}})};`,
+    '/apps/academy/network/secure-auth.js': '',
+    '/apps/academy/network/auth.js': `window.AcademyAuth={session:{id:'test',name:'测试店长',role:'manager'},start:async()=>{},pull:async()=>{},list:()=>[{id:'test',name:'测试店长',role:'manager'}],isManager:()=>true,onChange:()=>()=>{},connectRealtime(){}};`,
+    '/apps/academy/network/save-status.js': '',
     '/apps/vendor/supabase.min.js': 'window.supabase={};'
   };
   await page.route('**/*', async route => {
@@ -26,7 +29,7 @@ async page => {
     if (path in mocks || path in sources) {
       let body = mocks[path] ?? sources[path];
       if (!optimized && path.endsWith('index.html')) body = body.replace(/\s*<link rel="preload"[^>]*>/g, '');
-      if (!optimized && path.endsWith('bootstrap.js')) body = body.replace(/      \/\/ Download dependencies together[\s\S]*?      }\n/, '');
+      if (!optimized && path === bootPath) body = body.replace(/      \/\/ Download dependencies together[\s\S]*?      }\n/, '');
       if (path.endsWith('.js')) {
         requests.push(path);
         await page.waitForTimeout(150);
@@ -44,7 +47,7 @@ async page => {
       await page.waitForFunction(name => document.getElementById(`${name}-app`)?.getAttribute('aria-busy') === 'false', name);
       const measured = await page.evaluate(name => ({readyMs:Math.round(performance.now()),items:document.querySelectorAll(name === 'schedule' ? '.calendar-day' : '.empty-state').length}), name);
       results.push({name,optimized,...measured});
-      for (const path of ['/apps/network.js','/apps/academy/framework/store.js',stablePath,`/apps/academy/pages/${name}/app.js`]) {
+      for (const path of ['/apps/network.js','/apps/academy/network/store.js',stablePath,`/apps/academy/pages/${name}/app.js`]) {
         if (requests.filter(value => value === path).length !== 1) throw new Error(`Duplicate or missing script ${path}`);
       }
     }

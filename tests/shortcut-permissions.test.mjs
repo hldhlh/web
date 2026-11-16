@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { webcrypto } from 'node:crypto';
-const source = readFileSync('apps/academy/framework/auth.js', 'utf8');
+const source = readFileSync('apps/academy/network/auth.js', 'utf8');
 function fixture(role = 'manager', fail = false) {
   let remote = { rev: 1, users: [{ id: 'boss', name: '店长', role, access: 'full' }, { id: 'staff', name: '员工', role: 'staff', access: 'basic' }] };
   const storage = () => { const map = new Map(); return { getItem: key => map.get(key) ?? null, setItem: (key, value) => map.set(key, String(value)), removeItem: key => map.delete(key) }; };

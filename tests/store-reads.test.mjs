@@ -11,7 +11,7 @@ function setup() {
     async enqueue(path, data, base) { writes.push({path,data,base}); return {queued:true}; }
   };
   const context = {window:{AcademyReliable:reliable,addEventListener() {}}, navigator:{onLine:true},localStorage:{getItem:() => null},URL};
-  vm.runInNewContext(readFileSync('apps/academy/framework/store.js','utf8'), context);
+  vm.runInNewContext(readFileSync('apps/academy/network/store.js','utf8'), context);
   return {store:context.window.AcademyStore, requests, writes};
 }
 test('concurrent document reads share work and return independent objects', async () => {

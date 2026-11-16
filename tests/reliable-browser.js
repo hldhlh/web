@@ -1,7 +1,7 @@
 async page => {
   await page.route('**/reliable-test-fixture', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><meta charset="utf-8"><main></main>' }));
   await page.goto('http://127.0.0.1:8772/reliable-test-fixture');
-  await page.addScriptTag({ url: '/apps/academy/framework/reliable-store.js' });
+  await page.addScriptTag({ url: '/apps/academy/network/reliable-store.js' });
   const result = await page.evaluate(async () => {
     const sync = window.AcademyReliable;
     const remote = new Map();
@@ -106,7 +106,7 @@ async page => {
     return { passed, localMs: Math.round(localMs) };
   });
   await page.reload();
-  await page.addScriptTag({ url: '/apps/academy/framework/reliable-store.js' });
+  await page.addScriptTag({ url: '/apps/academy/network/reliable-store.js' });
   const recovered = await page.evaluate(async () => {
     const data = await window.AcademyReliable.read('progress:reload-test', { cached: true });
     if (data.saved !== 'survives reload') throw new Error('Reload lost the durable draft');

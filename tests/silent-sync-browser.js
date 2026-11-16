@@ -1,5 +1,5 @@
 async page => {
-  const source = await (await page.request.get('http://127.0.0.1:8772/apps/academy/framework/save-status.js')).text();
+  const source = await (await page.request.get('http://127.0.0.1:8772/apps/academy/network/save-status.js')).text();
   await page.goto('about:blank');
   return page.evaluate(async source => {
     const assert = (ok, message) => { if (!ok) throw new Error(message); };

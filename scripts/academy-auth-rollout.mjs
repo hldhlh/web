@@ -55,10 +55,10 @@ export async function rollout(mode, { env=process.env, request=fetch, report=con
   }
   // Refuse cutover until the deployed client matches this tested implementation.
   const site=env.AUTO_OFFICE_SITE_URL || 'https://hldhlh.github.io/web/';
-  const asset=new URL('apps/academy/framework/secure-auth.js',site.endsWith('/')?site:site+'/');
+  const asset=new URL('apps/academy/network/secure-auth.js',site.endsWith('/')?site:site+'/');
   asset.searchParams.set('rollout',String(Date.now()));
   const deployed=await request(asset,{cache:'no-store',signal:AbortSignal.timeout(20000)});
-  if(!deployed.ok || fingerprint(await deployed.text())!==fingerprint(readFileSync(resolve(root,'apps/academy/framework/secure-auth.js'),'utf8')))
+  if(!deployed.ok || fingerprint(await deployed.text())!==fingerprint(readFileSync(resolve(root,'apps/academy/network/secure-auth.js'),'utf8')))
     throw new Error('线上尚未部署本次安全登录代码，拒绝切换。');
   const indexURL=new URL('apps/academy/index.html',site.endsWith('/')?site:site+'/');indexURL.searchParams.set('rollout',String(Date.now()));
   const index=await request(indexURL,{cache:'no-store',signal:AbortSignal.timeout(20000)});

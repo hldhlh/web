@@ -26,7 +26,6 @@
 顶部玻璃工具栏可使用 `ao-toolbar`，统一柔和的下缘圆角。
 
 
-进度环通过半透明表面与 backdrop-filter 采样其背后的实际内容；背景越有变化，透光差异越明显。组件无需复制或计算页面背景；减少透明度时回退为实体表面。
 
 进度圆片使用 `ao-progress-disc`，可通过 `--ao-progress-size` 调整尺寸；容器设置 `role="progressbar"`、`aria-valuemin`、`aria-valuemax`、`aria-valuenow` 和可访问名称，内部用 SVG 的 `ao-progress-disc__track` 和 `ao-progress-disc__value` 绘制轨道与进度线（设置 `pathLength="100"` 和相应的 `stroke-dasharray`），并用 `span` 显示百分比。组件采用透明背景、浅色轨道与蓝色进度线。
 
@@ -35,3 +34,9 @@
 `ao-popover` 用于定位在触发元素附近的浮层；调用方负责位置、关闭和焦点行为。可使用 `ao-popover__close` 作为关闭按钮。
 
 次要按钮使用 `ao-button`，文字操作附加 `ao-button--quiet`，删除等操作附加 `ao-button--danger`；原生对话框可使用 `ao-dialog`。
+
+表单控件使用 `ao-field`；分段切换使用 `ao-segmented` 和 `ao-segmented__item`（通过 `aria-pressed` 或 `active` 表达状态）。`save-status.css` 提供同步提示样式。
+
+底部弹层使用 `ao-sheet` 和 `ao-sheet-backdrop`；最大高度可通过 `--ao-sheet-max-height` 调整。
+
+筛选标签使用 `ao-chip`，选中时添加 `active` 或设置 `aria-pressed="true"`。

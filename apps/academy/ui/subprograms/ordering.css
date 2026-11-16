@@ -45,15 +45,6 @@
             to { transform: rotate(360deg); }
         }
 
-        body.dark-mode .modal-card {
-            background: var(--card-bg);
-        }
-
-        body.dark-mode .loc-btn {
-            background: var(--glass-bg);
-            color: var(--text-sub);
-        }
-
         body.dark-mode .tag-chip {
             background: var(--glass-bg);
             color: var(--text-sub);
@@ -420,25 +411,7 @@
             white-space: nowrap;
         }
 
-        .tag-chip {
-            padding: 6px 14px;
-            border-radius: 12px;
-            background: white;
-            border: 1px solid var(--glass-border);
-            color: var(--text-sub);
-            font-size: 13px;
-            font-weight: 600;
-            white-space: nowrap;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .tag-chip.active {
-            background: var(--primary);
-            color: white;
-            border-color: var(--primary);
-            box-shadow: 0 4px 10px rgba(0, 113, 227, 0.2);
-        }
+        .tag-chip { white-space: nowrap; transition: background .2s, color .2s; }
 
         .filter-section-title {
             font-size: 11px;
@@ -808,15 +781,10 @@
         }
 
         .product-card {
-            background: var(--glass-bg);
-            backdrop-filter: blur(var(--blur));
-            border: 1px solid var(--glass-border);
-            border-radius: var(--radius-md);
             padding: 16px;
             margin-bottom: 12px;
             display: flex;
             align-items: center;
-            box-shadow: var(--shadow);
             transition: transform 0.2s;
             /* 长列表只布局和绘制视口附近卡片，移动端进入页面明显更轻。 */
             content-visibility: auto;
@@ -883,14 +851,7 @@
             display: flex;
         }
 
-        .modal-card {
-            background: white;
-            width: 100%;
-            max-width: 400px;
-            border-radius: 24px;
-            padding: 30px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-        }
+        .modal-card { width: 100%; max-width: 400px; padding: 30px; }
 
         /* 定位导航 - 药丸风格 */
         #locationList {
@@ -902,29 +863,8 @@
             margin: 0 auto;
         }
 
-        .loc-btn {
-            padding: 10px 20px;
-            border-radius: 20px;
-            background: rgba(255, 255, 255, 0.6);
-            backdrop-filter: blur(5px);
-            border: 1px solid var(--glass-border);
-            color: var(--text-sub);
-            font-size: 14px;
-            font-weight: 600;
-            white-space: nowrap;
-            flex-shrink: 0;
-            /* 极其重要：防止按钮被挤压 */
-            cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .loc-btn.active {
-            background: var(--primary);
-            color: white;
-            border-color: var(--primary);
-            box-shadow: 0 6px 16px rgba(0, 113, 227, 0.3);
-            transform: translateY(-1px);
-        }
+        .loc-btn { white-space: nowrap; flex-shrink: 0; transition: transform .2s, background .2s; }
+        .loc-btn.active { transform: translateY(-1px); }
 
         /* 列表区域内边距，防止被底部栏遮挡 */
         .product-grid,
@@ -1191,12 +1131,6 @@
                 padding: 0 16px 12px;
             }
 
-            .loc-btn {
-                padding: 6px 12px;
-                font-size: 13px;
-                border-radius: 10px;
-                /* 移动端采用更节省空间的略方圆角 */
-            }
         }
 
         /* 快捷操作栏 */
@@ -1212,38 +1146,8 @@
             display: none;
         }
 
-        .quick-action-btn {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 8px 14px;
-            border-radius: 20px;
-            background: var(--glass-bg);
-            backdrop-filter: blur(var(--blur));
-            border: 1px solid var(--glass-border);
-            color: var(--text-main);
-            font-size: 13px;
-            font-weight: 600;
-            white-space: nowrap;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .quick-action-btn:hover {
-            background: var(--primary);
-            color: white;
-            border-color: var(--primary);
-        }
-
-        .quick-action-btn .svg-icon {
-            font-size: 12px;
-        }
-
-        .quick-action-btn.active {
-            background: var(--primary);
-            color: white;
-            border-color: var(--primary);
-        }
+        .quick-action-btn { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+        .quick-action-btn .svg-icon { font-size: 12px; }
 
         /* 批量操作进度条 */
         .batch-progress {

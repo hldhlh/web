@@ -1,5 +1,8 @@
 // 部署时由 scripts/generate-build-meta.mjs 替换为当前 Git 提交版本。
-const CACHE_NAME = 'web-shell-__BUILD_VERSION__-static-assets-v6';
+const CACHE_NAME = 'web-shell-__BUILD_VERSION__-static-assets-v7';
+// Content-hashed assets remain valid across deployments, unlike page shells.
+const CONTENT_CACHE_NAME = 'web-content-assets-v1';
+const CONTENT_CACHE_LIMIT = 300;
 const SHELL = [
   './',
   './index.html',
@@ -17,10 +20,10 @@ const SHELL = [
   './apps/academy/version-guard.js',
   './apps/academy/home-layout.js',
   './apps/academy/dashboard-workbench.js',
-  './apps/academy/framework/reliable-store.js',
-  './apps/academy/framework/store.js',
-  './apps/academy/framework/save-status.js',
-  './apps/academy/framework/save-status.css',
+  './apps/academy/network/reliable-store.js',
+  './apps/academy/network/store.js',
+  './apps/academy/network/save-status.js',
+  './apps/academy/ui/save-status.css',
   './apps/vista/icon.svg',
   './apps/svg/icon.svg',
   './apps/log/icon.svg',
@@ -62,8 +65,8 @@ async function staleWhileRevalidate(request, event) {
   return cached || network;
 }
 
-async function networkFirst(request, event) {
-  const cache = await caches.open(CACHE_NAME);
+async function networkFirst(request, event, cacheName = CACHE_NAME) {
+  const cache = await caches.open(cacheName);
   const cached = await cache.match(request);
   let timer;
   // Return a cached page promptly on a slow network, but let revalidation finish.
@@ -84,6 +87,13 @@ async function networkFirst(request, event) {
   }
 }
 
+async function trimContentCache(cache) {
+  try {
+    const keys = await cache.keys();
+    await Promise.all(keys.slice(0, Math.max(0, keys.length - CONTENT_CACHE_LIMIT)).map(key => cache.delete(key)));
+  } catch (_) { /* Cache maintenance must not interrupt navigation. */ }
+}
+
 self.addEventListener('fetch', (event) => {
   if (!canCache(event.request)) return;
   const url = new URL(event.request.url);
@@ -91,8 +101,14 @@ self.addEventListener('fetch', (event) => {
   const version = url.searchParams.get('v');
   if (/^[0-9a-f]{7,40}$/i.test(version || '') && /\.(js|mjs|css|woff2?)$/.test(url.pathname)) {
     event.respondWith((async () => {
-      const cache = await caches.open(CACHE_NAME);
-      return await cache.match(event.request) || networkFirst(event.request, event);
+      // Only the build's 16-character content hashes are stable across releases.
+      const cacheName = /^[0-9a-f]{16}$/i.test(version) ? CONTENT_CACHE_NAME : CACHE_NAME;
+      const cache = await caches.open(cacheName);
+      const cached = await cache.match(event.request);
+      if (cached) return cached;
+      const response = await networkFirst(event.request, event, cacheName);
+      if (cacheName === CONTENT_CACHE_NAME) event.waitUntil(trimContentCache(cache));
+      return response;
     })());
     return;
   }

@@ -132,7 +132,7 @@
         <div id="locationList"></div>
         <div class="product-list-heading">
             <h2>商品</h2>
-            <button id="sortBtn" class="product-sort" type="button" aria-label="当前按定位排序，点击切换为按标签排序"><svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-sort"></use></svg><span>排序：定位</span></button>
+            <button id="sortBtn" class="product-sort ao-button ao-button--quiet" type="button" aria-label="当前按定位排序，点击切换为按标签排序"><svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-sort"></use></svg><span>排序：定位</span></button>
         </div>
         <main class="product-grid" id="productList"></main>
     </div>
@@ -157,13 +157,13 @@
         </header>
         <!-- 快捷操作栏 -->
         <div class="quick-actions">
-            <button class="quick-action-btn" onclick="batchSelectAll()">
+            <button class="quick-action-btn ao-button" onclick="batchSelectAll()">
                 <svg class="svg-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-check-all"></use></svg> 全部勾选
             </button>
-            <button class="quick-action-btn" onclick="batchDeselectAll()">
+            <button class="quick-action-btn ao-button" onclick="batchDeselectAll()">
                 <svg class="svg-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-close"></use></svg> 全部取消
             </button>
-            <button class="quick-action-btn" onclick="exportOrderImage()">
+            <button class="quick-action-btn ao-button" onclick="exportOrderImage()">
                 <svg class="svg-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-image"></use></svg> 导出图片
             </button>
         </div>
@@ -172,7 +172,7 @@
                 style="display:none; margin-top: 20px; justify-content: center;">
                 <div id="orderCountTop" class="total-amount" style="font-size: 24px;">0 项品种</div>
             </div>
-            <div class="admin-card">
+            <div class="admin-card ao-card">
                 <div class="card-label">订货品种汇总</div>
                 <div id="summaryList" style="margin-top:15px;"></div>
             </div>
@@ -193,17 +193,17 @@
         </header>
 
         <div class="toolbar">
-            <div class="search-box">
+            <div class="search-box ao-control ao-control--inset">
                 <svg class="svg-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-search"></use></svg>
                 <input type="text" id="adminSearchInput" placeholder="搜索名称或定位...">
             </div>
             <div style="display: flex; gap: 8px;">
-                <select id="adminLocFilter" class="select-custom" style="flex: 1;"></select>
-                <button class="select-custom"
-                    style="padding: 0 12px; display: flex; align-items: center; justify-content: center;"
+                <select id="adminLocFilter" class="select-custom ao-field" style="flex: 1;"></select>
+                <button class="select-custom ao-icon-button ao-icon-button--auxiliary"
+
                     onclick="openCategoryManager()" title="管理商品定位"><svg class="svg-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-settings"></use></svg></button>
-                <button class="select-custom"
-                    style="padding: 0 12px; display: flex; align-items: center; justify-content: center; background: rgba(255, 59, 48, 0.1); color: var(--accent);"
+                <button class="select-custom ao-icon-button ao-icon-button--auxiliary"
+
                     onclick="openTrashBin()" title="回收站"><svg class="svg-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-trash"></use></svg></button>
             </div>
         </div>
@@ -227,8 +227,8 @@
         </header>
         <div style="max-width: 800px; margin: 20px auto; padding: 0 16px; padding-bottom: 60px;">
             <div style="display: flex; gap: 12px; margin-bottom: 20px;">
-                <button id="tab7" class="tag-chip active" onclick="switchAnalyticsTab(7)">最近 7 天</button>
-                <button id="tab30" class="tag-chip" onclick="switchAnalyticsTab(30)">最近 30 天</button>
+                <button id="tab7" class="tag-chip ao-chip active" onclick="switchAnalyticsTab(7)">最近 7 天</button>
+                <button id="tab30" class="tag-chip ao-chip" onclick="switchAnalyticsTab(30)">最近 30 天</button>
             </div>
             <div id="analyticsContainer"
                 style="background: var(--glass-bg); backdrop-filter: blur(var(--blur)); padding: 24px; border-radius: var(--radius-md); box-shadow: var(--shadow); border: 1px solid var(--glass-border);">
@@ -240,13 +240,12 @@
     <!-- Modals -->
     <!-- 商品定位管理模态框 -->
     <div id="categoryManagerModal" class="modal">
-        <div class="modal-card">
+        <div class="modal-card ao-card">
             <h3 style="margin-bottom:24px;text-align:center;">管理商品定位</h3>
 
             <div style="margin-bottom: 16px; display: flex; gap: 8px;">
-                <input type="text" id="newCategoryName" class="card-input-small" placeholder="输入新定位名称" style="flex: 1;">
-                <button type="button" class="btn-delete"
-                    style="width: auto; padding: 0 16px; background: var(--primary); color: white;"
+                <input type="text" id="newCategoryName" class="card-input-small ao-field" placeholder="输入新定位名称" style="flex: 1;">
+                <button type="button" class="btn-delete ao-primary"
                     onclick="addCategory()">
                     添加
                 </button>
@@ -258,7 +257,7 @@
             </div>
 
             <div style="display:flex; justify-content: center;">
-                <button type="button" class="btn-delete" style="background:#f2f2f7;color:#1d1d1f; width: 100%;"
+                <button type="button" class="btn-delete ao-button" style="width: 100%;"
                     onclick="closeCategoryManager()">关闭</button>
             </div>
         </div>
@@ -266,7 +265,7 @@
 
     <!-- 商品回收站模态框 -->
     <div id="trashBinModal" class="modal">
-        <div class="modal-card" style="max-width: 600px; width: 90%;">
+        <div class="modal-card ao-card" style="max-width: 600px; width: 90%;">
             <h3 style="margin-bottom:24px;text-align:center;">商品回收站</h3>
 
             <div id="trashBinList"
@@ -275,20 +274,20 @@
             </div>
 
             <div style="display:flex; justify-content: center;">
-                <button type="button" class="btn-delete" style="background:#f2f2f7;color:#1d1d1f; width: 100%;"
+                <button type="button" class="btn-delete ao-button" style="width: 100%;"
                     onclick="closeTrashBin()">关闭</button>
             </div>
         </div>
     </div>
 
     <div id="editModal" class="modal">
-        <div class="modal-card">
+        <div class="modal-card ao-card">
             <h3 style="margin-bottom:24px;text-align:center;">添加新商品</h3>
             <form id="productForm">
                 <div class="card-field" style="margin-bottom:16px;">
                     <label class="card-label">商品定位</label>
                     <div style="display: flex; gap: 8px;">
-                        <select id="editLocationSelect" class="card-input-small" style="flex: 1;" onchange="
+                        <select id="editLocationSelect" class="card-input-small ao-field" style="flex: 1;" onchange="
                             if(this.value === '_custom_') {
                                 document.getElementById('editLocation').style.display = 'block';
                                 document.getElementById('editLocation').value = '';
@@ -299,26 +298,26 @@
                             }
                         ">
                         </select>
-                        <input type="text" id="editLocation" class="card-input-small" required placeholder="输入新定位"
+                        <input type="text" id="editLocation" class="card-input-small ao-field" required placeholder="输入新定位"
                             style="flex: 1; display: none;">
                     </div>
                 </div>
                 <div class="card-field" style="margin-bottom:16px;">
                     <label class="card-label">名称</label>
-                    <input type="text" id="editName" class="card-input-small" required placeholder="如：土豆">
+                    <input type="text" id="editName" class="card-input-small ao-field" required placeholder="如：土豆">
                 </div>
                 <div class="card-field" style="margin-bottom:16px;">
                     <label class="card-label">单位</label>
-                    <input type="text" id="editUnit" class="card-input-small" required value="斤">
+                    <input type="text" id="editUnit" class="card-input-small ao-field" required value="斤">
                 </div>
                 <div class="card-field" style="margin-bottom:24px;">
                     <label class="card-label">标签 (逗号分隔)</label>
-                    <input type="text" id="editTagsInput" class="card-input-small" placeholder="如：后厨, 常用">
+                    <input type="text" id="editTagsInput" class="card-input-small ao-field" placeholder="如：后厨, 常用">
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                    <button type="button" class="btn-delete" style="background:#f2f2f7;color:#1d1d1f;"
+                    <button type="button" class="btn-delete ao-button"
                         onclick="closeModal()">取消</button>
-                    <button type="submit" class="btn-delete" style="background:var(--primary);color:white;">保存</button>
+                    <button type="submit" class="btn-delete ao-primary">保存</button>
                 </div>
             </form>
         </div>
@@ -326,18 +325,18 @@
 
     <!-- 编辑商品模态框 -->
     <div id="editProductModal" class="modal">
-        <div class="modal-card">
+        <div class="modal-card ao-card">
             <h3 style="margin-bottom:24px;text-align:center;">编辑商品</h3>
             <form id="editProductForm">
                 <input type="hidden" id="editProductId">
                 <div class="card-field" style="margin-bottom:16px;">
                     <label class="card-label">商品名称</label>
-                    <input type="text" id="editProductName" class="card-input-small" required>
+                    <input type="text" id="editProductName" class="card-input-small ao-field" required>
                 </div>
                 <div class="card-field" style="margin-bottom:16px;">
                     <label class="card-label">定位</label>
                     <div style="display: flex; gap: 8px;">
-                        <select id="editProductLocationSelect" class="card-input-small" style="flex: 1;" onchange="
+                        <select id="editProductLocationSelect" class="card-input-small ao-field" style="flex: 1;" onchange="
                             if(this.value === '_custom_') {
                                 document.getElementById('editProductLocation').style.display = 'block';
                                 document.getElementById('editProductLocation').value = '';
@@ -348,26 +347,26 @@
                             }
                         ">
                         </select>
-                        <input type="text" id="editProductLocation" class="card-input-small" required
+                        <input type="text" id="editProductLocation" class="card-input-small ao-field" required
                             placeholder="输入新定位" style="flex: 1; display: none;">
                     </div>
                 </div>
                 <div class="card-field" style="margin-bottom:16px;">
                     <label class="card-label">单位</label>
-                    <input type="text" id="editProductUnit" class="card-input-small" required>
+                    <input type="text" id="editProductUnit" class="card-input-small ao-field" required>
                 </div>
                 <div class="card-field" style="margin-bottom:24px;">
                     <label class="card-label">标签 (逗号分隔)</label>
-                    <input type="text" id="editProductTags" class="card-input-small" placeholder="如：后厨, 常用">
+                    <input type="text" id="editProductTags" class="card-input-small ao-field" placeholder="如：后厨, 常用">
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
-                    <button type="button" class="btn-delete" onclick="deleteFromEditModal()"
+                    <button type="button" class="btn-delete ao-button ao-button--danger" onclick="deleteFromEditModal()"
                         style="font-size: 13px; padding: 0 4px;">
                         <svg class="svg-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-trash"></use></svg> 移到回收站
                     </button>
-                    <button type="button" class="btn-delete" style="background:#f2f2f7;color:#1d1d1f;"
+                    <button type="button" class="btn-delete ao-button"
                         onclick="closeEditProductModal()">取消</button>
-                    <button type="submit" class="btn-delete" style="background:var(--primary);color:white;">保存</button>
+                    <button type="submit" class="btn-delete ao-primary">保存</button>
                 </div>
             </form>
         </div>
@@ -844,7 +843,7 @@
                     <div style="display: flex; justify-content: space-between; align-items:flex-end;">
                         <span style="font-weight: 700; font-size: 15px;">
                             <span style="display:inline-block; width:24px; color:var(--text-sub); font-size: 13px;">${index + 1}.</span>
-                            ${item.name} 
+                            ${item.name}
                             <span style="font-size:11px; color:var(--text-sub); margin-left: 4px; font-weight: 500">${item.location}</span>
                         </span>
                         <span style="font-weight: 800; font-size: 15px; color: ${barColor};">${parseFloat(qty.toFixed(2))} <span style="font-size:12px; color:var(--text-sub); font-weight:500;">${item.unit}</span></span>
@@ -1327,10 +1326,10 @@
                         </div>
                     </div>
                     <div style="display: flex; gap: 8px;">
-                        <button class="btn-delete" style="width: auto; padding: 4px 12px; background: rgba(52,199,89,0.1); color: #34c759; border: none; font-size: 13px;" onclick="restoreProduct(${p.id})">
+                        <button class="btn-delete ao-button ao-button--quiet" onclick="restoreProduct(${p.id})">
                             ${iconSvg('undo')} 恢复
                         </button>
-                        <button class="btn-delete" style="width: auto; padding: 4px 12px; background: rgba(255,59,48,0.1); color: var(--accent); border: none; font-size: 13px;" onclick="deleteProductPermanently(${p.id}, '${p.name}')">
+                        <button class="btn-delete ao-button ao-button--danger" onclick="deleteProductPermanently(${p.id}, '${p.name}')">
                             ${iconSvg('trash')} 彻底删除
                         </button>
                     </div>
@@ -1426,10 +1425,10 @@
                         </div>
                     </div>
                     <div style="display: flex; gap: 8px;">
-                        <button class="icon-btn" style="width: 32px; height: 32px; background: rgba(0,113,227,0.1); color: var(--primary);" onclick="renameCategory('${loc}')">
+                        <button class="icon-btn ao-icon-button ao-icon-button--auxiliary" aria-label="重命名定位" onclick="renameCategory('${loc}')">
                             ${iconSvg('edit')}
                         </button>
-                        <button class="icon-btn" style="width: 32px; height: 32px; background: rgba(255,59,48,0.1); color: var(--accent);" onclick="deleteCategory('${loc}', ${count})">
+                        <button class="icon-btn ao-icon-button ao-icon-button--auxiliary" aria-label="删除定位" onclick="deleteCategory('${loc}', ${count})">
                             ${iconSvg('trash')}
                         </button>
                     </div>
@@ -1579,12 +1578,12 @@
                     </div>
                     <div class="admin-cell">
                         <span class="card-label">自定义标签 (逗号分隔)</span>
-                        <input type="text" class="admin-input-flat" style="font-size:12px;font-weight:400;" 
-                            placeholder="标签1, 标签2..." 
-                            value="${tags.join(', ')}" 
+                        <input type="text" class="admin-input-flat" style="font-size:12px;font-weight:400;"
+                            placeholder="标签1, 标签2..."
+                            value="${tags.join(', ')}"
                             onchange="updateTags(${p.id}, this.value)">
                     </div>
-                    <button class="btn-delete-icon" onclick="deleteProduct(${p.id})" title="移到回收站">
+                    <button class="btn-delete-icon ao-icon-button ao-icon-button--auxiliary" onclick="deleteProduct(${p.id})" title="移到回收站">
                         ${iconSvg('trash')}
                     </button>
                 </div>`;
@@ -1940,8 +1939,8 @@
                     ontouchend="cancelLongPress()"
                     ontouchcancel="cancelLongPress()">
                     <div class="check-wrapper">
-                        <input type="checkbox" id="check-${item.id}" class="custom-checkbox" 
-                            ${item.is_purchased ? 'checked' : ''} 
+                        <input type="checkbox" id="check-${item.id}" class="custom-checkbox"
+                            ${item.is_purchased ? 'checked' : ''}
                             onclick="togglePurchased(${item.id}, this.checked)">
                     </div>
                     <div style="flex:1;">
@@ -1950,11 +1949,11 @@
                     <div class="agg-qty-group">
                         ${state.editMode ? `
                             <div class="qty-control" style="margin-right:10px; scale:0.9;">
-                                <button class="icon-btn" style="width:28px;height:28px;background:none;" onclick="updateQty(${item.id}, -1); fetchDayData();">－</button>
+                                <button class="icon-btn ao-icon-button ao-icon-button--auxiliary" onclick="updateQty(${item.id}, -1); fetchDayData();">－</button>
                                 <input type="number" class="card-input-small" style="width:45px;text-align:center;background:none;padding:0;" value="${item.qty}" onchange="onQtyChange(${item.id}, this.value); fetchDayData();">
-                                <button class="icon-btn" style="width:28px;height:28px;background:none;" onclick="updateQty(${item.id}, 1); fetchDayData();">+</button>
+                                <button class="icon-btn ao-icon-button ao-icon-button--auxiliary" onclick="updateQty(${item.id}, 1); fetchDayData();">+</button>
                             </div>
-                            <button class="btn-delete-icon" style="margin-right:8px;" onclick="deleteCartItem(${item.id})" title="删除">
+                            <button class="btn-delete-icon ao-icon-button ao-icon-button--auxiliary" style="margin-right:8px;" onclick="deleteCartItem(${item.id})" title="删除">
                                 ${iconSvg('trash')}
                             </button>
                         ` : `
@@ -1986,7 +1985,7 @@
             }
 
             reconcileProductCards(document.getElementById('locationList'), locs.map(l =>
-                `<button data-id="${encodeURIComponent(l)}" class="loc-btn ${l === state.currentLocation ? 'active' : ''}" onclick="filterLoc('${l}')">${l}</button>`
+                `<button data-id="${encodeURIComponent(l)}" class="loc-btn ao-chip ${l === state.currentLocation ? 'active' : ''}" onclick="filterLoc('${l}')">${l}</button>`
             ).join(''));
         }
 
@@ -2017,7 +2016,7 @@
             container.style.display = 'flex';
             if (titles[0]) titles[0].style.display = 'flex';
             reconcileProductCards(container, allTags.map(tag => `
-                <div data-id="${encodeURIComponent(tag)}" class="tag-chip ${state.activeTags.has(tag) ? 'active' : ''}" onclick="toggleTagFilter('${tag}')">
+                <div data-id="${encodeURIComponent(tag)}" class="tag-chip ao-chip ${state.activeTags.has(tag) ? 'active' : ''}" onclick="toggleTagFilter('${tag}')">
                     ${tag}
                 </div>
             `).join(''));
@@ -2142,13 +2141,13 @@
                 const predictionHtml = prediction && !qty ? getPredictionHintHtml(p, prediction) : '';
                 const qtyPlaceholder = '0';
                 return `
-                <div class="product-card" data-id="${p.id}" 
-                    onmousedown="startLongPress(${p.id}, event)" 
-                    onmouseup="cancelLongPress()" 
+                <div class="product-card ao-card" data-id="${p.id}"
+                    onmousedown="startLongPress(${p.id}, event)"
+                    onmouseup="cancelLongPress()"
                     onmouseleave="cancelLongPress()"
-                    ontouchstart="startLongPress(${p.id}, event)" 
+                    ontouchstart="startLongPress(${p.id}, event)"
                     ontouchmove="cancelLongPress()"
-                    ontouchend="cancelLongPress()" 
+                    ontouchend="cancelLongPress()"
                     ontouchcancel="cancelLongPress()">
                     <div style="flex:1;">
                         <div style="font-weight:700;font-size:17px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
@@ -2164,9 +2163,9 @@
                         ${predictionHtml}
                     </div>
                     <div id="wrapper-${p.id}" class="qty-control">
-                        <button class="icon-btn" style="width:32px;height:32px;background:none;" onclick="updateQty(${p.id}, -1)">−</button>
+                        <button class="icon-btn ao-icon-button ao-icon-button--auxiliary" onclick="updateQty(${p.id}, -1)">−</button>
                         <input type="number" class="card-input-small" style="width:50px;text-align:center;background:none;padding:0;" value="${qty}" placeholder="${qtyPlaceholder}" onchange="onQtyChange(${p.id}, this.value)">
-                        <button class="icon-btn" style="width:32px;height:32px;background:none;" onclick="updateQty(${p.id}, 1)">+</button>
+                        <button class="icon-btn ao-icon-button ao-icon-button--auxiliary" onclick="updateQty(${p.id}, 1)">+</button>
                     </div>
                     <span style="margin-left:8px;font-size:14px;color:var(--text-sub);min-width:20px;">${p.unit || '斤'}</span>
                 </div>`;

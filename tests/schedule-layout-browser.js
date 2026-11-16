@@ -1,6 +1,6 @@
 async page => {
   const base='http://127.0.0.1:8772';
-  await page.route('**/pages/schedule/bootstrap.js', route=>route.fulfill({contentType:'text/javascript',body:''}));
+  await page.route('**/network/subprogram-bootstrap.js*', route=>route.fulfill({contentType:'text/javascript',body:''}));
   await page.route('https://**', route=>route.abort());
   const results=[];
   for (const variant of [{width:390,theme:'light'},{width:1280,theme:'dark'},{width:320,theme:'light'},{width:1024,theme:'light',large:true}]) {

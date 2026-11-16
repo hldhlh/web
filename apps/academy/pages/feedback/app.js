@@ -108,9 +108,9 @@
 
   function managerActions(item) {
     if (!hydrated || !isManager()) return "";
-    if (item.status === "open") return `<button type="button" data-status-action="processing" data-id="${escapeHtml(item.id)}">开始处理</button>`;
-    if (item.status === "processing") return `<button type="button" data-status-action="resolved" data-id="${escapeHtml(item.id)}">标记解决</button>`;
-    return `<button type="button" data-status-action="open" data-id="${escapeHtml(item.id)}">重新打开</button>`;
+    if (item.status === "open") return `<button class="ao-button ao-button--quiet" type="button" data-status-action="processing" data-id="${escapeHtml(item.id)}">开始处理</button>`;
+    if (item.status === "processing") return `<button class="ao-button ao-button--quiet" type="button" data-status-action="resolved" data-id="${escapeHtml(item.id)}">标记解决</button>`;
+    return `<button class="ao-button ao-button--quiet" type="button" data-status-action="open" data-id="${escapeHtml(item.id)}">重新打开</button>`;
   }
 
   function renderList() {
@@ -130,7 +130,7 @@
         <p>${escapeHtml(item.detail)}</p>
         <footer>
           <span><b>${escapeHtml(item.createdBy.name)}</b> · ${escapeHtml(timeLabel(item.createdAt))}</span>
-          <div class="feedback-actions">${canEdit(item) ? `<button type="button" data-edit-id="${escapeHtml(item.id)}">编辑</button><button type="button" class="delete-feedback" data-delete-id="${escapeHtml(item.id)}">删除</button>` : ""}${managerActions(item)}</div>
+          <div class="feedback-actions">${canEdit(item) ? `<button class="ao-button ao-button--quiet" type="button" data-edit-id="${escapeHtml(item.id)}">编辑</button><button type="button" class="delete-feedback ao-button ao-button--danger" data-delete-id="${escapeHtml(item.id)}">删除</button>` : ""}${managerActions(item)}</div>
         </footer>
       </article>`).join(""));
   }

@@ -19,11 +19,11 @@
     <div class="container">
         <div class="top-bar ao-card">
             <div id="status-dot" class="status-dot" title="连接中，点击重新连接" role="button" tabindex="0"></div>
-            <div class="input-group">
+            <div class="input-group ao-control ao-control--inset">
                 <input type="text" id="search" placeholder="搜索笔记或简拼" autofocus autocomplete="off"
                     name="search-field">
             </div>
-            <button type="button" class="btn-icon" onclick="togglePanel()" aria-label="新增笔记" title="新增笔记">+</button>
+            <button type="button" class="btn-icon ao-icon-button ao-icon-button--page" onclick="togglePanel()" aria-label="新增笔记" title="新增笔记">+</button>
         </div>
         <div id="results"></div>
     </div>
@@ -32,30 +32,30 @@
     <div id="panelOverlay" onclick="handleOverlayClick(event)">
         <div class="panel ao-card" id="addPanel">
             <!-- 隐藏的诱饵输入框，防止浏览器自动填充 -->
-            <input type="text" style="position:absolute;top:-9999px;left:-9999px;" tabindex="-1" autocomplete="off">
-            <input type="password" style="position:absolute;top:-9999px;left:-9999px;" tabindex="-1"
+            <input type="text" class="ao-autofill-trap" tabindex="-1" autocomplete="off">
+            <input type="password" class="ao-autofill-trap" tabindex="-1"
                 autocomplete="new-password">
-            <div style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">
+            <div class="notes-editor-meta">
                 数据编辑面板
-                <span id="lastModifiedDisplay" style="float: right; color: var(--muted); font-size: 10px;"></span>
+                <span id="lastModifiedDisplay" class="notes-editor-modified"></span>
             </div>
             <div class="form-row">
                 <label class="form-label">> 标题</label>
-                <input type="text" id="newTitle" class="form-input" placeholder="例如: 前厅开早流程" autocomplete="off">
+                <input type="text" id="newTitle" class="form-input ao-field" placeholder="例如: 前厅开早流程" autocomplete="off">
             </div>
             <div class="form-row">
                 <label class="form-label">> 分类</label>
-                <input type="text" id="newTag" class="form-input" placeholder="例如: 笔记, 流程, 资料" autocomplete="off">
+                <input type="text" id="newTag" class="form-input ao-field" placeholder="例如: 笔记, 流程, 资料" autocomplete="off">
             </div>
             <div class="form-row">
                 <label class="form-label">> 内容详情 (支持粘贴图片)</label>
-                <div id="newContent" class="form-content" contenteditable="true" placeholder="在此输入详细配方或流程... (直接粘贴图片)">
+                <div id="newContent" class="form-content ao-field" contenteditable="true" placeholder="在此输入详细配方或流程... (直接粘贴图片)">
                 </div>
             </div>
-            <div style="margin-top: 15px;">
+            <div class="notes-editor-actions">
                 <button class="btn-save ao-primary" id="btnSave" onclick="saveData()">保存</button>
-                <button class="btn-cancel" onclick="togglePanel()">取消</button>
-                <button class="btn-danger" id="btnDelete" onclick="deleteCurrentItem()">删除</button>
+                <button class="btn-cancel ao-button ao-button--quiet" onclick="togglePanel()">取消</button>
+                <button class="btn-danger ao-button ao-button--danger" id="btnDelete" onclick="deleteCurrentItem()">删除</button>
             </div>
         </div>
     </div>
@@ -68,30 +68,30 @@
 
     <!-- 密码输入弹窗 -->
     <div id="passwordOverlay" onclick="handlePasswordOverlayClick(event)">
-        <div class="password-panel">
+        <div class="password-panel ao-card">
             <div class="password-title">请输入密码</div>
             <!-- 隐藏的诱饵输入框，防止浏览器自动填充 -->
-            <input type="text" style="position:absolute;top:-9999px;left:-9999px;" tabindex="-1" autocomplete="off">
-            <input type="password" style="position:absolute;top:-9999px;left:-9999px;" tabindex="-1"
+            <input type="text" class="ao-autofill-trap" tabindex="-1" autocomplete="off">
+            <input type="password" class="ao-autofill-trap" tabindex="-1"
                 autocomplete="new-password">
-            <input type="password" id="passwordInput" class="password-input" placeholder="输入密码以继续..." autocomplete="off"
+            <input type="password" id="passwordInput" class="password-input ao-field" placeholder="输入密码以继续..." autocomplete="off"
                 name="password-field" />
             <div class="password-error" id="passwordError">密码错误！</div>
             <div class="password-buttons">
-                <button class="password-btn cancel" onclick="closePasswordDialog()">取消</button>
-                <button class="password-btn" onclick="confirmPassword()">确认</button>
+                <button class="password-btn cancel ao-button ao-button--quiet" onclick="closePasswordDialog()">取消</button>
+                <button class="password-btn ao-button" onclick="confirmPassword()">确认</button>
             </div>
         </div>
     </div>
 
     <!-- 删除确认弹窗 -->
     <div id="confirmOverlay" onclick="handleConfirmOverlayClick(event)">
-        <div class="password-panel">
+        <div class="password-panel ao-card">
             <div class="password-title">确认删除</div>
-            <div style="color: var(--muted); font-size: 14px; margin-bottom: 20px;">此操作无法撤销，确认要永久删除此条目吗？</div>
+            <div class="notes-confirm-copy">此操作无法撤销，确认要永久删除此条目吗？</div>
             <div class="password-buttons">
-                <button class="password-btn cancel" onclick="closeConfirmDialog()">取消</button>
-                <button class="password-btn delete" onclick="confirmDelete()">删除</button>
+                <button class="password-btn cancel ao-button ao-button--quiet" onclick="closeConfirmDialog()">取消</button>
+                <button class="password-btn delete ao-button ao-button--danger" onclick="confirmDelete()">删除</button>
             </div>
         </div>
     </div>
@@ -393,7 +393,7 @@
                     console.warn('后台数据加载失败:', e.message);
                     // 如果没有缓存且加载失败，显示错误
                     if (!cachedData) {
-                        DOM.results.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px 0;">加载失败，请刷新重试</div>';
+                        DOM.results.innerHTML = '<div class="ao-empty-message">加载失败，请刷新重试</div>';
                     }
                 }
             }
@@ -549,7 +549,7 @@
                             if (currentSeq !== searchSeq) return;
                             console.warn('全库内容搜索失败:', error);
                             if (!localMatches.length) {
-                                DOM.results.innerHTML = '<div style="color:var(--muted);padding-top:20px;">搜索失败，请检查网络后重试</div>';
+                                DOM.results.innerHTML = '<div class="ao-inline-message">搜索失败，请检查网络后重试</div>';
                             }
                         }
                     }, 300);
@@ -1254,7 +1254,7 @@
 
                 if (!list.length) {
                     previous.forEach(cleanupWebapps);
-                    DOM.results.innerHTML = '<div style="color:var(--muted);padding-top:20px;">暂无数据</div>';
+                    DOM.results.innerHTML = '<div class="ao-inline-message">暂无数据</div>';
                     return;
                 }
 
@@ -1303,7 +1303,7 @@
                     const content = document.createElement('div');
                     content.className = 'content';
                     content.onclick = (event) => event.stopPropagation();
-                    content.innerHTML = '<div style="color:var(--muted);padding:8px 0;">点击加载内容...</div>';
+                    content.innerHTML = '<div class="ao-inline-message ao-inline-message--compact">点击加载内容...</div>';
 
                     if (existing) {
                         const oldHeader = listItem.querySelector('.item-header');
@@ -1334,7 +1334,7 @@
 
                 const { renderedContent, webappBlocks } = processContentWithWebapps(item.info, item.id);
                 const displayContent = preservePlainTextLineBreaks(renderedContent);
-                const highlightedContent = displayContent.replace(/(^|\n|<br\s*\/?>)(\d+)\./g, '$1<span style="color:var(--highlight);">$2.</span>');
+                const highlightedContent = displayContent.replace(/(^|\n|<br\s*\/?>)(\d+)\./g, '$1<span class="ao-text-accent">$2.</span>');
 
                 listItemElement.dataset.webappBlocks = JSON.stringify(webappBlocks.map(b => ({
                     id: b.id,
@@ -1362,7 +1362,7 @@
                     if (cachedDetail) {
                         renderItemContent(el, cachedDetail, DOM.input.value.trim());
                     } else {
-                        if (content) content.innerHTML = '<div style="color:var(--muted);padding:8px 0;">正在加载内容...</div>';
+                        if (content) content.innerHTML = '<div class="ao-inline-message ao-inline-message--compact">正在加载内容...</div>';
                         const detail = await fetchItemDetail(itemId);
                         if (!el.isConnected || !el.classList.contains('expanded')) return;
                         renderItemContent(el, detail, DOM.input.value.trim());
@@ -1372,7 +1372,7 @@
                 } catch (error) {
                     console.warn('内容加载失败:', error);
                     if (el.isConnected && content) {
-                        content.innerHTML = `<div style="color:var(--danger);padding:8px 0;">内容加载失败：${error.message}</div>`;
+                        content.innerHTML = `<div class="ao-inline-message ao-inline-message--compact ao-inline-message--error">内容加载失败：${error.message}</div>`;
                     }
                 }
             }

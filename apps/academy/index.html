@@ -31,13 +31,12 @@
   <link rel="preload" href="./app.js?v=__BUILD_VERSION__" as="script">
   <link rel="prefetch" href="./pages/schedule/index.html">
   <link rel="prefetch" href="./ui/subprograms/schedule.css" as="style">
-  <link rel="prefetch" href="./pages/schedule/bootstrap.js" as="script">
+  <link rel="prefetch" href="./network/subprogram-bootstrap.js" as="script">
   <link rel="prefetch" href="./pages/schedule/app.js" as="script">
   <link rel="prefetch" href="./pages/feedback/index.html">
   <link rel="prefetch" href="./ui/subprograms/feedback.css" as="style">
-  <link rel="prefetch" href="./pages/feedback/bootstrap.js" as="script">
   <link rel="prefetch" href="./pages/feedback/app.js" as="script">
-  <link rel="stylesheet" href="./framework/save-status.css">
+  <link rel="stylesheet" href="./ui/save-status.css">
   <link rel="stylesheet" href="./ui/appearance.css?v=__BUILD_VERSION__">
   <link rel="stylesheet" href="./framework/security.css?v=__BUILD_VERSION__">
   <link rel="stylesheet" href="./document-course.css?v=__BUILD_VERSION__">
@@ -64,13 +63,13 @@
   <noscript>Auto Office 需要启用 JavaScript。</noscript>
   <script defer src="../network.js?v=__BUILD_VERSION__"></script>
   <script defer src="../vendor/supabase.min.js"></script>
-  <script defer src="./framework/reliable-store.js"></script>
-  <script defer src="./framework/store.js?v=__BUILD_VERSION__"></script>
+  <script defer src="./network/reliable-store.js"></script>
+  <script defer src="./network/store.js?v=__BUILD_VERSION__"></script>
   <script defer src="./version-guard.js?v=__BUILD_VERSION__"></script>
-  <script defer src="./framework/secure-auth.js?v=__BUILD_VERSION__"></script>
+  <script defer src="./network/secure-auth.js?v=__BUILD_VERSION__"></script>
   <script defer src="./framework/security-insights.js?v=__BUILD_VERSION__"></script>
   <script defer src="./framework/security-ui.js?v=__BUILD_VERSION__"></script>
-  <script defer src="./framework/auth.js?v=__BUILD_VERSION__"></script>
+  <script defer src="./network/auth.js?v=__BUILD_VERSION__"></script>
   <script defer src="./framework/gate.js?v=__BUILD_VERSION__"></script>
   <script defer src="./content.js?v=__BUILD_VERSION__"></script>
   <script defer src="./daily-status.js?v=__BUILD_VERSION__"></script>
@@ -89,6 +88,6 @@
       navigator.serviceWorker.getRegistration().then((registration) => registration?.update()).catch(() => {});
     }
   </script>
-  <script defer src="./framework/save-status.js"></script>
+  <script defer src="./network/save-status.js"></script>
 </body>
 </html>

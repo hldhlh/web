@@ -8,3 +8,7 @@ When changing any user-facing interface in this directory, read and follow `DESI
 - Prefer content hierarchy and familiar platform behavior over decorative effects.
 - New navigation, controls, and motion must remain consistent with the existing system and must not communicate state through color alone.
 - Persistent user preference (2026-11-03): modern, minimal Apple-style UI is required. Follow the official HIG and the concrete directory/list, typography, spacing, and visual-review rules in `DESIGN_SYSTEM.md`. Do not substitute pill buttons, decorative glyphs, excessive bold text, or blank space for a coherent navigation hierarchy.
+
+- Reuse shared components from `ui/` across subprograms and keep application-owned styles and local assets within that directory. Keep only necessary page layout and domain-specific rendering rules in `ui/subprograms/`; do not duplicate general button, input, card or dialog appearance in individual programs.
+
+- Keep Auto Office networking, authentication and synchronization modules in `network/`; reuse the repository-wide transport instead of maintaining another copy. When moving modules, update embedded-app bootstrap paths, preload manifests, service-worker caches and tests together.

@@ -89,7 +89,7 @@ window.AcademyDailyStatus = (() => {
       </section>
       <div class="daily-status-preview"><strong>首页今日展示</strong><p id="daily-status-preview-text"></p></div>
       <p role="status" aria-live="polite" id="daily-status-message"></p>
-      <div class="actions"><button class="primary" type="submit">保存设置</button><button class="ghost" type="button" id="daily-status-reset">放弃修改</button></div>
+      <div class="actions"><button class="primary ao-primary" type="submit">保存设置</button><button class="ghost" type="button" id="daily-status-reset">放弃修改</button></div>
     </form>`;
     const form = host.querySelector('form');
     const read = () => {

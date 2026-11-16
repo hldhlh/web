@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 const context = { window: { addEventListener() {} }, document: { addEventListener() {} } };
-vm.runInNewContext(readFileSync('apps/academy/framework/reliable-store.js', 'utf8'), context);
+vm.runInNewContext(readFileSync('apps/academy/network/reliable-store.js', 'utf8'), context);
 const { merge, split } = context.window.AcademyReliable;
 const plain = value => JSON.parse(JSON.stringify(value));
 test('different fields merge and deletion is retained', () => {

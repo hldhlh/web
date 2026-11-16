@@ -29,7 +29,7 @@
       <h2 id="manageFolderHeading">文件夹</h2>
       <p id="manageFolderStatus" role="status" aria-live="polite">正在读取…</p>
       <div id="manageFolderActions" class="folder-actions"><button id="chooseMoveFolder" class="button quiet ao-button ao-button--quiet" type="button">移动文件夹</button><button id="chooseDeleteFolder" class="button destructive ao-button ao-button--danger" type="button">删除文件夹</button></div>
-      <label id="manageFolderTargetField" hidden>移到<select id="manageFolderTarget"></select></label>
+      <label id="manageFolderTargetField" hidden>移到<select id="manageFolderTarget" class="ao-field"></select></label>
       <fieldset id="manageFolderDeleteField" hidden><legend>文件夹中的图片</legend>
         <label><input type="radio" name="deleteFolderMode" value="delete_keep" checked>保留图片及标注，移到上级目录</label>
         <label><input type="radio" name="deleteFolderMode" value="delete_all">连同所有图片项目及标注一起删除</label>
@@ -40,8 +40,8 @@
   </dialog>
   <dialog id="folderDialog" class="ao-dialog rename-dialog" aria-labelledby="folderDialogHeading">
     <form id="folderForm"><h2 id="folderDialogHeading">新建目录</h2>
-    <label id="folderNameField">目录名称<input id="folderName" maxlength="80" required autocomplete="off"></label>
-    <label id="folderTargetField" hidden>目标目录<select id="folderTarget"></select></label>
+    <label id="folderNameField">目录名称<input id="folderName" class="ao-field" maxlength="80" required autocomplete="off"></label>
+    <label id="folderTargetField" hidden>目标目录<select id="folderTarget" class="ao-field"></select></label>
     <p id="folderStatus" role="status" aria-live="polite"></p>
     <div class="rename-actions"><button id="cancelFolder" type="button" class="button quiet ao-button ao-button--quiet">取消</button><button id="saveFolder" class="button primary ao-primary">保存</button></div></form>
   </dialog>
@@ -49,7 +49,7 @@
     <h2 id="batchHeading">AI 批量编辑</h2>
     <p>导出项目交给 AI，粘贴编辑指令后预览。坐标使用原图像素。</p>
     <div class="batch-buttons"><button id="exportBatch" class="button quiet ao-button ao-button--quiet" type="button">导出项目 JSON</button><button id="undoBatch" class="button quiet ao-button ao-button--quiet" type="button">撤销上一批</button></div>
-    <label for="batchInput">编辑指令 JSON</label><textarea id="batchInput" rows="9" spellcheck="false"></textarea>
+    <label for="batchInput">编辑指令 JSON</label><textarea id="batchInput" class="ao-field" rows="9" spellcheck="false"></textarea>
     <p id="batchStatus" role="status" aria-live="polite"></p>
     <ul id="batchChanges"></ul>
     <canvas id="batchPreview" hidden aria-label="整批修改预览"></canvas>
@@ -66,7 +66,7 @@
     <form id="renameForm">
       <h2 id="renameHeading">编辑项目名称</h2>
       <label for="projectNameInput">项目名称</label>
-      <input id="projectNameInput" name="projectName" type="text" maxlength="180" required autocomplete="off" enterkeyhint="done" aria-describedby="renameStatus">
+      <input id="projectNameInput" class="ao-field" name="projectName" type="text" maxlength="180" required autocomplete="off" enterkeyhint="done" aria-describedby="renameStatus">
       <p id="renameStatus" role="status" aria-live="polite">名称会同步给项目成员。</p>
       <div class="rename-actions"><button id="cancelRename" class="button quiet ao-button ao-button--quiet" type="button">取消</button><button id="saveRename" class="button primary ao-primary" type="submit">保存</button></div>
     </form>
@@ -115,10 +115,10 @@
       </div>
       <div class="library-tools">
         <label class="search-field ao-control ao-control--inset" for="projectSearch"><svg class="icon" aria-hidden="true"><use href="#search"/></svg><span class="sr-only">搜索项目或制作员工</span><input id="projectSearch" type="search" placeholder="搜索项目或制作员工" autocomplete="off"></label>
-        <fieldset class="project-scope">
+        <fieldset class="project-scope ao-segmented">
           <legend class="sr-only">项目范围</legend>
-          <label class="scope-option"><input id="allProjects" type="radio" name="projectScope" value="all" checked><span>全部</span></label>
-          <label class="scope-option"><input id="onlyMine" type="radio" name="projectScope" value="mine"><span>我创建的</span></label>
+          <label class="scope-option ao-segmented__option"><input id="allProjects" type="radio" name="projectScope" value="all" checked><span>全部</span></label>
+          <label class="scope-option ao-segmented__option"><input id="onlyMine" type="radio" name="projectScope" value="mine"><span>我创建的</span></label>
         </fieldset>
       </div>
       <h2 class="sr-only">项目资料库</h2>
@@ -167,19 +167,19 @@
       </div>
       <aside class="side-panel" id="sidePanel" hidden aria-label="标注工具与属性">
         <div class="inspector-header"><h2>标注工具</h2><span>手动尺寸</span></div>
-        <div class="draw-mode" role="group" aria-label="绘制模式">
-          <button id="lineTool" class="active" type="button" aria-pressed="true"><svg class="icon" aria-hidden="true"><use href="#line"/></svg><span>尺寸线</span></button>
-          <button id="rectTool" class="" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#rect"/></svg><span>描边框</span></button>
-          <button id="circleTool" class="" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#circle"/></svg><span>圆形</span></button>
-          <button id="curveTool" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><path d="M3 19 Q3 5 20 5"/></svg><span>曲线描边</span></button>
-          <button id="noteTool" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><path d="M4 5h16M12 5v15M8 20h8"/></svg><span>说明</span></button>
+        <div class="draw-mode ao-segmented" role="group" aria-label="绘制模式">
+          <button id="lineTool" class="active ao-segmented__item" type="button" aria-pressed="true"><svg class="icon" aria-hidden="true"><use href="#line"/></svg><span>尺寸线</span></button>
+          <button id="rectTool" class="ao-segmented__item" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#rect"/></svg><span>描边框</span></button>
+          <button id="circleTool" class="ao-segmented__item" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#circle"/></svg><span>圆形</span></button>
+          <button id="curveTool" class="ao-segmented__item" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><path d="M3 19 Q3 5 20 5"/></svg><span>曲线描边</span></button>
+          <button id="noteTool" class="ao-segmented__item" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><path d="M4 5h16M12 5v15M8 20h8"/></svg><span>说明</span></button>
         </div>
         <section class="panel-section label-editor">
           <div class="section-heading"><h3>标注内容</h3><span id="selectionType">未选中</span></div>
-          <div id="lineLabelFields"><label for="labelInput">尺寸文字</label><input id="labelInput" type="text" maxlength="32" placeholder="例如：宽 120 cm" disabled>
+          <div id="lineLabelFields"><label for="labelInput">尺寸文字</label><input id="labelInput" class="ao-field" type="text" maxlength="32" placeholder="例如：宽 120 cm" disabled>
             <div class="quick-labels" aria-label="快速插入标注前缀"><button type="button" data-prefix="宽 ">宽度</button><button type="button" data-prefix="高 ">高度</button><button type="button" data-prefix="深 ">深度</button><button type="button" data-prefix="直径 Ø">直径</button></div>
           </div>
-          <div class="edge-fields" id="rectLabelFields" hidden><label>上边<input id="topLabelInput" type="text" maxlength="32" placeholder="填写尺寸" disabled></label><label>右边<input id="rightLabelInput" type="text" maxlength="32" placeholder="填写尺寸" disabled></label><label>下边<input id="bottomLabelInput" type="text" maxlength="32" placeholder="填写尺寸" disabled></label><label>左边<input id="leftLabelInput" type="text" maxlength="32" placeholder="填写尺寸" disabled></label></div>
+          <div class="edge-fields" id="rectLabelFields" hidden><label>上边<input id="topLabelInput" class="ao-field" type="text" maxlength="32" placeholder="填写尺寸" disabled></label><label>右边<input id="rightLabelInput" class="ao-field" type="text" maxlength="32" placeholder="填写尺寸" disabled></label><label>下边<input id="bottomLabelInput" class="ao-field" type="text" maxlength="32" placeholder="填写尺寸" disabled></label><label>左边<input id="leftLabelInput" class="ao-field" type="text" maxlength="32" placeholder="填写尺寸" disabled></label></div>
           <small class="editor-tip" id="editorTip">先在画布上拖出一条标注，再填写尺寸。</small>
         </section>
         <section class="panel-section appearance-section" aria-label="标注外观">

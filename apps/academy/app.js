@@ -1844,7 +1844,7 @@
           ${pendingItems.length ? pendingItems.map((item, index) => `<button type="button" class="pending-row ${index === 0 ? "is-priority" : ""}" data-act="${item.lessonId ? "open-lesson" : "go"}" ${item.lessonId ? `data-id="${escapeHtml(item.lessonId)}"` : `data-hash="${item.hash}"`}>
             <span class="pending-icon" aria-hidden="true">${svgIcon(item.icon)}</span>
             <strong>${item.count} ${item.title}</strong>
-            <span class="pending-action">${item.action}</span>
+            <span class="pending-action ao-primary">${item.action}</span>
           </button>`).join("") : `<div class="pending-empty">当前待办已完成 <span aria-hidden="true">✓</span></div>`}
         </div>
       </section><section data-home-block="tasks" class="learning-plan">
@@ -2744,7 +2744,7 @@
           ${renderPublishToggle("ops-notice-notify", data.notify, "发送铃铛消息", "发布后进入成员消息列表并显示未读铃铛")}
         </fieldset>
         <div class="actions">
-          <button class="primary" type="button" data-act="ops-save" data-section="notices" data-id="${data.id}">${data.id ? "保存通知" : "发布通知"}</button>
+          <button class="primary ao-primary" type="button" data-act="ops-save" data-section="notices" data-id="${data.id}">${data.id ? "保存通知" : "发布通知"}</button>
           <button class="ghost" type="button" data-act="ops-cancel" data-section="notices">取消</button>
         </div>
       </form>
@@ -2871,7 +2871,7 @@
         </div>
         <div class="lesson-editor-footer task-board-editor-footer">
           <span>分别绑定学习内容与接收人，发布后同步到成员首页</span>
-          <button class="primary" type="button" data-act="ops-save" data-section="tasks">发布任务</button>
+          <button class="primary ao-primary" type="button" data-act="ops-save" data-section="tasks">发布任务</button>
         </div>
       </form>`;
   }
@@ -3041,7 +3041,7 @@
 
         <div class="editor-actions">
           <button class="ghost" type="button" data-act="ops-cancel" data-section="lessons">取消</button>
-          <button class="primary" type="button" data-act="ops-save" data-section="lessons" data-id="${data.id}">${data.id ? "保存修改" : "发布课程"}</button>
+          <button class="primary ao-primary" type="button" data-act="ops-save" data-section="lessons" data-id="${data.id}">${data.id ? "保存修改" : "发布课程"}</button>
         </div>
       </form>
     `;
@@ -3070,7 +3070,7 @@
     return `
       <section class="ops-list" aria-label="课程列表">
         <header class="ops-list-head"><div><h3>全部课程</h3><span>共 ${DATA.lessons.length} 门课程</span></div></header>
-        ${window.AcademyFrontSafety ? `<section class="card front-safety-starter"><div><strong>前厅安全入门</strong><p>火锅前厅安全手册与20题考试，全部答对通过。</p></div><button type="button" class="primary" data-act="ops-front-safety">${lessonById(window.AcademyFrontSafety.lesson.id) ? "查看课程" : "创建课程与考试"}</button></section>` : ""}
+        ${window.AcademyFrontSafety ? `<section class="card front-safety-starter"><div><strong>前厅安全入门</strong><p>火锅前厅安全手册与20题考试，全部答对通过。</p></div><button type="button" class="primary ao-primary" data-act="ops-front-safety">${lessonById(window.AcademyFrontSafety.lesson.id) ? "查看课程" : "创建课程与考试"}</button></section>` : ""}
         ${renderGroupedCourses(DATA.lessons, renderOpsCourseCards, "ops")}
       </section>
     `;
@@ -3109,7 +3109,7 @@
         </label>
         <textarea id="ops-exam-questions" hidden>${escapeHtml(JSON.stringify(questionDrafts))}</textarea>
         <div class="actions">
-          <button class="primary" type="button" data-act="ops-save" data-section="exams" data-id="${data.id}">${data.id ? "保存考试" : "发布考试"}</button>
+          <button class="primary ao-primary" type="button" data-act="ops-save" data-section="exams" data-id="${data.id}">${data.id ? "保存考试" : "发布考试"}</button>
           <button class="ghost" type="button" data-act="ops-cancel" data-section="exams">取消</button>
         </div>
       </form>
@@ -3386,7 +3386,7 @@
           ${isEditing ? `<div class="ops-breadcrumb"><button data-act="ops-cancel" data-section="${active}">← 返回${titleMap[active]}</button><span>${route.mode === "add" ? "新建" : "编辑"}</span></div>` : `
             <header class="ops-workspace-head">
               <div><h2>${titleMap[active]}</h2></div>
-              ${actionMap[active] ? `<button class="primary ops-header-action" data-act="go" data-hash="${actionMap[active].hash}" aria-label="${actionMap[active].label}">${svgIcon("add")}<span>${actionMap[active].label}</span></button>` : ""}
+              ${actionMap[active] ? `<button class="primary ao-primary ops-header-action" data-act="go" data-hash="${actionMap[active].hash}" aria-label="${actionMap[active].label}">${svgIcon("add")}<span>${actionMap[active].label}</span></button>` : ""}
             </header>
           `}
           <div class="ops-content">${content}</div>
@@ -3440,24 +3440,24 @@
         <p class="kicker">权限不足</p>
         <strong>这份内容需要店长授权</strong>
         <p class="muted">当前账号暂未开通这项内容。如需学习，请联系店长。</p>
-        <button class="primary" data-act="back">返回上一页</button>
+        <button class="primary ao-primary" data-act="back">返回上一页</button>
       </div>
     `;
   }
 
   function lessonCompletionPanel(lesson, unlocked = true) {
     if (isDone(lesson.id)) {
-      return `<footer class="lesson-completion-panel is-done"><div><strong>本课已完成</strong></div><button class="primary" data-act="complete" data-id="${lesson.id}">继续学习</button></footer>`;
+      return `<footer class="lesson-completion-panel is-done"><div><strong>本课已完成</strong></div><button class="primary ao-primary" data-act="complete" data-id="${lesson.id}">继续学习</button></footer>`;
     }
     const linkedExam = lesson.requiredExamId ? examById(lesson.requiredExamId) : null;
     if (lesson.requiredExamId) {
       if (!linkedExam || !Gate.canExam(linkedExam)) {
         return `<footer class="lesson-completion-panel is-locked"><div><strong>关联考试暂不可用</strong><span>请联系店长检查考试配置或权限</span></div></footer>`;
       }
-      return `<footer class="lesson-completion-panel"><div><strong>通过考试后完成本课</strong><span>${escapeHtml(linkedExam.title)} · ${linkedExam.pass} 分通过</span></div><button class="primary" data-act="lesson-exam" data-exam-id="${linkedExam.id}" ${unlocked ? "" : "disabled"}>${unlocked ? "参加考试" : "看完视频后参加考试"}</button></footer>`;
+      return `<footer class="lesson-completion-panel"><div><strong>通过考试后完成本课</strong><span>${escapeHtml(linkedExam.title)} · ${linkedExam.pass} 分通过</span></div><button class="primary ao-primary" data-act="lesson-exam" data-exam-id="${linkedExam.id}" ${unlocked ? "" : "disabled"}>${unlocked ? "参加考试" : "看完视频后参加考试"}</button></footer>`;
     }
     if (lesson.requireConfirmation) {
-      return `<footer class="lesson-completion-panel"><div><strong>确认学习结果</strong><span>${unlocked ? "确认后，本课将计入已完成" : "视频播放结束后即可确认"}</span></div><button class="primary" data-act="complete" data-id="${lesson.id}" ${unlocked ? "" : "disabled"}>${unlocked ? "确认完成本课" : "看完视频后可确认"}</button></footer>`;
+      return `<footer class="lesson-completion-panel"><div><strong>确认学习结果</strong><span>${unlocked ? "确认后，本课将计入已完成" : "视频播放结束后即可确认"}</span></div><button class="primary ao-primary" data-act="complete" data-id="${lesson.id}" ${unlocked ? "" : "disabled"}>${unlocked ? "确认完成本课" : "看完视频后可确认"}</button></footer>`;
     }
     return `<footer class="lesson-completion-panel is-auto" data-auto-complete role="status" aria-live="polite"><div><strong>${unlocked ? "阅读到末尾后自动完成" : "看完视频后自动完成"}</strong></div><i aria-hidden="true"></i></footer>`;
   }
@@ -3756,7 +3756,7 @@
         <p class="muted">${exam.questions.length} 题 · ${minutesLabel(exam.minutes)} · ${exam.pass} 分及格</p>
         <p class="muted">确认后开始计时，时间结束自动交卷。${retake ? "已有成绩会保留在考试记录中。" : ""}</p>
         <div class="actions">
-          <button type="button" class="primary" data-act="exam-start">${retake ? "再考一次" : "开始考试"}</button>
+          <button type="button" class="primary ao-primary" data-act="exam-start">${retake ? "再考一次" : "开始考试"}</button>
           <button type="button" class="ghost" data-act="go" data-hash="#/exams">暂不考试</button>
         </div>
       </section>
@@ -3824,7 +3824,7 @@
           </button>`).join("")}
       </div>
       <div class="actions">
-        <button class="primary" data-act="exam-next">${state.exam.index === exam.questions.length - 1 ? "交卷" : "下一题"}</button>
+        <button class="primary ao-primary" data-act="exam-next">${state.exam.index === exam.questions.length - 1 ? "交卷" : "下一题"}</button>
         ${state.exam.index ? `<button class="ghost" data-act="exam-prev">上一题</button>` : ""}
       </div>
     `;
@@ -4082,7 +4082,7 @@
       ${result?.wrong?.length ? `<div class="sec-title"><h3>错题解析</h3></div>${result.wrong.map((item) =>
         `<div class="card lesson-card"><strong>${escapeHtml(item.stem)}</strong><p class="muted">${escapeHtml(item.explain)}</p></div>`).join("")}` : ""}
       ${renderExamHistory(exam, result?.at)}
-      <button class="primary" data-act="go" data-hash="#/exam/${exam.id}">再考一次</button>
+      <button class="primary ao-primary" data-act="go" data-hash="#/exam/${exam.id}">再考一次</button>
       <button class="ghost" data-act="go" data-hash="#/exams">返回考试列表</button>
     `;
   }
@@ -4172,7 +4172,7 @@
         <div class="shortcut-access-content">
           <div class="shortcut-access-symbol" aria-hidden="true"><svg width="44" height="44" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="11" y="21" width="26" height="21" rx="6"/><path d="M16 21v-7a8 8 0 0 1 16 0v7M24 30v4"/></svg></div>
           <div role="status"><h2 id="shortcut-access-title">此功能尚未开放</h2><p>您暂时无法使用「${escapeHtml(app.title)}」。<br>如需访问，请联系店长开通权限。</p></div>
-          <button class="primary" data-act="go" data-hash="#/home">返回首页</button>
+          <button class="primary ao-primary" data-act="go" data-hash="#/home">返回首页</button>
           <small>权限开通后，此页面会自动更新</small>
         </div>
       </section>`;
@@ -5093,7 +5093,7 @@
           <label class="gate-label"><span>密码</span><span class="gate-password"><input name="password" type="password" minlength="${gateMode === "register" ? 10 : 1}" maxlength="128" autocomplete="${gateMode === "login" ? "current-password" : "new-password"}" placeholder="请输入密码" required><button type="button" data-password-toggle>显示</button></span><small data-field-error="password"></small></label>
           ${authNotice ? `<div class="auth-kicked" role="alert"><i>!</i><span>${escapeHtml(authNotice)}</span></div>` : ""}
           <p class="auth-message" id="auth-error" role="status" aria-live="polite">${gateMode === "login" ? "使用 Auto Office 账号登录" : "注册后即可使用 Auto Office，完整权限由店长开放"}</p>
-          <button class="primary gate-submit" id="auth-submit" type="submit"><span>${gateMode === "login" ? "登录" : "注册并进入"}</span><i aria-hidden="true"></i></button>
+          <button class="primary ao-primary gate-submit" id="auth-submit" type="submit"><span>${gateMode === "login" ? "登录" : "注册并进入"}</span><i aria-hidden="true"></i></button>
           ${gateMode === 'login' ? '<button class="gate-password-link" type="button" data-change-password>更改密码</button>' : ''}
           <div class="gate-success" aria-hidden="true"><i>✓</i><strong>${gateMode === "login" ? "登录成功" : "注册成功"}</strong><span>正在进入 Auto Office</span></div>
         </form>

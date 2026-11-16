@@ -1,7 +1,7 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { imageSize } from 'image-size';
 
-// 与 framework/reliable-store.js 的 split/join 契约一致。只修改内容行，
+// 与 network/reliable-store.js 的 split/join 契约一致。只修改内容行，
 // 不触碰进度、排班或迁移标记；数据库 ts 是比较并交换（CAS）的版本号。
 export const CONTENT_KEY = 'doc:academy/content.json:value';
 const READY_KEY = 'doc:academy/content.json:$ready';

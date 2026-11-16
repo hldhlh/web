@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {rollout} from '../scripts/academy-auth-rollout.mjs';
 const env={SUPABASE_ACCESS_TOKEN:'test-management-secret',SUPABASE_SERVICE_ROLE_KEY:'test-service-secret'};
 const json=value=>({ok:true,json:async()=>value});
-const asset=readFileSync('apps/academy/framework/secure-auth.js','utf8');
+const asset=readFileSync('apps/academy/network/secure-auth.js','utf8');
 function fixture({active=false,changed=false,publicRetired=true,oldSessions=[]}={}){
   const queries=[],writes=[],reports=[];
   const request=async(url,options={})=>{

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { dirname, relative, resolve } from 'node:path';
 
 const pages = ['dimensions', 'feedback', 'jlhcdh', 'meat-template', 'notes', 'schedule', 'store-model'];
 const files = JSON.parse(readFileSync('deploy/public-files.json', 'utf8'));
@@ -46,4 +47,37 @@ test('portable UI assets and ordering controls use the shared entry', () => {
   assert.doesNotMatch(ordering, /darkModeBtn|toggleDarkMode|icon-moon|icon-sun/);
   assert.match(ordering, /class="[^"]*ao-icon-button/);
   assert.match(ordering, /class="[^"]*ao-control[^"]*" id="datePickerIndex"/);
+});
+
+test('subprograms use deployed shared components and stylesheets', () => {
+  for (const name of pages) {
+    const html = readFileSync(`apps/academy/pages/${name}/index.html`, 'utf8');
+    const links = [...html.matchAll(/<link\b[^>]*rel="stylesheet"[^>]*href="([^"]+)"/g)].map(match => match[1]);
+    for (const href of links) assert.match(href, /^\.\.\/\.\.\/ui\//, `${name}: ${href}`);
+    assert.match(html, /class="[^"]*\bao-(?:button|primary|card|control|icon-button|segmented)\b/, name);
+  }
+  assert.ok(files.includes('apps/academy/ui/save-status.css'));
+  assert.equal(existsSync('apps/academy/framework/save-status.css'), false);
+  const sw = readFileSync('sw.js', 'utf8');
+  assert.match(sw, /apps\/academy\/ui\/save-status\.css/);
+});
+
+
+test('all shared UI styles keep their assets inside the portable directory', () => {
+  const root = resolve('apps/academy/ui');
+  const walk = dir => readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+    const path = resolve(dir, entry.name);
+    return entry.isDirectory() ? walk(path) : path.endsWith('.css') ? [path] : [];
+  });
+  for (const css of walk(root)) {
+    const source = readFileSync(css, 'utf8');
+    for (const match of source.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)]*))\s*\)/g)) {
+      const asset = (match[1] ?? match[2] ?? match[3]).trim();
+      if (asset.startsWith('data:') || asset.startsWith('#')) continue;
+      const path = resolve(dirname(css), asset.split(/[?#]/)[0]);
+      const location = relative(root, path);
+      assert.ok(location && !location.startsWith('..') && !location.startsWith('/'), `${css}: ${asset}`);
+      assert.ok(existsSync(path), `${css}: missing ${asset}`);
+    }
+  }
 });

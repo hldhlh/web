@@ -103,7 +103,7 @@
 | `server.mjs` | 工具命名、严格 Zod schema、说明、权限入口、业务字段与结果 |
 | `backend.mjs` | HTTPS、认证、数据格式和 CAS；绝不暴露原始凭据异常 |
 
-新增工具时：先定义具体业务操作，明确读取范围与副作用，再写 schema、说明和注释。通过统一 `tool()` 注册，不能绕过 `authorize()`。写接口必须考虑幂等、并发、网络结果不确定和旧字段兼容。需要改变数据库契约时，同时检查 `apps/academy/framework/store.js`、`reliable-store.js` 和网页调用方。不要为方便 AI 开放原始 SQL 或整份内容覆盖入口。
+新增工具时：先定义具体业务操作，明确读取范围与副作用，再写 schema、说明和注释。通过统一 `tool()` 注册，不能绕过 `authorize()`。写接口必须考虑幂等、并发、网络结果不确定和旧字段兼容。需要改变数据库契约时，同时检查 `apps/academy/network/store.js`、`reliable-store.js` 和网页调用方。不要为方便 AI 开放原始 SQL 或整份内容覆盖入口。
 
 每次契约变化同步维护这份文档、`auto-office://guide`、工具 description 和 `tests/auto-office-mcp.test.mjs`。破坏兼容时升级 MCP 服务版本并说明迁移办法。
 

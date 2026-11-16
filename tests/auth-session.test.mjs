@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { createHash, webcrypto } from 'node:crypto';
 
-const source = readFileSync('apps/academy/framework/auth.js', 'utf8');
+const source = readFileSync('apps/academy/network/auth.js', 'utf8');
 const copy = value => structuredClone(value);
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 function fixture(sessionOverrides = {}) {
