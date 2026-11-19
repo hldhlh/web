@@ -341,8 +341,19 @@
 
     // Authentication mutations use the selected trusted route once only. A lost
     // login/password response must never create a second session or mutation.
-    if (!safeWrite) return fetchWithTimeout(replaceOrigin(input,
-      init.appNetworkSelectedRoute === true ? getOrderedOrigins()[0] : PROJECT_ORIGIN), requestInit, 30000);
+    if (!safeWrite) {
+      if (!init.appNetworkSelectedRoute) return fetchWithTimeout(replaceOrigin(input, PROJECT_ORIGIN), requestInit, 30000);
+      const origin = getOrderedOrigins()[0];
+      try {
+        return await fetchWithTimeout(replaceOrigin(input, origin), requestInit, 30000);
+      } catch (error) {
+        // A manual retry can use another route without replaying this mutation.
+        if (!requestInit.signal?.aborted || requestInit.signal.reason?.name === 'TimeoutError') {
+          unhealthyUntil.set(origin, Date.now() + FAILURE_COOLDOWN);
+        }
+        throw error;
+      }
+    }
 
     const origins = getOrderedOrigins();
     let lastError;

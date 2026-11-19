@@ -40,7 +40,7 @@ window.AcademySecureAuth = (() => {
     async function rpc(action, data = {}) {
       const cfg = window.ACADEMY_CONFIG;
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(),20000);
+      const timeout = setTimeout(() => controller.abort(new DOMException('Request timed out', 'TimeoutError')),20000);
       try {
         // Only verify/people are replayable reads; login and other mutations
         // use the selected trusted route exactly once, even after a lost reply.
@@ -63,7 +63,13 @@ window.AcademySecureAuth = (() => {
         }
         return result;
       } catch (error) {
-        if (error.name === 'AbortError') throw new Error(action === 'change_password' ? '未收到改密结果，请先尝试用新密码登录，避免重复修改' : '网络响应超时，请稍后重试');
+        if (controller.signal.aborted || error.name === 'AbortError') throw new Error(action === 'change_password' ? '未收到改密结果，请先尝试用新密码登录，避免重复修改' : '网络响应超时，请稍后重试');
+        if (error.name === 'TypeError') {
+          const message = action === 'change_password'
+            ? '未收到改密结果，请检查网络后先尝试用新密码登录'
+            : '未收到服务响应，请检查网络连接后重试';
+          throw new Error(message, { cause: error });
+        }
         throw error;
       } finally { clearTimeout(timeout); }
     }

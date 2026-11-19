@@ -225,6 +225,10 @@ test('read-only auth RPC falls back but login mutation uses selected route only 
   const url = project + '/rest/v1/rpc/academy_auth';
   await assert.rejects(api.request(url, {method:'POST',body:'{"p_action":"login"}',appNetworkSelectedRoute:true}), /route lost/);
   assert.equal(calls.length, 1); assert.ok(calls[0].url.startsWith(backup));
+  const retry = await api.request(url, {method:'POST',body:'{"p_action":"login"}',appNetworkSelectedRoute:true});
+  assert.ok(retry.ok);
+  assert.equal(calls.length, 2);
+  assert.ok(!calls[1].url.startsWith(backup));
   const result = await api.request(url, {method:'POST',body:'{"p_action":"verify"}',appNetworkReadOnly:true});
   assert.equal((await result.json()).ok, true);
   assert.equal(calls.length, 3);

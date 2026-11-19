@@ -94,3 +94,10 @@ test('startup verifies the session and loads people concurrently while preservin
   verify.resolve({ok:true,user:f.user});people.resolve({ok:true,users:[f.user]});
   const session=await started;assert.equal(session.id,f.user.id);assert.equal(f.auth.list().length,1);
 });
+
+test('a lost login response gives network guidance and preserves the existing session', async () => {
+  const f = fixture();
+  f.window.fetch = async () => { throw new TypeError('Failed to fetch'); };
+  await assert.rejects(f.auth.login('测试员工','password'), /检查网络连接后重试/);
+  assert.equal(f.auth.session.sessionToken, 'old-token');
+});
